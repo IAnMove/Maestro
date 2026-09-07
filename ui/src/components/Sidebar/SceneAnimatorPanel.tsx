@@ -3287,7 +3287,7 @@ export function SceneAnimatorPanel() {
         setForeground: setNarrativeForeground,
         attachAudio: (filename, title, kind) => attachSceneAudio(filename, title, kind),
       }}
-      onClose={() => setAssetExplorer(null)}
+      onClose={() => { pendingBindRef.current = null; setReassignId(null); setAssetExplorer(null) }}
     />
     <SceneLibraryDialog
       open={libraryOpen}
