@@ -132,3 +132,65 @@ test('closing the library before a scene fetch settles does not replace the curr
     globalThis.fetch = originalFetch
   }
 })
+
+test('a later library confirm wins over a slower first scene fetch', { concurrency: false }, async () => {
+  const { render, screen, fireEvent, waitFor, cleanup } = await import('@testing-library/react')
+  const { SceneLibraryDialog } = await import('../src/components/Sidebar/SceneLibraryDialog.tsx')
+  const originalFetch = globalThis.fetch
+  const scenes = Array.from({ length: 9 }, (_, index) => ({
+    name: `2026-08-25-22h21m0${index}s_Station-loop-${index}_aaaaaa.scene.json`,
+    type: 'scene',
+    mode: null,
+    size: 12,
+    created_at: 1000 + index,
+    url: `/api/v1/file/scene-${index}.scene.json`,
+    thumbnail_url: `/api/v1/file/scene-${index}.scene.preview.png`,
+  }))
+  const sceneFor = (index: number) => ({
+    version: 1,
+    name: `Station loop ${index}`,
+    width: 1280,
+    height: 720,
+    duration: 10,
+    layers: [{
+      id: 'plate', name: 'Plate', type: 'image', source: '/api/v1/file/plate.jpg', visible: true, z: 0,
+      transform: { x: 50, y: 50, scale: 1, opacity: 1 },
+      animation: { start: { x: 50, y: 50, scale: 1 }, end: { x: 50, y: 50, scale: 1 }, duration: 10, curve: 'linear' },
+    }],
+  })
+  let releaseFirst: ((value: Response) => void) | undefined
+  let releaseSecond: ((value: Response) => void) | undefined
+  const firstGate = new Promise<Response>(resolve => { releaseFirst = resolve })
+  const secondGate = new Promise<Response>(resolve => { releaseSecond = resolve })
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    const url = String(input)
+    if (url.includes('/api/v1/outputs') && url.includes('media_type=scene')) {
+      const parsed = new URL(url, 'http://localhost')
+      const offset = Number(parsed.searchParams.get('offset') || 0)
+      return new Response(JSON.stringify({ outputs: scenes.slice(offset, offset + 8), total: scenes.length }), { headers: { 'content-type': 'application/json' } })
+    }
+    if (url.includes('/api/v1/file/scene-0.scene.json')) return firstGate
+    if (url.includes('/api/v1/file/scene-8.scene.json')) return secondGate
+    throw new Error(`Unexpected request: ${url}`)
+  }) as typeof fetch
+  const opened: string[] = []
+  try {
+    render(<SceneLibraryDialog open workspace="default" onClose={() => undefined} onPickFile={() => undefined} onOpenScene={scene => opened.push(scene.name)} />)
+    await waitFor(() => assert.ok(screen.getAllByText('Station loop 0').length >= 1))
+    fireEvent.click(screen.getAllByText('Station loop 0')[0])
+    fireEvent.click(screen.getByRole('button', { name: 'Open scene' }))
+    fireEvent.click(screen.getByLabelText('Next page'))
+    await waitFor(() => assert.ok(screen.getAllByText('Station loop 8').length >= 1))
+    fireEvent.click(screen.getAllByText('Station loop 8')[0])
+    fireEvent.click(screen.getByRole('button', { name: 'Open scene' }))
+    releaseFirst?.(new Response(JSON.stringify(sceneFor(0)), { headers: { 'content-type': 'application/json' } }))
+    await Promise.resolve()
+    await Promise.resolve()
+    assert.deepEqual(opened, [])
+    releaseSecond?.(new Response(JSON.stringify(sceneFor(8)), { headers: { 'content-type': 'application/json' } }))
+    await waitFor(() => assert.deepEqual(opened, ['Station loop 8']))
+  } finally {
+    cleanup()
+    globalThis.fetch = originalFetch
+  }
+})

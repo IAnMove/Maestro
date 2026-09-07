@@ -93,6 +93,10 @@ export function SceneLibraryDialog({
   })
 
   const openItem = async (file: ApiOutput) => {
+    // A newer confirm must invalidate any in-flight open. Paging clears
+    // `opening`, so two fetches can overlap with the same generation and the
+    // slower first confirm would still replace the project (and wipe undo).
+    generationRef.current += 1
     const capture = { generation: generationRef.current, workspaceId: workspaceRef.current, purpose }
     const commit = commitLibraryChoice(liveChoice(), capture, file)
     if (commit.action === 'ignore') return
@@ -186,8 +190,8 @@ export function SceneLibraryDialog({
         <div className="flex items-center justify-between gap-2 border-t border-border px-4 py-2">
           <span className="text-[10px] text-text-muted">{t('library.savedPage', { total, current: Math.min(page + 1, pages), pages })}</span>
           <div className="flex gap-1">
-            <button type="button" aria-label={t('library.previousPage')} disabled={page <= 0} onClick={() => setPage(value => Math.max(0, value - 1))} className="rounded border border-border p-1.5 disabled:opacity-30"><ChevronLeft size={13} /></button>
-            <button type="button" aria-label={t('library.nextPage')} disabled={page + 1 >= pages} onClick={() => setPage(value => value + 1)} className="rounded border border-border p-1.5 disabled:opacity-30"><ChevronRight size={13} /></button>
+            <button type="button" aria-label={t('library.previousPage')} disabled={page <= 0} onClick={() => { generationRef.current += 1; setPage(value => Math.max(0, value - 1)) }} className="rounded border border-border p-1.5 disabled:opacity-30"><ChevronLeft size={13} /></button>
+            <button type="button" aria-label={t('library.nextPage')} disabled={page + 1 >= pages} onClick={() => { generationRef.current += 1; setPage(value => value + 1) }} className="rounded border border-border p-1.5 disabled:opacity-30"><ChevronRight size={13} /></button>
           </div>
         </div>
         {error && <p className="border-t border-border px-4 py-2 text-[10px] text-red-300">{error}</p>}
