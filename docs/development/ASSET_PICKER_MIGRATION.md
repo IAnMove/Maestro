@@ -234,27 +234,27 @@ Archivo: `ui/src/features/scene3d/Scene3DWorkspace.tsx`. **No editar mientras #2
 
 | ID | Módulo | Etiqueta / rol | Tipo | Qty | Origen actual | Restricciones | Persistencia | Wizard | Adaptador | Tests | Estado |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| CHR-01 | CharacterCreatorPanel | Imagen sujeto / objeto | image | S | Disco `createElement` `image/*` | Identidad; no cualquier crop de boca | upload + refs[0] | — | `characterRefAdapter` | — | pending |
-| CHR-02 | CharacterCreatorPanel | Refs extra (outfit/extra) | image | M | Disco por ref | Roles extra; MAX_REFS | refs[] | — | `characterRefAdapter` | — | pending |
-| CHR-03 | CharacterFacePatchPanel | Variante facial | image | S | Disco png/jpeg/webp | Compatibilidad espacial con pose; no foto libre de boca | overlay del kit | — | `facePatchAdapter` | Rechazar imagen no alineable | pending |
-| CHR-04 | CharacterSpeechPreparation | Imagen base del habla | image | S | Disco png/jpeg/webp | Importa kit; pose select es OOS | kit.base | — | `speechBaseAdapter` | e2e speech workshop | pending |
-| CHR-05 | CharacterKit (panel 2.5D) | Identidad del kit | image | S | Capa seleccionada / Wizard; no picker de catálogo | Una sola identity | kit identity output | `attach_character_kit_references` | `characterKitIdentityAdapter` | Un output exacto | pending |
+| CHR-01 | CharacterCreatorPanel | Imagen sujeto / objeto | image | S | `AssetInput` | Identidad; no cualquier crop de boca | upload + refs[0] | — | `characterRefAdapter` | — | migrated |
+| CHR-02 | CharacterCreatorPanel | Refs extra (outfit/extra) | image | M | `AssetInput` por hueco | Roles extra; MAX_REFS | refs[] | — | `characterRefAdapter` | — | migrated |
+| CHR-03 | CharacterFacePatchPanel | Variante facial | image | S | Disco + explorador; prepare local | Compatibilidad espacial en `prepareCharacterFacePatch`, no filtro de catálogo | overlay del kit | — | `facePatchAdapter` | Rechazar imagen no alineable | migrated |
+| CHR-04 | CharacterSpeechPreparation | Imagen base del habla | image | S | Disco + explorador; subida al importar | Importa kit; pose select es OOS | kit.base | — | `speechBaseAdapter` | e2e speech workshop | migrated |
+| CHR-05 | CharacterKit (panel 2.5D) | Identidad del kit | image | S | Capa seleccionada / Wizard; no picker de catálogo | Una sola identity | kit identity output | `attach_character_kit_references` | `characterKitIdentityAdapter` | Un output exacto | exception |
 
 ### 4.8 Story / Series / Cómics — PR 7
 
 | ID | Módulo | Etiqueta / rol | Tipo | Qty | Origen actual | Restricciones | Persistencia | Wizard | Adaptador | Tests | Estado |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| STY-01 | StoryLabPanel | Subir visual (world/character/location) | image | M | Disco `image/*` multiple → `uploadVisual` | No sustituye canon ni aprueba al seleccionar | `project.assets` + `referenceAssetIds` | `approve_story_visuals` (aprueba existentes) | `storyVisualAdapter` | No ejecutar generación | pending |
-| STY-02 | StoryAssetsImporter | Smart assets | image | M | Disco + drop | Analiza; propuesta aparte | pending smart assets | — | `storySmartAssetAdapter` | Drop + cancelar | pending |
-| STY-03 | SeriesCanonPanel | Identidad de personaje | image | S | Disco `image/*` | Canon; no finalizar outputs | `uploadReference(..., 'character')` | — | `seriesCanonAdapter` | — | pending |
-| STY-04 | SeriesCanonPanel | Referencia de localización | image | S | Disco | Canon | location refs | — | `seriesCanonAdapter` | — | pending |
-| STY-05 | SeriesCanonPanel | Referencia de prop | image | S | Disco | Canon | prop refs | — | `seriesCanonAdapter` | — | pending |
-| STY-06 | SeriesShotsPanel | Composed start | image | S | Disco | Frame compuesto del shot | `composed_start_frame` | — | `seriesShotFrameAdapter` | — | pending |
-| STY-07 | SeriesShotsPanel | Composed end | image | S | Disco | Frame compuesto | `composed_end_frame` | — | `seriesShotFrameAdapter` | — | pending |
-| STY-08 | ComicEditorPanel | Subir imágenes al cómic | image | M | Disco multiple | Inserta en página/assets | `project.assets` | — | `comicAssetAdapter` | — | pending |
-| STY-09 | ComicEditorPanel | Insertar desde HocusPocus / proyecto | image | S | Grid outputs **o** assets del cómic (click confirma ya) | Tabs maestro vs project | inserta elemento | — | `comicAssetAdapter` | Transaccional; no click=confirm | pending |
-| STY-10 | ComicEditorPanel planning | Identidad de personaje | image | S | `<select>` de `project.assets` | Solo assets del cómic | `referenceAssetId` | — | `comicIdentityAdapter` | Homónimos por ID | pending |
-| STY-11 | ComicWorkflowPanels | Referencia de personaje | image | S | Disco `image/*` | Director cómic | asset + `referenceAssetIds` | — | `comicIdentityAdapter` | — | pending |
+| STY-01 | StoryLabPanel | Subir visual (world/character/location) | image | M | `AssetInput` al pulsar añadir | No sustituye canon ni aprueba al seleccionar | `project.assets` + `referenceAssetIds` | `approve_story_visuals` (aprueba existentes) | `storyVisualAdapter` | No ejecutar generación | migrated |
+| STY-02 | StoryAssetsImporter | Smart assets | image | M | Disco + drop + `AssetInput` | Analiza; propuesta aparte. Catálogo se copia a File para `/stories/assets/analyze` | pending smart assets | — | `storySmartAssetAdapter` | Drop + cancelar | migrated |
+| STY-03 | SeriesCanonPanel | Identidad de personaje | image | S | `AssetInput` | Canon; no finalizar outputs. Import API solo `uploads/` | `uploadReference(..., 'character')` | — | `seriesCanonAdapter` | — | migrated |
+| STY-04 | SeriesCanonPanel | Referencia de localización | image | S | `AssetInput` | Canon | location refs | — | `seriesCanonAdapter` | — | migrated |
+| STY-05 | SeriesCanonPanel | Referencia de prop | image | S | `AssetInput` | Canon | prop refs | — | `seriesCanonAdapter` | — | migrated |
+| STY-06 | SeriesShotsPanel | Composed start | image | S | `AssetInput` | Frame compuesto del shot | `composed_start_frame` | — | `seriesShotFrameAdapter` | — | migrated |
+| STY-07 | SeriesShotsPanel | Composed end | image | S | `AssetInput` | Frame compuesto | `composed_end_frame` | — | `seriesShotFrameAdapter` | — | migrated |
+| STY-08 | ComicEditorPanel | Subir imágenes al cómic | image | M | `AssetInput` | Inserta en página/assets | `project.assets` | — | `comicAssetAdapter` | — | migrated |
+| STY-09 | ComicEditorPanel | Insertar desde HocusPocus / proyecto | image | S | `AssetInput` (pestaña maestro/proyecto) | Transaccional; Choose confirma | inserta elemento | — | `comicAssetAdapter` | Transaccional; no click=confirm | migrated |
+| STY-10 | ComicEditorPanel planning | Identidad de personaje | image | S | `AssetInput` de `project.assets` | Homónimos por ID de asset | `referenceAssetId` | — | `comicIdentityAdapter` | Homónimos por ID | migrated |
+| STY-11 | ComicWorkflowPanels | Referencia de personaje | image | S | `AssetInput` | Director cómic | asset + `referenceAssetIds` | — | `comicIdentityAdapter` | — | migrated |
 
 `ReferenceGallery` muestra/quita IDs ya ligados; no es un picker de origen. Tras migrar STY-01, Cambiar/Quitar debe respetar su confirmación de borrado.
 
@@ -351,9 +351,9 @@ Un agente es dueño del **núcleo** del picker (PR 1–4). Los demás solo adapt
 | 3 | Preview RAM-safe | Núcleo picker (archivos de preview) | Mezclado en #210 |
 | 4 | AssetInput dual origin + upload | Núcleo picker | Mezclado en #211 |
 | 5 | 2.5D + audio de escena + templates + Scene3D | Compositor 2.5D/3D | Mezclado en #213 (sin Scene3DWorkspace; #212 abierto) |
-| 6A | Tools, imagen, Hunyuan, edit | Tools/imagen | `Hunyuan3DPanel` en curso. No núcleo picker (#214) |
+| 6A | Tools, imagen, Hunyuan, edit | Tools/imagen | Hunyuan mezclado en #215. Tools/InputsPanel pendiente |
 | 6B | Audio, vídeo, Video Editor, mixer | Audio/vídeo | Paralelo a 6A si no comparten archivo |
-| 7 | Story, Series, personajes, cómics, Director | Labs | Dividir 7A/7B si el diff crece |
+| 7 | Story, Series, personajes, cómics | Labs | CHR/STY en `feat/asset-picker-labs`. Director queda en PR 8 |
 | 8 | Paridad Wizard + cierre inventario | Wizard + núcleo | `agentActions.ts` exclusivo |
 
 Asignación de IDs → PR de migración: P2D/TPL/S3D → 5; IMG/TLS → 6A; VID/AUD (Studio) → 6B; CHR/STY/DIR → 7–8.
@@ -385,7 +385,7 @@ Reglas:
 5. **P2D-12 vs P2D-07:** abrir escena vs usar el MP4 como capa. El modal debe titular el propósito; el Wizard ya tiene `open_3d_scene` vs `add_3d_scene_layer`.
 6. **TemplateAssetPicker vs AssetExplorer:** el primero ya usa `asset.id`; el segundo `ApiOutput.name`. PR 1 unifica.
 7. **Máscaras Inpaint/Outpaint:** el canvas de máscara no es un campo de catálogo. ¿Excepción permanente o picker solo para la fuente (IMG-05/06)?
-8. **CHR-03 / CHR-04:** el catálogo de imágenes genéricas es peligroso (boca/pose). «Desde HocusPocus» solo con filtro de compatibilidad espacial; si no se puede filtrar, no ofrecer el origen vacío.
+8. **CHR-03 / CHR-04:** el catálogo no filtra alineación. «Desde HocusPocus» entrega un `File` al prepare/import existentes; una imagen no alineable falla ahí, no al listar.
 9. **DIR-07:** el Wizard no debe simular el file picker del SO. Confirmar copy de «espera interacción humana».
 10. **ImageUpload / ContinueVideoSection:** ¿borrar en 6A/6B o dejar hasta ratchet de imports muertos?
 

@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle, ArrowDown, ArrowUp, Check, CheckCircle2, Clapperboard, Eye, Film,
-  ImagePlus, ListVideo, Loader2, Play, Plus, Settings2, ShieldCheck, Sparkles, Trash2, Upload,
+  ImagePlus, ListVideo, Loader2, Play, Plus, Settings2, ShieldCheck, Sparkles, Trash2,
 } from 'lucide-react'
 import type { TFunction } from 'i18next'
 import * as api from '../../api/client'
 import { useUiTranslation } from '../../i18n'
 import { DirectorLoraSelector } from '../../components/SettingsDrawer/DirectorLoraSelector'
 import { useStore } from '../../stores/useStore'
+import { AssetInput } from '../asset-picker/AssetInput.tsx'
+import { useWorkspaceImageOutputs } from '../../lib/labsImagePick'
 import type { PlannedClip } from '../../types'
 import { forEachComicPanelCapture } from './export'
 import {
@@ -325,8 +327,8 @@ export function ComicCharactersPanel({
   const { t } = useUiTranslation('comics')
   const { t: tCommon } = useUiTranslation('common')
   const project = useComicStore(state => state.project)
-  const fileRef = useRef<HTMLInputElement>(null)
-  const [uploadTarget, setUploadTarget] = useState<string | null>(null)
+  const workspace = useStore(state => state.activeWorkspace)
+  const imageItems = useWorkspaceImageOutputs(workspace)
   const [busy, setBusy] = useState<string | null>(null)
   const [draft, setDraft] = useState({ name: '', role: '', description: '' })
   const patchCharacter = (id: string, patch: Partial<ComicCharacter>) => {
@@ -352,15 +354,14 @@ export function ComicCharactersPanel({
     }])
     setDraft({ name: '', role: '', description: '' })
   }
-  const upload = async (file?: File) => {
-    const character = project.characters.find(item => item.id === uploadTarget)
-    if (!file || !character) return
+  const applyPicked = async (characterId: string, item: { name: string; url: string; thumbnail_url?: string | null }) => {
+    const character = project.characters.find(entry => entry.id === characterId)
+    if (!character) return
     setBusy(character.id)
     try {
-      const uploaded = await api.uploadImage(file)
       const asset: ComicAsset = {
-        id: comicId('asset'), name: `${character.name} reference`, kind: 'upload',
-        source: uploaded.url, thumbnail: uploaded.url, characterIds: [character.id],
+        id: comicId('asset'), name: item.name, kind: item.url.includes('/uploads/') ? 'upload' : 'maestro-output',
+        source: item.url, thumbnail: item.thumbnail_url || item.url, characterIds: [character.id],
         createdAt: new Date().toISOString(),
       }
       useComicStore.getState().addAsset(asset)
@@ -371,8 +372,6 @@ export function ComicCharactersPanel({
       notify('error', (error as Error).message)
     } finally {
       setBusy(null)
-      setUploadTarget(null)
-      if (fileRef.current) fileRef.current.value = ''
     }
   }
   return (
@@ -381,7 +380,6 @@ export function ComicCharactersPanel({
         <div className="text-xs font-semibold text-text-primary">{t('characters.title')}</div>
         <p className="mt-1 text-[10px] text-text-muted">{t('characters.hint')}</p>
       </div>
-      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={event => upload(event.target.files?.[0])} />
       {project.characters.map(character => (
         <details key={character.id} open className="rounded-lg border border-border bg-bg-tertiary/30">
           <summary className="cursor-pointer px-2.5 py-2 text-xs font-medium text-text-primary">{character.name}{character.role ? ` · ${character.role}` : ''}</summary>
@@ -406,7 +404,15 @@ export function ComicCharactersPanel({
               </div>
             )}
             <div className="grid grid-cols-2 gap-2">
-              <button className={button} disabled={busy !== null} onClick={() => { setUploadTarget(character.id); fileRef.current?.click() }}><Upload size={12} /> {t('characters.addReference')}</button>
+              <AssetInput
+                label={t('characters.addReference')}
+                placeholder={t('characters.addReference')}
+                items={imageItems}
+                accept="image/*"
+                disabled={busy !== null}
+                constraints={{ kinds: ['image'], maxCount: 1, optional: false }}
+                onChoose={item => { if (item) void applyPicked(character.id, item) }}
+              />
               <button className={`${button} border-purple-400/40 text-purple-300`} disabled={busy !== null} onClick={async () => { setBusy(character.id); try { await generateReference(character); notify('ok', t('characters.referenceGenerated', { name: character.name })) } catch (error) { notify('error', (error as Error).message) } finally { setBusy(null) } }}>
                 {busy === character.id ? <Loader2 size={12} className="animate-spin" /> : <ImagePlus size={12} />} {t('characters.generatePortrait')}
               </button>

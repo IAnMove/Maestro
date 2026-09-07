@@ -22,6 +22,10 @@ function installDom() {
 
 installDom()
 
+const originalFetch = globalThis.fetch
+globalThis.fetch = (async () => new Response(JSON.stringify({ outputs: [], total: 0 }), { headers: { 'content-type': 'application/json' } })) as typeof fetch
+test.after(() => { globalThis.fetch = originalFetch })
+
 test('Series Shots controls have programmatic names and selection state', async () => {
   const { render, screen, fireEvent, cleanup } = await import('@testing-library/react')
   const { ensureUiI18n } = await import('../src/i18n/index.ts')

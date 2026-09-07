@@ -1,6 +1,9 @@
 import { type RefObject } from 'react'
 import { Check, Loader2, Upload } from 'lucide-react'
 import { useUiTranslation } from '../../i18n'
+import { useStore } from '../../stores/useStore'
+import { AssetInput } from '../asset-picker/AssetInput.tsx'
+import { fileFromOutput, useWorkspaceImageOutputs } from '../../lib/labsImagePick'
 import { button, panel, Field } from './storyLabChrome'
 import { StoryAssetsProposalCard } from './StoryAssetsProposalCard'
 import type { PendingSmartAsset } from './storyLabAssets'
@@ -22,6 +25,8 @@ export function StoryAssetsImporter({
   patchPendingSmartAsset: (index: number, patch: Partial<PendingSmartAsset>) => void
 }) {
   const { t } = useUiTranslation('storyLab')
+  const workspace = useStore(state => state.activeWorkspace)
+  const imageItems = useWorkspaceImageOutputs(workspace)
   const analyzer = project.provider.writingProvider === 'maestro'
     ? t('assets.analyzerInternal')
     : t('assets.analyzerExternal', {
@@ -41,10 +46,11 @@ export function StoryAssetsImporter({
       </div>
 
       <div className={`${panel} mb-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]`}>
+        <div className="space-y-3">
         <button
           type="button"
           disabled={smartAssetBusy}
-          className="min-h-44 rounded-xl border-2 border-dashed border-border bg-bg-tertiary/40 p-6 text-center transition-colors hover:border-accent-blue hover:bg-accent-blue/5 disabled:opacity-50"
+          className="min-h-44 w-full rounded-xl border-2 border-dashed border-border bg-bg-tertiary/40 p-6 text-center transition-colors hover:border-accent-blue hover:bg-accent-blue/5 disabled:opacity-50"
           onClick={() => smartAssetRef.current?.click()}
           onDragOver={event => event.preventDefault()}
           onDrop={event => {
@@ -60,6 +66,19 @@ export function StoryAssetsImporter({
           </span>
           <span className="mt-2 block text-[10px] text-text-muted">{t('assets.dropHint')}</span>
         </button>
+        <AssetInput
+          label={t('assets.drop')}
+          placeholder={t('assets.dropHint')}
+          items={imageItems}
+          accept="image/*"
+          disabled={smartAssetBusy}
+          constraints={{ kinds: ['image'], maxCount: 1, optional: false }}
+          onChoose={item => {
+            if (!item) return
+            void fileFromOutput(item).then(file => analyzeSmartAssets([file]))
+          }}
+        />
+        </div>
         <div>
           <Field
             label={t('assets.batchContext')}

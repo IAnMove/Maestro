@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import { CheckSquare, Info, RefreshCw, Square, Upload } from 'lucide-react'
+import { CheckSquare, Info, RefreshCw, Square } from 'lucide-react'
 import * as api from '../../api/client'
+import type { ApiOutput } from '../../api/client'
+import { AssetInput } from '../asset-picker/AssetInput.tsx'
+import { ensureUploadsPath, useWorkspaceImageOutputs } from '../../lib/labsImagePick'
 import { Pill, SectionCard, seriesStatusLabel } from './components'
 import { SeriesShotDurationControl } from './SeriesShotDurationControl'
 import { primaryButton, secondaryButton, selectClass, textareaClass } from './styles'
@@ -20,6 +23,7 @@ export function SeriesShotsPanel({
   onRender: (mode: 'selected' | 'missing' | 'failed' | 'all', shotIds?: string[]) => void
 }) {
   const { t } = useUiTranslation('seriesLab')
+  const imageItems = useWorkspaceImageOutputs(workspace)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [routing, setRouting] = useState(false)
   const [acknowledgingLipSync, setAcknowledgingLipSync] = useState(false)
@@ -66,14 +70,14 @@ export function SeriesShotsPanel({
     finally { setRouting(false) }
   }
   const uploadComposedFrame = async (
-    shot: SeriesShot, file: File, referenceRole: 'composed_start_frame' | 'composed_end_frame',
+    shot: SeriesShot, item: ApiOutput, referenceRole: 'composed_start_frame' | 'composed_end_frame',
   ) => {
     setRouting(true); setError(null)
     try {
       await saveNow()
-      const upload = await api.uploadImage(file)
+      const ensured = await ensureUploadsPath(item)
       const result = await api.importSeriesAsset(workspace, series.id, {
-        uploadPath: upload.path, name: file.name, ownerType: 'shot', ownerId: shot.id,
+        uploadPath: ensured.path, name: item.name, ownerType: 'shot', ownerId: shot.id,
         kind: 'image', referenceRole,
       })
       replaceSeries(result.series)
@@ -153,7 +157,7 @@ export function SeriesShotsPanel({
             <div className="rounded-lg border border-border p-2">
               <span className="text-[10px] font-semibold uppercase text-text-muted">{t('shots.policyTitle')}</span>
               <div className="mt-2 grid max-h-40 gap-1 overflow-y-auto">{Object.values(series.assets).filter(asset => ['image', 'character', 'location', 'prop'].includes(asset.kind)).map(asset => <div key={asset.id} className="grid grid-cols-[1fr_auto_auto] items-center gap-2 text-[10px] text-text-secondary"><span className="truncate" title={asset.id}>{asset.id}</span><label className="flex items-center gap-1"><input type="checkbox" aria-label={t('shots.includeAria', { id: asset.id, order: shot.order })} checked={shot.referencePolicy.manualIncludeAssetIds.includes(asset.id)} onChange={event => patchShot(shot.id, current => ({ ...current, referencePolicy: { ...current.referencePolicy, mode: 'manual', manualIncludeAssetIds: event.target.checked ? [...current.referencePolicy.manualIncludeAssetIds.filter(id => id !== asset.id), asset.id] : current.referencePolicy.manualIncludeAssetIds.filter(id => id !== asset.id), manualExcludeAssetIds: event.target.checked ? current.referencePolicy.manualExcludeAssetIds.filter(id => id !== asset.id) : current.referencePolicy.manualExcludeAssetIds }, referenceManifest: undefined }))} />{t('shots.include')}</label><label className="flex items-center gap-1"><input type="checkbox" aria-label={t('shots.excludeAria', { id: asset.id, order: shot.order })} checked={shot.referencePolicy.manualExcludeAssetIds.includes(asset.id)} onChange={event => patchShot(shot.id, current => ({ ...current, referencePolicy: { ...current.referencePolicy, mode: 'manual', manualExcludeAssetIds: event.target.checked ? [...current.referencePolicy.manualExcludeAssetIds.filter(id => id !== asset.id), asset.id] : current.referencePolicy.manualExcludeAssetIds.filter(id => id !== asset.id), manualIncludeAssetIds: event.target.checked ? current.referencePolicy.manualIncludeAssetIds.filter(id => id !== asset.id) : current.referencePolicy.manualIncludeAssetIds }, referenceManifest: undefined }))} />{t('shots.exclude')}</label></div>)}</div>
-              <div className="mt-2 flex flex-wrap gap-2"><label className={secondaryButton}><Upload size={12} />{t('shots.composedStart')}<input type="file" accept="image/*" className="hidden" onChange={event => { const file = event.target.files?.[0]; if (file) void uploadComposedFrame(shot, file, 'composed_start_frame') }} /></label><label className={secondaryButton}><Upload size={12} />{t('shots.composedEnd')}<input type="file" accept="image/*" className="hidden" onChange={event => { const file = event.target.files?.[0]; if (file) void uploadComposedFrame(shot, file, 'composed_end_frame') }} /></label></div>
+              <div className="mt-2 grid gap-2"><AssetInput label={t('shots.composedStart')} placeholder={t('shots.composedStart')} items={imageItems} accept="image/*" disabled={routing} constraints={{ kinds: ['image'], maxCount: 1, optional: false }} onChoose={item => { if (item) void uploadComposedFrame(shot, item, 'composed_start_frame') }} /><AssetInput label={t('shots.composedEnd')} placeholder={t('shots.composedEnd')} items={imageItems} accept="image/*" disabled={routing} constraints={{ kinds: ['image'], maxCount: 1, optional: false }} onChoose={item => { if (item) void uploadComposedFrame(shot, item, 'composed_end_frame') }} /></div>
             </div>
           </div>
           </details>

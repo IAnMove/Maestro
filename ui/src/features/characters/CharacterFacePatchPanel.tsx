@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import { uploadImage } from '../../api/client'
+import { LabsLibraryPick } from '../../lib/LabsLibraryPick'
 import { useUiTranslation } from '../../i18n'
 import { characterFacePatchPrompt, registerCharacterFacePatch, type FacePatchMetadata } from '../../lib/characterFacePatch'
 import { prepareCharacterFacePatch } from '../../lib/prepareCharacterFacePatch'
@@ -50,6 +51,7 @@ type Controller = {
   error: string | null
   status: string | null
   onVariantChange: (event: ChangeEvent<HTMLInputElement>) => void
+  applyVariant: (variant: File | undefined) => void
   onSave: () => void
 }
 
@@ -228,9 +230,7 @@ function useCharacterFacePatchController(props: CharacterFacePatchPanelProps): C
     setStatus(null)
     return tokenRef.current
   }
-  const onVariantChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const variant = event.target.files?.[0]
-    event.target.value = ''
+  const applyVariant = (variant: File | undefined) => {
     if (!patchInputAllowed(latestPropsRef.current)) {
       setError(disabledReason ?? t('facePatch.disabled.external'))
       return
@@ -346,7 +346,12 @@ function useCharacterFacePatchController(props: CharacterFacePatchPanelProps): C
     busy: visibleBusy,
     error: staleVisible ? null : error,
     status: staleVisible ? t('facePatch.status.cancelled') : status,
-    onVariantChange,
+    onVariantChange: (event: ChangeEvent<HTMLInputElement>) => {
+      const variant = event.target.files?.[0]
+      event.target.value = ''
+      applyVariant(variant)
+    },
+    applyVariant,
     onSave,
   }
 }
@@ -384,6 +389,7 @@ export function CharacterFacePatchPanel(props: CharacterFacePatchPanelProps) {
           {t('facePatch.variantLabel')}
           <input type="file" accept="image/png,image/jpeg,image/webp" disabled={fileDisabled} onChange={controller.onVariantChange} className="mt-0.5 block w-full text-[8px] text-text-muted file:mr-1 file:rounded file:border-0 file:bg-violet-400/20 file:px-1 file:py-0.5 file:text-[8px] file:text-violet-100" />
         </label>
+        <LabsLibraryPick workspace={props.workspace} disabled={fileDisabled} onFile={file => controller.applyVariant(file)} />
         <button type="button" disabled={saveDisabled} onClick={controller.onSave} className="w-full rounded border border-violet-300/50 bg-violet-400/10 px-1 py-1.5 text-[9px] text-violet-100 disabled:opacity-40">
           {controller.busy === 'prepare' ? t('facePatch.status.preparing') : controller.busy === 'save' ? t('facePatch.status.saving') : t('facePatch.savePending')}
         </button>
