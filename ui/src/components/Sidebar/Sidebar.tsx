@@ -24,6 +24,8 @@ import { OutpaintControls } from './OutpaintControls'
 import { RetakeControls } from './RetakeControls'
 import { EditAnythingControls } from './EditAnythingControls'
 import { RecastControls } from './RecastControls'
+import { ViggleControls } from './ViggleControls'
+import { WangpModelControls } from './WangpModelControls'
 import { BlendControls } from './BlendControls'
 import { AnchorReturnBanner } from './AnchorReturnBanner'
 import { VoiceRefSection } from './VoiceRefSection'
@@ -57,6 +59,7 @@ export function Sidebar() {
   const isMobile = useIsMobile()
 
   const isVideo = generationMode === 'video'
+  const isAdvancedH3 = String(modelType).startsWith('h3_advanced')
   const isImage = generationMode === 'image'
   const isAudio = generationMode === 'audio'
   const isModel3d = generationMode === 'model3d'
@@ -159,8 +162,7 @@ export function Sidebar() {
       )}
       {isRecast && (
         <>
-          <RecastControls />
-          <PromptInput />
+          {modelType === 'viggle_animate' ? <ViggleControls /> : <><RecastControls /><PromptInput /></>}
         </>
       )}
     </>
@@ -193,10 +195,11 @@ export function Sidebar() {
         {isVideo && !isBlend && <DurationSlider />}
         {isVideo && <MiniMaxH3TurboToggle />}
         {isVideo && <H3PromptControls />}
+        <WangpModelControls />
         {/* Frames (image_mode 0) AND Extend (image_mode 3) both use the unified
             InputsPanel. In Extend mode its first tile is the source video to
             continue from; otherwise it's the start frame. */}
-        {isVideo && !isOmniReference && !isMultiClip && !isBlend && (
+        {isVideo && !isAdvancedH3 && !isOmniReference && !isMultiClip && !isBlend && (
           <div>
             {isI2vOnly && !isContinue && (
               <div className="text-[10px] text-indicator-warning bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-1.5 mb-2">
@@ -217,7 +220,7 @@ export function Sidebar() {
             In Frames mode (video, image_mode 0) the unified InputsPanel routes
             audio/control-video via tiles instead, so the dropdown is hidden
             there. Other video sub-modes + image mode keep AudioModeSection. */}
-        {!isEdit && !isAudio && !(isVideo && (imageMode === 0 || imageMode === 3)) && modelOptions?.audio_prompt_type_sources && <AudioModeSection />}
+        {!isAdvancedH3 && !isEdit && !isAudio && !(isVideo && (imageMode === 0 || imageMode === 3)) && modelOptions?.audio_prompt_type_sources && <AudioModeSection />}
 
         {/* Audio mode: sub-mode toggle + mode-specific controls */}
         {isAudio && <AudioSubModeToggle />}
@@ -231,7 +234,7 @@ export function Sidebar() {
 
         {/* Video: reference images below prompt. In Frames mode the InputsPanel
             renders them as ordered tiles instead. */}
-        {isVideo && !isOmniReference && imageMode !== 0 && imageMode !== 3 && modelOptions?.image_ref_choices && <ImageRefSection />}
+        {isVideo && !isAdvancedH3 && !isOmniReference && imageMode !== 0 && imageMode !== 3 && modelOptions?.image_ref_choices && <ImageRefSection />}
 
         {/* Voice Reference (ID-LoRA) — gated by Settings → Services
             toggle (`voice_reference_enabled`). VoiceRefSection internally

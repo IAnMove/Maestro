@@ -250,6 +250,7 @@ export async function fetchJobStatus(jobId: string): Promise<ApiJobStatus> {
 // --- Tools: standalone post-processing on existing media ---
 
 export async function submitToolUpscale(params: {
+  wangp_processor_settings?: Record<string, unknown>
   source?: string
   // Kept for callers that submit the legacy video contract.
   video_path?: string
@@ -622,6 +623,10 @@ export async function repaintPreview(params: {
 // --- Recast (SCAIL-2 Replace: swap a person for a reference character) ---
 
 export async function submitRecast(params: {
+  viggle_audio_mode?: 'source' | 'generated';
+  spatial_upsampling?: string;
+  temporal_upsampling?: string;
+  wangp_processor_settings?: Record<string, unknown>;
   video_path: string;
   ref_image_path?: string;
   /** Same-character views for the legacy single-mapping request. */

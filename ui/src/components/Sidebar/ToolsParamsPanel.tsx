@@ -1,4 +1,7 @@
 import { Mic } from 'lucide-react'
+import { useWangpProcessors } from './useWangpProcessors'
+import { WangpProcessorOptions } from './WangpProcessorOptions'
+import { useStore } from '../../stores/useStore'
 import type { ApiOutput } from '../../api/outputs'
 import { AssetInput } from '../../features/asset-picker/AssetInput.tsx'
 import { useUiTranslation } from '../../i18n'
@@ -36,6 +39,8 @@ export function ToolsParamsPanel(props: ParamsProps) {
 }
 
 function UpscaleParams({ method, setMethod, flashvsrOff }: ParamsProps) {
+  const processors = useWangpProcessors()
+  const kind = useStore(s => s.toolsSourceKind)
   const { t } = useUiTranslation('studio')
   return (
     <div>
@@ -46,7 +51,9 @@ function UpscaleParams({ method, setMethod, flashvsrOff }: ParamsProps) {
         className="w-full bg-bg-tertiary border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-accent-blue"
       >
         {upscaleMethods.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+        {processors.filter(option => !kind || option.media.includes(kind)).map(option => <option key={option.value} value={option.value} disabled={!option.enabled}>{option.label}{option.reason ? ` (${option.reason})` : ''}</option>)}
       </select>
+      <WangpProcessorOptions processor={processors.find(option => option.value === method)} />
       {flashvsrOff && <p className="text-[10px] text-indicator-warning mt-1.5 leading-snug">{t('tools.flashvsrOff')}</p>}
       <p className="text-[10px] text-text-muted mt-1.5 leading-snug">{t('tools.upscaleHint')}</p>
     </div>

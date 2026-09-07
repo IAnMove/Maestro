@@ -98,7 +98,7 @@ def resolve_generation_location(
     return {"workspace_id": None, "output_folder": None}
 
 
-def normalize_submission_provenance(value: Any) -> GenerationProvenance:
+def normalize_submission_provenance(value: Any, *, trusted_tool: str | None = None) -> GenerationProvenance:
     """Validate the optional provenance attached to a generation request.
 
     This is attribution data, not an authorization boundary. Runtime-owned
@@ -121,7 +121,7 @@ def normalize_submission_provenance(value: Any) -> GenerationProvenance:
         "actor": actor,
         # Browser-supplied tool labels are untrusted. The public capability is
         # already allow-listed, so derive the initiating UI surface from it.
-        "tool": _TRUSTED_TOOL_BY_CAPABILITY.get(capability or "", "studio"),
+        "tool": "external_agent" if trusted_tool == "external_agent" else _TRUSTED_TOOL_BY_CAPABILITY.get(capability or "", "studio"),
         "command": command,
     }
     if capability:

@@ -83,6 +83,13 @@ export interface Resolution {
 }
 
 export interface GenerateParams {
+  viggle_audio_mode?: 'source' | 'generated'
+  switch_threshold?: number
+  video_mask?: string
+  denoising_strength?: number
+  video_guide_outpainting?: string
+  temporal_upsampling?: string
+  wangp_processor_settings?: Record<string, unknown>
   prompt: string
   /** ACE-Step "Music Caption" — style/genre/instruments/mood (music mode). */
   alt_prompt?: string
@@ -720,6 +727,8 @@ export interface SlidingWindowMemoryPolicy {
 }
 
 export interface ModelOptions {
+  wangp_1272?: boolean
+  wangp_1272_capabilities?: { viggle: boolean; two_phase: boolean; grouped_mask: boolean; audio_refinement: boolean; vdn: boolean }
   model_type: string
   architecture: string
   guidance_max_phases: number
@@ -845,7 +854,7 @@ export interface ModelOptions {
   duration_slider: { label: string; min: number; max: number; increment: number; default: number } | null
   pause_between_sentences: boolean
   temperature_enabled: boolean
-  custom_settings_def: { id: string; label: string; name: string; type: string }[] | null
+  custom_settings_def: { id: string; label: string; name: string; type: string; default?: unknown; choices?: [string, string | number][] }[] | null
   h3_reference_inputs?: boolean
 }
 

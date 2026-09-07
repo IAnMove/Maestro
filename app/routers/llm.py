@@ -297,6 +297,7 @@ def create_llm_router(
     default_llm_repo: str,
     ensure_llm_loaded: Callable[[], None],
     comic_writing_llm: Callable[[dict], dict | None],
+    resolve_visual_media: Callable[[str, str | None], str] | None = None,
 ) -> APIRouter:
     """Build the contiguous LLM control/generate/song-writer router."""
 
@@ -374,7 +375,8 @@ def create_llm_router(
         ensure_llm_loaded()
 
         try:
-            result = llm_service.generate(
+            from services.wangp_analysis import generate_with_media
+            arguments = dict(
                 prompt=prompt,
                 system_prompt=body.get("system_prompt", ""),
                 max_new_tokens=body.get("max_new_tokens", 256),
@@ -385,7 +387,12 @@ def create_llm_router(
                 seed=body.get("seed"),
                 json_schema=json_schema,
             )
-            return {"text": result}
+            if body.get("media") and resolve_visual_media is None:
+                raise ValueError("Visual input resolver is unavailable")
+            return await asyncio.to_thread(generate_with_media, llm_service, arguments, body.get("media"),
+                                           lambda value: resolve_visual_media(value, body.get("workspace")))
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
