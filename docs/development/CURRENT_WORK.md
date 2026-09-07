@@ -1,6 +1,6 @@
 # Estado de desarrollo y punto de entrada
 
-Verificado el 7 de septiembre de 2026 contra `origin/development` **`eb14a2c7`**.
+Verificado el 7 de septiembre de 2026 contra `origin/development` **`fae7d3f697d810bebf7e9ad8f749314da9bbd2b7`**.
 Es una fotografía con evidencia, no un sustituto de Git. Antes de reservar trabajo:
 `git fetch origin development`, consultar PR abiertos y comprobar sus archivos.
 
@@ -29,6 +29,7 @@ no autorizan acciones ni representan el estado actual.
 | Inspección GLB y parches faciales | #190, #193, #195 | Router de inspección de #195 todavía sin montar; parches tienen límites de piloto |
 | Taller de habla 2D (preparación manual) | #200 | Panel, borrador, recarga y e2e simulado. El test del panel evita aserciones HTMLElement-vs-null (~260 MiB RSS). No es validación artística de un personaje hablando ni cierra R2–R4 |
 | Series attemptId vs número de plano | #201 | `attempt_id` en un único shot selecciona esa toma histórica. `shot_numbers: [2]` sin `attempt_id` sigue siendo el último eligible del plano 2. No cubre móvil real ni GPU |
+| Escenas 3D reales (editor + AssetExplorer inicial) | #198, merge `fae7d3f6` | No es el selector universal. Conserva doble clic, preselección del primero e identidad por `name`. `Scene3DWorkspace` sigue en #204 |
 
 La integración es en **development**. No implica que el servidor local esté usando
 esa revisión ni que exista una publicación de aplicación en main.
@@ -36,12 +37,16 @@ esa revisión ni que exista una publicación de aplicación en main.
 ## En curso al comprobarlo
 
 Al cerrar esta revisión el taller de habla (#200), la limpieza documental
-(#199) y el contrato attemptId (#201, merge `eb14a2c7`) ya están integrados.
-Escenas 3D sigue en un PR abierto, no integrado. Estado por dominio:
+(#199) y el contrato attemptId (#201) ya están integrados. Escenas 3D reales
+(#198) se mezcló en development el 07/09 (`fae7d3f6`). Estado por dominio:
 
-- **Escenas 3D reales**: PR [#198](https://github.com/IAnMove/hocuspocus/pull/198),
-  rama `feat/video3d-real-scene-mode`, cambios en
-  `PROCEDURAL_3D_SCENE_SPEC.md`, SceneAnimator, `features/scene3d`, dependencias e i18n.
+- **Selector universal de recursos (PR 0)**: inventario por campo y contrato
+  de aceptación en [ASSET_PICKER_MIGRATION](ASSET_PICKER_MIGRATION.md). PR
+  [#206](https://github.com/IAnMove/hocuspocus/pull/206), rama
+  `docs/asset-picker-inventory`. Sin implementación de UI. Cursor: no ejecutada (cuota).
+- **Plantillas musicales vídeo 3D**: PR [#204](https://github.com/IAnMove/hocuspocus/pull/204),
+  rama `feat/video3d-music-templates`. Dueño de `Scene3DWorkspace.tsx`; no
+  superponer el picker sobre ese archivo mientras el PR esté abierto.
 - **Vídeo procedural**: conservar el checkpoint `work/procedural-video-pilot-checkpoint`;
   consultar [PROCEDURAL_VIDEO_ROADMAP](PROCEDURAL_VIDEO_ROADMAP.md) y el documento del
   subdominio asignado. No mezclar el checkpoint en bloque ni asumir que todo su
