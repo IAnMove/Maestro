@@ -148,6 +148,23 @@ test('music-video templates keep clips unbound and dress the world', () => {
   assert.equal(dance.slots[0].clip, null)
 })
 
+test('cafe-dance is a front set with a textured building, not a cylinder', () => {
+  const document = applyScene3DTemplate('cafe-dance')
+  assert.equal(document.templateId, 'cafe-dance')
+  assert.equal(document.dressing, 'cafe')
+  assert.equal(document.camera.family, 'front')
+  assert.equal(document.camera.fov, 42)
+  assert.equal(document.slots[0].clip, null)
+  assert.equal(document.slots[0].rotationY, 0)
+  assert.equal(document.slots.some(slot => slot.slot === 'background'), false)
+  const look = cameraLookAtTime(document.camera, 1, document.duration, document.slots)
+  const eye = cameraEyeAtTime(document.camera, 1, document.duration, document.slots)
+  assert.ok(eye[2] > look[2])
+  assert.ok(Math.abs(eye[1] - look[1]) < 0.2)
+  const restored = parseScene3DDocument(JSON.parse(JSON.stringify(document)))
+  assert.equal(restored?.dressing, 'cafe')
+})
+
 test('world3d export plan is independent of compositor layers', () => {
   assert.equal(evenDim(1281), 1280)
   assert.deepEqual(world3dExportSize(1920, 1080), { width: 1280, height: 720 })

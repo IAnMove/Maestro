@@ -61,6 +61,7 @@ export type GpuWorld = {
   dir: DirectionalLight
   floor: Mesh
   dressing: Object3D | null
+  dressingReady: boolean
   slots: Map<string, SlotGpu>
 }
 
@@ -242,6 +243,7 @@ export function placeSlot(
 }
 
 export function worldAssetsReady(world: GpuWorld, slots: readonly Scene3DSlot[]): boolean {
+  if (!world.dressingReady) return false
   return slots.every(slot => {
     if (!slot.sourceUrl) return true
     const gpu = world.slots.get(slot.id)
@@ -332,7 +334,7 @@ export function createWorld(host: HTMLDivElement, light: Scene3DLight, fov: numb
   )
   floor.rotation.x = -Math.PI / 2
   scene.add(floor)
-  return { renderer, scene, camera, dir, floor, dressing: null, slots: new Map() }
+  return { renderer, scene, camera, dir, floor, dressing: null, dressingReady: true, slots: new Map() }
 }
 
 export function disposeWorld(world: GpuWorld) {

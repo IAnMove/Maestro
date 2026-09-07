@@ -25,6 +25,7 @@ export const SCENE3D_TEMPLATES: readonly Scene3DTemplate[] = [
   { id: 'walk-void', camera: 'establishment', duration: 6, slots: ['subject_1', 'background'] },
   { id: 'dance-orbit', camera: 'orbit', duration: 6, slots: ['subject_1', 'background'] },
   { id: 'dance-stage', camera: 'musical', duration: 8, slots: ['subject_1', 'background'] },
+  { id: 'cafe-dance', camera: 'front', duration: 8, slots: ['subject_1'] },
 ]
 
 const LAYOUTS: Record<Scene3DTemplateId, Partial<Record<Scene3DSlotId, Pick<Scene3DSlot, 'position' | 'rotationY' | 'scale'>>>> = {
@@ -86,6 +87,9 @@ const LAYOUTS: Record<Scene3DTemplateId, Partial<Record<Scene3DSlotId, Pick<Scen
     subject_1: { position: [0, 0, 0], rotationY: 0.2, scale: 1 },
     background: { position: [0, 0, 0], rotationY: 0, scale: 1 },
   },
+  'cafe-dance': {
+    subject_1: { position: [0, 0, 0.35], rotationY: 0, scale: 1 },
+  },
 }
 
 function emptySlot(id: Scene3DSlotId): Scene3DSlot {
@@ -111,6 +115,7 @@ export function applyScene3DTemplate(id: Scene3DTemplateId): Scene3DDocument {
     ...document.camera,
     family: template.camera,
     ...(template.camera === 'side' ? { fov: 38 } : {}),
+    ...(template.camera === 'front' ? { fov: 42 } : {}),
   }
   document.slots = template.slots.map(slotId => {
     const slot = emptySlot(slotId)
@@ -142,6 +147,7 @@ const DRESSING_BY_TEMPLATE: Partial<Record<Scene3DTemplateId, Scene3DDocument['d
   'block-street': 'treadmill',
   'space-float': 'space',
   'dance-stage': 'street',
+  'cafe-dance': 'cafe',
 }
 
 export function patchScene3DSlot(

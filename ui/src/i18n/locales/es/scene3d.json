@@ -950,6 +950,7 @@
       "encounter": "Plano de dos / OTS",
       "pursuit": "Persecución / carrera",
       "side": "Perfil de lado",
+      "front": "Set de frente",
       "musical": "Órbita musical"
     },
     "template": {
@@ -966,7 +967,8 @@
       "space-float": "Flotar en el espacio",
       "walk-void": "Caminar en el vacío",
       "dance-orbit": "Órbita de baile",
-      "dance-stage": "Escenario de baile"
+      "dance-stage": "Escenario de baile",
+      "cafe-dance": "Baile en la cafetería"
     }
   },
   "agent": {

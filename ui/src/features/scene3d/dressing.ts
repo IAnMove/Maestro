@@ -7,6 +7,7 @@ import {
   MeshStandardMaterial,
   type Object3D,
 } from 'three'
+import { cafeGroup, type CafeMaps } from './cafeSet.ts'
 import type { GpuWorld } from './gpu.ts'
 import type { Scene3DDressing } from './types.ts'
 
@@ -54,10 +55,11 @@ function spaceGroup(): Object3D {
   return root
 }
 
-export function syncDressing(world: GpuWorld, kind: Scene3DDressing | undefined) {
+export function syncDressing(world: GpuWorld, kind: Scene3DDressing | undefined, maps?: CafeMaps) {
   dropDressing(world)
-  world.floor.visible = kind !== 'space' && kind !== 'treadmill'
+  world.floor.visible = kind !== 'space' && kind !== 'treadmill' && kind !== 'cafe'
   if (kind === 'street') world.dressing = streetGroup()
   if (kind === 'space') world.dressing = spaceGroup()
+  if (kind === 'cafe') world.dressing = cafeGroup(maps ?? { facade: null, floor: null, back: null })
   if (world.dressing) world.scene.add(world.dressing)
 }
