@@ -41,7 +41,8 @@ Al cerrar esta revisión el taller de habla (#200), la limpieza documental
 (#198) se mezcló en development el 07/09 (`fae7d3f6`). Estado por dominio:
 
 - **Selector universal de recursos (PR 0)**: inventario por campo y contrato
-  de aceptación en [ASSET_PICKER_MIGRATION](ASSET_PICKER_MIGRATION.md). Rama
+  de aceptación en [ASSET_PICKER_MIGRATION](ASSET_PICKER_MIGRATION.md). PR
+  [#206](https://github.com/IAnMove/hocuspocus/pull/206), rama
   `docs/asset-picker-inventory`. Sin implementación de UI. Cursor: no ejecutada (cuota).
 - **Plantillas musicales vídeo 3D**: PR [#204](https://github.com/IAnMove/hocuspocus/pull/204),
   rama `feat/video3d-music-templates`. Dueño de `Scene3DWorkspace.tsx`; no
