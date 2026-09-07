@@ -49,7 +49,7 @@ export function ModelSelector() {
   //   2. nsfw_only gate (Mature Mode must be on for those to appear).
   const groups = modeFamilies.map(family => ({
     family,
-    models: getModelsForFamily(family.id, models, generationMode)
+    models: getModelsForFamily(family.id, models, generationMode, effectiveSubMode)
       .filter(m => !m.tool_only)
       .filter(m => enabledModels.has(m.model_type))
       .filter(m => !m.nsfw_only || nsfwMode),
@@ -58,7 +58,7 @@ export function ModelSelector() {
   // How many models are available for this mode but NOT enabled — powers the
   // "+N" hint that nudges users toward Settings → Enabled Models.
   const disabledCount = modeFamilies.reduce((n, family) => {
-    const avail = getModelsForFamily(family.id, models, generationMode)
+    const avail = getModelsForFamily(family.id, models, generationMode, effectiveSubMode)
       .filter(m => !m.tool_only)
       .filter(m => !m.nsfw_only || nsfwMode)
     return n + avail.filter(m => !enabledModels.has(m.model_type)).length
