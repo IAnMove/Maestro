@@ -165,18 +165,18 @@ Archivo: `ui/src/features/scene3d/Scene3DWorkspace.tsx`. **No editar mientras #2
 | IMG-02 | InputsPanel | End frame | image | S | `AssetInput` dual | Solo si `supports_end_frame` | `endImage` / `image_end` | attach refs (si se extiende) | `studioFrameAdapter` | Oculto si el modelo no soporta | migrated |
 | IMG-03 | InputsPanel | Frames inyectados | image | M | `AssetInput` dual; reordenables | Presupuesto de frames del modelo | `inject frames` paths | — | `studioFrameAdapter` | Orden, máximo | migrated |
 | IMG-04 | InputsPanel / ImageRefSection | Referencias de imagen | image | M | InputsPanel: `AssetInput`. ImageRefSection sigue disco | `max_image_refs`; Edit consume 1 slot | `imageRefs` Files + upload paths | `attach_studio_references` subject/style | `studioRefsAdapter` | Orden, máximo, quitar | partial |
-| IMG-05 | InpaintControls | Vídeo a inpaint | video | S | Disco + drop `video/*` | SAM/máscara aparte (no es asset picker) | `editVideo*` store | — | `editSourceAdapter` | Tipo no vídeo rechazado | pending |
-| IMG-06 | OutpaintControls | Fuente outpaint | video/image | S | Disco + drop `video/*,image/*` | Canvas/máscara de expansión aparte | `editVideo*` | — | `editSourceAdapter` | Imagen y vídeo | pending |
-| IMG-07 | EditAnythingControls | Vídeo Edit Anything | video | S | Disco + drop `video/*` | LoRA interpreta prompt; no SAM | `editVideo*` | — | `editSourceAdapter` | Rango temporal intacto | pending |
-| IMG-08 | BlendControls | Clip A | video/image | S | Disco + drop | A y B independientes | `blendClipA` File+path+url | — | `blendClipAdapter` | Cancelar no toca B | pending |
-| IMG-09 | BlendControls | Clip B | video/image | S | Disco + drop | Igual | `blendClipB` | — | `blendClipAdapter` | Igual | pending |
+| IMG-05 | InpaintControls | Vídeo a inpaint | video | S | `AssetInput` dual; SAM/máscara aparte | SAM/máscara no es picker | `editVideo*` store | — | `editSourceAdapter` | Tipo no vídeo rechazado | migrated |
+| IMG-06 | OutpaintControls | Fuente outpaint | video/image | S | `AssetInput` dual; canvas de máscara aparte | Canvas/máscara de expansión aparte | `editVideo*` | — | `editSourceAdapter` | Imagen y vídeo | migrated |
+| IMG-07 | EditAnythingControls | Vídeo Edit Anything | video | S | `AssetInput` dual | LoRA interpreta prompt; no SAM | `editVideo*` | — | `editSourceAdapter` | Rango temporal intacto | migrated |
+| IMG-08 | BlendControls | Clip A | video/image | S | `AssetInput` dual | A y B independientes | `blendClipA` File+path+url | — | `blendClipAdapter` | Cancelar no toca B | migrated |
+| IMG-09 | BlendControls | Clip B | video/image | S | `AssetInput` dual | Igual | `blendClipB` | — | `blendClipAdapter` | Igual | migrated |
 | IMG-10 | PanoramaLoopPanel | Fuente panorámica | image | S | Disco visible `png/jpeg/webp` | Preparación de loop; no audio | Blob preparado en panel | — | `panoramaSourceAdapter` | Transparencia/proporción | pending |
 | IMG-11 | RecastControls | Vídeo a recastear | video | S | Disco + drop `video/*` | SCAIL | `editVideo*` | — | `recastAdapter` | No confirma al play | pending |
 | IMG-12 | RecastControls | Personaje de reemplazo | image | S×N mappings | Disco `image/*` por mapping | Una identidad por mapping | `mapping.refPath` | — | `recastAdapter` | Mapping 0 y 1 | pending |
 | IMG-13 | RecastControls | Vistas extra | image | M≤4 / mapping | Disco multiple | Tras alineación | `additionalRefs` | — | `recastAdapter` | Máximo 4 | pending |
 | IMG-14 | RestyleControls | Vídeo a repintar | video | S | Disco + drop `video/*` | Timeline start/end | `editVideo*` | — | `restyleAdapter` | Trim conservado | pending |
 | IMG-15 | RestyleControls | Frame editado | image | S | Disco `image/*` o round-trip Image mode | Debe corresponder al primer frame | `targetFrame*` | — | `restyleAdapter` | Reemplazar frame | pending |
-| IMG-16 | RetakeControls | Vídeo a retomar | video | S | Disco + drop `video/*` | Timeline | `editVideo*` | — | `retakeAdapter` | Igual inpaint | pending |
+| IMG-16 | RetakeControls | Vídeo a retomar | video | S | `AssetInput` dual | Timeline | `editVideo*` | — | `retakeAdapter` | Igual inpaint | migrated |
 
 `ImageUpload.tsx` (start/end dropzones) **no está montado**; `InputsPanel` lo sustituyó. No migrar el componente muerto; borrar o reexportar en PR 6A si sigue huérfano.
 
@@ -351,7 +351,7 @@ Un agente es dueño del **núcleo** del picker (PR 1–4). Los demás solo adapt
 | 3 | Preview RAM-safe | Núcleo picker (archivos de preview) | Mezclado en #210 |
 | 4 | AssetInput dual origin + upload | Núcleo picker | Mezclado en #211 |
 | 5 | 2.5D + audio de escena + templates + Scene3D | Compositor 2.5D/3D | Mezclado en #213 (sin Scene3DWorkspace; #212 abierto) |
-| 6A | Tools, imagen, Hunyuan, edit | Tools/imagen | Hunyuan #215 y Tools #217 mezclados. InputsPanel IMG-01..04/VID-01..06 en curso. Restan IMG-05..16 y superficies duplicadas |
+| 6A | Tools, imagen, Hunyuan, edit | Tools/imagen | Hunyuan #215, Tools #217, InputsPanel #223 mezclados. Edit IMG-05..09/16 en #224. Restan IMG-10..15 y superficies duplicadas |
 | 6B | Audio, vídeo, Video Editor, mixer | Audio/vídeo | Paralelo a 6A si no comparten archivo |
 | 7 | Story, Series, personajes, cómics | Labs | Mezclado en #218. Director queda en PR 8 |
 | 8 | Paridad Wizard + cierre inventario | Wizard + núcleo | `agentActions.ts` exclusivo |

@@ -1,10 +1,12 @@
-import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
-import { Upload, X } from 'lucide-react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
+import { X } from 'lucide-react'
 import { useStore } from '../../stores/useStore'
 import { useUiTranslation } from '../../i18n'
 import { VideoTimelineSelector } from '../shared/VideoTimelineSelector'
 import { OutpaintCanvas } from './OutpaintCanvas'
 import * as api from '../../api/client'
+import { StudioSourceField } from '../../lib/StudioSourceField.tsx'
+import { useWorkspaceOutputs } from '../../lib/studioAssetPick.ts'
 
 /**
  * Outpaint mode controls.
@@ -69,7 +71,12 @@ export function OutpaintControls() {
 
   const [error, setError] = useState<string | null>(null)
   const [showAdvanced, setShowAdvanced] = useState(false)
-  const fileRef = useRef<HTMLInputElement>(null)
+  const activeWorkspace = useStore(s => s.activeWorkspace)
+  const library = useWorkspaceOutputs(activeWorkspace)
+  const mediaItems = useMemo(
+    () => library.filter(item => item.type === 'image' || item.type === 'video'),
+    [library],
+  )
 
   // Source pixel dimensions parsed from editVideoResolution (e.g. "1280x720").
   // OutpaintCanvas needs these to:
@@ -115,12 +122,6 @@ export function OutpaintControls() {
     }
   }, [setEditVideo, setTrimStart, setTrimEnd])
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    const file = e.dataTransfer.files[0]
-    if (file && (file.type.startsWith('video/') || file.type.startsWith('image/'))) handleUpload(file)
-  }, [handleUpload])
-
   const isVideoFile = editVideoFile?.type.startsWith('video/')
   const selectedDuration = trimEnd > trimStart
     ? trimEnd - trimStart
@@ -145,23 +146,13 @@ export function OutpaintControls() {
       {/* Upload zone — shown only when no clip loaded. Same dashed-border
           + drop-target treatment as the other Edit-mode flows. */}
       {!editVideoFile ? (
-        <div
-          onDragOver={e => e.preventDefault()}
-          onDrop={handleDrop}
-          onClick={() => fileRef.current?.click()}
-          className="border-2 border-dashed border-border rounded-lg p-6 text-center cursor-pointer hover:border-accent-blue transition-colors"
-        >
-          <Upload size={24} className="mx-auto mb-2 text-text-muted" />
-          <p className="text-xs text-text-secondary">{t('outpaint.drop')}</p>
-          <p className="text-[10px] text-text-muted mt-1">{t('chrome.orBrowse')}</p>
-          <input
-            ref={fileRef}
-            type="file"
-            accept="video/*,image/*"
-            className="hidden"
-            onChange={e => { const f = e.target.files?.[0]; if (f) handleUpload(f) }}
-          />
-        </div>
+        <StudioSourceField
+          label={t('outpaint.drop')}
+          items={mediaItems}
+          accept="video/*,image/*"
+          kinds={['image', 'video']}
+          onFile={handleUpload}
+        />
       ) : (
         <>
           {/* Header: filename + remove button. The X mirrors the inpaint
