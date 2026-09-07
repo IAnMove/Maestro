@@ -68,7 +68,7 @@ test('From HocusPocus opens the shared explorer and Remove clears', { concurrenc
       />,
     )
     fireEvent.click(screen.getByRole('button', { name: /From HocusPocus/ }))
-    assert.ok(screen.getByTestId('asset-explorer'))
+    assert.ok(await screen.findByTestId('asset-explorer'))
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     assert.deepEqual(chosen, [])
     fireEvent.click(screen.getByRole('button', { name: /Remove/ }))

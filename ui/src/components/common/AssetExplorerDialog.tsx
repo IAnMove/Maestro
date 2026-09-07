@@ -2,60 +2,18 @@ import { useMemo, useState } from 'react'
 import { FolderOpen, X } from 'lucide-react'
 import type { ApiOutput } from '../../api/outputs'
 import type { AssetKind } from '../../api/assets'
+import { checkCompatibility, outputToPickerItem } from '../../features/asset-picker/adapters.ts'
+import { isSameRef, type AssetConstraints, type CatalogSort, type PickerItem } from '../../features/asset-picker/types.ts'
 import {
-  checkCompatibility,
   confirmExplorerItem,
   explorerCanConfirm,
   explorerListModel,
-  isSameRef,
-  outputToPickerItem,
   resolveExplorerSelection,
   useRemoteCatalogPage,
-  type AssetConstraints,
-  type CatalogSort,
-  type PickerItem,
-} from '../../features/asset-picker'
+} from '../../features/asset-picker/remoteCatalog.ts'
 import { useUiTranslation } from '../../i18n'
 import { ExplorerFooter, ExplorerGallery, ExplorerPreview, ExplorerToolbar } from './AssetExplorerChrome.tsx'
-import { assetPreviewUrl, formatAssetDate } from './assetExplorer.ts'
 import { ModalShell } from './ModalShell'
-
-export function AssetPickTrigger({
-  label,
-  selected,
-  placeholder,
-  onOpen,
-  disabled,
-}: {
-  label: string
-  selected?: ApiOutput
-  placeholder: string
-  onOpen: () => void
-  disabled?: boolean
-}) {
-  const preview = selected ? assetPreviewUrl(selected) : ''
-  const picked = selected ? outputToPickerItem(selected, '') : null
-  return (
-    <div className="block text-[9px] text-text-muted">
-      {label}
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={onOpen}
-        className="mt-0.5 flex w-full items-center gap-2 rounded border border-border bg-bg-primary px-1.5 py-1 text-left text-[10px] text-text-primary disabled:opacity-40"
-      >
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded bg-bg-active">
-          {preview ? <img src={preview} alt="" className="h-full w-full object-cover" /> : <FolderOpen size={14} className="text-text-muted" />}
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block truncate">{picked?.title ?? placeholder}</span>
-          {picked && <span className="block truncate text-[8px] text-text-muted">{picked.filename}</span>}
-          {selected && <span className="block text-[8px] text-text-muted">{formatAssetDate(selected)}</span>}
-        </span>
-      </button>
-    </div>
-  )
-}
 
 type BodyProps = {
   title: string

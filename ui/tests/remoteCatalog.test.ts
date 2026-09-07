@@ -8,9 +8,8 @@ import {
   explorerToolbarKinds,
   remotePageCount,
   resolveExplorerSelection,
-  type PickerItem,
-} from '../src/features/asset-picker/index.ts'
-import { ASSET_PICKER_PAGE_SIZE } from '../src/features/asset-picker/types.ts'
+} from '../src/features/asset-picker/remoteCatalog.ts'
+import { ASSET_PICKER_PAGE_SIZE, type PickerItem } from '../src/features/asset-picker/types.ts'
 
 function catalogItem(id: string, filename: string, kind: PickerItem['kind'] = 'image'): PickerItem {
   return {

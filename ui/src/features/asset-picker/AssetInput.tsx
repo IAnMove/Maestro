@@ -1,10 +1,14 @@
-import { useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { FolderOpen, Monitor, X } from 'lucide-react'
 import type { ApiOutput } from '../../api/outputs'
 import { useUiTranslation } from '../../i18n'
-import { AssetExplorerDialog, AssetPickTrigger } from '../../components/common/AssetExplorerDialog'
+import { AssetPickTrigger } from '../../components/common/AssetPickTrigger.tsx'
 import type { AssetConstraints } from './types.ts'
 import { createUploadSession, fileMatchesConstraints } from './upload.ts'
+
+const AssetExplorerDialog = lazy(() =>
+  import('../../components/common/AssetExplorerDialog.tsx').then(module => ({ default: module.AssetExplorerDialog })),
+)
 
 export function AssetInput({
   label,
@@ -97,18 +101,22 @@ export function AssetInput({
         data-testid="asset-input-file"
         onChange={event => { void pickLocal(event.target.files?.[0]) }}
       />
-      <AssetExplorerDialog
-        open={open}
-        title={label}
-        items={items}
-        selected={value}
-        workspaceId={workspaceId}
-        remote={Boolean(workspaceId)}
-        allowNone={optional}
-        constraints={constraints}
-        onClose={() => setOpen(false)}
-        onChoose={item => { onChoose(item); setOpen(false) }}
-      />
+      {open ? (
+        <Suspense fallback={<div className="fixed inset-0 z-[130] bg-black/70" />}>
+          <AssetExplorerDialog
+            open={open}
+            title={label}
+            items={items}
+            selected={value}
+            workspaceId={workspaceId}
+            remote={Boolean(workspaceId)}
+            allowNone={optional}
+            constraints={constraints}
+            onClose={() => setOpen(false)}
+            onChoose={item => { onChoose(item); setOpen(false) }}
+          />
+        </Suspense>
+      ) : null}
     </div>
   )
 }
