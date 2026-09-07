@@ -4,6 +4,9 @@ import * as api from '../../api/client'
 import { useStore } from '../../stores/useStore'
 import { useUiTranslation } from '../../i18n'
 import type { MiniMaxH3AudioIntent, MiniMaxH3Reference, MiniMaxH3ReferenceType } from '../../types'
+import type { ApiOutput } from '../../api/outputs'
+import { AssetInput } from '../../features/asset-picker/AssetInput.tsx'
+import { applyChosenStudioMedia, studioMediaPath, useWorkspaceOutputs } from '../../lib/studioAssetPick.ts'
 
 const IMAGE_RE = /\.(png|jpe?g|webp|bmp|tiff?)$/i
 const VIDEO_RE = /\.(mp4|mov|mkv|webm|avi|m4v)$/i
@@ -31,6 +34,11 @@ export function OmniReferenceSection() {
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState('')
   const [dragIndex, setDragIndex] = useState<number | null>(null)
+  const activeWorkspace = useStore(s => s.activeWorkspace)
+  const imageItems = useWorkspaceOutputs(activeWorkspace, 'image')
+  const videoItems = useWorkspaceOutputs(activeWorkspace, 'video')
+  const audioItems = useWorkspaceOutputs(activeWorkspace, 'audio')
+  const catalogItems = [...imageItems, ...videoItems, ...audioItems]
 
   const references = useMemo(() => params.minimax_h3_references ?? [], [params.minimax_h3_references])
   const limits = modelOptions?.omni_reference_limits ?? {
@@ -104,25 +112,50 @@ export function OmniReferenceSection() {
     update(references.map((reference, itemIndex) => itemIndex === index ? { ...reference, ...patch } : reference))
   }
 
-  const attachAudio = async (referenceId: string, file: File | undefined) => {
-    if (!file || uploading) return
-    setUploading(true)
-    setError('')
-    try {
-      const uploaded = await api.uploadAudio(file)
-      const current = useStore.getState().params.minimax_h3_references ?? []
-      update(current.map(reference => reference.id === referenceId ? {
-        ...reference,
-        audio_path: uploaded.path,
-        audio_filename: file.name,
-        audio_duration_seconds: uploaded.duration_seconds ?? null,
-        include_audio: true,
-      } : reference))
-    } catch (uploadError) {
-      setError(uploadError instanceof Error ? uploadError.message : t('omni.soundtrackFailed'))
-    } finally {
-      setUploading(false)
+  const chooseCatalog = (item: ApiOutput | null) => {
+    if (!item) return
+    const type: MiniMaxH3ReferenceType | null = item.type === 'image' || item.type === 'video' || item.type === 'audio' ? item.type : null
+    if (!type) {
+      setError(t('omni.unsupported', { name: item.name }))
+      return
     }
+    const next = [...(useStore.getState().params.minimax_h3_references ?? [])]
+    const counts = {
+      image: next.filter(entry => entry.type === 'image').length,
+      video: next.filter(entry => entry.type === 'video').length,
+      audio: next.filter(entry => entry.type === 'audio').length,
+    }
+    if (next.length >= limits.total || counts[type] >= limits[type]) {
+      setError(t('omni.limit', { image: limits.image, video: limits.video, audio: limits.audio, total: limits.total }))
+      return
+    }
+    applyChosenStudioMedia(item, media => {
+      const live = [...(useStore.getState().params.minimax_h3_references ?? [])]
+      if (live.length >= limits.total || live.filter(entry => entry.type === type).length >= limits[type]) return
+      update([...live, {
+        id: newId(),
+        type,
+        path: studioMediaPath(item),
+        filename: item.name,
+        url: item.url,
+        duration_seconds: media.duration > 0 ? media.duration : null,
+        has_audio: type === 'audio',
+        audio_intent: type === 'audio' ? 'voice' : undefined,
+        role: '',
+      }])
+    })
+  }
+
+  const chooseItemAudio = (referenceId: string, item: ApiOutput | null) => {
+    if (!item) return
+    const current = useStore.getState().params.minimax_h3_references ?? []
+    update(current.map(reference => reference.id === referenceId ? {
+      ...reference,
+      audio_path: studioMediaPath(item),
+      audio_filename: item.name,
+      audio_duration_seconds: null,
+      include_audio: true,
+    } : reference))
   }
 
   const reorder = (from: number, to: number) => {
@@ -172,6 +205,15 @@ export function OmniReferenceSection() {
           onChange={event => void addFiles(Array.from(event.target.files ?? []))}
         />
       </div>
+      <AssetInput
+        label={t('omni.add')}
+        placeholder={t('omni.add')}
+        items={catalogItems}
+        accept="image/*,video/*,audio/*,.mkv,.m4v,.flac,.m4a,.aac"
+        workspaceId={activeWorkspace}
+        constraints={{ kinds: ['image', 'video', 'audio'], maxCount: 1, optional: false }}
+        onChoose={chooseCatalog}
+      />
 
       {references.length > 0 && (
         <div className="space-y-1.5">
@@ -230,18 +272,15 @@ export function OmniReferenceSection() {
                 )}
                 {reference.type === 'video' && (
                   <div className="flex items-center gap-1.5 text-[9px] text-text-secondary">
-                    <label className="cursor-pointer hover:text-text-primary">
-                      {reference.audio_path ? t('omni.replaceAudio') : t('omni.attachAudio')}
-                      <input
-                        type="file"
-                        accept="audio/*,.flac,.m4a,.aac"
-                        className="hidden"
-                        onChange={event => {
-                          void attachAudio(reference.id, event.target.files?.[0])
-                          event.currentTarget.value = ''
-                        }}
-                      />
-                    </label>
+                    <AssetInput
+                      label={reference.audio_path ? t('omni.replaceAudio') : t('omni.attachAudio')}
+                      placeholder={t('omni.attachAudio')}
+                      items={audioItems}
+                      accept="audio/*,.flac,.m4a,.aac"
+                      workspaceId={activeWorkspace}
+                      constraints={{ kinds: ['audio'], maxCount: 1, optional: false }}
+                      onChoose={item => { if (item) chooseItemAudio(reference.id, item) }}
+                    />
                     {reference.audio_path && (
                       <button
                         type="button"
