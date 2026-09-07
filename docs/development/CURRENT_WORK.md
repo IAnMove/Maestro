@@ -50,8 +50,9 @@ Al cerrar esta revisión el taller de habla (#200), la limpieza documental
 (#198) se mezcló en development el 07/09 (`fae7d3f6`). Estado por dominio:
 
 - **Selector universal de recursos (PR 6A)**: Hunyuan vistas/GLB a `AssetInput`.
-  Rama `feat/asset-picker-tools-hunyuan`. No toca el núcleo del picker (#214)
-  ni `Scene3DWorkspace` (#212). Cursor: no ejecutada (cuota). No mezclar hasta
+  PR [#215](https://github.com/IAnMove/hocuspocus/pull/215), rama
+  `feat/asset-picker-tools-hunyuan`. No toca el núcleo del picker (#214) ni
+  `Scene3DWorkspace` (#212). Cursor: no ejecutada (cuota). No mezclar hasta
   que lo pidan.
 - **Vídeo procedural**: conservar el checkpoint `work/procedural-video-pilot-checkpoint`;
   consultar [PROCEDURAL_VIDEO_ROADMAP](PROCEDURAL_VIDEO_ROADMAP.md) y el documento del
