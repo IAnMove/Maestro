@@ -56,6 +56,19 @@ test('3D templates, playback speed and object transforms work in the editor', as
   await expect(workspace.getByLabel('Position (m) X', { exact: true })).not.toHaveValue('-0.95')
   await workspace.getByRole('button', { name: 'Reset transform' }).click()
 
+  await workspace.getByLabel('Rotation Y (°)', { exact: true }).fill('0')
+  await workspace.getByRole('button', { name: 'Scale', exact: true }).click()
+  await canvas.scrollIntoViewIfNeeded()
+  const scaleBox = (await canvas.boundingBox())!
+  const scaleX = scaleBox.x + point.x * scaleBox.width
+  const scaleY = scaleBox.y + point.y * scaleBox.height
+  await page.mouse.move(scaleX, scaleY)
+  await page.mouse.down()
+  await page.mouse.move(scaleX + 40, scaleY, { steps: 10 })
+  await page.mouse.up()
+  await expect(workspace.getByLabel('Size', { exact: true })).not.toHaveValue('1')
+  await workspace.getByRole('button', { name: 'Reset transform' }).click()
+
   await workspace.locator('summary').click()
   await workspace.getByRole('searchbox', { name: 'Search templates' }).fill('portrait')
   await workspace.getByTestId('world3d-template-portrait-arc').click()
