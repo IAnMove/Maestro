@@ -13,6 +13,7 @@ export type LibraryLive = {
   generation: number
   workspaceId: string
   purpose: LibraryPurpose
+  /** Current dialog visibility. Must not be hardcoded true after an await. */
   open: boolean
 }
 

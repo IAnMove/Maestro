@@ -33,16 +33,19 @@ export function SceneLibraryDialog({
   const [error, setError] = useState<string | null>(null)
   const [selected, setSelected] = useState<ApiOutput | null>(null)
   const generationRef = useRef(0)
+  const openRef = useRef(open)
   const workspaceRef = useRef(workspace || '')
+  const purposeRef = useRef(purposeFromTab(tab))
   const purpose = purposeFromTab(tab)
+  // Bump generation during render. A useEffect bump loses to a fetch that
+  // settles in the same turn as Cancel/Escape, and a later reopen would
+  // otherwise reuse the captured generation and apply the stale scene.
+  if (openRef.current && !open) generationRef.current += 1
+  if (workspaceRef.current !== (workspace || '')) generationRef.current += 1
+  openRef.current = open
+  workspaceRef.current = workspace || ''
+  purposeRef.current = purpose
 
-  useEffect(() => {
-    if (workspaceRef.current !== (workspace || '')) generationRef.current += 1
-    workspaceRef.current = workspace || ''
-  }, [workspace])
-  useEffect(() => {
-    if (!open) generationRef.current += 1
-  }, [open])
   useEffect(() => {
     if (!open) return
     setError(null)
@@ -82,14 +85,16 @@ export function SceneLibraryDialog({
 
   const pages = Math.max(1, Math.ceil(total / SCENE_LIBRARY_PAGE_SIZE))
 
+  const liveChoice = () => ({
+    generation: generationRef.current,
+    workspaceId: workspaceRef.current,
+    purpose: purposeRef.current,
+    open: openRef.current,
+  })
+
   const openItem = async (file: ApiOutput) => {
     const capture = { generation: generationRef.current, workspaceId: workspaceRef.current, purpose }
-    const commit = commitLibraryChoice({
-      generation: generationRef.current,
-      workspaceId: workspaceRef.current,
-      purpose,
-      open,
-    }, capture, file)
+    const commit = commitLibraryChoice(liveChoice(), capture, file)
     if (commit.action === 'ignore') return
     setOpening(file.name)
     setError(null)
@@ -98,22 +103,12 @@ export function SceneLibraryDialog({
         const response = await fetch(commit.item.url)
         if (!response.ok) throw new Error(t('library.loadFailed'))
         const payload = await response.json()
-        if (commitLibraryChoice({
-          generation: generationRef.current,
-          workspaceId: workspaceRef.current,
-          purpose,
-          open: true,
-        }, capture, commit.item).action === 'ignore') return
+        if (commitLibraryChoice(liveChoice(), capture, commit.item).action === 'ignore') return
         onOpenScene(sceneFromLibraryPayload(payload), sceneLibraryTitle(commit.item.name))
         return
       }
-      const metadata = await fetchOutputMetadata(commit.item.name, workspace)
-      if (commitLibraryChoice({
-        generation: generationRef.current,
-        workspaceId: workspaceRef.current,
-        purpose,
-        open: true,
-      }, capture, commit.item).action === 'ignore') return
+      const metadata = await fetchOutputMetadata(commit.item.name, capture.workspaceId || undefined)
+      if (commitLibraryChoice(liveChoice(), capture, commit.item).action === 'ignore') return
       onOpenScene(sceneFromLibraryPayload(metadata), sceneLibraryTitle(commit.item.name))
     } catch (openError) {
       setError(openError instanceof Error ? openError.message : t('library.openFailed'))
