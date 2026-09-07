@@ -187,7 +187,7 @@ async function chooseComposerLibraryFile(page: Page, composer: Locator, filename
   await expect(card).toBeVisible()
   await card.click()
   await explorer.getByRole('button', { name: 'Choose', exact: true }).click()
-  await expect(composer.getByText(filename)).toBeVisible()
+  await expect(composer.getByText(filename).first()).toBeVisible()
 }
 
 test('opens cinema-establishing in the real editor, saves exact scene JSON, and reopens the saved scene', async ({ page }) => {
