@@ -16,7 +16,8 @@ export type TemplateSlotLive = {
 export type TemplateSlotCommit =
   | { action: 'ignore' }
   | { action: 'clear' }
-  | { action: 'reject'; reasonKey: 'missing-id' | 'incompatible' }
+  | { action: 'reject'; reasonKey: 'missing-id' }
+  | { action: 'reject'; reasonKey: 'incompatible'; message: string }
   | { action: 'apply'; item: AssetCatalogItem }
 
 export async function commitTemplateSlotChoice(
@@ -37,7 +38,7 @@ export async function commitTemplateSlotChoice(
   if (live.workspaceId !== capture.workspaceId) return { action: 'ignore' }
   if (live.slotId !== capture.slotId) return { action: 'ignore' }
   const issue = bindingIssue(asset)
-  if (issue) return { action: 'reject', reasonKey: 'incompatible' }
+  if (issue) return { action: 'reject', reasonKey: 'incompatible', message: issue }
   return { action: 'apply', item: asset }
 }
 

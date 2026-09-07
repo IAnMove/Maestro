@@ -47,7 +47,10 @@ test('cancel clears; workspace, slot or generation mismatch is ignored', async (
 test('bindingIssue blocks a catalog item that the slot cannot use', async () => {
   const result = await commitTemplateSlotChoice(live, capture, output, async () => catalog, () => 'El slot hero no admite image.')
   assert.equal(result.action, 'reject')
-  if (result.action === 'reject') assert.equal(result.reasonKey, 'incompatible')
+  if (result.action === 'reject') {
+    assert.equal(result.reasonKey, 'incompatible')
+    assert.equal(result.message, 'El slot hero no admite image.')
+  }
 })
 
 test('accept lists images and glb only for the slot kinds', () => {

@@ -62,7 +62,7 @@ export function TemplateAssetPicker({
           ).then(commit => {
             if (commit.action === 'ignore') return
             if (commit.action === 'reject') {
-              setIssue(commit.reasonKey === 'missing-id' ? t('composer.needsCatalogIdentity') : t('composer.incompatibleKind'))
+              setIssue(commit.reasonKey === 'missing-id' ? t('composer.needsCatalogIdentity') : commit.message)
               return
             }
             setIssue('')

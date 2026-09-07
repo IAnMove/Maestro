@@ -63,18 +63,36 @@ const responseFor = (value: unknown, status = 200) => new Response(JSON.stringif
 
 const installAssetFetch = () => {
   const calls: string[] = []
-  globalThis.fetch = (async input => {
+  const previous = globalThis.fetch
+  const mock: typeof fetch = (async (input, init) => {
     const url = String(input)
     calls.push(url)
-    if (url.includes('/api/v1/assets?')) return responseFor({ assets, total: assets.length })
-    if (url.includes('/api/v1/assets/')) {
-      const id = decodeURIComponent(url.slice(url.lastIndexOf('/') + 1))
-      const selected = assets.find(item => item.id === id)
-      return selected ? responseFor(selected) : responseFor({ detail: 'missing' }, 404)
+    if (url.includes('/api/v1/assets?')) {
+      const query = new URL(url, 'http://localhost').searchParams
+      if (query.get('workspace') && query.get('workspace') !== WORKSPACE) {
+        if (typeof previous === 'function') return previous(input, init)
+      }
+      return responseFor({ assets, total: assets.length })
     }
+    if (url.includes('/api/v1/assets/')) {
+      const id = decodeURIComponent(url.slice(url.lastIndexOf('/') + 1).split('?')[0])
+      const selected = assets.find(item => item.id === id)
+      if (!selected) {
+        if (typeof previous === 'function') return previous(input, init)
+        return responseFor({ detail: 'missing' }, 404)
+      }
+      return responseFor(selected)
+    }
+    if (typeof previous === 'function') return previous(input, init)
     throw new Error(`Unexpected request: ${url}`)
   }) as typeof fetch
-  return calls
+  globalThis.fetch = mock
+  return {
+    calls,
+    restore() {
+      if (globalThis.fetch === mock) globalThis.fetch = previous
+    },
+  }
 }
 
 async function renderDialog(props: { onApply?: (scene: Scene) => boolean } = {}) {
@@ -84,20 +102,27 @@ async function renderDialog(props: { onApply?: (scene: Scene) => boolean } = {})
   return { ...view, screen, fireEvent, waitFor, cleanup }
 }
 
+function clickLast(view: Awaited<ReturnType<typeof renderDialog>>, name: string | RegExp, exact = false) {
+  const buttons = view.screen.getAllByRole('button', exact && typeof name === 'string' ? { name, exact: true } : { name })
+  view.fireEvent.click(buttons[buttons.length - 1])
+}
+
 async function chooseAsset(
   view: Awaited<ReturnType<typeof renderDialog>>,
   slotLabel: RegExp,
   filename: string,
 ) {
-  view.fireEvent.click(view.screen.getByRole('button', { name: slotLabel }))
-  const assetButton = await view.screen.findByRole('button', { name: `Select ${filename}` })
-  view.fireEvent.click(assetButton)
+  clickLast(view, slotLabel)
+  clickLast(view, /From HocusPocus/)
+  await view.waitFor(() => assert.ok(document.querySelector(`button[title="${filename}"]`)))
+  view.fireEvent.click(document.querySelector(`button[title="${filename}"]`) as HTMLButtonElement)
+  clickLast(view, 'Choose', true)
+  await view.waitFor(() => assert.ok(view.screen.getAllByText(filename).length >= 1))
 }
 
 test('expone claves y descripciones musicales, exige dos sujetos, conserva IDs y no ofrece referencia aprobada', { concurrency: false }, async () => {
-  const originalFetch = globalThis.fetch
   const originalClipboard = navigator.clipboard
-  const calls = installAssetFetch()
+  const { calls, restore } = installAssetFetch()
   let clipboardText = ''
   Object.defineProperty(navigator, 'clipboard', {
     configurable: true,
@@ -153,14 +178,13 @@ test('expone claves y descripciones musicales, exige dos sujetos, conserva IDs y
     assert.equal(calls.some(url => /generate|model3d\/generate/i.test(url)), false)
     view.cleanup()
   } finally {
-    globalThis.fetch = originalFetch
+    restore()
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: originalClipboard })
   }
 })
 
 test('mantiene BPM e intensidad desactivados en las 24 nuevas coreografías', { concurrency: false }, async () => {
-  const originalFetch = globalThis.fetch
-  const calls = installAssetFetch()
+  const { calls, restore } = installAssetFetch()
   try {
     const view = await renderDialog()
     const selector = view.screen.getByRole('combobox', { name: 'Action / template' }) as HTMLSelectElement
@@ -173,13 +197,12 @@ test('mantiene BPM e intensidad desactivados en las 24 nuevas coreografías', { 
     assert.equal(calls.some(url => /generate|model3d\/generate/i.test(url)), false)
     view.cleanup()
   } finally {
-    globalThis.fetch = originalFetch
+    restore()
   }
 })
 
 test('cambiar entre una plantilla musical y una legacy reinicia selecciones sin romper el compositor', { concurrency: false }, async () => {
-  const originalFetch = globalThis.fetch
-  installAssetFetch()
+  const installed = installAssetFetch()
   try {
     const view = await renderDialog()
     const selector = view.screen.getByRole('combobox', { name: 'Action / template' }) as HTMLSelectElement
@@ -187,21 +210,21 @@ test('cambiar entre una plantilla musical y una legacy reinicia selecciones sin 
     view.fireEvent.change(selector, { target: { value: 'music-orbit-duel' } })
     await view.waitFor(() => assert.equal(selector.value, 'music-orbit-duel'))
     await chooseAsset(view, /Subject 1.*required/i, fixture.subject1.filename)
-    const selected = view.screen.getByRole('button', { name: `Select ${fixture.subject1.filename}` })
-    assert.equal(selected.getAttribute('aria-pressed'), 'true')
+    assert.ok(view.screen.getAllByText(fixture.subject1.filename).length >= 1)
 
     view.fireEvent.change(selector, { target: { value: 'cinema-establishing' } })
     await view.waitFor(() => assert.equal(selector.value, 'cinema-establishing'))
     assert.equal(view.screen.queryByText('subject_1 · image'), null)
+    assert.equal(view.screen.queryAllByText(fixture.subject1.filename).length, 0)
     assert.equal((view.screen.getByRole('button', { name: /Create and open in editor/i }) as HTMLButtonElement).disabled, true)
 
     view.fireEvent.change(selector, { target: { value: 'music-orbit-duel' } })
     await view.waitFor(() => assert.equal(selector.value, 'music-orbit-duel'))
-    const reset = await view.screen.findByRole('button', { name: `Select ${fixture.subject1.filename}` })
-    assert.equal(reset.getAttribute('aria-pressed'), 'false')
+    assert.equal(view.screen.queryAllByText(fixture.subject1.filename).length, 0)
     assert.ok(view.screen.getByText('subject_1 · image'))
+    assert.ok(view.screen.getAllByText('Unassigned').length >= 1)
     view.cleanup()
   } finally {
-    globalThis.fetch = originalFetch
+    installed.restore()
   }
 })
