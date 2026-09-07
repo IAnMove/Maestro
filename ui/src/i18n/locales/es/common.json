@@ -48,6 +48,26 @@
   "sample": {
     "named": "{{name}}"
   },
+  "explorer": {
+    "choose": "Elegir",
+    "subtitle": "Vista previa, nombre y fecha de creación — los nombres solos se confunden.",
+    "search": "Buscar por nombre",
+    "empty": "No hay recursos de este tipo en este workspace.",
+    "selectHint": "Selecciona un recurso para previsualizarlo.",
+    "created": "Creado {{date}}",
+    "none": "Ninguno",
+    "page": "{{shown}} de {{total}}",
+    "closeAria": "Cerrar selector de recursos",
+    "previousPage": "Página anterior",
+    "nextPage": "Página siguiente",
+    "previewAria": "Vista previa de {{name}}",
+    "typeImage": "Imagen",
+    "typeVideo": "Vídeo",
+    "typeModel": "Modelo 3D",
+    "typeAudio": "Audio",
+    "typeScene": "Escena",
+    "typeComic": "Cómic"
+  },
   "welcome": {
     "title": "Novedades de HocusPocus",
     "subtitle": "Tu estudio local de IA para vídeo, imágenes, audio y 3D. Estas son las claves para arrancar bien una producción.",

@@ -23,6 +23,8 @@ import {
 
 const SceneAnimatorPanel = lazy(() => import('../Sidebar/SceneAnimatorPanel')
   .then(module => ({ default: module.SceneAnimatorPanel })))
+const Scene3DEditorPanel = lazy(() => import('../../features/scene3d/Scene3DEditorPanel')
+  .then(module => ({ default: module.Scene3DEditorPanel })))
 const RigAnimatePanel = lazy(() => import('../Sidebar/RigAnimatePanel')
   .then(module => ({ default: module.RigAnimatePanel })))
 const ComicEditorPanel = lazy(() => import('../../features/comics/ComicEditorPanel')
@@ -607,6 +609,12 @@ export function MainContent() {
           <div className="flex-1 overflow-y-auto p-4 md:p-8">
             <div className="max-w-[1600px] mx-auto">
               <SceneAnimatorPanel />
+            </div>
+          </div>
+        ) : mediaFilter === 'world3d' ? (
+          <div className="flex-1 overflow-y-auto p-4 md:p-8">
+            <div className="max-w-[1600px] mx-auto">
+              <Scene3DEditorPanel />
             </div>
           </div>
         ) : mediaFilter === 'animate3d' ? (

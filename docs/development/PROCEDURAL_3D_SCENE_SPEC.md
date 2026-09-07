@@ -1,9 +1,11 @@
 # Procedural 3D scene spec (G3)
 
-Status: design only. No engine, UI, or `_launch_runtime.py` change ships with
-this document. Playback and HTTP inspection remain blocked on the catalog
-resolver contract (GROK-API-001, mailbox) and on explicit ownership of
-compositor hotspots.
+Status: the 2.5D compositor stays the **Video 2.5D** studio tab (`scene3d`).
+Real 3D is a **separate Video 3D** tab (`world3d`) in `ui/src/features/scene3d/`.
+They share asset pickers and GLB clip identity, not one overloaded panel.
+Wizard hook: `hocuspocus:world3d-workflow-request` mounts the same template ids
+later; 2.5D `video_3d` actions stay on the compositor. Private Meshy GLBs stay
+off git. `_launch_runtime.py` is still not mounted for G2.
 
 Related: [GLB animation import contract](GLB_ANIMATION_IMPORT_CONTRACT.md)
 (`inspect_glb`, schema `glb-inspection-v1`).
@@ -44,11 +46,13 @@ selector must use that pair. Human labels must not rename clips.
 | B | Add a **separate scene mode** with a real graph (nodes, camera, light, clips by id) beside the compositor | Yes | Medium | Proposed minimum. |
 | C | Replace the compositor with a general 3D engine | No | High | Rejected. Breaks Character Kits, atmospheres, 2.5D recipes, browser capture. |
 
-### Decision (proposed, not implemented)
+### Decision
 
-Ship **B** only after G2’s resolver contract and hotspot ownership are
-agreed. Mode A remains the default for existing templates and the Omarchy
-compositor work owned by the principal.
+Ship **B** as a sibling, not a replacement. The 2.5D compositor stays the
+**Video 2.5D** tab. The 3D stage lives in `ui/src/features/scene3d/` as the
+**Video 3D** tab (`world3d`), not a toggle inside the compositor panel. G2’s
+resolver remains unmounted; local GLB files are read in the browser only.
+Mode A remains the path for existing templates and the Omarchy compositor work.
 
 Criteria for choosing B for a shot: more than one mesh must share space,
 occlusion, a camera move in world units, or a light. Otherwise stay on A.
@@ -118,6 +122,19 @@ the G1 report or the resolver, for example:
 
 No magic aliases (`idle`, `run`, `dance`) unless that exact string is the
 clip name.
+
+The 2.5D compositor’s `seamlessHorizontal` / cylinder panorama has a 3D
+sibling: an image slot with `loop: { cylinder: true, speed }` maps onto the
+inside of an open Y-up cylinder (`CylinderGeometry`, BackSide,
+RepeatWrapping). UV `offset.x = (t * speed) mod 1` scrolls the world. The
+`run-loop` template is the treadmill shot: `subject_1` stays at the origin,
+camera family `pursuit`, and the background cylinder moves. Clip selection
+stays `(index, exact glTF name)`; do not infer Running. Any image background
+can enable the same infinite cylinder without switching template.
+
+Video 3D export is independent of the 2.5D compositor. The world editor paints
+three.js frames (`paintWorld`) and encodes H.264 in the browser. It does not
+call `SceneAnimatorPanel` recording. Published files are named `world3d-*`.
 
 ## 6. Time, persistence, languages
 

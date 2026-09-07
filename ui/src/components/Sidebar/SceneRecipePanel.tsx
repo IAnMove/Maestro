@@ -8,6 +8,7 @@ import {
   type ProgrammaticVideoPreparationAck,
 } from '../../features/agent/programmaticVideoHandoff'
 import { useUiTranslation } from '../../i18n'
+import { AssetExplorerDialog } from '../common/AssetExplorerDialog'
 import { useStore } from '../../stores/useStore'
 import {
   EXAMPLE_SAUCER_CRUISE_RECIPE,
@@ -701,44 +702,33 @@ export function SceneRecipePanel({
             </div>
           )}
 
-          {picker && (
-            <div className="rounded border border-border bg-bg-primary p-2">
-              <div className="mb-1.5 flex items-center justify-between gap-1">
-                <span className="text-[10px] text-text-muted">
-                  {picker === 'model3d' ? t('recipe.glbFromApp') : t('recipe.imagesFromApp')}
-                </span>
-                <button type="button" onClick={() => setPicker(null)} className="text-text-muted hover:text-text-primary"><X size={12} /></button>
-              </div>
-              <button
-                type="button"
-                disabled={locked}
-                onClick={() => (picker === 'model3d' ? modelInputRef : imageInputRef).current?.click()}
-                className="mb-2 flex w-full items-center justify-center gap-1 rounded border border-dashed border-cyan-400/40 py-1.5 text-[10px] text-cyan-200 hover:bg-cyan-400/10 disabled:opacity-40"
-              >
-                {busy === 'upload' ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
-                {picker === 'model3d' ? t('recipe.importGlb') : t('recipe.importImage')}
-              </button>
-              {pickerItems.length ? (
-                <div className="grid max-h-52 grid-cols-3 gap-1.5 overflow-y-auto">
-                  {pickerItems.map(item => (
-                    <AssetThumb
-                      key={item.name}
-                      name={item.name}
-                      kind={kindForOutput(item)}
-                      previewUrl={previewForOutput(item)}
-                      selected={selected.some(asset => asset.source === item.name)}
-                      disabled={locked}
-                      onClick={() => void addOutput(item)}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <p className="text-[9px] text-text-muted">
-                  {picker === 'model3d' ? t('recipe.emptyGlbs') : t('recipe.emptyImages')}
-                </p>
-              )}
-            </div>
-          )}
+          <div className="flex gap-1">
+            <button
+              type="button"
+              disabled={locked}
+              onClick={() => imageInputRef.current?.click()}
+              className="flex flex-1 items-center justify-center gap-1 rounded border border-dashed border-cyan-400/40 py-1.5 text-[10px] text-cyan-200 hover:bg-cyan-400/10 disabled:opacity-40"
+            >
+              {busy === 'upload' ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
+              {t('recipe.importImage')}
+            </button>
+            <button
+              type="button"
+              disabled={locked}
+              onClick={() => modelInputRef.current?.click()}
+              className="flex flex-1 items-center justify-center gap-1 rounded border border-dashed border-cyan-400/40 py-1.5 text-[10px] text-cyan-200 hover:bg-cyan-400/10 disabled:opacity-40"
+            >
+              {busy === 'upload' ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
+              {t('recipe.importGlb')}
+            </button>
+          </div>
+          <AssetExplorerDialog
+            open={Boolean(picker)}
+            title={picker === 'model3d' ? t('recipe.glbFromApp') : t('recipe.imagesFromApp')}
+            items={pickerItems}
+            onClose={() => setPicker(null)}
+            onChoose={item => { if (item) void addOutput(item); setPicker(null) }}
+          />
           <input
             ref={imageInputRef}
             type="file"

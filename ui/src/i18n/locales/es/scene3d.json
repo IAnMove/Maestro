@@ -887,5 +887,59 @@
     "cameraN": "Cámara {{n}}",
     "eventN": "Evento {{n}}",
     "photoCamera": "Cámara fotográfica · {{label}}"
+  },
+  "stage": {
+    "badge": "Escenario 3D",
+    "modeTitle": "Modo de escenario",
+    "modeHelp": "El 2,5D mantiene placas y capas en el encuadre. Vídeo 3D es un editor de mundo aparte, en metros (Y-up).",
+    "fromApp": "Desde HocusPocus…",
+    "editorTitle": "Vídeo 3D",
+    "editorHelp": "Separado del compositor 2,5D. Elige una plantilla de cine, asigna objetos y fondo, luego mueve, escala y rota. Un fondo de imagen puede envolver un cilindro que se desplaza (fondo infinito). Las familias de cámara son movimientos prediseñados; el Wizard podrá montar los mismos ids más adelante.",
+    "scale": "Escala",
+    "rotate": "Yaw",
+    "compositor": "Compositor 2,5D",
+    "world": "Escenario 3D",
+    "play": "Reproducir",
+    "pause": "Pausa",
+    "export": "Exportar MP4",
+    "exporting": "Exportando 3D…",
+    "exportProgress": "Fotograma 3D {{index}} / {{total}}",
+    "exported": "MP4 3D guardado en Vídeos como {{name}}",
+    "exportFailed": "No se pudo exportar la escena 3D.",
+    "help": "Metros, Y-up. La identidad del clip es índice más el nombre glTF exacto. Los GLB locales se quedan en el navegador; no se suben.",
+    "runHelp": "El personaje se queda en sitio. Elige el clip Running por su nombre glTF exacto; no lo adivines. El mundo es un cilindro que se desplaza detrás.",
+    "infinite": "Fondo infinito",
+    "loopSpeed": "Desplazamiento",
+    "clipIndex": "Índice de clip",
+    "clipName": "Nombre exacto",
+    "noClip": "Sin clip",
+    "exactName": "Running",
+    "eye": "ojo x {{x}}",
+    "slot": {
+      "subject_1": "Sujeto 1",
+      "subject_2": "Sujeto 2",
+      "background": "Fondo",
+      "prop": "Atrezo"
+    },
+    "family": {
+      "establishment": "Establecimiento / push-in",
+      "orbit": "Órbita",
+      "follow": "Travelling",
+      "product": "Plato de producto",
+      "reveal": "Grúa de revelado",
+      "encounter": "Plano de dos / OTS",
+      "pursuit": "Persecución / carrera",
+      "musical": "Órbita musical"
+    },
+    "template": {
+      "two-shot": "Plano de dos",
+      "product-orbit": "Órbita de producto",
+      "hero-push": "Push-in de héroe",
+      "over-shoulder": "Sobre el hombro",
+      "tracking": "Travelling",
+      "crane-reveal": "Grúa de revelado",
+      "establishing": "Plano de situación",
+      "run-loop": "Carrera en bucle"
+    }
   }
 }

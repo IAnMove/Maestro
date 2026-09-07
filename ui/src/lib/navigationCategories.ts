@@ -7,7 +7,7 @@ export const NAVIGATION_CATEGORIES = [
 export type NavigationCategory = typeof NAVIGATION_CATEGORIES[number]
 
 const STUDIOS = new Set<MediaFilter>([
-  'stories', 'series', 'comics', 'scene3d', 'animate3d', 'characters',
+  'stories', 'series', 'comics', 'scene3d', 'world3d', 'animate3d', 'characters',
 ])
 const PRODUCTION = new Set<MediaFilter>(['videoeditor'])
 const MEDIA = new Set<MediaFilter>([
@@ -26,7 +26,7 @@ export function categoryForMediaFilter(filter: MediaFilter): NavigationCategory 
 export function categoryForNavigationDestination(destination: string): NavigationCategory | null {
   if (destination === 'studio') return 'direct-generation'
   if (destination === 'director' || destination === 'productions' || destination === 'video_editor') return 'production'
-  if (['story_lab', 'series_lab', 'comics', 'video_3d', 'animate_3d', 'character_creator', 'character_kit'].includes(destination)) return 'studios'
+  if (['story_lab', 'series_lab', 'comics', 'video_3d', 'world_3d', 'animate_3d', 'character_creator', 'character_kit'].includes(destination)) return 'studios'
   if (['images', 'videos', 'audio', '3d'].includes(destination)) return 'media'
   return null
 }

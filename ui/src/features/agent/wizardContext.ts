@@ -861,6 +861,7 @@ function inferredLocation(state: ReturnType<typeof useStore.getState>): WizardCo
     comics: { area: 'comics', tab: 'comics', section: '' },
     videoeditor: { area: 'video_editor', tab: 'video_editor', section: '' },
     scene3d: { area: 'video_3d', tab: 'video_3d', section: '' },
+    world3d: { area: 'video_3d', tab: 'world_3d', section: 'world' },
     animate3d: { area: 'video_3d', tab: 'animate_3d', section: 'animate' },
     characters: { area: 'character_kit', tab: 'character_kit', section: '' },
     workspaces: { area: 'workspaces', tab: 'workspaces', section: '' },
