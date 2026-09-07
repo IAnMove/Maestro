@@ -47,10 +47,10 @@ test('selecciona el asset completo por id durable y sólo consulta el catálogo'
   }) as typeof fetch
   try {
     const view = await renderPicker({ onPick: item => { selected.value = item } })
-    await view.screen.findByRole('button', { name: 'Seleccionar hero.png' })
+    await view.screen.findByRole('button', { name: 'Select hero.png' })
     const unavailableGlb = view.screen.getByRole('tab', { name: /GLB \/ 3D/ }) as HTMLButtonElement
     assert.equal(unavailableGlb.disabled, true)
-    assert.match(unavailableGlb.textContent || '', /no disponible/)
+    assert.match(unavailableGlb.textContent || '', /unavailable/)
     await view.waitFor(() => assert.equal(requests.length, 1))
     const query = new URL(requests[0], 'http://localhost').searchParams
     assert.equal(query.get('workspace'), 'default')
@@ -59,7 +59,7 @@ test('selecciona el asset completo por id durable y sólo consulta el catálogo'
     assert.equal(query.get('offset'), '0')
     assert.ok(requests.every(url => url.includes('/api/v1/assets?')))
     assert.equal(requests.some(url => url.includes('/generate') || url.includes('/model')), false)
-    view.fireEvent.click(view.screen.getByRole('button', { name: 'Seleccionar hero.png' }))
+    view.fireEvent.click(view.screen.getByRole('button', { name: 'Select hero.png' }))
     assert.equal(selected.value?.id, hero.id)
     assert.equal(selected.value?.filename, hero.filename)
     assert.deepEqual(selected.value?.locations, hero.locations)
@@ -93,8 +93,8 @@ test('cancela y oculta resultados obsoletos al cambiar de workspace', { concurre
     assert.equal(aborts, 1)
     pending.get('one')?.resolve(new Response(JSON.stringify({ assets: [asset({ id: 'stale', filename: 'stale.png' })], total: 1 })))
     pending.get('two')?.resolve(new Response(JSON.stringify({ assets: [asset({ id: 'current', filename: 'current.png', locations: [{ workspace_id: 'two', filename: 'current.png', url: '/api/v1/file/current.png?workspace=two' }] })], total: 1 })))
-    await screen.findByRole('button', { name: 'Seleccionar current.png' })
-    assert.equal(screen.queryByRole('button', { name: 'Seleccionar stale.png' }), null)
+    await screen.findByRole('button', { name: 'Select current.png' })
+    assert.equal(screen.queryByRole('button', { name: 'Select stale.png' }), null)
     cleanup()
   } finally {
     globalThis.fetch = originalFetch
@@ -111,13 +111,13 @@ test('cambiar el tipo invalida la lista anterior y deja visible el tipo incompat
   }) as typeof fetch
   try {
     const { screen, waitFor, fireEvent, cleanup } = await renderPicker({ kinds: ['image', 'model3d'], onPick: () => undefined })
-    await screen.findByRole('button', { name: 'Seleccionar hero.png' })
+    await screen.findByRole('button', { name: 'Select hero.png' })
     const modelTab = screen.getByRole('tab', { name: /GLB \/ 3D/ })
     fireEvent.click(modelTab)
-    assert.equal(screen.queryByRole('button', { name: 'Seleccionar hero.png' }), null)
-    await screen.findByRole('button', { name: 'Seleccionar ship.glb' })
-    await waitFor(() => assert.equal(screen.queryByRole('button', { name: 'Seleccionar hero.png' }), null))
-    const imageTab = screen.getByRole('tab', { name: /Imágenes/ })
+    assert.equal(screen.queryByRole('button', { name: 'Select hero.png' }), null)
+    await screen.findByRole('button', { name: 'Select ship.glb' })
+    await waitFor(() => assert.equal(screen.queryByRole('button', { name: 'Select hero.png' }), null))
+    const imageTab = screen.getByRole('tab', { name: /Images/ })
     assert.equal((imageTab as HTMLButtonElement).disabled, false)
     cleanup()
   } finally {
@@ -136,7 +136,7 @@ test('muestra una razón de bloqueo y conserva la identidad aunque falle el prev
       onPick: () => { picked = true },
       disabledReason: () => 'Falta metadata canónica',
     })
-    const card = await view.screen.findByRole('button', { name: 'Seleccionar hero.png' }) as HTMLButtonElement
+    const card = await view.screen.findByRole('button', { name: 'Select hero.png' }) as HTMLButtonElement
     assert.equal(card.disabled, true)
     assert.match(card.textContent || '', /Falta metadata canónica/)
     assert.equal(card.getAttribute('aria-pressed'), 'true')
@@ -146,10 +146,10 @@ test('muestra una razón de bloqueo y conserva la identidad aunque falle el prev
     // Render an enabled copy to exercise the image error path without changing selectedId.
     const Picker = view.TemplateAssetPicker
     view.rerender(<Picker workspace="default" kinds={['image']} selectedId={hero.id} onPick={() => undefined} />)
-    const image = await view.screen.findByRole('img', { name: 'Vista previa de hero.png' })
+    const image = await view.screen.findByRole('img', { name: 'Preview of hero.png' })
     view.fireEvent.error(image)
-    assert.ok(view.screen.getByText('Preview no disponible'))
-    assert.equal((view.screen.getByRole('button', { name: 'Seleccionar hero.png' }) as HTMLButtonElement).getAttribute('aria-pressed'), 'true')
+    assert.ok(view.screen.getByText('Preview unavailable'))
+    assert.equal((view.screen.getByRole('button', { name: 'Select hero.png' }) as HTMLButtonElement).getAttribute('aria-pressed'), 'true')
     view.cleanup()
   } finally {
     globalThis.fetch = originalFetch
@@ -168,9 +168,9 @@ test('rechaza URLs remotas, blob y ubicaciones de otro workspace para previews',
   globalThis.fetch = (async () => new Response(JSON.stringify({ assets: [unsafe], total: 1 }))) as typeof fetch
   try {
     const { screen, cleanup } = await renderPicker({ onPick: () => undefined })
-    await screen.findByRole('button', { name: 'Seleccionar hero.png' })
+    await screen.findByRole('button', { name: 'Select hero.png' })
     assert.equal(screen.queryByRole('img'), null)
-    assert.ok(screen.getByText('Preview no disponible en este workspace'))
+    assert.ok(screen.getByText('Preview unavailable in this workspace'))
     cleanup()
   } finally {
     globalThis.fetch = originalFetch
@@ -183,7 +183,7 @@ test('no carga una preview cuyo query apunta a otro workspace aunque la ubicaci�
   globalThis.fetch = (async () => new Response(JSON.stringify({ assets: [mismatched], total: 1 }))) as typeof fetch
   try {
     const view = await renderPicker({ onPick: () => undefined })
-    await view.screen.findByRole('button', { name: 'Seleccionar hero.png' })
+    await view.screen.findByRole('button', { name: 'Select hero.png' })
     assert.equal(view.screen.queryByRole('img'), null)
     view.cleanup()
   } finally { globalThis.fetch = originalFetch }
@@ -197,7 +197,7 @@ test('muestra y selecciona hero(1).png con la codificación del backend', { conc
   let picked = ''
   try {
     const view = await renderPicker({ workspace: 'film(2)', onPick: value => { picked = value.id } })
-    const button = await view.screen.findByRole('button', { name: 'Seleccionar hero(1).png' })
+    const button = await view.screen.findByRole('button', { name: 'Select hero(1).png' })
     assert.equal(view.screen.getByRole('img').getAttribute('src'), source)
     view.fireEvent.click(button)
     assert.equal(picked, item.id)

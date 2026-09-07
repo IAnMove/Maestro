@@ -90,7 +90,7 @@ async function chooseAsset(
   filename: string,
 ) {
   view.fireEvent.click(view.screen.getByRole('button', { name: slotLabel }))
-  const assetButton = await view.screen.findByRole('button', { name: `Seleccionar ${filename}` })
+  const assetButton = await view.screen.findByRole('button', { name: `Select ${filename}` })
   view.fireEvent.click(assetButton)
 }
 
@@ -107,7 +107,7 @@ test('expone claves y descripciones musicales, exige dos sujetos, conserva IDs y
 
   try {
     const view = await renderDialog({ onApply: scene => { applied.push(scene); return true } })
-    const selector = view.screen.getByRole('combobox', { name: 'Acción / plantilla' }) as HTMLSelectElement
+    const selector = view.screen.getByRole('combobox', { name: 'Action / template' }) as HTMLSelectElement
     assert.equal(selector.options.length, ALL_SCENE_TEMPLATES.length)
 
     view.fireEvent.change(selector, { target: { value: 'music-orbit-duel' } })
@@ -118,9 +118,9 @@ test('expone claves y descripciones musicales, exige dos sujetos, conserva IDs y
       assert.ok(view.screen.getByText(`${slot.id} · image`))
       assert.ok(view.screen.getByText(slot.description))
     }
-    assert.equal((view.screen.getByRole('button', { name: /Crear y abrir en editor/i }) as HTMLButtonElement).disabled, true)
-    assert.equal((view.screen.getByRole('spinbutton', { name: 'BPM visual' }) as HTMLInputElement).disabled, true)
-    assert.equal((view.screen.getByRole('spinbutton', { name: 'Intensidad del pulso' }) as HTMLInputElement).disabled, true)
+    assert.equal((view.screen.getByRole('button', { name: /Create and open in editor/i }) as HTMLButtonElement).disabled, true)
+    assert.equal((view.screen.getByRole('spinbutton', { name: 'Visual BPM' }) as HTMLInputElement).disabled, true)
+    assert.equal((view.screen.getByRole('spinbutton', { name: 'Pulse intensity' }) as HTMLInputElement).disabled, true)
 
     assert.ok(await view.screen.findByText(/referencia visual pendiente de revisión/i))
     assert.equal(view.container.querySelector('video, iframe'), null)
@@ -133,13 +133,13 @@ test('expone claves y descripciones musicales, exige dos sujetos, conserva IDs y
     assert.equal(contract.templateId, 'music-orbit-duel')
     assert.deepEqual(contract.components.map((component: { key: string }) => component.key), ['subject_1', 'subject_2', 'background'])
 
-    await chooseAsset(view, /Sujeto 1.*obligatorio/i, fixture.subject1.filename)
-    await chooseAsset(view, /Sujeto 2.*obligatorio/i, fixture.subject2.filename)
-    await chooseAsset(view, /Fondo.*obligatorio/i, fixture.background.filename)
-    assert.equal((view.screen.getByRole('button', { name: /Crear y abrir en editor/i }) as HTMLButtonElement).disabled, true, 'confirmation remains required')
+    await chooseAsset(view, /Subject 1.*required/i, fixture.subject1.filename)
+    await chooseAsset(view, /Subject 2.*required/i, fixture.subject2.filename)
+    await chooseAsset(view, /Background.*required/i, fixture.background.filename)
+    assert.equal((view.screen.getByRole('button', { name: /Create and open in editor/i }) as HTMLButtonElement).disabled, true, 'confirmation remains required')
 
-    view.fireEvent.click(view.screen.getByRole('checkbox', { name: /He guardado lo que necesito/i }))
-    const apply = view.screen.getByRole('button', { name: /Crear y abrir en editor/i }) as HTMLButtonElement
+    view.fireEvent.click(view.screen.getByRole('checkbox', { name: /I have saved what I need/i }))
+    const apply = view.screen.getByRole('button', { name: /Create and open in editor/i }) as HTMLButtonElement
     assert.equal(apply.disabled, false)
     view.fireEvent.click(apply)
     await view.waitFor(() => assert.equal(applied.length, 1))
@@ -163,12 +163,12 @@ test('mantiene BPM e intensidad desactivados en las 24 nuevas coreografías', { 
   const calls = installAssetFetch()
   try {
     const view = await renderDialog()
-    const selector = view.screen.getByRole('combobox', { name: 'Acción / plantilla' }) as HTMLSelectElement
+    const selector = view.screen.getByRole('combobox', { name: 'Action / template' }) as HTMLSelectElement
     for (const template of MUSIC_MOTION_TEMPLATES) {
       view.fireEvent.change(selector, { target: { value: template.id } })
       await view.waitFor(() => assert.equal(selector.value, template.id))
-      assert.equal((view.screen.getByRole('spinbutton', { name: 'BPM visual' }) as HTMLInputElement).disabled, true, template.id)
-      assert.equal((view.screen.getByRole('spinbutton', { name: 'Intensidad del pulso' }) as HTMLInputElement).disabled, true, template.id)
+      assert.equal((view.screen.getByRole('spinbutton', { name: 'Visual BPM' }) as HTMLInputElement).disabled, true, template.id)
+      assert.equal((view.screen.getByRole('spinbutton', { name: 'Pulse intensity' }) as HTMLInputElement).disabled, true, template.id)
     }
     assert.equal(calls.some(url => /generate|model3d\/generate/i.test(url)), false)
     view.cleanup()
@@ -182,22 +182,22 @@ test('cambiar entre una plantilla musical y una legacy reinicia selecciones sin 
   installAssetFetch()
   try {
     const view = await renderDialog()
-    const selector = view.screen.getByRole('combobox', { name: 'Acción / plantilla' }) as HTMLSelectElement
+    const selector = view.screen.getByRole('combobox', { name: 'Action / template' }) as HTMLSelectElement
 
     view.fireEvent.change(selector, { target: { value: 'music-orbit-duel' } })
     await view.waitFor(() => assert.equal(selector.value, 'music-orbit-duel'))
-    await chooseAsset(view, /Sujeto 1.*obligatorio/i, fixture.subject1.filename)
-    const selected = view.screen.getByRole('button', { name: `Seleccionar ${fixture.subject1.filename}` })
+    await chooseAsset(view, /Subject 1.*required/i, fixture.subject1.filename)
+    const selected = view.screen.getByRole('button', { name: `Select ${fixture.subject1.filename}` })
     assert.equal(selected.getAttribute('aria-pressed'), 'true')
 
     view.fireEvent.change(selector, { target: { value: 'cinema-establishing' } })
     await view.waitFor(() => assert.equal(selector.value, 'cinema-establishing'))
     assert.equal(view.screen.queryByText('subject_1 · image'), null)
-    assert.equal((view.screen.getByRole('button', { name: /Crear y abrir en editor/i }) as HTMLButtonElement).disabled, true)
+    assert.equal((view.screen.getByRole('button', { name: /Create and open in editor/i }) as HTMLButtonElement).disabled, true)
 
     view.fireEvent.change(selector, { target: { value: 'music-orbit-duel' } })
     await view.waitFor(() => assert.equal(selector.value, 'music-orbit-duel'))
-    const reset = await view.screen.findByRole('button', { name: `Seleccionar ${fixture.subject1.filename}` })
+    const reset = await view.screen.findByRole('button', { name: `Select ${fixture.subject1.filename}` })
     assert.equal(reset.getAttribute('aria-pressed'), 'false')
     assert.ok(view.screen.getByText('subject_1 · image'))
     view.cleanup()
