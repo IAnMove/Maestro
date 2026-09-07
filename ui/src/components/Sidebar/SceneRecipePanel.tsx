@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { TFunction } from 'i18next'
-import { Box, FileJson, Image as ImageIcon, Loader2, Play, Sparkles, Square, Upload, Video, X } from 'lucide-react'
-import { fetchOutputMetadata, generateLlmText, getFileUrl, getOutputThumbnailUrl, uploadImage, type ApiOutput } from '../../api/client'
+import { Box, FileJson, Image as ImageIcon, Loader2, Play, Sparkles, Square, Video, X } from 'lucide-react'
+import { fetchOutputMetadata, generateLlmText, getFileUrl, getOutputThumbnailUrl, type ApiOutput } from '../../api/client'
 import {
   listenForProgrammaticVideoPreparation,
   type ProgrammaticVideoPreparation,
   type ProgrammaticVideoPreparationAck,
 } from '../../features/agent/programmaticVideoHandoff'
 import { useUiTranslation } from '../../i18n'
-import { AssetExplorerDialog } from '../common/AssetExplorerDialog'
+import { AssetInput } from '../../features/asset-picker/AssetInput.tsx'
 import { useStore } from '../../stores/useStore'
 import {
   EXAMPLE_SAUCER_CRUISE_RECIPE,
@@ -48,8 +48,6 @@ type LoadedAsset = {
   animations?: RecipeRigAnimation[]
   seamlessHorizontal?: boolean
 }
-
-type PickerKind = 'image' | 'model3d'
 
 const INTENT_EXAMPLES = [
   {
@@ -237,7 +235,6 @@ export function SceneRecipePanel({
 }) {
   const { t } = useUiTranslation('scene3d')
   const workspace = useStore(s => s.activeWorkspace)
-  const loadOutputs = useStore(s => s.loadOutputs)
   // A natural-language request should work without first understanding the
   // asset picker. Manual remains available for deterministic compositions.
   const [mode, setMode] = useState<'manual' | 'auto'>('auto')
@@ -246,7 +243,7 @@ export function SceneRecipePanel({
   const [recipeText, setRecipeText] = useState(JSON.stringify(EXAMPLE_SAUCER_CRUISE_RECIPE, null, 2))
   const [selected, setSelected] = useState<LoadedAsset[]>([])
   const [programmaticPreparation, setProgrammaticPreparation] = useState<ProgrammaticVideoPreparation | null>(null)
-  const [picker, setPicker] = useState<PickerKind | null>(null)
+
   const [busy, setBusy] = useState<'write' | 'run' | 'upload' | null>(null)
   const [status, setStatus] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -254,8 +251,6 @@ export function SceneRecipePanel({
   const [plannedRecipe, setPlannedRecipe] = useState<SceneRecipe | null>(null)
   const [activeShot, setActiveShot] = useState(0)
   const abortRef = useRef<AbortController | null>(null)
-  const imageInputRef = useRef<HTMLInputElement>(null)
-  const modelInputRef = useRef<HTMLInputElement>(null)
   const workspaceRef = useRef(workspace)
   const outputsRef = useRef(outputs)
   const pendingPreparationAckRef = useRef<PendingProgrammaticPreparationAck | null>(null)
@@ -273,7 +268,7 @@ export function SceneRecipePanel({
     const models = outputs.filter(item => item.type === 'model3d' && /\.glb$/i.test(item.name))
     return { images, models }
   }, [outputs])
-  const pickerItems = picker === 'model3d' ? gallery.models : picker === 'image' ? gallery.images : []
+
 
   useEffect(() => {
     const unsubscribe = listenForProgrammaticVideoPreparation(async request => {
@@ -343,7 +338,6 @@ export function SceneRecipePanel({
       setPlannedRecipe(null)
       setShots([])
       setActiveShot(0)
-      setPicker(null)
       setError(null)
       setStatus(translationRef.current('recipe.wizardPreparationLoaded', { policy: accepted.generationPolicy }))
       return reflected
@@ -443,36 +437,6 @@ export function SceneRecipePanel({
     } catch {
       // Imported and legacy outputs may not have a readable sidecar. The exact
       // source and filename remain enough for manual composition.
-    }
-  }
-
-  const importFiles = async (files: File[], kind: PickerKind) => {
-    if (!files.length) return
-    setPanelBusy('upload')
-    setError(null)
-    try {
-      const next: LoadedAsset[] = []
-      for (const file of files) {
-        const uploaded = await uploadImage(file)
-        const resolvedKind: RecipeAssetKind = kind === 'model3d' ? 'model3d' : file.type.startsWith('video/') ? 'video' : 'image'
-        next.push({
-          key: uploaded.filename,
-          name: uploaded.filename,
-          kind: resolvedKind,
-          source: uploaded.filename,
-          previewUrl: resolvedKind === 'model3d' ? getOutputThumbnailUrl(uploaded.filename) : uploaded.url,
-        })
-      }
-      setSelected(current => {
-        const seen = new Set(current.map(asset => asset.source))
-        return [...current, ...next.filter(asset => !seen.has(asset.source))]
-      })
-      await loadOutputs()
-      setStatus(t('recipe.addedFiles', { count: next.length }))
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : t('recipe.uploadFailed'))
-    } finally {
-      setPanelBusy(null)
     }
   }
 
@@ -660,29 +624,24 @@ export function SceneRecipePanel({
 
       {mode === 'manual' && (
         <div className="space-y-2">
-          <div className="flex gap-1">
-            <button
-              type="button"
-              disabled={locked}
-              onClick={() => setPicker(current => current === 'image' ? null : 'image')}
-              className={`flex flex-1 items-center justify-center gap-1 rounded border px-2 py-1.5 text-[10px] ${
-                picker === 'image' ? 'border-cyan-300 bg-cyan-400/15 text-cyan-100' : 'border-border text-text-secondary'
-              }`}
-            >
-              <ImageIcon size={12} /> {t('recipe.images')}
-            </button>
-            <button
-              type="button"
-              disabled={locked}
-              onClick={() => setPicker(current => current === 'model3d' ? null : 'model3d')}
-              className={`flex flex-1 items-center justify-center gap-1 rounded border px-2 py-1.5 text-[10px] ${
-                picker === 'model3d' ? 'border-cyan-300 bg-cyan-400/15 text-cyan-100' : 'border-border text-text-secondary'
-              }`}
-            >
-              <Box size={12} /> {t('recipe.models')}
-            </button>
-          </div>
-
+          <AssetInput
+            label={t('recipe.imagesFromApp')}
+            placeholder={t('recipe.images')}
+            items={gallery.images}
+            accept="image/*,video/*"
+            disabled={locked}
+            constraints={{ kinds: ['image', 'video'], maxCount: 1, optional: true }}
+            onChoose={item => { if (item) void addOutput(item) }}
+          />
+          <AssetInput
+            label={t('recipe.glbFromApp')}
+            placeholder={t('recipe.models')}
+            items={gallery.models}
+            accept=".glb,model/gltf-binary"
+            disabled={locked}
+            constraints={{ kinds: ['model3d'], maxCount: 1, optional: true }}
+            onChoose={item => { if (item) void addOutput(item) }}
+          />
           {selected.length > 0 && (
             <div>
               <div className="mb-1 text-[9px] uppercase tracking-wider text-text-muted">{t('recipe.selectedCount', { count: selected.length })}</div>
@@ -701,56 +660,6 @@ export function SceneRecipePanel({
               </div>
             </div>
           )}
-
-          <div className="flex gap-1">
-            <button
-              type="button"
-              disabled={locked}
-              onClick={() => imageInputRef.current?.click()}
-              className="flex flex-1 items-center justify-center gap-1 rounded border border-dashed border-cyan-400/40 py-1.5 text-[10px] text-cyan-200 hover:bg-cyan-400/10 disabled:opacity-40"
-            >
-              {busy === 'upload' ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
-              {t('recipe.importImage')}
-            </button>
-            <button
-              type="button"
-              disabled={locked}
-              onClick={() => modelInputRef.current?.click()}
-              className="flex flex-1 items-center justify-center gap-1 rounded border border-dashed border-cyan-400/40 py-1.5 text-[10px] text-cyan-200 hover:bg-cyan-400/10 disabled:opacity-40"
-            >
-              {busy === 'upload' ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
-              {t('recipe.importGlb')}
-            </button>
-          </div>
-          <AssetExplorerDialog
-            open={Boolean(picker)}
-            title={picker === 'model3d' ? t('recipe.glbFromApp') : t('recipe.imagesFromApp')}
-            items={pickerItems}
-            onClose={() => setPicker(null)}
-            onChoose={item => { if (item) void addOutput(item); setPicker(null) }}
-          />
-          <input
-            ref={imageInputRef}
-            type="file"
-            accept="image/*,video/*"
-            multiple
-            className="hidden"
-            onChange={event => {
-              void importFiles(Array.from(event.target.files || []), 'image')
-              event.currentTarget.value = ''
-            }}
-          />
-          <input
-            ref={modelInputRef}
-            type="file"
-            accept=".glb,model/gltf-binary"
-            multiple
-            className="hidden"
-            onChange={event => {
-              void importFiles(Array.from(event.target.files || []), 'model3d')
-              event.currentTarget.value = ''
-            }}
-          />
         </div>
       )}
 
