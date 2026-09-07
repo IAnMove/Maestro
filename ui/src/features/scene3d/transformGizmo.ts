@@ -59,7 +59,8 @@ export function createTransformGizmo(world: GpuWorld, onChange: (id: string, pat
       allowed = enabled
       mode = nextMode
       controls.enabled = enabled
-      if (!slot || slot.media === 'image' || !enabled) { controls.detach(); return }
+      if (!slot || slot.media === 'image' || !enabled) { controls.pointerUp(null); controls.detach(); return }
+      if (selectedId !== slot.id) controls.pointerUp(null)
       selectedId = slot.id
       if (!controls.dragging) {
         proxy.position.fromArray(slot.position)
@@ -74,7 +75,7 @@ export function createTransformGizmo(world: GpuWorld, onChange: (id: string, pat
       controls.showZ = mode !== 'rotate'
       controls.attach(proxy)
     },
-    hide() { allowed = false; controls.enabled = false; controls.detach() },
+    hide() { allowed = false; controls.pointerUp(null); controls.enabled = false; controls.detach() },
     dispose() {
       canvas.removeEventListener('pointerdown', select)
       controls.removeEventListener('change', redraw)
