@@ -31,7 +31,7 @@ async function setup(mode: 'avatar' | 'video', subMode: 'recast' | 'restyle', di
     families: [{ id: 'wan', label: 'Wan', order: 1 }, { id: 'h3_advanced', label: 'H3 / Viggle', order: 2 }],
     enabledModels: new Set(models.map(model => model.model_type).filter(id => !disabled.includes(id))),
     params: { ...initial.params, model_type: 'scail2_14B' },
-    selectModel: async id => { selections.push(id) },
+    selectModel: async id => { selections.push(id); useStore.setState(s => ({ params: { ...s.params, model_type: id } })) },
   })
   const view = render(<ModelSelector />)
   fireEvent.click(view.getByRole('button', { name: 'SCAIL HQ' }))
@@ -41,7 +41,7 @@ async function setup(mode: 'avatar' | 'video', subMode: 'recast' | 'restyle', di
   }
 }
 
-test('Recast dropdown exposes Viggle and the two replacement recipes, without H3 video generators', async () => {
+test('Recast dropdown exposes its SCAIL recipes; Viggle has a separate workflow', async () => {
   const fixture = await setup('avatar', 'recast')
   try {
     const { view, fireEvent, selections } = fixture
@@ -50,16 +50,14 @@ test('Recast dropdown exposes Viggle and the two replacement recipes, without H3
     assert.equal(view.queryByRole('button', { name: 'SCAIL Animate Fast' }), null)
     assert.equal(view.queryByRole('button', { name: 'H3 FL2VA' }), null)
     assert.equal(view.queryByRole('button', { name: 'H3 Ref2VA' }), null)
-    const viggle = view.queryByRole('button', { name: 'Viggle-Animate Pruned 20B' })
-    assert.ok(viggle, 'The visible Recast dropdown must offer Viggle')
-    fireEvent.click(viggle)
-    assert.deepEqual(selections, ['viggle_animate'])
     assert.equal(view.queryByRole('button', { name: 'Viggle-Animate Pruned 20B' }), null)
+    fireEvent.click(view.getByRole('button', { name: 'SCAIL Recast Fast' }))
+    assert.deepEqual(selections, ['scail2_14B_recast_fast'])
   } finally { fixture.close() }
 })
 
 test('Recast enable-more count includes disabled compatible models only', async () => {
-  const fixture = await setup('avatar', 'recast', ['viggle_animate', 'h3_advanced_fl2va_pruned', 'h3_advanced_ref2va_pruned'])
+  const fixture = await setup('avatar', 'recast', ['viggle_animate', 'scail2_14B_recast_fast', 'h3_advanced_fl2va_pruned', 'h3_advanced_ref2va_pruned'])
   try {
     assert.ok(fixture.view.queryByRole('button', { name: /Enable more models.*1 available/ }))
     assert.equal(fixture.view.queryByRole('button', { name: 'Viggle-Animate Pruned 20B' }), null)
@@ -81,5 +79,22 @@ test('Video dropdown retains H3 generators and excludes Viggle even after visiti
     assert.ok(fixture.view.queryByRole('button', { name: 'H3 FL2VA' }))
     assert.ok(fixture.view.queryByRole('button', { name: 'H3 Ref2VA' }))
     assert.equal(fixture.view.queryByRole('button', { name: 'Viggle-Animate Pruned 20B' }), null)
+  } finally { fixture.close() }
+})
+
+
+test('Viggle tab selects its exact model and displays a fixed model label; Recast restores SCAIL', async () => {
+  const fixture = await setup('avatar', 'recast')
+  const { render, fireEvent } = await import('@testing-library/react')
+  const { EditSubModeToggle } = await import('../src/components/Sidebar/EditSubModeToggle')
+  try {
+    const tabs = render(<EditSubModeToggle />)
+    fireEvent.click(tabs.getByRole('button', { name: 'Viggle', exact: true }))
+    assert.deepEqual(fixture.selections, ['viggle_animate'])
+    assert.equal(fixture.view.container.querySelectorAll('button').length, 0)
+    assert.match(fixture.view.container.textContent || '', /Viggle-Animate Pruned 20B/)
+    assert.equal(tabs.getByRole('button', { name: 'Viggle', exact: true }).getAttribute('aria-pressed'), 'true')
+    fireEvent.click(tabs.getByRole('button', { name: 'Recast', exact: true }))
+    assert.deepEqual(fixture.selections, ['viggle_animate', 'scail2_14B_recast_fast'])
   } finally { fixture.close() }
 })

@@ -11436,6 +11436,8 @@ async def extract_frames_endpoint(request: Request):
         video_path: str,
         start_time?: float,    # if provided, extract this frame
         end_time?: float,      # if provided, extract this frame
+        wangp_media?: bool,    # resolve canonical media URLs within their roots
+        workspace?: str,
     }
 
     Returns: {
@@ -11447,7 +11449,12 @@ async def extract_frames_endpoint(request: Request):
     video_path = body.get("video_path")
     if not video_path:
         raise HTTPException(status_code=400, detail="video_path is required")
-    if not os.path.isabs(video_path):
+    if body.get("wangp_media"):
+        try:
+            video_path = _resolve_wangp_visual_media(video_path, body.get("workspace"))
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+    elif not os.path.isabs(video_path):
         # Resolve relative paths against the active workspace + uploads/
         for base in [_workspace_dir(body.get("workspace")), os.path.join(os.getcwd(), "uploads")]:
             cand = os.path.join(base, os.path.basename(video_path))

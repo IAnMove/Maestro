@@ -51,6 +51,7 @@ export function ModelSelector() {
     family,
     models: getModelsForFamily(family.id, models, generationMode, effectiveSubMode)
       .filter(m => !m.tool_only)
+      .filter(m => effectiveSubMode !== 'recast' || m.model_type !== 'viggle_animate')
       .filter(m => enabledModels.has(m.model_type))
       .filter(m => !m.nsfw_only || nsfwMode),
   })).filter(g => g.models.length > 0)
@@ -60,9 +61,16 @@ export function ModelSelector() {
   const disabledCount = modeFamilies.reduce((n, family) => {
     const avail = getModelsForFamily(family.id, models, generationMode, effectiveSubMode)
       .filter(m => !m.tool_only)
+      .filter(m => effectiveSubMode !== 'recast' || m.model_type !== 'viggle_animate')
       .filter(m => !m.nsfw_only || nsfwMode)
     return n + avail.filter(m => !enabledModels.has(m.model_type)).length
   }, 0)
+
+  if (effectiveSubMode === 'recast' && currentModelType === 'viggle_animate') {
+    return <div data-wizard-anchor="model" className="rounded-lg border border-border bg-bg-tertiary px-2.5 py-2 text-xs">
+      <span>{currentModel?.name || 'Viggle-Animate'}</span>
+    </div>
+  }
 
   return (
     <div className="relative flex-1 min-w-0" ref={containerRef} data-wizard-anchor="model">

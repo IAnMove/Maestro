@@ -27,7 +27,8 @@
     "outpaint": "Outpaint",
     "restyle": "Repintar",
     "recast": "Recast",
-    "inpaint": "Inpaint"
+    "inpaint": "Inpaint",
+    "viggle": "Viggle"
   },
   "audioSubModes": {
     "speech": "Voz",
@@ -858,6 +859,26 @@
     "visualKind": "Tipo de referencia",
     "visualImage": "Imagen",
     "visualVideo": "Vídeo",
-    "visualHint": "Usa el LLM con visión seleccionado. Vídeos: hasta 8 fotogramas muestreados, sin audio."
+    "visualHint": "Usa el LLM con visión seleccionado. Vídeos: hasta 8 fotogramas muestreados, sin audio.",
+    "aspectMismatch": "El vídeo mide {{videoWidth}} × {{videoHeight}} y la imagen {{imageWidth}} × {{imageHeight}}. Genera el fotograma sustituto conservando la proporción del vídeo; una foto del personaje por separado no sirve como fotograma editado.",
+    "checkingFrame": "Comprobando fotograma…",
+    "mediaUnreadable": "No se pudo leer el vídeo o el fotograma. Selecciona ambos archivos antes de generar.",
+    "autoDownload": "Al pulsar Generar se descargarán automáticamente los archivos del modelo que falten y después comenzará la animación. Puedes seguir el progreso y cancelar desde la tarea.",
+    "steps": {
+      "title": "Cómo sustituir un personaje con Viggle",
+      "source": "Carga el vídeo cuyo movimiento quieres conservar.",
+      "edit": "Pulsa «Abrir un fotograma original en el editor de imágenes». Allí genera la imagen con el personaje sustituido y pulsa «Aplicar y volver».",
+      "animate": "Comprueba el fotograma editado, elige resolución y audio y pulsa «Generar» para crear el vídeo."
+    },
+    "imageStep": {
+      "title": "Paso 2 de 3 · Genera el fotograma sustituto",
+      "references": "Conserva el fotograma original como referencia 1. Si quieres copiar la apariencia de otro personaje, añade su imagen como referencia 2.",
+      "prompt": "Describe en el campo de texto qué personaje sustituir y cómo debe quedar. Usa un modelo de edición de imágenes que admita referencias.",
+      "generate": "Pulsa «Generar» o «Ir» en el botón azul inferior y espera a que termine la imagen. Añadir referencias todavía no realiza la sustitución.",
+      "apply": "Revisa la última imagen generada y pulsa «Aplicar y volver». Volverás a Viggle para generar el vídeo.",
+      "keepFrame": "Mantén la pose, el fondo y el encuadre del fotograma original. Deja la resolución y la proporción en Auto para conservar el lienzo del vídeo.",
+      "exampleTitle": "Ejemplo de instrucción",
+      "example": "Sustituye al personaje de la imagen 1 por la persona de la imagen 2. Conserva la pose, el fondo, la cámara, el encuadre y las proporciones de la imagen 1."
+    }
   }
 }

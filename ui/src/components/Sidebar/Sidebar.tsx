@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { X, Globe, BookMarked, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { useStore } from '../../stores/useStore'
 import { useIsMobile } from '../../lib/useIsMobile'
@@ -24,7 +24,6 @@ import { OutpaintControls } from './OutpaintControls'
 import { RetakeControls } from './RetakeControls'
 import { EditAnythingControls } from './EditAnythingControls'
 import { RecastControls } from './RecastControls'
-import { ViggleControls } from './ViggleControls'
 import { WangpModelControls } from './WangpModelControls'
 import { BlendControls } from './BlendControls'
 import { AnchorReturnBanner } from './AnchorReturnBanner'
@@ -38,6 +37,8 @@ import { PanoramaLoopPanel } from './PanoramaLoopPanel'
 import { BrandIdentity } from '../BrandIdentity'
 import { DirectorChat } from './DirectorChat'
 import { useUiTranslation } from '../../i18n'
+
+const ViggleControls = lazy(() => import('./ViggleControls').then(module => ({ default: module.ViggleControls })))
 
 export function Sidebar() {
   const { t } = useUiTranslation('navigation')
@@ -162,7 +163,9 @@ export function Sidebar() {
       )}
       {isRecast && (
         <>
-          {modelType === 'viggle_animate' ? <ViggleControls /> : <><RecastControls /><PromptInput /></>}
+          {modelType === 'viggle_animate'
+            ? <Suspense fallback={<div role="status">Viggle-Animate…</div>}><ViggleControls /></Suspense>
+            : <><RecastControls /><PromptInput /></>}
         </>
       )}
     </>

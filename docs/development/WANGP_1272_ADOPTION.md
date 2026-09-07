@@ -26,11 +26,19 @@ RIFE mantiene sus rutas ×2/×4 y añade ×3 con tiempos de interpolación en te
 
 ## Viggle
 
-1. Seleccionar Viggle en Recast y elegir el vídeo fuente.
+1. Abrir **Editar → Viggle** y elegir el vídeo fuente. Esta pestaña fija el modelo
+   Viggle-Animate; **Recast** conserva las recetas SCAIL.
 2. Extraer un fotograma hacia Imágenes, editar la apariencia manteniendo pose,
-   encuadre y proporciones, y aplicar el resultado de vuelta a Recast. También se
+   encuadre y proporciones, generar la imagen y aplicar el resultado de vuelta a Viggle. También se
    puede elegir directamente un fotograma ya editado.
 3. Elegir resolución y audio y generar.
+
+Ambos paneles explican el recorrido en español e inglés. La referencia 1 es el
+fotograma completo; una imagen adicional del personaje aporta su apariencia.
+Adjuntar referencias no genera la imagen sustituta. Durante esta edición, Auto
+conserva el lienzo del vídeo; la UI valida dimensiones antes de enviar la animación
+y el servidor mantiene su validación. La descarga de pesos faltantes sucede en
+la carga normal del modelo tras Generar, con el progreso y cancelación del trabajo.
 
 El preset fija tres pasos, Euler, shift 3 y CFG 1 a 24 FPS. Emplea un prompt
 precalculado: el cambio visual se expresa mediante el fotograma. Su panel no

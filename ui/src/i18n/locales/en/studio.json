@@ -27,7 +27,8 @@
     "outpaint": "Outpaint",
     "restyle": "Repaint",
     "recast": "Recast",
-    "inpaint": "Inpaint"
+    "inpaint": "Inpaint",
+    "viggle": "Viggle"
   },
   "audioSubModes": {
     "speech": "Speech",
@@ -824,7 +825,7 @@
     "reselectMedia": "Select the missing media again before generating.",
     "viggleHint": "1. Choose a video. 2. Edit one frame to replace the character, keeping the pose and framing. 3. Generate.",
     "controlVideo": "Control video",
-    "editFrame": "Open a source frame in the image editor",
+    "editFrame": "Open an original frame in the image editor",
     "editedFrame": "Edited frame from this video",
     "resolution": "Resolution",
     "audio": "Audio",
@@ -858,6 +859,26 @@
     "visualKind": "Reference type",
     "visualImage": "Image",
     "visualVideo": "Video",
-    "visualHint": "Uses the selected vision LLM. Videos: up to 8 sampled frames, without audio."
+    "visualHint": "Uses the selected vision LLM. Videos: up to 8 sampled frames, without audio.",
+    "aspectMismatch": "The video is {{videoWidth}} × {{videoHeight}} and the image is {{imageWidth}} × {{imageHeight}}. Generate the replacement frame keeping the video aspect ratio; a separate character portrait is not an edited frame.",
+    "checkingFrame": "Checking frame…",
+    "mediaUnreadable": "Could not read the video or frame. Select both files before generating.",
+    "autoDownload": "Generate automatically downloads any missing model files, then starts the animation. Follow progress or cancel from the task.",
+    "steps": {
+      "title": "How to replace a character with Viggle",
+      "source": "Upload the video whose motion you want to keep.",
+      "edit": "Click “Open an original frame in the image editor”. Generate the image with the replacement character there, then click “Apply & Return”.",
+      "animate": "Check the edited frame, choose resolution and audio, then click “Generate” to create the video."
+    },
+    "imageStep": {
+      "title": "Step 2 of 3 · Generate the replacement frame",
+      "references": "Keep the original frame as reference 1. To copy another character’s appearance, add their image as reference 2.",
+      "prompt": "Describe the character replacement in the prompt field. Use an image editing model that supports references.",
+      "generate": "Click “Generate” or “Go” in the blue button below and wait for the image to finish. Adding references does not perform the replacement yet.",
+      "apply": "Review the latest generated image and click “Apply & Return”. You will return to Viggle to generate the video.",
+      "keepFrame": "Keep the original frame’s pose, background and framing. Leave resolution and aspect ratio on Auto to preserve the video canvas.",
+      "exampleTitle": "Example prompt",
+      "example": "Replace the character in image 1 with the person in image 2. Keep the pose, background, camera, framing and aspect ratio of image 1."
+    }
   }
 }

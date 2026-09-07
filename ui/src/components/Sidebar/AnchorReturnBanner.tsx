@@ -30,6 +30,7 @@ export function AnchorReturnBanner() {
   if (!target) return null
 
   const isRecast = target.anchor === 'recast'
+  const isViggle = isRecast && target.modelType === 'viggle_animate'
   const isRepaint = target.anchor === 'repaint'
   const anchorLabel = target.anchor === 'start'
     ? t('anchor.start')
@@ -48,7 +49,9 @@ export function AnchorReturnBanner() {
       <div className="flex items-center gap-2 mb-1.5">
         <ArrowLeft size={12} className="text-accent-blue shrink-0" />
         <span className="text-[10px] font-semibold text-accent-blue">
-          {isRecast
+          {isViggle
+            ? t('wangp.imageStep.title')
+            : isRecast
             ? t('anchor.editingRecast')
             : isRepaint
               ? t('anchor.editingRepaint')
@@ -66,13 +69,25 @@ export function AnchorReturnBanner() {
           <X size={11} />
         </button>
       </div>
-      <p className="text-[9px] text-text-muted leading-snug mb-2">
+      {isViggle ? <div className="max-h-[32vh] overflow-y-auto pr-1 text-xs text-text-secondary leading-relaxed mb-3 space-y-2">
+        <ol className="list-decimal pl-4 space-y-1">
+          <li>{t('wangp.imageStep.references')}</li>
+          <li>{t('wangp.imageStep.prompt')}</li>
+          <li>{t('wangp.imageStep.generate')}</li>
+          <li>{t('wangp.imageStep.apply')}</li>
+        </ol>
+        <details>
+          <summary className="cursor-pointer">{t('wangp.imageStep.exampleTitle')}</summary>
+          <p className="mt-1">{t('wangp.imageStep.example')}</p>
+        </details>
+        <p>{t('wangp.imageStep.keepFrame')}</p>
+      </div> : <p className="text-[9px] text-text-muted leading-snug mb-2">
         {isRecast
           ? t('anchor.bodyRecast')
           : isRepaint
             ? t('anchor.bodyRepaint')
             : t('anchor.bodyAnchor', { label: anchorLabel.toLowerCase() })}
-      </p>
+      </p>}
       <div className="flex gap-1.5">
         <button
           onClick={() => void apply()}

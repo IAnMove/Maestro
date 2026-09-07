@@ -4,6 +4,7 @@ import { useStore } from '../../stores/useStore'
 import { useUiTranslation } from '../../i18n'
 import { splitPromptSchedule } from '../../lib/promptScheduler'
 import { newUserGenerationContext } from '../../features/studio/generationProvenance'
+import { useViggleGenerationGuard } from '../../lib/useViggleGenerationGuard'
 
 export function GenerateButton() {
   const { t } = useUiTranslation('studio')
@@ -12,6 +13,7 @@ export function GenerateButton() {
   const startGeneration = useStore(s => s.startGeneration)
   const setSidebarOpen = useStore(s => s.setSidebarOpen)
   const [cooldown, setCooldown] = useState(false)
+  const { checkingFrame, frameError, checkBeforeGenerate } = useViggleGenerationGuard()
 
   // Check if i2v-only model needs a start image. Video mode only: edit
   // sub-modes supply their own source media (Recast runs the i2v-only
@@ -55,8 +57,8 @@ export function GenerateButton() {
     return () => clearTimeout(timer)
   }, [cooldown])
 
-  const handleClick = () => {
-    if (blocked) return
+  const handleClick = async () => {
+    if (blocked || !await checkBeforeGenerate()) return
     setCooldown(true)
     startGeneration(undefined, newUserGenerationContext())
     setSidebarOpen(false)
@@ -92,13 +94,14 @@ export function GenerateButton() {
     )
   }
 
-  return (
+  return <div>
+    {frameError && <p role="alert" className="mb-1 max-w-xs text-xs text-red-300">{frameError}</p>}
     <button
       onClick={handleClick}
       data-wizard-anchor="generate"
-      disabled={cooldown || needsScheduledPrompts}
+      disabled={cooldown || checkingFrame || needsScheduledPrompts}
       className={`px-4 py-2 rounded-lg flex items-center gap-1.5 font-medium text-xs transition-all whitespace-nowrap ${
-        cooldown || needsScheduledPrompts
+        cooldown || checkingFrame || needsScheduledPrompts
           ? 'bg-bg-active text-text-muted cursor-not-allowed'
           // Classic theme: bg-cta resolves to a flat accent-green.
           // HocusPocus Blue resolves to the branded blue gradient, while
@@ -107,7 +110,7 @@ export function GenerateButton() {
       }`}
     >
       <Play size={13} fill={cooldown || needsScheduledPrompts ? 'currentColor' : 'white'} />
-      {needsScheduledPrompts
+      {checkingFrame ? t('wangp.checkingFrame') : needsScheduledPrompts
         ? t('generate.addPrompts')
         : cooldown
           ? scheduledVideoCount > 1 ? t('generate.queuedCount', { count: scheduledVideoCount }) : tCommon('status.queued')
@@ -115,5 +118,5 @@ export function GenerateButton() {
             ? t('generate.queueCount', { count: scheduledVideoCount })
             : queueCount > 0 ? t('generate.goCount', { count: queueCount }) : tCommon('actions.generate')}
     </button>
-  )
+  </div>
 }
