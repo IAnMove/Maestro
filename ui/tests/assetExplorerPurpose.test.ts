@@ -26,17 +26,23 @@ test('explorer helpers pick the catalog, title and optional-none flag', () => {
   const audio = [item('score.wav', 'audio')]
   assert.equal(explorerTitleKey('layer-model'), 'animator.generatedModels')
   assert.equal(explorerTitleKey('scene-audio'), 'animator.chooseAudio')
+  assert.equal(explorerTitleKey('layer-overlay'), 'animator.chooseAsset')
   assert.deepEqual(assetsForExplorer('layer-model', models, media, visuals, audio), models)
   assert.deepEqual(assetsForExplorer('narrative-plate', models, media, visuals, audio), media)
+  assert.deepEqual(
+    assetsForExplorer('layer-overlay', models, [item('plate.png'), item('photo.jpg'), item('clip.mp4', 'video')], visuals, audio).map(entry => entry.name),
+    ['plate.png'],
+  )
   assert.equal(explorerSelectedName('narrative-hero', { hero: 'hero.glb', plate: '', prop: '', foreground: '' }), 'hero.glb')
   assert.equal(explorerAllowsNone('narrative-prop'), true)
   assert.equal(explorerAllowsNone('layer-media'), false)
+  assert.equal(explorerAllowsNone('layer-overlay'), false)
 })
 
 test('applyExplorerChoice routes a pick to the matching scene slot', () => {
   const calls: string[] = []
   const handlers = {
-    addLayer: (type: 'model3d' | 'video' | 'image', url: string, name: string) => { calls.push(`layer:${type}:${name}:${url}`) },
+    addLayer: (type: 'model3d' | 'video' | 'image' | 'overlay', url: string, name: string) => { calls.push(`layer:${type}:${name}:${url}`) },
     setHero: (name: string) => { calls.push(`hero:${name}`) },
     setPlate: (name: string) => { calls.push(`plate:${name}`) },
     setProp: (name: string) => { calls.push(`prop:${name}`) },
@@ -45,12 +51,14 @@ test('applyExplorerChoice routes a pick to the matching scene slot', () => {
   }
   applyExplorerChoice('layer-model', item('hero.glb', 'model3d'), handlers)
   applyExplorerChoice('layer-media', item('clip.mp4', 'video'), handlers)
+  applyExplorerChoice('layer-overlay', item('sticker.png'), handlers)
   applyExplorerChoice('narrative-hero', item('hero.glb', 'model3d'), handlers)
   applyExplorerChoice('narrative-plate', null, handlers)
   applyExplorerChoice('scene-audio', item('score.wav', 'audio'), handlers)
   assert.deepEqual(calls, [
     'layer:model3d:hero.glb:/api/v1/file/hero.glb',
     'layer:video:clip.mp4:/api/v1/file/clip.mp4',
+    'layer:overlay:sticker.png:/api/v1/file/sticker.png',
     'hero:hero.glb',
     'plate:',
     'audio:score.wav:score',

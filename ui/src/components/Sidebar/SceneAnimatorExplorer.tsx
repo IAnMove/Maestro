@@ -48,6 +48,12 @@ export function SceneAnimatorExplorer({
       selectedName={purpose ? explorerSelectedName(purpose, names) : undefined}
       allowNone={Boolean(purpose && explorerAllowsNone(purpose))}
       noneLabel={t('animator.none')}
+      constraints={
+        purpose === 'layer-model' ? { kinds: ['model3d'], maxCount: 1, optional: false }
+          : purpose === 'layer-media' ? { kinds: ['image', 'video'], maxCount: 1, optional: false }
+            : purpose === 'layer-overlay' ? { kinds: ['image'], maxCount: 1, optional: false }
+              : undefined
+      }
       onClose={onClose}
       onChoose={item => {
         if (purpose) applyExplorerChoice(purpose, item, handlers)
