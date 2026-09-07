@@ -1,11 +1,13 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Wrench, Play } from 'lucide-react'
 import { useStore } from '../../stores/useStore'
 import { useUiTranslation } from '../../i18n'
 import * as api from '../../api/client'
 import type { AssetCatalogItem } from '../../api/assets'
+import type { ApiOutput } from '../../api/outputs'
+import { catalogItemToOutput, matchCatalogByOutput } from '../../features/asset-picker'
 import { ToolsParamsPanel } from './ToolsParamsPanel'
-import { ToolsSourcePanel } from './ToolsSourcePanel'
+import { ToolsSourcePanel, type ToolSource } from './ToolsSourcePanel'
 
 export function ToolsPanel() {
   const { t } = useUiTranslation('studio')
@@ -36,63 +38,65 @@ export function ToolsPanel() {
   const current = outputs[selectedOutput]
   const currentIsVideo = !!current && current.type === 'video'
 
-  const fileRef = useRef<HTMLInputElement>(null)
-  const vcFileRefs = [useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null)]
-  const [uploading, setUploading] = useState(false)
-  const [vcUploading, setVcUploading] = useState<number | null>(null)
-  const [imageAssets, setImageAssets] = useState<AssetCatalogItem[]>([])
-  const [imageAssetsLoading, setImageAssetsLoading] = useState(false)
-  const [imageAssetsError, setImageAssetsError] = useState(false)
+  const [catalogAssets, setCatalogAssets] = useState<AssetCatalogItem[]>([])
   const [sourceUploadError, setSourceUploadError] = useState(false)
 
   useEffect(() => {
-    if (tool !== 'upscale' && tool !== 'remove_background') return
     const controller = new AbortController()
-    setImageAssetsLoading(true)
-    setImageAssetsError(false)
-    api.fetchAssets({ kind: 'image', limit: 100, signal: controller.signal })
+    api.fetchAssets({ workspace: activeWorkspace, limit: 100, signal: controller.signal })
       .then(result => {
-        if (!controller.signal.aborted) setImageAssets(result.assets)
+        if (!controller.signal.aborted) setCatalogAssets(result.assets)
       })
       .catch(error => {
-        if (!controller.signal.aborted) {
-          setImageAssetsError(true)
-          console.error('Image asset catalog failed:', error)
-        }
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setImageAssetsLoading(false)
+        if (!controller.signal.aborted) console.error('Asset catalog failed:', error)
       })
     return () => controller.abort()
-  }, [tool, toolsAssetsRevision])
+  }, [tool, toolsAssetsRevision, activeWorkspace])
 
-  const handleSourceUpload = async (file: File) => {
-    const image = file.type.startsWith('image/') || /\.(bmp|gif|jpe?g|png|tiff?|webp)$/i.test(file.name)
-    const video = file.type.startsWith('video/') || /\.(avi|m4v|mkv|mov|mp4|mpeg|mpg|webm|wmv)$/i.test(file.name)
-    if ((!image && !video) || (tool === 'remove_background' && !image) || (tool === 'revoice' && !video)) {
+  const sourceItems = useMemo(
+    () => catalogAssets
+      .filter(asset => (
+        tool === 'remove_background' ? asset.kind === 'image'
+          : tool === 'revoice' ? asset.kind === 'video'
+            : asset.kind === 'image' || asset.kind === 'video'
+      ))
+      .map(asset => catalogItemToOutput(asset, activeWorkspace))
+      .filter((item): item is ApiOutput => Boolean(item)),
+    [catalogAssets, tool, activeWorkspace],
+  )
+  const voiceItems = useMemo(
+    () => catalogAssets
+      .filter(asset => asset.kind === 'audio' || asset.kind === 'video')
+      .map(asset => catalogItemToOutput(asset, activeWorkspace))
+      .filter((item): item is ApiOutput => Boolean(item)),
+    [catalogAssets, activeWorkspace],
+  )
+
+  const applySource = (item: ApiOutput | null) => {
+    if (!item) {
+      setSource(null)
+      setSourceUploadError(false)
+      return
+    }
+    const catalog = matchCatalogByOutput(catalogAssets, item, activeWorkspace)
+    const location = catalog?.locations.find(entry => entry.workspace_id === activeWorkspace) ?? catalog?.locations[0]
+    const kind: ToolSource['kind'] = item.type === 'video' ? 'video' : item.type === 'audio' ? 'audio' : 'image'
+    if ((tool === 'remove_background' && kind !== 'image') || (tool === 'revoice' && kind !== 'video')) {
       setSourceUploadError(true)
       return
     }
     setSourceUploadError(false)
-    setUploading(true)
-    try {
-      const r = await api.uploadImage(file)  // /api/v1/upload handles video too
-      const kind = image ? 'image' : 'video'
-      setSource({
-        path: r.path,
-        name: file.name,
-        url: r.url,
-        workspace: '__uploads__',
-        kind,
-      })
-    } catch (e) {
-      setSourceUploadError(true)
-      console.error('Source upload failed:', e)
-    } finally {
-      setUploading(false)
-    }
+    setSource({
+      path: location?.filename || item.name,
+      name: catalog?.filename || item.name,
+      url: item.url,
+      assetId: catalog?.id ?? null,
+      workspace: location?.workspace_id ?? (catalog ? activeWorkspace : '__uploads__'),
+      kind,
+    })
   }
 
+  const currentIsImage = !!current && current.type === 'image'
   const useCurrentClip = () => {
     if (currentIsVideo) setSource({ path: current.name, name: current.name, url: current.url, kind: 'video' })
   }
@@ -101,42 +105,15 @@ export function ToolsPanel() {
     if (currentIsImage) setSource({ path: current.name, name: current.name, url: current.url, kind: 'image' })
   }
 
-  const selectImageAsset = (assetId: string) => {
-    const asset = imageAssets.find(item => item.id === assetId)
-    if (!asset) {
-      setSource(null)
+  const applyVoice = (index: number, item: ApiOutput | null) => {
+    if (!item) {
+      setRevoiceRef(index, null)
       return
     }
-    const location = asset.locations.find(item => item.workspace_id === activeWorkspace)
-      || asset.locations[0]
-    if (!location) {
-      setSource(null)
-      return
-    }
-    setSource({
-      path: location.filename,
-      name: asset.filename,
-      url: location.url || asset.url,
-      assetId: asset.id,
-      workspace: location.workspace_id,
-      kind: 'image',
-    })
-  }
-
-  const handleVcUpload = async (index: number, file: File) => {
-    setVcUploading(index)
-    try {
-      const r = await api.uploadAudio(file)
-      setRevoiceRef(index, { filename: file.name, path: r.path })
-    } catch (e) {
-      console.error('Voice ref upload failed:', e)
-    } finally {
-      setVcUploading(null)
-    }
+    setRevoiceRef(index, { filename: item.name, path: item.name })
   }
 
   const hasRefs = revoiceRefs.some(r => r && r.path)
-  const currentIsImage = !!current && current.type === 'image'
   const hasVideoSource = !!sourcePath && sourceKind === 'video'
   const hasImageSource = !!sourcePath && sourceKind === 'image'
   const canRun =
@@ -176,18 +153,13 @@ export function ToolsPanel() {
         sourceWorkspace={sourceWorkspace}
         sourceKind={sourceKind}
         setSource={setSource}
-        fileRef={fileRef}
-        uploading={uploading}
-        handleSourceUpload={handleSourceUpload}
         currentIsImage={currentIsImage}
         currentIsVideo={currentIsVideo}
         useCurrentImage={useCurrentImage}
         useCurrentClip={useCurrentClip}
-        imageAssets={imageAssets}
-        imageAssetsLoading={imageAssetsLoading}
-        imageAssetsError={imageAssetsError}
         sourceUploadError={sourceUploadError}
-        selectImageAsset={selectImageAsset}
+        items={sourceItems}
+        onChoose={applySource}
       />
       {tool === 'remove_background' && !sourcePath && (
         <p className="text-[10px] text-text-muted leading-snug" role="status">
@@ -203,10 +175,8 @@ export function ToolsPanel() {
         revoiceMode={revoiceMode}
         setRevoiceMode={setRevoiceMode}
         revoiceRefs={revoiceRefs}
-        setRevoiceRef={setRevoiceRef}
-        vcFileRefs={vcFileRefs}
-        vcUploading={vcUploading}
-        handleVcUpload={handleVcUpload}
+        voiceItems={voiceItems}
+        onChooseVoice={applyVoice}
         removeBackgroundInstruction={removeBackgroundInstruction}
         setRemoveBackgroundInstruction={setRemoveBackgroundInstruction}
       />

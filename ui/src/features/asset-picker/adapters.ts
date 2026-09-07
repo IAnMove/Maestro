@@ -48,6 +48,43 @@ export function catalogItemToPickerItem(
   }
 }
 
+const OUTPUT_TYPE: Partial<Record<AssetKind, ApiOutput['type']>> = {
+  image: 'image',
+  video: 'video',
+  audio: 'audio',
+  model3d: 'model3d',
+  scene: 'scene',
+  document: 'comic',
+}
+
+export function catalogItemToOutput(item: AssetCatalogItem, workspaceId: string): ApiOutput | null {
+  const type = OUTPUT_TYPE[item.kind]
+  if (!type) return null
+  const location = catalogLocation(item, workspaceId) ?? item.locations[0]
+  if (!location) return null
+  return {
+    name: location.filename || item.filename,
+    type,
+    mode: null,
+    size: item.size_bytes,
+    created_at: item.created_at,
+    completed_at: item.completed_at,
+    url: location.url || item.url,
+    thumbnail_url: item.kind === 'image' ? (location.url || item.url) : '',
+  }
+}
+
+export function matchCatalogByOutput(
+  items: readonly AssetCatalogItem[],
+  output: ApiOutput,
+  workspaceId: string,
+): AssetCatalogItem | undefined {
+  return items.find(item => {
+    const mapped = catalogItemToOutput(item, workspaceId)
+    return mapped?.name === output.name && mapped.url === output.url
+  })
+}
+
 export function outputToPickerItem(item: ApiOutput, workspaceId: string): PickerItem {
   const kind = OUTPUT_KIND[item.type]
   const createdAt = knownCreatedAt(item.created_at)

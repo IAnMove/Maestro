@@ -203,16 +203,16 @@ Archivo: `ui/src/features/scene3d/Scene3DWorkspace.tsx`. **No editar mientras #2
 
 | ID | Módulo | Etiqueta / rol | Tipo | Qty | Origen actual | Restricciones | Persistencia | Wizard | Adaptador | Tests | Estado |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| TLS-01 | ToolsSourcePanel | Fuente Tools | image o video | S | Disco + grid `AssetCatalogItem` + «usar galería actual» | remove_bg: solo image; upscale: image/video; revoice: video | `sourcePath` + `assetId` | — | `toolsSourceAdapter` | e2e `tools-background-removal.spec.ts` retarget al modal | partial |
-| TLS-02 | ToolsParamsPanel | Voz A / referencia | audio/video | S | Disco `audio/*,video/*` | Revoice single | `revoiceRefs[0]` | — | `revoiceRefAdapter` | Sample incompatible | pending |
-| TLS-03 | ToolsParamsPanel | Voz B | audio/video | S | Disco | Solo modo two | `revoiceRefs[1]` | — | `revoiceRefAdapter` | — | pending |
-| TLS-04 | PostProcessing | Voice clone A | audio/video | S | Disco (duplica Tools) | Post de un clip existente | `voiceCloneRefs[0]` | — | `revoiceRefAdapter` | Compartir adaptador con TLS-02 | pending |
-| TLS-05 | PostProcessing | Voice clone B | audio/video | S | Disco | Modo two | `voiceCloneRefs[1]` | — | `revoiceRefAdapter` | — | pending |
-| TLS-06 | Hunyuan3DPanel | Vista front | image | S | Dual: upload **y** picker outputs `fromApp` | Obligatoria; `image/*` | `views.front` path/url/workspace | — | `hunyuanViewAdapter` | Workspace change invalida | partial |
-| TLS-07 | Hunyuan3DPanel | Vista left | image | S | Dual | Solo multiview | `views.left` | — | `hunyuanViewAdapter` | Modelo sin multiview: no multi accidental | partial |
-| TLS-08 | Hunyuan3DPanel | Vista right | image | S | Dual | Solo multiview | `views.right` | — | `hunyuanViewAdapter` | — | partial |
-| TLS-09 | Hunyuan3DPanel | Vista back | image | S | Dual | Solo multiview | `views.back` | — | `hunyuanViewAdapter` | — | partial |
-| TLS-10 | Hunyuan3DPanel | GLB a retexturizar | model3d | S | Dual: import `.glb` + grid de GLB del workspace | Operación retexture | `sourceModel` path | — | `hunyuanGlbAdapter` | Quitar fuente | partial |
+| TLS-01 | ToolsSourcePanel | Fuente Tools | image o video | S | `AssetInput` dual + atajo galería actual | remove_bg: solo image; upscale: image/video; revoice: video | `sourcePath` + `assetId` | — | `toolsSourceAdapter` | e2e modal Choose; conserva `asset_id` | done |
+| TLS-02 | ToolsParamsPanel | Voz A / referencia | audio/video | S | `AssetInput` | Revoice single | `revoiceRefs[0]` | — | `revoiceRefAdapter` | Sample incompatible | done |
+| TLS-03 | ToolsParamsPanel | Voz B | audio/video | S | `AssetInput` | Solo modo two | `revoiceRefs[1]` | — | `revoiceRefAdapter` | — | done |
+| TLS-04 | PostProcessing | Voice clone A | audio/video | S | `AssetInput` (comparte adaptador) | Post de un clip existente | `voiceCloneRefs[0]` | — | `revoiceRefAdapter` | Compartir adaptador con TLS-02 | done |
+| TLS-05 | PostProcessing | Voice clone B | audio/video | S | `AssetInput` | Modo two | `voiceCloneRefs[1]` | — | `revoiceRefAdapter` | — | done |
+| TLS-06 | Hunyuan3DPanel | Vista front | image | S | `AssetInput` | Obligatoria; `image/*` | `views.front` path/url/workspace | — | `hunyuanViewAdapter` | Workspace change invalida | done |
+| TLS-07 | Hunyuan3DPanel | Vista left | image | S | `AssetInput` | Solo multiview | `views.left` | — | `hunyuanViewAdapter` | Modelo sin multiview: no multi accidental | done |
+| TLS-08 | Hunyuan3DPanel | Vista right | image | S | `AssetInput` | Solo multiview | `views.right` | — | `hunyuanViewAdapter` | — | done |
+| TLS-09 | Hunyuan3DPanel | Vista back | image | S | `AssetInput` | Solo multiview | `views.back` | — | `hunyuanViewAdapter` | — | done |
+| TLS-10 | Hunyuan3DPanel | GLB a retexturizar | model3d | S | `AssetInput` | Operación retexture | `sourceModel` path | — | `hunyuanGlbAdapter` | Quitar fuente | done |
 
 ### 4.6 Audio — PR 6B (y Story en PR 7)
 
@@ -351,9 +351,9 @@ Un agente es dueño del **núcleo** del picker (PR 1–4). Los demás solo adapt
 | 3 | Preview RAM-safe | Núcleo picker (archivos de preview) | Mezclado en #210 |
 | 4 | AssetInput dual origin + upload | Núcleo picker | Mezclado en #211 |
 | 5 | 2.5D + audio de escena + templates + Scene3D | Compositor 2.5D/3D | Mezclado en #213 (sin Scene3DWorkspace; #212 abierto) |
-| 6A | Tools, imagen, Hunyuan, edit | Tools/imagen | Hunyuan mezclado en #215. Tools/InputsPanel pendiente |
+| 6A | Tools, imagen, Hunyuan, edit | Tools/imagen | Hunyuan #215 mezclado. Tools TLS-01..05 en este PR. Restan IMG-01..16 |
 | 6B | Audio, vídeo, Video Editor, mixer | Audio/vídeo | Paralelo a 6A si no comparten archivo |
-| 7 | Story, Series, personajes, cómics | Labs | CHR/STY en `feat/asset-picker-labs`. Director queda en PR 8 |
+| 7 | Story, Series, personajes, cómics | Labs | Mezclado en #218. Director queda en PR 8 |
 | 8 | Paridad Wizard + cierre inventario | Wizard + núcleo | `agentActions.ts` exclusivo |
 
 Asignación de IDs → PR de migración: P2D/TPL/S3D → 5; IMG/TLS → 6A; VID/AUD (Studio) → 6B; CHR/STY/DIR → 7–8.

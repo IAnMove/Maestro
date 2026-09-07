@@ -1,8 +1,11 @@
-import { useState, useMemo, useRef } from 'react'
-import { ChevronDown, ChevronRight, X, Mic } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { ChevronDown, ChevronRight, Mic } from 'lucide-react'
 import { useStore } from '../../stores/useStore'
 import { useUiTranslation } from '../../i18n'
 import * as api from '../../api/client'
+import type { ApiOutput } from '../../api/outputs'
+import { catalogItemToOutput } from '../../features/asset-picker'
+import { AssetInput } from '../../features/asset-picker/AssetInput.tsx'
 
 const baseOptions = [
   { value: '', label: 'None' },
@@ -47,21 +50,28 @@ export function PostProcessing() {
   const voiceCloneRefs = useStore(s => s.voiceCloneRefs)
   const setVoiceCloneRef = useStore(s => s.setVoiceCloneRef)
   const generationMode = useStore(s => s.generationMode)
+  const activeWorkspace = useStore(s => s.activeWorkspace)
   const showVoiceClone = generationMode === 'video' || generationMode === 'avatar'
-  const [vcUploading, setVcUploading] = useState<number | null>(null)
-  const vcFileRefs = [useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null)]
+  const [voiceItems, setVoiceItems] = useState<ApiOutput[]>([])
 
-  const handleVcUpload = async (index: number, file: File) => {
-    setVcUploading(index)
-    try {
-      const result = await api.uploadAudio(file)
-      setVoiceCloneRef(index, { filename: file.name, path: result.path })
-    } catch (e) {
-      console.error('Voice ref upload failed:', e)
-    } finally {
-      setVcUploading(null)
-    }
-  }
+  useEffect(() => {
+    if (!showVoiceClone || !voiceCloneEnabled) return
+    const controller = new AbortController()
+    api.fetchAssets({ workspace: activeWorkspace, limit: 100, signal: controller.signal })
+      .then(result => {
+        if (controller.signal.aborted) return
+        setVoiceItems(
+          result.assets
+            .filter(asset => asset.kind === 'audio' || asset.kind === 'video')
+            .map(asset => catalogItemToOutput(asset, activeWorkspace))
+            .filter((item): item is ApiOutput => Boolean(item)),
+        )
+      })
+      .catch(error => {
+        if (!controller.signal.aborted) console.error('Voice catalog failed:', error)
+      })
+    return () => controller.abort()
+  }, [showVoiceClone, voiceCloneEnabled, activeWorkspace])
   // Compute showVae as a primitive boolean directly in the selector to avoid
   // unstable array references that cause infinite re-renders (React error #185)
   const showVae = useStore(s => {
@@ -198,37 +208,25 @@ export function PostProcessing() {
                   {[0, ...(voiceCloneMode === 'two' ? [1] : [])].map(idx => {
                     const ref = voiceCloneRefs[idx]
                     const label = voiceCloneMode === 'two' ? (idx === 0 ? t('tools.voiceA') : t('tools.voiceB')) : t('tools.referenceVoice')
+                    const value = ref?.path
+                      ? { name: ref.filename, type: 'audio' as const, mode: null, size: 0, created_at: 0, url: '', thumbnail_url: '' }
+                      : undefined
                     return (
                       <div key={idx}>
-                        <label className="text-[10px] text-text-muted uppercase tracking-wider mb-1 block">{label}</label>
-                        {!ref || !ref.path ? (
-                          <div
-                            onClick={() => vcFileRefs[idx].current?.click()}
-                            className={`border-2 border-dashed border-border rounded-lg p-2 text-center cursor-pointer hover:border-accent-blue transition-colors ${
-                              vcUploading === idx ? 'opacity-50 pointer-events-none' : ''
-                            }`}
-                          >
-                            <p className="text-[11px] text-text-secondary">
-                              {vcUploading === idx ? t('chrome.uploading') : t('tools.uploadSample', { label: label.toLowerCase() })}
-                            </p>
-                            <input
-                              ref={vcFileRefs[idx]}
-                              type="file"
-                              accept="audio/*,video/*"
-                              className="hidden"
-                              onChange={e => { const f = e.target.files?.[0]; if (f) handleVcUpload(idx, f) }}
-                            />
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-2 bg-bg-tertiary border border-border rounded-lg px-2 py-1.5">
+                        <AssetInput
+                          label={label}
+                          placeholder={t('tools.uploadSample', { label: label.toLowerCase() })}
+                          items={voiceItems}
+                          value={value}
+                          accept="audio/*,video/*"
+                          optional
+                          constraints={{ kinds: ['audio', 'video'], maxCount: 1, optional: true }}
+                          onChoose={item => setVoiceCloneRef(idx, item ? { filename: item.name, path: item.name } : null)}
+                        />
+                        {ref?.path && (
+                          <div className="mt-1 flex items-center gap-2 bg-bg-tertiary border border-border rounded-lg px-2 py-1.5">
                             <Mic size={12} className="text-accent-blue shrink-0" />
                             <span className="flex-1 min-w-0 truncate text-[11px] text-text-primary">{ref.filename}</span>
-                            <button
-                              onClick={() => setVoiceCloneRef(idx, null)}
-                              className="p-0.5 text-text-muted hover:text-red-400 transition-colors"
-                            >
-                              <X size={12} />
-                            </button>
                           </div>
                         )}
                       </div>
