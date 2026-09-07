@@ -30,11 +30,15 @@ export async function fileFromOutput(item: ApiOutput): Promise<File> {
   return new File([blob], item.name, { type: blob.type || 'image/png' })
 }
 
-/** Series import copies from uploads/ only. Catalog picks are copied once into uploads. */
+/**
+ * Copy the pick into uploads/ and return the upload API payload.
+ * Callers (Series import, Character Creator describe, H3 isfile checks)
+ * only share that absolute filesystem path. A synthetic `uploads/${name}`
+ * is not enough: describe resolves relative names under uploads/, so
+ * `uploads/hero.png` becomes `uploads/uploads/hero.png` and the default
+ * empty-prompt Character Creator flow 400s.
+ */
 export async function ensureUploadsPath(item: ApiOutput): Promise<{ path: string; name: string; url: string }> {
-  if (isUploadOutput(item)) {
-    return { path: `uploads/${item.name}`, name: item.name, url: item.url }
-  }
   const uploaded = await uploadImage(await fileFromOutput(item))
   return { path: uploaded.path, name: uploaded.filename, url: uploaded.url }
 }
