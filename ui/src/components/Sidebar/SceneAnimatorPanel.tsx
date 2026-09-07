@@ -5,9 +5,9 @@ import { ArrayBufferTarget, Muxer } from 'mp4-muxer'
 import { useUiTranslation } from '../../i18n'
 import { useStore } from '../../stores/useStore'
 import { analyzeAudio, deleteCharacterKit, fetchCharacterKitLibrary, fetchOutputs, generateLlmText, saveCharacterKit, saveScene as saveSceneOutput, saveSceneRecording, uploadImage } from '../../api/client'
-import { AssetPickTrigger } from '../common/AssetExplorerDialog'
+
 import type { AssetExplorerPurpose } from '../common/assetExplorer.ts'
-import { SceneAnimatorExplorer, SceneAnimatorNarrativeSetup } from './SceneAnimatorExplorer'
+import { SceneAnimatorAudioInput, SceneAnimatorExplorer, SceneAnimatorNarrativeSetup } from './SceneAnimatorExplorer'
 import { generateSceneSpeechClip } from '../../lib/sceneSpeech'
 import { SceneRecipePanel } from './SceneRecipePanel'
 import { TemplateComposerDialog } from '../../features/sceneTemplates/TemplateComposerDialog'
@@ -3012,7 +3012,10 @@ export function SceneAnimatorPanel() {
         voiceSpace={narrativeVoiceSpace}
         suitability={narrativeSuitability}
         onTemplateId={setNarrativeTemplateId}
-        onOpenExplorer={setAssetExplorer}
+        onHero={setNarrativeHero}
+        onPlate={name => { setNarrativePlate(name); setNarrativePlateLoopReady(false) }}
+        onProp={setNarrativeProp}
+        onForeground={setNarrativeForeground}
         onPlateLoopReady={setNarrativePlateLoopReady}
         onMood={setNarrativeMood}
         onIntensity={setNarrativeIntensity}
@@ -3035,7 +3038,7 @@ export function SceneAnimatorPanel() {
         <p className="text-[8px] leading-relaxed text-text-muted">{t('animator.sceneAudioHelp')}</p>
         <textarea value={sceneAudioPrompt} disabled={sceneAudioBusy || playing || recording || publishing} onChange={event => setSceneAudioPrompt(event.target.value)} placeholder={t('animator.sceneAudioPlaceholder')} rows={2} className="w-full resize-y rounded border border-border bg-bg-primary px-2 py-1 text-[10px] disabled:opacity-50" />
         <button type="button" disabled={!sceneAudioPrompt.trim() || sceneAudioBusy || playing || recording || publishing} onClick={() => void generateSceneSpeech()} className="w-full rounded border border-amber-300/50 bg-amber-400/10 px-2 py-1 text-[10px] text-amber-100 disabled:opacity-40">{sceneAudioBusy ? t('animator.generatingNarration') : t('animator.generateSpeech', { model: selectedSpeechModel })}</button>
-        {generatedAudio.length > 0 && <AssetPickTrigger label={t('animator.attachOutput')} placeholder={t('animator.chooseAudio')} disabled={playing || recording || publishing} onOpen={() => setAssetExplorer('scene-audio')} />}
+        {generatedAudio.length > 0 && <SceneAnimatorAudioInput audio={generatedAudio} disabled={playing || recording || publishing} onAttach={(filename, title, kind) => attachSceneAudio(filename, title, kind)} />}
         {(scene.audioTracks ?? []).length > 0 && <div className="space-y-1 rounded border border-amber-300/15 bg-black/15 p-1.5">{scene.audioTracks!.map(track => <div key={track.id} className="grid grid-cols-[1fr_44px_44px_18px] items-center gap-1 text-[8px]"><span title={track.prompt ?? track.name} className="truncate text-amber-100">{track.kind} · {track.name}</span><label className="text-text-muted">{t('animator.at')}<input aria-label={t('animator.startTrack', { name: track.name })} type="number" min="0" max={scene.duration} step="0.1" value={track.startTime} onChange={event => { const startTime = Number(event.target.value); if (Number.isFinite(startTime)) updateScene(current => ({ ...current, audioTracks: (current.audioTracks ?? []).map(item => item.id === track.id ? { ...item, startTime: Math.max(0, Math.min(current.duration, startTime)) } : item) })) }} className="mt-0.5 w-full rounded border border-border bg-bg-primary px-1 py-0.5 text-[8px]" /></label><label className="text-text-muted">{t('animator.vol')}<input aria-label={t('animator.volumeTrack', { name: track.name })} type="number" min="0" max="2" step="0.1" value={track.volume} onChange={event => { const volume = Number(event.target.value); if (Number.isFinite(volume)) updateScene(current => ({ ...current, audioTracks: (current.audioTracks ?? []).map(item => item.id === track.id ? { ...item, volume: Math.max(0, Math.min(2, volume)) } : item) })) }} className="mt-0.5 w-full rounded border border-border bg-bg-primary px-1 py-0.5 text-[8px]" /></label><button type="button" title={t('animator.removeTrack', { name: track.name })} onClick={() => updateScene(current => ({ ...current, audioTracks: (current.audioTracks ?? []).filter(item => item.id !== track.id) }))} className="mt-3 text-red-300"><Trash2 size={12} /></button></div>)}</div>}
         {rhythmAudioTracks.length > 0 && <div className="space-y-1.5 rounded border border-violet-300/25 bg-violet-400/[.045] p-1.5">
           <div className="flex items-center justify-between gap-2"><span className="text-[9px] font-medium text-violet-100">{t('animator.rhythmTitle')}</span><span className="text-[7px] text-violet-200/70">{t('animator.rhythmMeta')}</span></div>

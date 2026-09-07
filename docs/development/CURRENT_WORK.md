@@ -1,6 +1,6 @@
 # Estado de desarrollo y punto de entrada
 
-Verificado el 7 de septiembre de 2026 contra `origin/development` **`631c0d47`**.
+Verificado el 7 de septiembre de 2026 contra `origin/development` **`1e6cb636`**.
 Es una fotografía con evidencia, no un sustituto de Git. Antes de reservar trabajo:
 `git fetch origin development`, consultar PR abiertos y comprobar sus archivos.
 
@@ -37,6 +37,7 @@ no autorizan acciones ni representan el estado actual.
 | Modal selector transaccional (PR 2) | #208, merge `059282ed` | Choose/Cancel/None; sin doble clic ni preselección. No es preview real ni dual origin |
 | Set café vídeo 3D | #209 | Decorado texturizado; no es el picker |
 | Preview selector (PR 3) | #210, merge `631c0d47` | Un reproductor/visor a demanda. No es el campo de doble origen |
+| Campo doble origen (PR 4) | #211, merge `1e6cb636` | `AssetInput`. No migra todos los consumidores |
 
 La integración es en **development**. No implica que el servidor local esté usando
 esa revisión ni que exista una publicación de aplicación en main.
@@ -47,9 +48,10 @@ Al cerrar esta revisión el taller de habla (#200), la limpieza documental
 (#199) y el contrato attemptId (#201) ya están integrados. Escenas 3D reales
 (#198) se mezcló en development el 07/09 (`fae7d3f6`). Estado por dominio:
 
-- **Selector universal de recursos (PR 4)**: campo de doble origen
-  (`AssetInput`). PR [#211](https://github.com/IAnMove/hocuspocus/pull/211), rama
-  `feat/asset-picker-input`. Preview #210 ya integrado. Cursor: no ejecutada
+- **Selector universal de recursos (PR 5)**: migración 2.5D/recetas a
+  `AssetInput`. PR [#213](https://github.com/IAnMove/hocuspocus/pull/213), rama
+  `feat/asset-picker-scene-fields`. `Scene3DWorkspace` queda para después de
+  [#212](https://github.com/IAnMove/hocuspocus/pull/212). Cursor: no ejecutada
   (cuota). No mezclar hasta que lo pidan.
 - **Vídeo procedural**: conservar el checkpoint `work/procedural-video-pilot-checkpoint`;
   consultar [PROCEDURAL_VIDEO_ROADMAP](PROCEDURAL_VIDEO_ROADMAP.md) y el documento del

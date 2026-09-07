@@ -7,7 +7,9 @@ import {
   type NarrativeSceneTemplate,
   type NarrativeTemplateInput,
 } from '../../lib/sceneNarrative'
-import { AssetExplorerDialog, AssetPickTrigger } from '../common/AssetExplorerDialog'
+import { AssetExplorerDialog } from '../common/AssetExplorerDialog'
+import { AssetInput } from '../../features/asset-picker/AssetInput.tsx'
+import type { AssetKind } from '../../api/assets'
 import {
   applyExplorerChoice,
   assetsForExplorer,
@@ -55,6 +57,67 @@ export function SceneAnimatorExplorer({
   )
 }
 
+function NarrativeAssetField({
+  label,
+  placeholder,
+  items,
+  selectedName,
+  optional,
+  disabled,
+  kinds,
+  accept,
+  onName,
+}: {
+  label: string
+  placeholder: string
+  items: ApiOutput[]
+  selectedName: string
+  optional?: boolean
+  disabled: boolean
+  kinds: readonly AssetKind[]
+  accept?: string
+  onName: (name: string) => void
+}) {
+  return (
+    <AssetInput
+      label={label}
+      placeholder={placeholder}
+      items={items}
+      value={items.find(asset => asset.name === selectedName)}
+      optional={optional}
+      disabled={disabled}
+      accept={accept}
+      constraints={{ kinds, maxCount: 1, optional: Boolean(optional) }}
+      onChoose={item => onName(item?.name ?? '')}
+    />
+  )
+}
+
+export function SceneAnimatorAudioInput({
+  audio,
+  disabled,
+  onAttach,
+}: {
+  audio: ApiOutput[]
+  disabled: boolean
+  onAttach: (filename: string, title: string, kind: 'audio') => void
+}) {
+  const { t } = useUiTranslation('scene3d')
+  return (
+    <AssetInput
+      label={t('animator.attachOutput')}
+      placeholder={t('animator.chooseAudio')}
+      items={audio}
+      disabled={disabled}
+      accept="audio/*"
+      constraints={{ kinds: ['audio'], maxCount: 1, optional: true }}
+      onChoose={item => {
+        if (item) onAttach(item.name, item.name.replace(/\.[^.]+$/, ''), 'audio')
+      }}
+    />
+  )
+}
+
 export function SceneAnimatorNarrativeSetup({
   busy,
   templateId,
@@ -74,7 +137,10 @@ export function SceneAnimatorNarrativeSetup({
   voiceSpace,
   suitability,
   onTemplateId,
-  onOpenExplorer,
+  onHero,
+  onPlate,
+  onProp,
+  onForeground,
   onPlateLoopReady,
   onMood,
   onIntensity,
@@ -102,7 +168,10 @@ export function SceneAnimatorNarrativeSetup({
   voiceSpace: NonNullable<NarrativeTemplateInput['controls']>['voiceSpace']
   suitability: (role: NarrativeAssetRole, name: string) => AssetSuitability
   onTemplateId: (id: NarrativeSceneId) => void
-  onOpenExplorer: (purpose: AssetExplorerPurpose) => void
+  onHero: (name: string) => void
+  onPlate: (name: string) => void
+  onProp: (name: string) => void
+  onForeground: (name: string) => void
   onPlateLoopReady: (ready: boolean) => void
   onMood: (value: NonNullable<NarrativeTemplateInput['controls']>['mood']) => void
   onIntensity: (value: 1 | 2 | 3) => void
@@ -125,13 +194,13 @@ export function SceneAnimatorNarrativeSetup({
       </select>
       <div className="grid grid-cols-2 gap-1">{NARRATIVE_SCENE_TEMPLATES.map(item => <button key={item.id} type="button" disabled={busy} onClick={() => onTemplateId(item.id)} title={item.description} className={`rounded border p-1 text-left disabled:opacity-40 ${templateId === item.id ? 'border-fuchsia-300/70 bg-fuchsia-400/15 text-fuchsia-100' : 'border-border bg-bg-primary text-text-secondary hover:border-fuchsia-300/40'}`}><span className="block truncate text-[8px] font-medium">{item.experimental ? t('animator.experimental') : ''}{item.title}</span><span className="block text-[7px] text-text-muted">{t('animator.templateMeta', { duration: item.defaultDuration, count: item.assetSlots.filter(slot => slot.required).length })}</span></button>)}</div>
       <p className="text-[8px] leading-relaxed text-text-muted">{template.description}</p>
-      <AssetPickTrigger label={t('animator.character')} selected={visuals.find(asset => asset.name === hero)} placeholder={t('animator.chooseAsset')} disabled={busy} onOpen={() => onOpenExplorer('narrative-hero')} />
+      <NarrativeAssetField label={t('animator.character')} placeholder={t('animator.chooseAsset')} items={visuals} selectedName={hero} disabled={busy} kinds={['image', 'video', 'model3d']} accept="image/*,video/*,.glb" onName={onHero} />
       {hero ? <p className={`rounded border px-1.5 py-1 text-[8px] leading-relaxed ${heroFit.level === 'warning' ? 'border-amber-300/25 bg-amber-400/[.06] text-amber-100' : 'border-emerald-300/20 bg-emerald-400/[.04] text-emerald-100'}`}>{heroFit.message}</p> : null}
-      <AssetPickTrigger label={t('animator.background')} selected={media.find(asset => asset.name === plate)} placeholder={t('animator.chooseAsset')} disabled={busy} onOpen={() => onOpenExplorer('narrative-plate')} />
+      <NarrativeAssetField label={t('animator.background')} placeholder={t('animator.chooseAsset')} items={media} selectedName={plate} disabled={busy} kinds={['image', 'video']} accept="image/*,video/*" onName={onPlate} />
       {plate && plateFit.level !== 'ok' ? <p className="rounded border border-cyan-300/20 bg-cyan-400/[.04] px-1.5 py-1 text-[8px] leading-relaxed text-cyan-100">{plateFit.message}</p> : null}
       {plate ? <label className="flex items-start gap-1.5 rounded border border-amber-300/20 bg-amber-400/[.035] p-1.5 text-[8px] leading-relaxed text-amber-100"><input type="checkbox" checked={plateLoopReady} onChange={event => onPlateLoopReady(event.target.checked)} className="mt-0.5" /> <span><strong>{t('animator.loopReady')}</strong><br />{t('animator.loopReadyHelp')}</span></label> : null}
-      {propSlot ? <AssetPickTrigger label={`${t('animator.objectPortal')}${propSlot.required ? '' : t('animator.optional')}`} selected={visuals.find(asset => asset.name === prop)} placeholder={t('animator.none')} disabled={busy} onOpen={() => onOpenExplorer('narrative-prop')} /> : null}
-      {foregroundSlot ? <AssetPickTrigger label={t('animator.foreground')} selected={media.find(asset => asset.name === foreground)} placeholder={t('animator.none')} disabled={busy} onOpen={() => onOpenExplorer('narrative-foreground')} /> : null}
+      {propSlot ? <NarrativeAssetField label={`${t('animator.objectPortal')}${propSlot.required ? '' : t('animator.optional')}`} placeholder={t('animator.none')} items={visuals} selectedName={prop} optional={!propSlot.required} disabled={busy} kinds={['image', 'video', 'model3d']} accept="image/*,video/*,.glb" onName={onProp} /> : null}
+      {foregroundSlot ? <NarrativeAssetField label={t('animator.foreground')} placeholder={t('animator.none')} items={media} selectedName={foreground} optional disabled={busy} kinds={['image', 'video']} accept="image/*,video/*" onName={onForeground} /> : null}
       <div className="grid grid-cols-2 gap-1 text-[9px] text-text-muted">
         {template.controls.includes('mood') ? <label>{t('animator.mood')}<select value={mood} onChange={event => onMood(event.target.value as typeof mood)} className="mt-0.5 w-full rounded border border-border bg-bg-primary px-1 py-1 text-[9px]"><option value="calm">{t('animator.moodCalm')}</option><option value="tense">{t('animator.moodTense')}</option><option value="dreamy">{t('animator.moodDreamy')}</option><option value="heroic">{t('animator.moodHeroic')}</option></select></label> : null}
         {template.controls.includes('intensity') ? <label>{t('animator.intensity')}<select value={intensity} onChange={event => onIntensity(Number(event.target.value) as 1 | 2 | 3)} className="mt-0.5 w-full rounded border border-border bg-bg-primary px-1 py-1 text-[9px]"><option value={1}>{t('animator.intensityLow')}</option><option value={2}>{t('animator.intensityMedium')}</option><option value={3}>{t('animator.intensityHigh')}</option></select></label> : null}
