@@ -181,7 +181,7 @@ async function confirmLibraryScene(dialog: Locator, title: string): Promise<void
 
 async function chooseComposerLibraryFile(page: Page, composer: Locator, filename: string): Promise<void> {
   await composer.getByRole('button', { name: 'From HocusPocus' }).click()
-  const explorer = page.getByRole('dialog').filter({ has: page.getByTestId('asset-explorer') })
+  const explorer = page.getByRole('dialog').filter({ has: page.getByTestId('asset-explorer') }).last()
   await expect(explorer).toBeVisible()
   const card = explorer.locator(`button[title="${filename}"]`)
   await expect(card).toBeVisible()
