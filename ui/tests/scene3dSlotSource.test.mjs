@@ -30,6 +30,8 @@ const catalog = {
   size: 12,
   created_at: 1,
   url: '/api/v1/file/hero.glb?workspace=film',
+  asset_id: 'asset-hero',
+  workspace_id: 'film',
 }
 
 test('catalog choice stores a durable url and workspace filename, not a blob', () => {
@@ -39,7 +41,38 @@ test('catalog choice stores a durable url and workspace filename, not a blob', (
   assert.equal(result.sourceUrl.startsWith('blob:'), false)
   assert.equal(result.sourceRef.filename, 'hero.glb')
   assert.equal(result.sourceRef.workspaceId, 'film')
+  assert.equal(result.sourceRef.assetId, 'asset-hero')
   assert.equal(result.clip, null)
+})
+
+test('catalog identity uses asset_id not a phantom item.id', () => {
+  const result = commitSlotSourceChoice(live, capture, {
+    ...catalog,
+    workspace_id: 'other-ws',
+  })
+  assert.equal(result.action, 'apply')
+  if (result.action !== 'apply') return
+  assert.equal(result.sourceRef.assetId, 'asset-hero')
+  assert.equal(result.sourceRef.workspaceId, 'other-ws')
+  const picked = pickerOutputFromSlot(result.sourceUrl, 'model3d', result.sourceRef)
+  assert.equal(picked?.asset_id, 'asset-hero')
+  assert.equal(picked?.workspace_id, 'other-ws')
+  assert.equal(picked?.path, 'hero.glb')
+})
+
+test('legacy outputs without asset_id still bind filename and workspace', () => {
+  const result = commitSlotSourceChoice(live, capture, {
+    name: 'hero.glb',
+    type: 'model3d',
+    mode: null,
+    size: 1,
+    created_at: 1,
+    url: '/api/v1/file/hero.glb?workspace=film',
+  })
+  assert.equal(result.action, 'apply')
+  if (result.action !== 'apply') return
+  assert.equal(result.sourceRef.assetId, undefined)
+  assert.equal(result.sourceRef.workspaceId, 'film')
 })
 
 test('blob urls are not committed as a scene source', () => {
@@ -67,6 +100,7 @@ test('save and reopen keeps sourceRef and drops blob urls', () => {
     workspaceId: 'film',
     filename: 'hero.glb',
     url: '/api/v1/file/hero.glb?workspace=film',
+    assetId: 'asset-hero',
   }
   document.slots[1].sourceUrl = 'blob:http://localhost/stale'
   const restored = parseScene3DDocument(JSON.parse(JSON.stringify(document)))
@@ -75,7 +109,10 @@ test('save and reopen keeps sourceRef and drops blob urls', () => {
   assert.equal(restored.slots[0].sourceUrl, '/api/v1/file/hero.glb?workspace=film')
   assert.equal(restored.slots[1].sourceUrl, '')
   assert.equal(restored.slots[1].sourceRef, undefined)
-  assert.equal(pickerOutputFromSlot(restored.slots[0].sourceUrl, 'model3d', restored.slots[0].sourceRef)?.name, 'hero.glb')
+  const picked = pickerOutputFromSlot(restored.slots[0].sourceUrl, 'model3d', restored.slots[0].sourceRef)
+  assert.equal(picked?.name, 'hero.glb')
+  assert.equal(picked?.asset_id, 'asset-hero')
+  assert.equal(picked?.workspace_id, 'film')
 })
 
 test('drive and cafe templates still expose only the documented slot roles', () => {

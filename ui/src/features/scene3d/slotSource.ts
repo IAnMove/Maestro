@@ -48,12 +48,13 @@ export function durableScene3DSourceUrl(url: string): string {
 }
 
 export function sourceRefFromOutput(item: ApiOutput, workspaceId: string): Scene3DSourceRef {
-  const extra = item as ApiOutput & { id?: string }
+  const scope = typeof item.workspace_id === 'string' && item.workspace_id ? item.workspace_id : workspaceId
+  const assetId = typeof item.asset_id === 'string' && item.asset_id ? item.asset_id : undefined
   return {
-    workspaceId,
+    workspaceId: scope,
     filename: item.name,
     url: item.url,
-    assetId: typeof extra.id === 'string' && extra.id ? extra.id : undefined,
+    assetId,
   }
 }
 
@@ -68,6 +69,9 @@ export function pickerOutputFromSlot(sourceUrl: string, media: Scene3DSlotMedia,
     created_at: 0,
     url,
     thumbnail_url: media === 'image' ? url : '',
+    asset_id: sourceRef?.assetId,
+    workspace_id: sourceRef?.workspaceId,
+    path: sourceRef?.filename,
   }
 }
 
