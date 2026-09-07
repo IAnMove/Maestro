@@ -1,6 +1,6 @@
 # Estado de desarrollo y punto de entrada
 
-Verificado el 7 de septiembre de 2026 contra `origin/development` **`70854428`**.
+Verificado el 7 de septiembre de 2026 contra `origin/development` **`5b4e6334`**.
 Es una fotografía con evidencia, no un sustituto de Git. Antes de reservar trabajo:
 `git fetch origin development`, consultar PR abiertos y comprobar sus archivos.
 
@@ -39,8 +39,9 @@ no autorizan acciones ni representan el estado actual.
 | Preview selector (PR 3) | #210, merge `631c0d47` | Un reproductor/visor a demanda. No es el campo de doble origen |
 | Campo doble origen (PR 4) | #211, merge `1e6cb636` | `AssetInput`. No migra todos los consumidores |
 | Migración 2.5D/recetas (PR 5) | #213, merge `445250f7` | Narrative + recetas. Scene3DWorkspace no |
-| Hunyuan dual origin (PR 6A parcial) | #215, merge `86596d03` | Vistas/GLB a `AssetInput`. Tools/InputsPanel no |
+| Hunyuan dual origin (PR 6A parcial) | #215, merge `86596d03` | Vistas/GLB a `AssetInput` |
 | Labs CHR/STY (PR 7) | #218, merge `70854428` | Personajes, Series, Story, cómics. CHR-05 excepción; Director no |
+| Tools 6A remainder | #217, merge `5b4e6334` | TLS-01..05. InputsPanel/imagen no |
 
 La integración es en **development**. No implica que el servidor local esté usando
 esa revisión ni que exista una publicación de aplicación en main.
@@ -51,10 +52,12 @@ Al cerrar esta revisión el taller de habla (#200), la limpieza documental
 (#199) y el contrato attemptId (#201) ya están integrados. Escenas 3D reales
 (#198) se mezcló en development el 07/09 (`fae7d3f6`). Estado por dominio:
 
-- **Selector universal de recursos (PR 6A resto Tools)**: TLS-01..05 a
-  `AssetInput`. Rama `feat/asset-picker-6a-remainder`. Labs #218 ya mezclado.
-  Restan IMG-01..16, 6B, Scene3DWorkspace y PR 8 Wizard. No mezclar hasta que
-  lo pidan.
+- **Selector universal de recursos (InputsPanel)**: IMG-01..04, VID-01..06 y
+  AUD-01 en `InputsPanel` a `AssetInput`. Rama
+  `feat/asset-picker-inputs-panel`. No tocar `InputsPanel.tsx` en paralelo.
+  Superficies duplicadas (ImageRefSection, ControlVideoSection,
+  AudioModeSection, VoiceRefSection) y Director quedan fuera. Restan IMG-05..16,
+  6B, Scene3DWorkspace y PR 8 Wizard. No mezclar hasta que lo pidan.
 - **Vídeo procedural**: conservar el checkpoint `work/procedural-video-pilot-checkpoint`;
   consultar [PROCEDURAL_VIDEO_ROADMAP](PROCEDURAL_VIDEO_ROADMAP.md) y el documento del
   subdominio asignado. No mezclar el checkpoint en bloque ni asumir que todo su

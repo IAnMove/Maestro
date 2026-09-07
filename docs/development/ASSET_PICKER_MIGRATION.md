@@ -161,10 +161,10 @@ Archivo: `ui/src/features/scene3d/Scene3DWorkspace.tsx`. **No editar mientras #2
 
 | ID | Módulo | Etiqueta / rol | Tipo | Qty | Origen actual | Restricciones | Persistencia | Wizard | Adaptador | Tests | Estado |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| IMG-01 | InputsPanel | Start / frame inicial | image | S | Disco `pickImage` + drop; atajo galería `MediaFeedItem` «send to input» | `image/*`; obligatorio en I2V-only | `startImage` File y/o `params.image_start` path | `attach_studio_references` `start_frame` | `studioFrameAdapter` | Disco, catálogo, cancelar, quitar | pending |
-| IMG-02 | InputsPanel | End frame | image | S | Disco + drop | Solo si `supports_end_frame` | `endImage` / `image_end` | attach refs (si se extiende) | `studioFrameAdapter` | Oculto si el modelo no soporta | pending |
-| IMG-03 | InputsPanel | Frames inyectados | image | M | Disco + drop; reordenables | Presupuesto de frames del modelo | `inject frames` paths | — | `studioFrameAdapter` | Orden, máximo | pending |
-| IMG-04 | InputsPanel / ImageRefSection | Referencias de imagen | image | M | Disco multiple + drop; reorder | `max_image_refs`; Edit consume 1 slot | `imageRefs` Files + upload paths | `attach_studio_references` subject/style | `studioRefsAdapter` | Orden, máximo, quitar | pending |
+| IMG-01 | InputsPanel | Start / frame inicial | image | S | `AssetInput` dual | `image/*`; obligatorio en I2V-only | `startImage` File y/o `params.image_start` path | `attach_studio_references` `start_frame` | `studioFrameAdapter` | Disco, catálogo, cancelar, quitar | migrated |
+| IMG-02 | InputsPanel | End frame | image | S | `AssetInput` dual | Solo si `supports_end_frame` | `endImage` / `image_end` | attach refs (si se extiende) | `studioFrameAdapter` | Oculto si el modelo no soporta | migrated |
+| IMG-03 | InputsPanel | Frames inyectados | image | M | `AssetInput` dual; reordenables | Presupuesto de frames del modelo | `inject frames` paths | — | `studioFrameAdapter` | Orden, máximo | migrated |
+| IMG-04 | InputsPanel / ImageRefSection | Referencias de imagen | image | M | InputsPanel: `AssetInput`. ImageRefSection sigue disco | `max_image_refs`; Edit consume 1 slot | `imageRefs` Files + upload paths | `attach_studio_references` subject/style | `studioRefsAdapter` | Orden, máximo, quitar | partial |
 | IMG-05 | InpaintControls | Vídeo a inpaint | video | S | Disco + drop `video/*` | SAM/máscara aparte (no es asset picker) | `editVideo*` store | — | `editSourceAdapter` | Tipo no vídeo rechazado | pending |
 | IMG-06 | OutpaintControls | Fuente outpaint | video/image | S | Disco + drop `video/*,image/*` | Canvas/máscara de expansión aparte | `editVideo*` | — | `editSourceAdapter` | Imagen y vídeo | pending |
 | IMG-07 | EditAnythingControls | Vídeo Edit Anything | video | S | Disco + drop `video/*` | LoRA interpreta prompt; no SAM | `editVideo*` | — | `editSourceAdapter` | Rango temporal intacto | pending |
@@ -184,12 +184,12 @@ Archivo: `ui/src/features/scene3d/Scene3DWorkspace.tsx`. **No editar mientras #2
 
 | ID | Módulo | Etiqueta / rol | Tipo | Qty | Origen actual | Restricciones | Persistencia | Wizard | Adaptador | Tests | Estado |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| VID-01 | InputsPanel | Extender desde | video | S | Disco `video/*` + drop (modo Extend) | Ancla de timeline | `continueVideo` File+path+duración | — | `extendSourceAdapter` | Galería «continue from» | pending |
-| VID-02 | InputsPanel / ControlVideoSection / AudioModeSection | Control / guide video | video | S | Disco; Advanced y audio mode duplican `video_guide` | mp4/webm/mkv/mov; image-mode usa imagen | `params.video_guide` | — | `controlVideoAdapter` | Un valor, varias superficies | pending |
-| VID-03 | InputsPanel | Guide video (SCAIL etc.) | video | S | Disco si `guide_custom_choices` | Distinto proceso letters | `video_guide` + fps | — | `guideVideoAdapter` | Modelo sin guide: oculto | pending |
-| VID-04 | InputsPanel | Soundtrack | audio/video | S | Disco wav/mp3/flac/ogg/m4a **o** contenedor vídeo | Backend extrae audio | `audio_guide` / soundtrack name | — | `soundtrackAdapter` | Vídeo como fuente de audio | pending |
-| VID-05 | InputsPanel | H3 video refs | video | M≤3 | Disco | Total H3 refs ≤12; 2–15 s | paths H3 | — | `h3RefAdapter` | Cupo | pending |
-| VID-06 | InputsPanel | H3 audio refs | audio | M≤3 | Disco | Igual cupo | paths H3 | — | `h3RefAdapter` | Cupo | pending |
+| VID-01 | InputsPanel | Extender desde | video | S | `AssetInput` dual (modo Extend) | Ancla de timeline | `continueVideo` File+path+duración | — | `extendSourceAdapter` | Galería «continue from» | migrated |
+| VID-02 | InputsPanel / ControlVideoSection / AudioModeSection | Control / guide video | video | S | InputsPanel: `AssetInput`. Advanced/audio mode siguen disco | mp4/webm/mkv/mov; image-mode usa imagen | `params.video_guide` | — | `controlVideoAdapter` | Un valor, varias superficies | partial |
+| VID-03 | InputsPanel | Guide video (SCAIL etc.) | video | S | `AssetInput` si `guide_custom_choices` | Distinto proceso letters | `video_guide` + fps | — | `guideVideoAdapter` | Modelo sin guide: oculto | migrated |
+| VID-04 | InputsPanel | Soundtrack | audio/video | S | `AssetInput` wav/mp3/flac/ogg/m4a **o** contenedor vídeo | Backend extrae audio | `audio_guide` / soundtrack name | — | `soundtrackAdapter` | Vídeo como fuente de audio | migrated |
+| VID-05 | InputsPanel | H3 video refs | video | M≤3 | `AssetInput` | Total H3 refs ≤12; 2–15 s | paths H3 | — | `h3RefAdapter` | Cupo | migrated |
+| VID-06 | InputsPanel | H3 audio refs | audio | M≤3 | `AssetInput` | Igual cupo | paths H3 | — | `h3RefAdapter` | Cupo | migrated |
 | VID-07 | VideoEditControls | Vídeo fuente | video | S | Disco `.mp4,.webm,.avi,.mov` | Edit de vídeo Studio | `sourceVideo` + `video_guide` | — | `videoEditAdapter` | — | pending |
 | VID-08 | VideoEditControls | Imagen de referencia | image | S | Disco png/jpg/webp; opcional | — | `refImage` path | — | `videoEditAdapter` | Quitar ≠ cancelar | pending |
 | VID-09 | MultiClipEditor | Start image del shot | image | S / clip | Disco + drop | Un start por clip | `clip.startImage` File/path | — | `multiClipAdapter` | Clip 2 no pisa clip 1 | pending |
@@ -218,7 +218,7 @@ Archivo: `ui/src/features/scene3d/Scene3DWorkspace.tsx`. **No editar mientras #2
 
 | ID | Módulo | Etiqueta / rol | Tipo | Qty | Origen actual | Restricciones | Persistencia | Wizard | Adaptador | Tests | Estado |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| AUD-01 | VoiceRefSection / InputsPanel / DirectorChat | Voice ref (ID-LoRA) | audio | S | Disco `.wav,.mp3,.flac,.ogg,.m4a`; tres superficies, **mismo** `directorVoiceRef` | Gate `voice_reference_enabled`; ~5 s | File en store + path al generar | — | `voiceRefAdapter` | Un valor en Studio y Director | pending |
+| AUD-01 | VoiceRefSection / InputsPanel / DirectorChat | Voice ref (ID-LoRA) | audio | S | InputsPanel: `AssetInput`. VoiceRefSection y DirectorChat siguen disco; **mismo** `directorVoiceRef` | Gate `voice_reference_enabled`; ~5 s | File en store + path al generar | — | `voiceRefAdapter` | Un valor en Studio y Director | partial |
 | AUD-02 | AudioModeSection | Voces TTS | audio | M (N voces) | `FileUploadZone` por voz | wav/mp3/flac/ogg/m4a | `ttsVoices[].filename` | — | `ttsVoiceAdapter` | Voz 1 ≠ voz 2 | pending |
 | AUD-03 | AudioModeSection | Audio file (no TTS) | audio/video | S | FileUploadZone | Incluye contenedores vídeo | `audio_guide` | — | `soundtrackAdapter` | Compartir con VID-04 | pending |
 | AUD-04 | MixerControls | Pista base | audio | S | FileUploadZone | Duración completa | mixer local state | — | `mixerTrackAdapter` | — | pending |
@@ -351,7 +351,7 @@ Un agente es dueño del **núcleo** del picker (PR 1–4). Los demás solo adapt
 | 3 | Preview RAM-safe | Núcleo picker (archivos de preview) | Mezclado en #210 |
 | 4 | AssetInput dual origin + upload | Núcleo picker | Mezclado en #211 |
 | 5 | 2.5D + audio de escena + templates + Scene3D | Compositor 2.5D/3D | Mezclado en #213 (sin Scene3DWorkspace; #212 abierto) |
-| 6A | Tools, imagen, Hunyuan, edit | Tools/imagen | Hunyuan #215 mezclado. Tools TLS-01..05 en este PR. Restan IMG-01..16 |
+| 6A | Tools, imagen, Hunyuan, edit | Tools/imagen | Hunyuan #215 y Tools #217 mezclados. InputsPanel IMG-01..04/VID-01..06 en curso. Restan IMG-05..16 y superficies duplicadas |
 | 6B | Audio, vídeo, Video Editor, mixer | Audio/vídeo | Paralelo a 6A si no comparten archivo |
 | 7 | Story, Series, personajes, cómics | Labs | Mezclado en #218. Director queda en PR 8 |
 | 8 | Paridad Wizard + cierre inventario | Wizard + núcleo | `agentActions.ts` exclusivo |
