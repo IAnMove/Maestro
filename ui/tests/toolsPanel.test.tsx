@@ -215,3 +215,43 @@ test('Tools submits background removal only once while the request is pending', 
     useStore.setState({ toolsSubmitting: false, jobs: [] } as never)
   }
 })
+
+test('remote catalog picks past the local 100-item cache keep workspace identity', async () => {
+  const { resolveToolSource } = await import('../src/lib/toolSource.ts')
+  const remote = {
+    name: 'wanted.png',
+    type: 'image' as const,
+    mode: null,
+    size: 12,
+    created_at: 1,
+    url: '/api/v1/file/wanted.png?workspace=film',
+    thumbnail_url: '/api/v1/file/wanted.png?workspace=film',
+    asset_id: 'asset-110',
+    workspace_id: 'film',
+    path: 'wanted.png',
+  }
+  const source = resolveToolSource(remote, [], 'film')
+  assert.equal(source.assetId, 'asset-110')
+  assert.equal(source.workspace, 'film')
+  assert.equal(source.path, 'wanted.png')
+  assert.equal(source.kind, 'image')
+})
+
+test('device uploads without a catalog id still resolve under uploads', async () => {
+  const { resolveToolSource } = await import('../src/lib/toolSource.ts')
+  const uploaded = {
+    name: 'from-disk.png',
+    type: 'image' as const,
+    mode: null,
+    size: 8,
+    created_at: 1,
+    url: '/api/v1/uploads/from-disk.png',
+    thumbnail_url: '/api/v1/uploads/from-disk.png',
+    workspace_id: 'film',
+    path: 'uploads/from-disk.png',
+  }
+  const source = resolveToolSource(uploaded, [], 'film')
+  assert.equal(source.assetId, null)
+  assert.equal(source.workspace, '__uploads__')
+  assert.equal(source.path, 'from-disk.png')
+})

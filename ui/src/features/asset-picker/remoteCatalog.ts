@@ -96,6 +96,10 @@ export function explorerListModel(input: {
   }
 }
 
+function usableExplorerOutput(output: ApiOutput): boolean {
+  return Boolean(output.asset_id || String(output.url || '').trim())
+}
+
 export function resolveExplorerSelection(input: {
   remote: boolean
   pickerItems: PickerItem[]
@@ -106,7 +110,9 @@ export function resolveExplorerSelection(input: {
 }): PickerItem | null {
   const selectedFromValue = input.selectedOutput
     ? livePickerItem(input.pickerItems, outputToPickerItem(input.selectedOutput, input.workspaceId))
-      ?? (input.remote ? outputToPickerItem(input.selectedOutput, input.workspaceId) : null)
+      ?? (input.remote && usableExplorerOutput(input.selectedOutput)
+        ? outputToPickerItem(input.selectedOutput, input.workspaceId)
+        : null)
     : null
   const namedMatches = input.selectedName ? input.pickerItems.filter(item => item.filename === input.selectedName) : []
   if (input.remote) return input.scopedPicked ?? selectedFromValue ?? namedUnique(input.scopedPicked, namedMatches)
@@ -124,7 +130,8 @@ export function explorerCanConfirm(
   selected: PickerItem | null,
 ): boolean {
   if (!selected) return false
-  return remote || Boolean(livePickerItem(pickerItems, selected))
+  if (!remote) return Boolean(livePickerItem(pickerItems, selected))
+  return Boolean(String(selected.url || '').trim())
 }
 
 export function confirmExplorerItem(
@@ -147,7 +154,7 @@ export function confirmExplorerItem(
     return
   }
   const output = pickerItemToOutput(item)
-  if (!output) return
+  if (!output || !String(output.url || '').trim()) return
   if (constraints && !checkCompatibility(item, constraints, 0).allowed) return
   onChoose(output)
   onClose()
