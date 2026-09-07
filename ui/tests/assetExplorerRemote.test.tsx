@@ -87,3 +87,50 @@ test('remote explorer pages the catalog at 24 and can find a hit past the first 
     cleanup()
   }
 })
+
+test('remote explorer does not refetch when the parent rebuilds the same constraints object', { concurrency: false }, async () => {
+  const { render, screen, waitFor, cleanup } = await import('@testing-library/react')
+  const { AssetExplorerDialog } = await import('../src/components/common/AssetExplorerDialog.tsx')
+  const calls: string[] = []
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    calls.push(String(input))
+    return new Response(JSON.stringify({
+      total: 1,
+      assets: [catalogAsset(0, 'clip.mp4')],
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+  }) as typeof fetch
+  try {
+    const view = render(
+      <AssetExplorerDialog
+        open
+        remote
+        workspaceId="film"
+        title="Library"
+        items={[]}
+        constraints={{ kinds: ['video'], maxCount: 1, optional: false }}
+        onClose={() => undefined}
+        onChoose={() => undefined}
+      />,
+    )
+    await waitFor(() => assert.ok(screen.getByTitle('clip.mp4')))
+    assert.equal(calls.length, 1)
+    view.rerender(
+      <AssetExplorerDialog
+        open
+        remote
+        workspaceId="film"
+        title="Library"
+        items={[]}
+        constraints={{ kinds: ['video'], maxCount: 1, optional: false }}
+        onClose={() => undefined}
+        onChoose={() => undefined}
+      />,
+    )
+    await waitFor(() => assert.ok(screen.getByTitle('clip.mp4')))
+    assert.equal(calls.length, 1)
+  } finally {
+    globalThis.fetch = originalFetch
+    cleanup()
+  }
+})

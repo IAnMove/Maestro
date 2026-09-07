@@ -6,6 +6,7 @@ import {
   explorerCanConfirm,
   explorerListModel,
   explorerToolbarKinds,
+  remoteCatalogFilterKey,
   remotePageCount,
   resolveExplorerSelection,
 } from '../src/features/asset-picker/remoteCatalog.ts'
@@ -38,6 +39,15 @@ function outputFrom(item: PickerItem): ApiOutput {
     path: item.filename,
   }
 }
+
+test('catalog filter key ignores constraints object identity', () => {
+  const first = { kinds: ['video'] as const, maxCount: 1, optional: false }
+  const second = { kinds: ['video'] as const, maxCount: 1, optional: false }
+  assert.equal(remoteCatalogFilterKey('', first), 'video')
+  assert.equal(remoteCatalogFilterKey('', second), remoteCatalogFilterKey('', first))
+  assert.equal(remoteCatalogFilterKey('audio', first), 'audio')
+  assert.equal(remoteCatalogFilterKey('', undefined), '')
+})
 
 test('remote pages are 24 wide and never collapse to zero', () => {
   assert.equal(ASSET_PICKER_PAGE_SIZE, 24)

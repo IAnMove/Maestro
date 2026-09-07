@@ -14,6 +14,14 @@ import type { AssetConstraints, CatalogSort, PickerItem } from './types.ts'
 
 const DEFAULT_KINDS: AssetKind[] = ['image', 'video', 'audio', 'model3d', 'scene']
 
+export function remoteCatalogFilterKey(
+  kind: AssetKind | '',
+  constraints?: AssetConstraints,
+): string {
+  if (kind) return kind
+  return (constraints?.kinds || []).join(',')
+}
+
 export function useRemoteCatalogPage(input: {
   enabled: boolean
   workspaceId?: string
@@ -28,10 +36,11 @@ export function useRemoteCatalogPage(input: {
   const [items, setItems] = useState<PickerItem[]>([])
   const [total, setTotal] = useState(0)
   const [status, setStatus] = useState<'ready' | 'loading' | 'error'>(input.enabled ? 'loading' : 'ready')
+  const kindsKey = remoteCatalogFilterKey(input.kind, input.constraints)
   useEffect(() => () => session.current.dispose(), [])
   useEffect(() => {
     if (!input.enabled || !input.workspaceId) return
-    const kinds = input.kind ? [input.kind] : input.constraints?.kinds
+    const kinds = kindsKey ? kindsKey.split(',') as AssetKind[] : undefined
     void session.current.run({
       workspace: input.workspaceId,
       search: input.query.trim() || undefined,
@@ -45,7 +54,7 @@ export function useRemoteCatalogPage(input: {
       setTotal(result.total)
       setStatus('ready')
     }).catch(() => setStatus('error'))
-  }, [input.constraints, input.enabled, input.kind, input.page, input.query, input.retry, input.sort, input.workspaceId])
+  }, [input.enabled, input.page, input.query, input.retry, input.sort, input.workspaceId, kindsKey])
   return { items, total, status }
 }
 
