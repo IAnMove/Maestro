@@ -1,0 +1,63 @@
+import {
+  BoxGeometry,
+  Color,
+  Group,
+  IcosahedronGeometry,
+  Mesh,
+  MeshStandardMaterial,
+  type Object3D,
+} from 'three'
+import type { GpuWorld } from './gpu.ts'
+import type { Scene3DDressing } from './types.ts'
+
+function dropDressing(world: GpuWorld) {
+  if (!world.dressing) return
+  world.scene.remove(world.dressing)
+  world.dressing.traverse(child => {
+    if (!(child instanceof Mesh)) return
+    child.geometry.dispose()
+    const materials = Array.isArray(child.material) ? child.material : [child.material]
+    for (const material of materials) material.dispose()
+  })
+  world.dressing = null
+}
+
+function streetGroup(): Object3D {
+  const root = new Group()
+  const brick = new MeshStandardMaterial({ color: 0x3a3340, roughness: 0.88 })
+  const glass = new MeshStandardMaterial({ color: 0x1a2438, roughness: 0.28, metalness: 0.55 })
+  const blocks = [
+    [-5.4, 2.2, -4.2, 1.6, 4.4, 1.6],
+    [5.8, 3.1, -3.6, 1.8, 6.2, 1.8],
+    [-6.2, 1.6, 3.4, 1.4, 3.2, 1.5],
+    [6.4, 2.4, 4.1, 1.7, 4.8, 1.7],
+    [0.4, 1.2, -7.2, 3.2, 2.4, 1.2],
+    [-2.8, 0.9, 6.8, 2.2, 1.8, 1.1],
+  ]
+  for (const [x, y, z, w, h, d] of blocks) {
+    const mesh = new Mesh(new BoxGeometry(w, h, d), Math.abs(x) > 5 ? glass : brick)
+    mesh.position.set(x, y, z)
+    root.add(mesh)
+  }
+  return root
+}
+
+function spaceGroup(): Object3D {
+  const root = new Group()
+  const rock = new MeshStandardMaterial({ color: new Color(0x2a2030), roughness: 0.95, emissive: 0x140818, emissiveIntensity: 0.35 })
+  const spots = [[-3.2, 0.4, -2.4, 0.7], [3.6, 0.8, -1.6, 0.9], [1.2, 0.2, 3.1, 0.5], [-2.1, 1.4, 2.6, 0.4]]
+  for (const [x, y, z, r] of spots) {
+    const mesh = new Mesh(new IcosahedronGeometry(r, 0), rock)
+    mesh.position.set(x, y, z)
+    root.add(mesh)
+  }
+  return root
+}
+
+export function syncDressing(world: GpuWorld, kind: Scene3DDressing | undefined) {
+  dropDressing(world)
+  world.floor.visible = kind !== 'space' && kind !== 'treadmill'
+  if (kind === 'street') world.dressing = streetGroup()
+  if (kind === 'space') world.dressing = spaceGroup()
+  if (world.dressing) world.scene.add(world.dressing)
+}

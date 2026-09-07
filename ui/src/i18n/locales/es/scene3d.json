@@ -907,7 +907,7 @@
     "exported": "MP4 3D guardado en Vídeos como {{name}}",
     "exportFailed": "No se pudo exportar la escena 3D.",
     "help": "Metros, Y-up. La identidad del clip es índice más el nombre glTF exacto. Los GLB locales se quedan en el navegador; no se suben.",
-    "runHelp": "El personaje se queda en sitio. Elige el clip Running por su nombre glTF exacto; no lo adivines. El mundo es un cilindro que se desplaza detrás.",
+    "runHelp": "De lado, a la altura del pecho. El personaje se queda en sitio; elige el clip Running por su nombre glTF exacto. Sin suelo: solo el sujeto y el cilindro desplazándose al contrario.",
     "infinite": "Fondo infinito",
     "loopSpeed": "Desplazamiento",
     "clipIndex": "Índice de clip",
@@ -929,6 +929,7 @@
       "reveal": "Grúa de revelado",
       "encounter": "Plano de dos / OTS",
       "pursuit": "Persecución / carrera",
+      "side": "Perfil de lado",
       "musical": "Órbita musical"
     },
     "template": {
@@ -939,7 +940,13 @@
       "tracking": "Travelling",
       "crane-reveal": "Grúa de revelado",
       "establishing": "Plano de situación",
-      "run-loop": "Carrera en bucle"
+      "run-loop": "Carrera en bucle",
+      "neon-run": "Carrera neón",
+      "block-street": "Calle de bloques",
+      "space-float": "Flotar en el espacio",
+      "walk-void": "Caminar en el vacío",
+      "dance-orbit": "Órbita de baile",
+      "dance-stage": "Escenario de baile"
     }
   }
 }

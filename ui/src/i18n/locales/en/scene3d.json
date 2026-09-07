@@ -907,7 +907,7 @@
     "exported": "3D MP4 saved in Videos as {{name}}",
     "exportFailed": "Could not export the 3D scene.",
     "help": "Metres, Y-up. Clip identity is index plus the exact glTF name. Local GLB files stay in the browser; they are not uploaded.",
-    "runHelp": "The character stays on the spot. Pick the Running clip by its exact glTF name — do not guess. The world is a cylinder that scrolls behind them.",
+    "runHelp": "Side-on, chest height. The character stays on the spot; pick the Running clip by its exact glTF name. No floor — only the subject and the cylinder scrolling the other way.",
     "infinite": "Infinite backdrop",
     "loopSpeed": "Scroll",
     "clipIndex": "Clip index",
@@ -929,6 +929,7 @@
       "reveal": "Crane reveal",
       "encounter": "Two-shot / OTS",
       "pursuit": "Pursuit / run",
+      "side": "Side profile",
       "musical": "Musical orbit"
     },
     "template": {
@@ -939,7 +940,13 @@
       "tracking": "Tracking shot",
       "crane-reveal": "Crane reveal",
       "establishing": "Establishing",
-      "run-loop": "Run loop"
+      "run-loop": "Run loop",
+      "neon-run": "Neon run",
+      "block-street": "Block street",
+      "space-float": "Space float",
+      "walk-void": "Walk in the void",
+      "dance-orbit": "Dance orbit",
+      "dance-stage": "Dance stage"
     }
   }
 }

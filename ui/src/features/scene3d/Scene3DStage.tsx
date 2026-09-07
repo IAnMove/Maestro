@@ -1,6 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
 import { TextureLoader } from 'three'
 import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js'
+import { syncDressing } from './dressing.ts'
 import {
   applyLight,
   catalogFromClips,
@@ -156,6 +157,12 @@ export const Scene3DStage = forwardRef<Scene3DStageHandle, Props>(function Scene
     if (!world) return
     applyLight(world.dir, document.light)
   }, [document.light])
+
+  useEffect(() => {
+    const world = worldRef.current
+    if (!world) return
+    syncDressing(world, document.dressing)
+  }, [document.dressing])
 
   useEffect(() => {
     const world = worldRef.current

@@ -80,5 +80,8 @@ export function parseScene3DDocument(raw: unknown): Scene3DDocument | null {
     && (SCENE3D_TEMPLATE_IDS as readonly string[]).includes(value.templateId)
     ? value.templateId as Scene3DTemplateId
     : 'two-shot'
-  return { ...value, slots, templateId } as Scene3DDocument
+  const dressing = value.dressing === 'street' || value.dressing === 'space' || value.dressing === 'treadmill'
+    ? value.dressing
+    : undefined
+  return { ...value, slots, templateId, dressing } as Scene3DDocument
 }
