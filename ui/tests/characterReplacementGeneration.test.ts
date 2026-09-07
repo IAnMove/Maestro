@@ -179,3 +179,44 @@ test('Video uses canonical Recast admission, keeps full source by default and re
     assert.deepEqual(requests.map(item => item.url), ['/api/v1/recast', '/api/v1/status/video-job'])
   } finally { close() }
 })
+
+test('Video completion selects the last cumulative window from its job in API order', async () => {
+  const requests: string[] = []
+  const firstWindow = 'z-first-124-frames.mp4'
+  const finalWindow = 'a-final-761-frames.MP4'
+  const outputFiles = [firstWindow, 'preview.png', 'm-second-230-frames.webm',
+    finalWindow, 'soundtrack.wav', 'last-preview.jpg', 'metadata.mp4.json']
+  const observedOutputs: string[][] = []
+  const close = fixture(async input => {
+    requests.push(String(input))
+    assert.equal(String(input), '/api/v1/status/long-video-job')
+    const running = requests.length === 1
+    return Response.json({ ...completed, job_id: 'long-video-job', task_id: 'task-long-video',
+      root_task_id: 'root-long-video', status: running ? 'running' : 'completed',
+      output_files: running ? [firstWindow] : outputFiles })
+  })
+  try {
+    useStore.setState({ outputs: [{ name: 'unrelated-gallery-video.mp4', media_type: 'video' }] as never })
+    const result = await waitForReplacementVideo('long-video-job', 'demo', status => {
+      observedOutputs.push(status.output_files)
+    })
+    assert.deepEqual(result, { name: finalWindow, source: `/api/v1/file/${finalWindow}?workspace=demo`,
+      jobId: 'long-video-job', taskId: 'task-long-video', rootTaskId: 'root-long-video' })
+    assert.deepEqual(requests, ['/api/v1/status/long-video-job', '/api/v1/status/long-video-job'])
+    assert.deepEqual(observedOutputs, [[firstWindow], outputFiles])
+  } finally { close() }
+})
+
+test('Video completion without a video fails even when the gallery contains one', async () => {
+  const requests: string[] = []
+  const close = fixture(async input => {
+    requests.push(String(input))
+    return Response.json({ ...completed, job_id: 'missing-video-job',
+      output_files: ['preview.png', 'soundtrack.wav', 'video.mp4.json'] })
+  })
+  try {
+    useStore.setState({ outputs: [{ name: 'unrelated-gallery-video.mp4', media_type: 'video' }] as never })
+    await assert.rejects(waitForReplacementVideo('missing-video-job', 'demo'), /without a video/)
+    assert.deepEqual(requests, ['/api/v1/status/missing-video-job'])
+  } finally { close() }
+})
