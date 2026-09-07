@@ -12,8 +12,21 @@ const OUTPUT_KIND: Record<ApiOutput['type'], AssetKind> = {
   comic: 'document',
 }
 
-export function catalogItemToPickerItem(item: AssetCatalogItem, workspaceId: string): PickerItem {
-  const location = item.locations.find(entry => entry.workspace_id === workspaceId) ?? item.locations[0]
+export function catalogLocation(item: AssetCatalogItem, workspaceId: string) {
+  return item.locations.find(entry => entry.workspace_id === workspaceId)
+}
+
+export function catalogItemToPickerItem(
+  item: AssetCatalogItem,
+  workspaceId: string,
+  options?: { strict?: boolean },
+): PickerItem {
+  const location = catalogLocation(item, workspaceId) ?? (options?.strict ? undefined : item.locations[0])
+  if (options?.strict && !location) {
+    const error = new Error('Asset location not found')
+    ;(error as Error & { status: number }).status = 409
+    throw error
+  }
   const filename = location?.filename || item.filename
   const createdAt = knownCreatedAt(item.created_at)
   const ref: AssetRef = {

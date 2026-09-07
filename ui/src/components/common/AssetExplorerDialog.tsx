@@ -5,8 +5,10 @@ import type { AssetKind } from '../../api/assets'
 import {
   ASSET_PICKER_PAGE_SIZE,
   checkCompatibility,
+  confirmPickerChoice,
   filterPickerItems,
   isSameRef,
+  livePickerItem,
   outputToPickerItem,
   paginatePickerItems,
   sortPickerItems,
@@ -33,6 +35,7 @@ export function AssetPickTrigger({
   disabled?: boolean
 }) {
   const preview = selected ? assetPreviewUrl(selected) : ''
+  const picked = selected ? outputToPickerItem(selected, '') : null
   return (
     <div className="block text-[9px] text-text-muted">
       {label}
@@ -46,7 +49,8 @@ export function AssetPickTrigger({
           {preview ? <img src={preview} alt="" className="h-full w-full object-cover" /> : <FolderOpen size={14} className="text-text-muted" />}
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate">{selected?.name ?? placeholder}</span>
+          <span className="block truncate">{picked?.title ?? placeholder}</span>
+          {picked && <span className="block truncate text-[8px] text-text-muted">{picked.filename}</span>}
           {selected && <span className="block text-[8px] text-text-muted">{formatAssetDate(selected)}</span>}
         </span>
       </button>
@@ -74,15 +78,16 @@ function compatibleKinds(items: PickerItem[], constraints?: AssetConstraints) {
   return constraints?.kinds?.length ? present.filter(kind => constraints.kinds.includes(kind)) : present
 }
 
-function confirmOutput(items: ApiOutput[], item: PickerItem | null, onChoose: (item: ApiOutput | null) => void, onClose: () => void) {
-  if (item) {
-    const output = items.find(entry => entry.name === item.filename)
-    if (!output) return
-    onChoose(output)
-  } else {
-    onChoose(null)
-  }
-  onClose()
+function confirmOutput(
+  items: ApiOutput[],
+  pickerItems: PickerItem[],
+  item: PickerItem | null,
+  workspaceId: string,
+  constraints: AssetConstraints | undefined,
+  onChoose: (item: ApiOutput | null) => void,
+  onClose: () => void,
+) {
+  confirmPickerChoice(items, pickerItems, item, workspaceId, constraints, onChoose, onClose)
 }
 
 function AssetExplorerBody({
@@ -108,16 +113,18 @@ function AssetExplorerBody({
     () => items.map(item => outputToPickerItem(item, workspaceId || '')),
     [items, workspaceId],
   )
-  const [picked, setPicked] = useState<PickerItem | null>(null)
-  const selected = picked ?? pickerItems.find(item => item.filename === selectedName) ?? null
+  const [picked, setPicked] = useState<{ workspaceId: string; item: PickerItem } | null>(null)
+  const scopedPicked = picked && picked.workspaceId === (workspaceId || '') ? picked.item : null
+  const selected = livePickerItem(pickerItems, scopedPicked)
+    ?? (scopedPicked ? null : pickerItems.find(item => item.filename === selectedName) ?? null)
   const filtered = useMemo(
     () => sortPickerItems(filterPickerItems(pickerItems, query, kind ? [kind] : constraints?.kinds), sort),
     [constraints, kind, pickerItems, query, sort],
   )
   const { pages, safePage, visible } = paginatePickerItems(filtered, page, ASSET_PICKER_PAGE_SIZE)
   const compatibility = selected && constraints ? checkCompatibility(selected, constraints, 0) : { allowed: true as const }
-  const stillInCatalog = selected ? pickerItems.some(item => isSameRef(item.ref, selected.ref)) : false
-  const selectedStillVisible = selected ? filtered.some(item => isSameRef(item.ref, selected.ref)) : true
+  const stillInCatalog = Boolean(selected && livePickerItem(pickerItems, selected))
+  const selectedStillVisible = selected ? filtered.some(item => isSameRef(item.ref, selected.ref) && item.url === selected.url) : true
   const emptyLabel = pickerItems.length && query.trim() ? t('explorer.noResults') : t('explorer.empty')
 
   return (
@@ -148,7 +155,7 @@ function AssetExplorerBody({
         onQuery={value => { setQuery(value); setPage(0) }}
         onKind={value => { setKind(value); setPage(0) }}
         onSort={value => { setSort(value); setPage(0) }}
-        onClear={() => confirmOutput(items, null, onChoose, onClose)}
+        onClear={() => confirmOutput(items, pickerItems, null, workspaceId || '', constraints, onChoose, onClose)}
       />
       <div className="grid min-h-0 flex-1 gap-3 overflow-hidden p-4 md:grid-cols-[minmax(0,1fr)_240px]">
         <div className="min-h-0 overflow-y-auto">
@@ -158,7 +165,7 @@ function AssetExplorerBody({
             selected={selected}
             emptyLabel={emptyLabel}
             onRetry={onRetry}
-            onPick={setPicked}
+            onPick={item => setPicked({ workspaceId: workspaceId || '', item })}
           />
         </div>
         <aside className="flex min-h-[200px] flex-col rounded-lg border border-border bg-bg-tertiary p-2">
@@ -177,7 +184,7 @@ function AssetExplorerBody({
         canConfirm={Boolean(selected) && compatibility.allowed && stillInCatalog}
         onCancel={onClose}
         onPage={setPage}
-        onConfirm={() => selected && confirmOutput(items, selected, onChoose, onClose)}
+        onConfirm={() => selected && confirmOutput(items, pickerItems, selected, workspaceId || '', constraints, onChoose, onClose)}
       />
     </div>
   )

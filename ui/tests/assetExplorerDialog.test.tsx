@@ -225,3 +225,60 @@ test('growing the item list does not wipe a provisional choice', { concurrency: 
     cleanup()
   }
 })
+
+test('homonymous files confirm the clicked url, not the first name match', { concurrency: false }, async () => {
+  const { render, screen, fireEvent, cleanup } = await import('@testing-library/react')
+  const { AssetExplorerDialog } = await import('../src/components/common/AssetExplorerDialog.tsx')
+  const chosen: string[] = []
+  const items = [
+    { ...glb('same.glb', 1), url: '/api/v1/file/a/same.glb', thumbnail_url: '/a.png' },
+    { ...glb('same.glb', 2), url: '/api/v1/file/b/same.glb', thumbnail_url: '/b.png' },
+  ]
+  try {
+    render(
+      <AssetExplorerDialog
+        open
+        title="Choose a GLB"
+        workspaceId="film"
+        items={items}
+        onClose={() => undefined}
+        onChoose={item => { if (item) chosen.push(item.url) }}
+      />,
+    )
+    fireEvent.click(screen.getAllByTitle('same.glb')[0])
+    fireEvent.click(screen.getByRole('button', { name: 'Choose' }))
+    assert.deepEqual(chosen, ['/api/v1/file/b/same.glb'])
+  } finally {
+    cleanup()
+  }
+})
+
+test('workspace change, deletion and compatibility drop block confirm', { concurrency: false }, async () => {
+  const { render, screen, fireEvent, cleanup } = await import('@testing-library/react')
+  const { AssetExplorerDialog } = await import('../src/components/common/AssetExplorerDialog.tsx')
+  const item = glb('hero-running-aaaaaa.glb', 1_725_000_000)
+  const chosen: string[] = []
+  const props = {
+    open: true,
+    title: 'Choose a GLB',
+    onClose: () => undefined,
+    onChoose: (value: { name: string } | null) => { if (value) chosen.push(value.name) },
+  }
+  try {
+    const view = render(<AssetExplorerDialog {...props} workspaceId="alpha" items={[item]} />)
+    fireEvent.click(screen.getAllByTitle(item.name)[0])
+    assert.equal((screen.getByRole('button', { name: 'Choose' }) as HTMLButtonElement).disabled, false)
+    view.rerender(<AssetExplorerDialog {...props} workspaceId="beta" items={[item]} />)
+    assert.equal((screen.getByRole('button', { name: 'Choose' }) as HTMLButtonElement).disabled, true)
+    view.rerender(<AssetExplorerDialog {...props} workspaceId="alpha" items={[item]} />)
+    fireEvent.click(screen.getAllByTitle(item.name)[0])
+    view.rerender(<AssetExplorerDialog {...props} workspaceId="alpha" items={[]} />)
+    assert.equal((screen.getByRole('button', { name: 'Choose' }) as HTMLButtonElement).disabled, true)
+    view.rerender(<AssetExplorerDialog {...props} workspaceId="alpha" items={[item]} constraints={{ kinds: ['audio'], maxCount: 1, optional: false }} />)
+    fireEvent.click(screen.getAllByTitle(item.name)[0])
+    assert.equal((screen.getByRole('button', { name: 'Choose' }) as HTMLButtonElement).disabled, true)
+    assert.deepEqual(chosen, [])
+  } finally {
+    cleanup()
+  }
+})

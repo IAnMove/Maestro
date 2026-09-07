@@ -1,7 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
 import { TextureLoader } from 'three'
 import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js'
-import { loadCafeMaps } from './cafeSet.ts'
+import { adoptCafeMaps, loadCafeMaps } from './cafeSet.ts'
 import { syncDressing } from './dressing.ts'
 import {
   applyLight,
@@ -171,7 +171,7 @@ export const Scene3DStage = forwardRef<Scene3DStageHandle, Props>(function Scene
     syncDressing(world, 'cafe')
     let gone = false
     void loadCafeMaps().then(maps => {
-      if (gone || worldRef.current !== world) return
+      if (!adoptCafeMaps(maps, () => !gone && worldRef.current === world)) return
       syncDressing(world, 'cafe', maps)
       world.dressingReady = true
     })

@@ -5,9 +5,12 @@ import type { ApiOutput } from '../src/api/outputs.ts'
 import {
   catalogItemToPickerItem,
   checkCompatibility,
+  confirmPickerChoice,
   createCatalogQuerySession,
   filterPickerItems,
   isSameRef,
+  livePickerItem,
+  matchOutputByPicker,
   outputToPickerItem,
   queryAssetCatalog,
   resolveAssetRef,
@@ -60,7 +63,7 @@ test('missing created_at becomes unknown date, not completed_at', async () => {
   }), 'default')
   assert.equal(item.createdAt, null)
   assert.equal(formatCreatedDate(item.createdAt), formatUnknownDate())
-  assert.match(item.title, /Unknown date/)
+  assert.match(item.title, /Unknown date|Fecha desconocida/)
 })
 
 test('legacy outputs do not invent catalog ids', () => {
@@ -149,6 +152,102 @@ test('resolveAssetRef reports 404 for an unknown catalog id', async () => {
   }
 })
 
+test('strict catalog mapping does not fall back to another workspace', () => {
+  const item = catalogItem({
+    id: 'shared', filename: 'same.png',
+    workspace_ids: ['alpha', 'beta'],
+    locations: [
+      { workspace_id: 'alpha', filename: 'same.png', url: '/alpha/same.png' },
+      { workspace_id: 'beta', filename: 'same.png', url: '/beta/same.png' },
+    ],
+  })
+  const browse = catalogItemToPickerItem(item, 'missing')
+  assert.equal(browse.url, '/alpha/same.png')
+  assert.throws(
+    () => catalogItemToPickerItem(item, 'missing', { strict: true }),
+    (error: unknown) => error instanceof Error
+      && error.message === 'Asset location not found'
+      && (error as Error & { status?: number }).status === 409,
+  )
+})
+
+test('resolveAssetRef pages past the first fifty search-like hits', async () => {
+  const originalFetch = globalThis.fetch
+  const decoys = Array.from({ length: 50 }, (_, index) => catalogItem({
+    id: `decoy_${index}`, filename: `hit-${index}.png`,
+    prompt_preview: 'wanted.png',
+    locations: [{ workspace_id: 'film', filename: `hit-${index}.png`, url: `/d/${index}` }],
+    workspace_ids: ['film'],
+  }))
+  const wanted = catalogItem({
+    id: 'wanted', filename: 'wanted.png',
+    locations: [{ workspace_id: 'film', filename: 'wanted.png', url: '/wanted.png' }],
+    workspace_ids: ['film'],
+  })
+  globalThis.fetch = (async (url: RequestInfo | URL) => {
+    const parsed = new URL(String(url), 'http://localhost')
+    const offset = Number(parsed.searchParams.get('offset') || '0')
+    const limit = Number(parsed.searchParams.get('limit') || '50')
+    const all = [...decoys, wanted]
+    return new Response(JSON.stringify({
+      total: all.length,
+      assets: all.slice(offset, offset + limit),
+    }))
+  }) as typeof fetch
+  try {
+    const match = await resolveAssetRef({
+      version: 1, scheme: 'legacy-output', workspaceId: 'film', filename: 'wanted.png', outputType: 'image',
+    })
+    assert.equal(match.id, 'wanted')
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test('catalog resolve refuses a silent workspace substitution', async () => {
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = (async () => new Response(JSON.stringify(catalogItem({
+    id: 'asset_alpha', filename: 'same.png', workspace_ids: ['alpha'],
+    locations: [{ workspace_id: 'alpha', filename: 'same.png', url: '/alpha' }],
+  })))) as typeof fetch
+  try {
+    await assert.rejects(
+      () => resolveAssetRef({
+        version: 1, scheme: 'catalog', id: 'asset_alpha', workspaceId: 'beta', filename: 'same.png',
+      }),
+      (error: unknown) => error instanceof Error
+        && error.message === 'Asset location not found'
+        && (error as Error & { status?: number }).status === 409,
+    )
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test('query session dispose aborts the in-flight request', async () => {
+  const originalFetch = globalThis.fetch
+  const session = createCatalogQuerySession()
+  let aborted = false
+  globalThis.fetch = (async (_url: RequestInfo | URL, init?: RequestInit) => {
+    await new Promise<void>((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => {
+        aborted = true
+        reject(Object.assign(new Error('aborted'), { name: 'AbortError' }))
+      })
+    })
+    return new Response(JSON.stringify({ total: 0, assets: [] }))
+  }) as typeof fetch
+  try {
+    const pending = session.run({ workspace: 'default' })
+    session.dispose()
+    const result = await pending
+    assert.equal(aborted, true)
+    assert.equal(result.stale, true)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
 test('legacy resolve keeps homonyms distinct by workspace', async () => {
   const originalFetch = globalThis.fetch
   globalThis.fetch = (async () => new Response(JSON.stringify({
@@ -172,6 +271,38 @@ test('legacy resolve keeps homonyms distinct by workspace', async () => {
   } finally {
     globalThis.fetch = originalFetch
   }
+})
+
+test('confirm resolves by full ref and url, not filename', () => {
+  const twins: ApiOutput[] = [
+    { name: 'same.glb', type: 'model3d', mode: null, size: 1, created_at: 1, url: '/api/v1/file/a/same.glb', thumbnail_url: '/a.png' },
+    { name: 'same.glb', type: 'model3d', mode: null, size: 2, created_at: 2, url: '/api/v1/file/b/same.glb', thumbnail_url: '/b.png' },
+  ]
+  const items = twins.map(item => outputToPickerItem(item, 'film'))
+  const chosen: string[] = []
+  const ok = confirmPickerChoice(twins, items, items[1], 'film', undefined, item => { if (item) chosen.push(item.url) }, () => undefined)
+  assert.equal(ok, true)
+  assert.deepEqual(chosen, ['/api/v1/file/b/same.glb'])
+  assert.equal(matchOutputByPicker(twins, items[0], 'film')?.url, '/api/v1/file/a/same.glb')
+  assert.equal(livePickerItem(items.slice(1), items[0]), null)
+})
+
+test('confirm refuses a live item that is gone or incompatible', () => {
+  const output: ApiOutput = {
+    name: 'plate.png', type: 'image', mode: null, size: 2, created_at: 1,
+    url: '/api/v1/file/plate.png', thumbnail_url: '/api/v1/file/plate.png',
+  }
+  const item = outputToPickerItem(output, 'film')
+  const chosen: Array<string | null> = []
+  assert.equal(confirmPickerChoice([], [item], item, 'film', undefined, value => chosen.push(value ? value.name : null), () => undefined), false)
+  assert.deepEqual(chosen, [])
+  assert.equal(confirmPickerChoice(
+    [output], [item], item, 'film',
+    { kinds: ['audio'], maxCount: 1, optional: false },
+    value => chosen.push(value ? value.name : null),
+    () => undefined,
+  ), false)
+  assert.deepEqual(chosen, [])
 })
 
 test('picker catalog queries default to created_desc and 24 items', async () => {
