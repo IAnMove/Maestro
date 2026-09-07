@@ -5,9 +5,10 @@ import { useUiTranslation } from '../../i18n'
 import * as api from '../../api/client'
 import type { AssetCatalogItem } from '../../api/assets'
 import type { ApiOutput } from '../../api/outputs'
-import { catalogItemToOutput, matchCatalogByOutput, voiceRefFromOutput } from '../../features/asset-picker'
+import { catalogItemToOutput, voiceRefFromOutput } from '../../features/asset-picker'
 import { ToolsParamsPanel } from './ToolsParamsPanel'
-import { ToolsSourcePanel, type ToolSource } from './ToolsSourcePanel'
+import { resolveToolSource } from '../../lib/toolSource'
+import { ToolsSourcePanel } from './ToolsSourcePanel'
 
 export function ToolsPanel() {
   const { t } = useUiTranslation('studio')
@@ -78,22 +79,13 @@ export function ToolsPanel() {
       setSourceUploadError(false)
       return
     }
-    const catalog = matchCatalogByOutput(catalogAssets, item, activeWorkspace)
-    const location = catalog?.locations.find(entry => entry.workspace_id === activeWorkspace) ?? catalog?.locations[0]
-    const kind: ToolSource['kind'] = item.type === 'video' ? 'video' : item.type === 'audio' ? 'audio' : 'image'
-    if ((tool === 'remove_background' && kind !== 'image') || (tool === 'revoice' && kind !== 'video')) {
+    const source = resolveToolSource(item, catalogAssets, activeWorkspace)
+    if ((tool === 'remove_background' && source.kind !== 'image') || (tool === 'revoice' && source.kind !== 'video')) {
       setSourceUploadError(true)
       return
     }
     setSourceUploadError(false)
-    setSource({
-      path: location?.filename || item.name,
-      name: catalog?.filename || item.name,
-      url: item.url,
-      assetId: catalog?.id ?? null,
-      workspace: location?.workspace_id ?? (catalog ? activeWorkspace : '__uploads__'),
-      kind,
-    })
+    setSource(source)
   }
 
   const currentIsImage = !!current && current.type === 'image'
