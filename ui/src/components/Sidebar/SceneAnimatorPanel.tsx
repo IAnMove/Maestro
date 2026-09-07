@@ -7,16 +7,20 @@ import { useStore } from '../../stores/useStore'
 import { analyzeAudio, deleteCharacterKit, fetchCharacterKitLibrary, fetchOutputs, generateLlmText, saveCharacterKit, saveScene as saveSceneOutput, saveSceneRecording, uploadImage } from '../../api/client'
 
 import type { AssetExplorerPurpose } from '../common/assetExplorer.ts'
-import { uploadLocalAsset } from '../../features/asset-picker/upload.ts'
+import {
+  applyLayerSourceCommit,
+  bindKindFromCatalogType,
+  bindLocalLayerFiles,
+  captureLayerBind,
+  catalogLayerOutput,
+  makeLiveLayerSource,
+  type LayerBindSink,
+} from '../../lib/sceneLayerBind.ts'
 import {
   bindKindFromLayerType,
-  commitLayerSourceChoice,
   explorerPurposeForBindKind,
-  localFileMatchesKind,
-  outputFromLocalUpload,
   type LayerSourceCapture,
   type SceneLayerBindKind,
-  type SceneLayerVisualType,
 } from '../../lib/sceneLayerSource.ts'
 import { SceneAnimatorAudioInput, SceneAnimatorExplorer, SceneAnimatorNarrativeSetup } from './SceneAnimatorExplorer'
 import { generateSceneSpeechClip } from '../../lib/sceneSpeech'
@@ -1009,78 +1013,34 @@ export function SceneAnimatorPanel() {
     })
     setSelectedId(duplicateId); setSelectedKeyframeId(null); setSelectedEventId(null); setMessage(t('animator.duplicated', { name: original.name }))
   }
-  const liveLayerSource = () => ({
+  const liveLayerSource = () => makeLiveLayerSource({
     generation: generationRef.current,
     workspaceId: workspaceRef.current,
     recording: recordingRef.current,
     publishing: publishingRef.current,
     saving: savingRef.current,
-    layerExists: (id: string) => sceneRef.current.layers.some(layer => layer.id === id),
-    layerType: (id: string): SceneLayerVisualType | undefined => {
-      const layer = sceneRef.current.layers.find(item => item.id === id)
-      return layer && (layer.type === 'model3d' || layer.type === 'image' || layer.type === 'video' || layer.type === 'overlay')
-        ? layer.type
-        : undefined
-    },
+    layers: sceneRef.current.layers,
   })
-  const applyLayerCommit = (commit: ReturnType<typeof commitLayerSourceChoice>) => {
-    if (commit.action === 'ignore') return
-    if (commit.action === 'reassign') {
-      const previous = sceneRef.current.layers.find(layer => layer.id === commit.layerId)
+  const layerBindSink: LayerBindSink = {
+    addLayer,
+    reassignLayer: (layerId, source, name, thumbnail) => {
+      const previous = sceneRef.current.layers.find(layer => layer.id === layerId)
       if (previous?.source.startsWith('blob:')) URL.revokeObjectURL(previous.source)
-      delete localFilesRef.current[commit.layerId]
-      updateLayer(commit.layerId, layer => ({
-        ...layer,
-        source: commit.source,
-        name: commit.name,
-        thumbnail: commit.thumbnail ?? layer.thumbnail,
-        missingAsset: false,
-      }))
-      setReassignId(current => current === commit.layerId ? null : current)
-      return
-    }
-    addLayer(commit.type, commit.source, commit.name, commit.thumbnail)
-  }
-  const bindLayerOutput = (capture: LayerSourceCapture, item: Parameters<typeof commitLayerSourceChoice>[2]) => {
-    applyLayerCommit(commitLayerSourceChoice(liveLayerSource(), capture, item))
-  }
-  const captureLayerBind = (kind: SceneLayerBindKind, reassignLayerId: string | null): LayerSourceCapture => {
-    const existingType = reassignLayerId ? liveLayerSource().layerType(reassignLayerId) : undefined
-    return {
-      generation: generationRef.current,
-      workspaceId: workspaceRef.current,
-      reassignId: reassignLayerId,
-      kind,
-      existingType,
-    }
+      delete localFilesRef.current[layerId]
+      updateLayer(layerId, layer => ({ ...layer, source, name, thumbnail: thumbnail ?? layer.thumbnail, missingAsset: false }))
+      setReassignId(current => current === layerId ? null : current)
+    },
   }
   const openLayerPicker = (kind: SceneLayerBindKind, reassignLayerId: string | null) => {
-    pendingBindRef.current = captureLayerBind(kind, reassignLayerId)
-    setReassignId(reassignLayerId)
-    setAssetExplorer(explorerPurposeForBindKind(kind))
-    setAddOpen(false)
+    pendingBindRef.current = captureLayerBind(liveLayerSource(), kind, reassignLayerId)
+    setReassignId(reassignLayerId); setAssetExplorer(explorerPurposeForBindKind(kind)); setAddOpen(false)
   }
   const startLocalLayerPick = (kind: SceneLayerBindKind, reassignLayerId: string | null, input: { current: HTMLInputElement | null }) => {
-    pendingBindRef.current = captureLayerBind(kind, reassignLayerId)
-    setReassignId(reassignLayerId)
-    setAddOpen(false)
-    input.current?.click()
+    pendingBindRef.current = captureLayerBind(liveLayerSource(), kind, reassignLayerId)
+    setReassignId(reassignLayerId); setAddOpen(false); input.current?.click()
   }
-  const bindLocalLayerFiles = async (kind: SceneLayerBindKind, files: File[]) => {
-    const capture = pendingBindRef.current?.kind === kind ? pendingBindRef.current : captureLayerBind(kind, pendingBindRef.current?.reassignId ?? null)
-    const selected = capture.reassignId ? files.slice(0, 1) : files
-    for (const file of selected) {
-      if (!localFileMatchesKind(kind, file)) continue
-      try {
-        const uploaded = await uploadLocalAsset(file)
-        bindLayerOutput(capture, outputFromLocalUpload(file, uploaded, kind))
-      } catch (error) {
-        if (error instanceof DOMException && error.name === 'AbortError') return
-        setMessage(error instanceof Error ? error.message : t('animator.saveFailed'))
-        return
-      }
-    }
-    pendingBindRef.current = null
+  const pickLocalLayerFiles = async (kind: SceneLayerBindKind, files: File[]) => {
+    pendingBindRef.current = await bindLocalLayerFiles(liveLayerSource(), pendingBindRef.current, kind, files, layerBindSink, message => setMessage(message || t('animator.saveFailed')))
   }
   const translateLayer = (id: string, x: number, y: number, useSnap = true) => updateLayer(id, layer => {
     const nextX = useSnap ? snapCoordinate(x) : x; const nextY = useSnap ? snapCoordinate(y) : y
@@ -3196,7 +3156,7 @@ export function SceneAnimatorPanel() {
       <button type="button" disabled={playing || recording || publishing || saving} onClick={() => setTemplateComposerOpen(true)} className="w-full rounded border border-cyan-400/40 p-2 text-xs text-cyan-100 disabled:opacity-40">{t('animator.createFromLibrary')}</button>
       <a href="/scene-template-review" target="_blank" rel="noopener noreferrer" className="block rounded border border-cyan-500/30 p-2 text-center text-xs text-cyan-200">{t('animator.labCatalog')}</a>
       <div className="relative"><button onClick={() => setAddOpen(value => !value)} className="w-full rounded bg-accent-blue px-2.5 py-2 text-xs text-white flex items-center justify-center gap-1"><Plus size={13} /> {t('animator.addLayer')}</button>{addOpen && <div className="absolute z-[1100] mt-1 max-h-[75vh] w-full space-y-1 overflow-y-auto rounded border border-border bg-bg-primary p-1 shadow-xl"><button onClick={addCamera} className="w-full rounded px-2 py-1.5 text-left text-[11px] text-cyan-200 hover:bg-bg-hover">{t('animator.addCamera')}</button><div className="px-2 pt-1 text-[8px] font-medium uppercase tracking-wider text-text-muted">{t('animator.atmospherePresets')}</div><div className="grid grid-cols-2 gap-1">{ATMOSPHERE_KINDS.map(kind => <button key={kind} onClick={() => addAtmosphere(kind)} title={`${t(`atmosphere.labels.${kind}`)} — ${t(`atmosphere.descriptions.${kind}`, { defaultValue: ATMOSPHERE_DESCRIPTIONS[kind] })}`} className="truncate rounded border border-border px-2 py-1.5 text-left text-[9px] text-purple-200 hover:border-purple-400/60 hover:bg-bg-hover">{t(`atmosphere.labels.${kind}`)}</button>)}</div><button onClick={() => openLayerPicker('model3d', null)} className="w-full rounded px-2 py-1.5 text-left text-[11px] hover:bg-bg-hover">{t('animator.selectGenerated3d')}</button><button onClick={() => startLocalLayerPick('model3d', null, modelInputRef)} className="w-full rounded px-2 py-1.5 text-left text-[11px] hover:bg-bg-hover">{t('animator.importGlb')}</button><button onClick={() => openLayerPicker('media', null)} className="w-full rounded px-2 py-1.5 text-left text-[11px] hover:bg-bg-hover">{t('animator.selectGeneratedMedia')}</button><button onClick={() => startLocalLayerPick('media', null, mediaInputRef)} className="w-full rounded px-2 py-1.5 text-left text-[11px] hover:bg-bg-hover">{t('animator.importMedia')}</button><button onClick={() => openLayerPicker('overlay', null)} className="w-full rounded px-2 py-1.5 text-left text-[11px] hover:bg-bg-hover">{t('animator.chooseAsset')}</button><button onClick={() => startLocalLayerPick('overlay', null, overlayInputRef)} className="w-full rounded px-2 py-1.5 text-left text-[11px] hover:bg-bg-hover">{t('animator.importOverlay')}</button></div>}</div>
-      <input ref={modelInputRef} type="file" accept=".glb,model/gltf-binary" className="hidden" data-testid="scene-layer-model-file" onChange={event => { const files = [...(event.target.files ?? [])]; event.currentTarget.value = ''; if (files.length) void bindLocalLayerFiles('model3d', files) }} /><input ref={mediaInputRef} type="file" accept="image/*,video/*" className="hidden" data-testid="scene-layer-media-file" onChange={event => { const files = [...(event.target.files ?? [])]; event.currentTarget.value = ''; if (files.length) void bindLocalLayerFiles('media', files) }} /><input ref={overlayInputRef} type="file" accept="image/png,image/webp" multiple className="hidden" data-testid="scene-layer-overlay-file" onChange={event => { const files = [...(event.target.files ?? [])]; event.currentTarget.value = ''; if (files.length) void bindLocalLayerFiles('overlay', files) }} />
+      <input ref={modelInputRef} type="file" accept=".glb,model/gltf-binary" className="hidden" data-testid="scene-layer-model-file" onChange={event => { const files = [...(event.target.files ?? [])]; event.currentTarget.value = ''; if (files.length) void pickLocalLayerFiles('model3d', files) }} /><input ref={mediaInputRef} type="file" accept="image/*,video/*" className="hidden" data-testid="scene-layer-media-file" onChange={event => { const files = [...(event.target.files ?? [])]; event.currentTarget.value = ''; if (files.length) void pickLocalLayerFiles('media', files) }} /><input ref={overlayInputRef} type="file" accept="image/png,image/webp" multiple className="hidden" data-testid="scene-layer-overlay-file" onChange={event => { const files = [...(event.target.files ?? [])]; event.currentTarget.value = ''; if (files.length) void pickLocalLayerFiles('overlay', files) }} />
       <div><div className="mb-1.5 text-[10px] font-medium uppercase tracking-wider text-text-muted">{t('animator.layers')}</div><div className="space-y-1">{[...scene.layers].sort((a, b) => b.z - a.z).map(layer => <div key={layer.id} onClick={() => setSelectedId(layer.id)} className={`flex cursor-pointer items-center gap-1.5 rounded border p-1.5 text-[10px] ${selectedId === layer.id ? 'border-accent-blue bg-accent-blue/10' : 'border-border bg-bg-primary'}`}><div className="h-7 w-7 shrink-0 overflow-hidden rounded bg-bg-active flex items-center justify-center">{layer.thumbnail ? <img src={layer.thumbnail} alt="" className="h-full w-full object-cover" /> : iconFor(layer.type)}</div><div className="min-w-0 flex-1"><div className="truncate">{layer.name}</div><div className="text-[9px] text-text-muted">{t('animator.layerMeta', { type: t(`layerTypes.${layer.type}` as 'layerTypes.camera'), z: layer.z })}{layer.missingAsset ? t('animator.missingAssetSuffix') : ''}</div></div><button onClick={event => { event.stopPropagation(); updateLayer(layer.id, item => ({ ...item, visible: !item.visible })) }} title={t('animator.visibility')}>{layer.visible ? <Eye size={12} /> : <EyeOff size={12} />}</button><div className="flex flex-col"><button title={t('animator.bringForward')} onClick={event => { event.stopPropagation(); moveLayerZ(layer.id, 1) }}><ChevronUp size={12} /></button><button title={t('animator.sendBackward')} onClick={event => { event.stopPropagation(); moveLayerZ(layer.id, -1) }}><ChevronDown size={12} /></button></div><button onClick={event => { event.stopPropagation(); updateScene(current => ({ ...current, layers: normalizeZ(current.layers.filter(item => item.id !== layer.id)) })); if (selectedId === layer.id) setSelectedId(null) }} className="text-red-400"><Trash2 size={12} /></button></div>)}</div></div>
       {selected && <label className={`flex cursor-pointer items-center justify-between gap-2 rounded border p-2 text-[9px] ${chainFromPlayhead ? 'border-purple-300/60 bg-purple-400/10 text-purple-100' : 'border-border bg-bg-primary text-text-secondary'}`}><span><span className="block font-medium">{t('animator.chainFromPlayhead')}</span><span className="block text-[8px] text-text-muted">{t('animator.chainHelp', { frame: Math.round(progress * scene.duration * fps) })}</span></span><input type="checkbox" checked={chainFromPlayhead} onChange={event => setChainFromPlayhead(event.target.checked)} /></label>}
       {selected && <div className="grid grid-cols-2 gap-1.5"><button type="button" onClick={() => updateLayer(selected.id, layer => ({ ...layer, locked: !layer.locked }))} className={`flex items-center justify-center gap-1 rounded border py-1.5 text-[9px] ${selected.locked ? 'border-amber-400/60 bg-amber-400/10 text-amber-200' : 'border-border bg-bg-primary text-text-secondary'}`}>{selected.locked ? <Lock size={11} /> : <Unlock size={11} />}{selected.locked ? t('animator.locked') : t('animator.lockLayer')}</button><button type="button" onClick={() => duplicateLayer(selected.id)} className="flex items-center justify-center gap-1 rounded border border-border bg-bg-primary py-1.5 text-[9px] text-text-secondary"><CopyPlus size={11} /> {t('animator.duplicate')}</button>{selected.locked && <p className="col-span-2 text-[8px] text-amber-200/80">{t('animator.unlockHelp')}</p>}</div>}
@@ -3315,19 +3275,10 @@ export function SceneAnimatorPanel() {
       names={{ hero: narrativeHero, plate: narrativePlate, prop: narrativeProp, foreground: narrativeForeground }}
       handlers={{
         addLayer: (type, url, name, thumbnail) => {
-          const kind = type === 'overlay' ? 'overlay' : type === 'model3d' ? 'model3d' : 'media'
-          const capture = pendingBindRef.current?.kind === kind
-            ? pendingBindRef.current
-            : captureLayerBind(kind, pendingBindRef.current?.reassignId ?? reassignId)
-          bindLayerOutput(capture, {
-            name,
-            type: type === 'overlay' ? 'image' : type,
-            mode: null,
-            size: 0,
-            created_at: 0,
-            url,
-            thumbnail_url: thumbnail ?? '',
-          })
+          const kind = bindKindFromCatalogType(type)
+          const live = liveLayerSource()
+          const capture = pendingBindRef.current?.kind === kind ? pendingBindRef.current : captureLayerBind(live, kind, pendingBindRef.current?.reassignId ?? reassignId)
+          applyLayerSourceCommit(live, capture, catalogLayerOutput(type, url, name, thumbnail), layerBindSink)
           pendingBindRef.current = null
         },
         setHero: setNarrativeHero,
