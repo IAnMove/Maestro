@@ -136,10 +136,10 @@ export function ExplorerGallery({
   return (
     <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
       {visible.map(item => {
-        const active = selected ? isSameRef(selected.ref, item.ref) : false
+        const active = selected ? isSameRef(selected.ref, item.ref) && selected.url === item.url : false
         return (
           <button
-            key={assetRefKey(item.ref)}
+            key={`${assetRefKey(item.ref)}:${item.url}`}
             type="button"
             title={item.filename}
             aria-pressed={active}

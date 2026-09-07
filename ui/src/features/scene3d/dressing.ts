@@ -11,14 +11,19 @@ import { cafeGroup, type CafeMaps } from './cafeSet.ts'
 import type { GpuWorld } from './gpu.ts'
 import type { Scene3DDressing } from './types.ts'
 
-function dropDressing(world: GpuWorld) {
+export function dropDressing(world: GpuWorld) {
   if (!world.dressing) return
   world.scene.remove(world.dressing)
   world.dressing.traverse(child => {
     if (!(child instanceof Mesh)) return
     child.geometry.dispose()
     const materials = Array.isArray(child.material) ? child.material : [child.material]
-    for (const material of materials) material.dispose()
+    for (const material of materials) {
+      const mapped = material as MeshStandardMaterial
+      mapped.map?.dispose()
+      mapped.map = null
+      material.dispose()
+    }
   })
   world.dressing = null
 }

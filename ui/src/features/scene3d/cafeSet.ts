@@ -53,6 +53,18 @@ export function loadCafeMaps(): Promise<CafeMaps> {
   ]).then(([facade, floor, back]) => ({ facade, floor, back }))
 }
 
+export function disposeCafeMaps(maps: CafeMaps) {
+  maps.facade?.dispose()
+  maps.floor?.dispose()
+  maps.back?.dispose()
+}
+
+export function adoptCafeMaps(maps: CafeMaps, live: () => boolean): boolean {
+  if (live()) return true
+  disposeCafeMaps(maps)
+  return false
+}
+
 export function cafeGroup(maps: CafeMaps): Object3D {
   const root = new Group()
   const plaster = new MeshStandardMaterial({ color: 0xc9b896, roughness: 0.9 })
