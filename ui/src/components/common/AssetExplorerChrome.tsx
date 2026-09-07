@@ -8,6 +8,7 @@ import {
   type Compatibility,
   type PickerItem,
 } from '../../features/asset-picker'
+import { AssetPreviewPlayer } from '../../features/asset-picker/previewPlayer.tsx'
 import { useUiTranslation } from '../../i18n'
 
 const EXPLORER_SORTS: CatalogSort[] = ['created_desc', 'created_asc', 'name_asc', 'name_desc']
@@ -177,11 +178,7 @@ export function ExplorerPreview({
   return (
     <>
       <div className="flex aspect-video items-center justify-center overflow-hidden rounded bg-black/50">
-        {selected.thumbnailUrl ? (
-          <img src={selected.thumbnailUrl} alt={t('explorer.previewAria', { name: selected.filename })} className="h-full w-full object-contain" />
-        ) : (
-          <KindGlyph kind={selected.kind} size={36} />
-        )}
+        <AssetPreviewPlayer item={selected} />
       </div>
       <div className="mt-2 break-all text-[11px] font-medium text-text-primary" title={selected.filename}>{selected.title}</div>
       <div className="mt-0.5 break-all text-[9px] text-text-muted">{selected.filename}</div>

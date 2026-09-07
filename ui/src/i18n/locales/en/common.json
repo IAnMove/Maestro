@@ -79,7 +79,11 @@
     "loadFailed": "Could not load assets.",
     "retry": "Retry",
     "noResults": "No assets match this search.",
-    "filteredHidden": "The selected asset is hidden by the current filter."
+    "filteredHidden": "The selected asset is hidden by the current filter.",
+    "playPreview": "Play",
+    "view3d": "3D view",
+    "previewFailed": "This preview cannot be played.",
+    "tooLarge": "Large file — load preview?"
   },
   "picker": {
     "unknownDate": "Unknown date",

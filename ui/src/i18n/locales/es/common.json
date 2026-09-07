@@ -79,7 +79,11 @@
     "loadFailed": "No se pudieron cargar los recursos.",
     "retry": "Reintentar",
     "noResults": "Ningún recurso coincide con esta búsqueda.",
-    "filteredHidden": "El recurso seleccionado está oculto por el filtro actual."
+    "filteredHidden": "El recurso seleccionado está oculto por el filtro actual.",
+    "playPreview": "Reproducir",
+    "view3d": "Vista 3D",
+    "previewFailed": "No se puede reproducir esta vista previa.",
+    "tooLarge": "Archivo grande — ¿cargar vista previa?"
   },
   "picker": {
     "unknownDate": "Fecha desconocida",
