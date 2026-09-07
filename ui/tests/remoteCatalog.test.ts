@@ -130,3 +130,36 @@ test('local confirm stays disabled when the picked row left the catalog', () => 
   assert.equal(explorerCanConfirm(false, [], item), false)
   assert.equal(explorerCanConfirm(true, [], item), true)
 })
+
+test('remote reopen does not confirm a reconstructed value with no url or catalog id', () => {
+  const page = [catalogItem('asset-0', 'hit-0.png')]
+  const hollow: ApiOutput = {
+    name: 'voice.wav',
+    type: 'audio',
+    mode: null,
+    size: 0,
+    created_at: 0,
+    url: '',
+    thumbnail_url: '',
+  }
+  const selected = resolveExplorerSelection({
+    remote: true,
+    pickerItems: page,
+    scopedPicked: null,
+    selectedOutput: hollow,
+    workspaceId: 'film',
+  })
+  assert.equal(selected, null)
+  const hollowPicker = {
+    ...catalogItem('legacy', 'voice.wav', 'audio'),
+    ref: { version: 1 as const, scheme: 'legacy-output' as const, workspaceId: 'film', filename: 'voice.wav', outputType: 'audio' as const },
+    url: '',
+    thumbnailUrl: '',
+  }
+  assert.equal(explorerCanConfirm(true, page, hollowPicker), false)
+  const chosen: ApiOutput[] = []
+  confirmExplorerItem(true, [], page, hollowPicker, 'film', undefined, value => {
+    if (value) chosen.push(value)
+  }, () => undefined)
+  assert.deepEqual(chosen, [])
+})
