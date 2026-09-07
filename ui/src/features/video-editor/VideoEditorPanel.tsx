@@ -22,12 +22,12 @@ import {
   WandSparkles,
   X,
 } from 'lucide-react'
-import { Fragment, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, lazy, Suspense, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { ParseKeys } from 'i18next'
 import { useUiTranslation } from '../../i18n'
 import * as api from '../../api/client'
 import { useStore } from '../../stores/useStore'
-import { ModalShell } from '../../components/common/ModalShell'
+import { videoEditorClipFromOutput } from './videoEditorCatalogPick'
 import {
   clearVideoEditorReplacementResult,
   clearVideoEditorReplacementTarget,
@@ -108,7 +108,9 @@ interface PendingEditorSequence {
 const VIDEO_ACCEPT = '.mp4,.webm,.mov,.mkv,.avi,.m4v'
 const VIDEO_EDITOR_PENDING_SEQUENCE_KEY = 'maestro-video-editor-pending-sequence'
 const VIDEO_EDITOR_EXPORT_KEY = 'maestro-video-editor-export-v1'
-const MAESTRO_PICKER_PAGE_SIZE = 24
+const AssetExplorerDialog = lazy(() =>
+  import('../../components/common/AssetExplorerDialog.tsx').then(module => ({ default: module.AssetExplorerDialog })),
+)
 const VIDEO_EDITOR_ACTIVE_STATUSES = new Set<api.VideoEditorExportJob['status']>([
   'queued',
   'waiting_resource',
@@ -739,12 +741,6 @@ export function VideoEditorPanel() {
   const [adding, setAdding] = useState(false)
   const [addProgress, setAddProgress] = useState('')
   const [pickerOpen, setPickerOpen] = useState(false)
-  const [maestroVideos, setMaestroVideos] = useState<api.ApiOutput[]>([])
-  const [maestroVideoTotal, setMaestroVideoTotal] = useState(0)
-  const [pickerLoading, setPickerLoading] = useState(false)
-  const [pickerSelected, setPickerSelected] = useState<string[]>([])
-  const pickerAnchorRef = useRef<number | null>(null)
-  const pickerSelectedSet = useMemo(() => new Set(pickerSelected), [pickerSelected])
   const [error, setError] = useState<string | null>(draft.warning)
   const [exportJob, setExportJob] = useState<api.VideoEditorExportJob | null>(() => {
     const jobId = readVideoEditorExportId(activeWorkspace)
@@ -1071,111 +1067,21 @@ export function VideoEditorPanel() {
     if (failures.length) setError(failures.join('\n'))
   }
 
-  const closeMaestroPicker = () => {
-    setPickerOpen(false)
-    setPickerSelected([])
-    pickerAnchorRef.current = null
-  }
-
-  const openMaestroPicker = async () => {
-    setPickerOpen(true)
-    setPickerSelected([])
-    pickerAnchorRef.current = null
-    setPickerLoading(true)
-    setError(null)
-    setMaestroVideos([])
-    setMaestroVideoTotal(0)
-    try {
-      const result = await api.fetchOutputs(MAESTRO_PICKER_PAGE_SIZE, 0, { mediaType: 'video', workspace: activeWorkspace })
-      setMaestroVideos(result.outputs)
-      setMaestroVideoTotal(result.total)
-    } catch (reason) {
-      setError((reason as Error).message)
-    } finally {
-      setPickerLoading(false)
-    }
-  }
-
-  const loadMoreMaestroVideos = async () => {
-    if (pickerLoading || maestroVideos.length >= maestroVideoTotal) return
-    setPickerLoading(true)
-    setError(null)
-    try {
-      const result = await api.fetchOutputs(
-        MAESTRO_PICKER_PAGE_SIZE,
-        maestroVideos.length,
-        { mediaType: 'video', workspace: activeWorkspace },
-      )
-      setMaestroVideos(current => {
-        const known = new Set(current.map(output => output.name))
-        return [...current, ...result.outputs.filter(output => !known.has(output.name))]
-      })
-      setMaestroVideoTotal(result.total)
-    } catch (reason) {
-      setError((reason as Error).message)
-    } finally {
-      setPickerLoading(false)
-    }
-  }
-
-  const toggleMaestroVideo = (output: api.ApiOutput, event: ReactMouseEvent<HTMLButtonElement>) => {
-    const index = maestroVideos.findIndex(item => item.name === output.name)
-    if (index < 0) return
-    if (event.shiftKey && pickerAnchorRef.current !== null) {
-      const start = Math.min(pickerAnchorRef.current, index)
-      const end = Math.max(pickerAnchorRef.current, index)
-      const range = maestroVideos.slice(start, end + 1).map(item => item.name)
-      setPickerSelected(current => {
-        const seen = new Set(current)
-        const next = [...current]
-        for (const name of range) {
-          if (!seen.has(name)) {
-            seen.add(name)
-            next.push(name)
-          }
-        }
-        return next
-      })
-      return
-    }
-    pickerAnchorRef.current = index
-    setPickerSelected(current => (
-      current.includes(output.name)
-        ? current.filter(name => name !== output.name)
-        : [...current, output.name]
-    ))
-  }
-
-  const addSelectedMaestroVideos = async () => {
-    const selected = pickerSelected
-      .map(name => maestroVideos.find(item => item.name === name))
-      .filter((item): item is api.ApiOutput => Boolean(item))
-    if (!selected.length) {
-      setError(t('errors.selectVideos'))
-      return
-    }
+  const addCatalogOutput = async (item: api.ApiOutput) => {
+    const workspace = activeWorkspace
     setAdding(true)
-    closeMaestroPicker()
     setError(null)
-    const failures: string[] = []
-    for (let index = 0; index < selected.length; index++) {
-      const output = selected[index]
-      setAddProgress(t('status.addingNamed', { current: index + 1, total: selected.length, name: output.name }))
-      try {
-        const source = api.getFileUrl(output.name, activeWorkspace)
-        await addSource(
-          source,
-          source,
-          output.name,
-          output.thumbnail_url || api.getOutputThumbnailUrl(output.name, activeWorkspace),
-        )
-      } catch (reason) {
-        failures.push(`${output.name}: ${(reason as Error).message}`)
-      }
+    setAddProgress(t('status.addingNamed', { current: 1, total: 1, name: item.name }))
+    try {
+      if (useStore.getState().activeWorkspace !== workspace) return
+      const next = videoEditorClipFromOutput(item, workspace)
+      await addSource(next.source, next.previewUrl, next.name, next.thumbnailUrl)
+    } catch (reason) {
+      setError(`${item.name}: ${(reason as Error).message}`)
+    } finally {
+      setAdding(false)
+      setAddProgress('')
     }
-    setAdding(false)
-    setAddProgress('')
-    if (failures.length) setError(failures.join('\n'))
   }
 
   const reorder = (id: string, direction: -1 | 1) => {
@@ -2062,7 +1968,7 @@ export function VideoEditorPanel() {
           <Upload size={13} /> {t('toolbar.import')}
         </button>
         <button
-          onClick={openMaestroPicker}
+          onClick={() => setPickerOpen(true)}
           disabled={adding}
           className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg border border-border bg-bg-secondary hover:bg-bg-hover disabled:opacity-50"
         >
@@ -2924,130 +2830,23 @@ export function VideoEditorPanel() {
         </div>
       </div>
 
-      {pickerOpen && (
-        <ModalShell
-          open
-          title={t('picker.title')}
-          onClose={closeMaestroPicker}
-          className="fixed inset-0 z-[80] bg-black/65 flex items-center justify-center p-4"
-          onMouseDown={event => {
-            if (event.currentTarget === event.target) closeMaestroPicker()
-          }}
-        >
-          <div className="w-full max-w-4xl max-h-[78vh] bg-bg-secondary border border-border rounded-xl shadow-2xl overflow-hidden flex flex-col">
-            <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
-              <FolderOpen size={15} className="text-accent-blue" />
-              <span className="text-sm font-medium">{t('picker.title')}</span>
-              {maestroVideoTotal > 0 && (
-                <span className="text-[10px] text-text-muted">{maestroVideos.length} / {maestroVideoTotal}</span>
-              )}
-              <button type="button" onClick={closeMaestroPicker} aria-label={t('picker.closeAria')} className="ml-auto p-1 rounded hover:bg-bg-hover">
-                <X size={15} />
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-3">
-              {pickerLoading && maestroVideos.length === 0 ? (
-                <div className="min-h-48 flex items-center justify-center text-text-muted">
-                  <Loader2 size={22} className="animate-spin" />
-                </div>
-              ) : maestroVideos.length ? (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3" role="listbox" aria-multiselectable="true" aria-label={t('picker.listAria')}>
-                  {maestroVideos.map(output => {
-                    const selected = pickerSelectedSet.has(output.name)
-                    return (
-                      <button
-                        key={output.name}
-                        type="button"
-                        role="option"
-                        aria-label={output.name}
-                        aria-selected={selected}
-                        onClick={event => toggleMaestroVideo(output, event)}
-                        className={`relative rounded-lg overflow-hidden border text-left ${
-                          selected
-                            ? 'border-accent-blue ring-1 ring-accent-blue/50 bg-accent-blue/10'
-                            : 'border-border bg-bg-tertiary hover:border-accent-blue'
-                        }`}
-                      >
-                        <span className={`absolute top-2 left-2 z-10 flex h-5 w-5 items-center justify-center rounded border ${
-                          selected
-                            ? 'border-accent-blue bg-accent-blue text-white'
-                            : 'border-white/50 bg-black/50 text-transparent'
-                        }`}>
-                          <Check size={12} />
-                        </span>
-                        {output.thumbnail_url ? (
-                          <img
-                            src={output.thumbnail_url}
-                            alt=""
-                            className="w-full aspect-video object-cover bg-black"
-                            loading="lazy"
-                            decoding="async"
-                          />
-                        ) : (
-                          <div className="flex aspect-video items-center justify-center bg-black text-text-muted"><Film size={20} /></div>
-                        )}
-                        <p className="p-2 text-[10px] text-text-secondary truncate">{output.name}</p>
-                      </button>
-                    )
-                  })}
-                </div>
-              ) : (
-                <div className="min-h-48 flex items-center justify-center text-xs text-text-muted">
-                  {t('picker.empty', { workspace: activeWorkspace })}
-                </div>
-              )}
-              {maestroVideos.length < maestroVideoTotal && (
-                <div className="flex justify-center py-4">
-                  <button
-                    type="button"
-                    onClick={() => void loadMoreMaestroVideos()}
-                    disabled={pickerLoading}
-                    className="flex items-center gap-2 rounded-lg border border-border bg-bg-tertiary px-3 py-2 text-xs text-text-secondary hover:border-accent-blue hover:text-text-primary disabled:opacity-60"
-                  >
-                    {pickerLoading && <Loader2 size={13} className="animate-spin" />}
-                    {t('picker.loadMore', { count: Math.min(MAESTRO_PICKER_PAGE_SIZE, maestroVideoTotal - maestroVideos.length) })}
-                  </button>
-                </div>
-              )}
-            </div>
-            {maestroVideos.length > 0 && (
-              <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-t border-border bg-bg-tertiary/40">
-                <button
-                  type="button"
-                  onClick={() => setPickerSelected(maestroVideos.map(item => item.name))}
-                  className="px-2.5 py-1.5 text-xs rounded-lg border border-border bg-bg-secondary hover:bg-bg-hover"
-                >
-                  {t('picker.selectAllShown')}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPickerSelected([])
-                    pickerAnchorRef.current = null
-                  }}
-                  disabled={!pickerSelected.length}
-                  className="px-2.5 py-1.5 text-xs rounded-lg border border-border bg-bg-secondary hover:bg-bg-hover disabled:opacity-40"
-                >
-                  {t('picker.clear')}
-                </button>
-                <span className="text-[10px] text-text-muted">
-                  {t('picker.hint', { count: pickerSelected.length })}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => void addSelectedMaestroVideos()}
-                  disabled={!pickerSelected.length || adding}
-                  className="ml-auto flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg bg-accent-blue text-white hover:bg-accent-blue/80 disabled:opacity-40"
-                >
-                  {pickerSelected.length
-                    ? t('picker.addCount', { count: pickerSelected.length })
-                    : t('picker.addVideos')}
-                </button>
-              </div>
-            )}
-          </div>
-        </ModalShell>
-      )}
+      {pickerOpen ? (
+        <Suspense fallback={<div className="fixed inset-0 z-[80] bg-black/70" />}>
+          <AssetExplorerDialog
+            open={pickerOpen}
+            title={t('picker.title')}
+            items={[]}
+            workspaceId={activeWorkspace}
+            remote
+            constraints={{ kinds: ['video'], maxCount: 1, optional: false }}
+            onClose={() => setPickerOpen(false)}
+            onChoose={item => {
+              setPickerOpen(false)
+              if (item) void addCatalogOutput(item)
+            }}
+          />
+        </Suspense>
+      ) : null}
     </div>
   )
 }
