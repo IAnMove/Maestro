@@ -1,3 +1,4 @@
+import { scene3dCopy } from './copy.ts'
 import type { Scene3DClipCatalogEntry, Scene3DClipError, Scene3DClipRef } from './types.ts'
 
 export function resolveScene3DClip(
@@ -9,14 +10,14 @@ export function resolveScene3DClip(
   if (!Number.isInteger(index) || index < 0 || index >= catalog.length) {
     return {
       code: 'clip_missing',
-      message: `No clip at index ${index}`,
+      message: scene3dCopy('stage.clipMissing', { index }),
     }
   }
   const found = catalog[index]
   if (found.name !== wanted.name) {
     return {
       code: 'clip_name_mismatch',
-      message: `Clip ${index} is ${JSON.stringify(found.name)}, not ${JSON.stringify(wanted.name)}`,
+      message: scene3dCopy('stage.clipNameMismatch', { index, found: JSON.stringify(found.name), wanted: JSON.stringify(wanted.name) }),
     }
   }
   return found

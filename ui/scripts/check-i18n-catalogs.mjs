@@ -106,6 +106,9 @@ const PILOT_FILES = [
   'src/features/styles/StyleSheetPanel.tsx',
   'src/features/projects/ProjectsPanel.tsx',
   'src/features/auditdev/AuditDevPanel.tsx',
+  'src/components/Sidebar/SceneAnimatorPanel.tsx',
+  'src/features/scene3d/exportFlow.ts',
+  'src/features/scene3d/exportMp4.ts',
 ]
 
 const FORBIDDEN = [
@@ -147,6 +150,11 @@ const FORBIDDEN = [
   'Retry hand-off',
   'Add HocusPocus videos',
   'Rehacer en Creación de vídeo',
+  'Operación 3D no reconocida.',
+  'Plantillas · crear con mis assets de Library',
+  'Laboratorio · catálogo de escenas candidatas y editables ↗',
+  'The 3D assets did not finish loading.',
+  'This browser cannot encode a deterministic H.264 MP4.',
   'Idioma hablado del vídeo',
   'Vídeo directo · T2V puro · sin imágenes',
   'Vídeo directo · text only, no images',

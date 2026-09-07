@@ -1270,7 +1270,7 @@ export function SceneAnimatorPanel() {
       const nextDuration = Math.max(scene.duration, sceneTime + preset.duration)
       updateLayer(selected.id, layer => appendPresetAtPlayhead(layer, preset))
       updateScene(current => ({ ...current, duration: Math.max(current.duration, sceneTime + preset.duration) }))
-      setProgress(sceneTime / nextDuration); setSelectedPresetId(preset.id); setSelectedKeyframeId(null); setMessage(`${t(scene3dKey(`cameraPresets.${preset.id}`))} chained from frame ${Math.round(sceneTime * fps)} without a position jump.`)
+      setProgress(sceneTime / nextDuration); setSelectedPresetId(preset.id); setSelectedKeyframeId(null); setMessage(t('animator.chainedFromFrame', { preset: t(scene3dKey(`cameraPresets.${preset.id}`)), frame: Math.round(sceneTime * fps) }))
       return
     }
     updateLayer(selected.id, layer => ({ ...layer, relationship: preset.requiresTarget ? undefined : layer.relationship, animation: { start: preset.start, end: preset.end, duration: preset.duration, curve: preset.curve, events: normalizeSceneEvents(layer.animation.events, preset.duration, layer.id), spin: preset.spin, rotationSpeed: layer.animation.rotationSpeed, clip: layer.animation.clip, clipOffset: layer.animation.clipOffset, clipSpeed: layer.animation.clipSpeed, clipReverse: layer.animation.clipReverse, clipLoop: layer.animation.clipLoop, clipTrimStart: layer.animation.clipTrimStart, clipTrimEnd: layer.animation.clipTrimEnd, orbit: preset.requiresTarget && target ? { targetLayerId: target.id, radiusX: 18, radiusY: 9, turns: 2, phase: 0, count: 1, facing: 'fixed', centerOffsetX: 0, centerOffsetY: 0 } : undefined } }))
@@ -1291,12 +1291,12 @@ export function SceneAnimatorPanel() {
         return { ...chained, animation: { ...chained.animation, shake: preset.shake ? { ...preset.shake, startTime, endTime: startTime + preset.duration * timing.speed } : undefined } }
       })
       updateScene(current => ({ ...current, duration: Math.max(current.duration, sceneTime + preset.duration) }))
-      setProgress(sceneTime / nextDuration); setSelectedPresetId(preset.id); setSelectedKeyframeId(null); setMessage(`${t(scene3dKey(`cameraPresets.${preset.id}`))} camera move chained from frame ${Math.round(sceneTime * fps)}.`)
+      setProgress(sceneTime / nextDuration); setSelectedPresetId(preset.id); setSelectedKeyframeId(null); setMessage(t('animator.cameraChainedFromFrame', { preset: t(scene3dKey(`cameraPresets.${preset.id}`)), frame: Math.round(sceneTime * fps) }))
       return
     }
     updateLayer(selected.id, layer => ({ ...layer, transform: { ...layer.transform, x: preset.start.x, y: preset.start.y, scale: preset.start.scale, rotation: preset.start.rotation ?? 0 }, animation: { ...layer.animation, start: { ...preset.start }, end: { ...preset.end }, keyframes: undefined, events: normalizeSceneEvents(layer.animation.events, preset.duration, layer.id), duration: preset.duration, curve: preset.curve, offset: 0, speed: 1, loop: false, trimStart: 0, trimEnd: preset.duration, shake: preset.shake, orbit: undefined } }))
     updateScene(current => ({ ...current, duration: Math.max(current.duration, preset.duration) }))
-    setSelectedPresetId(preset.id); setSelectedKeyframeId(null); setProgress(0); setMessage(`${t(scene3dKey(`cameraPresets.${preset.id}`))} applied to ${selected.name}.`)
+    setSelectedPresetId(preset.id); setSelectedKeyframeId(null); setProgress(0); setMessage(t('animator.presetApplied', { preset: t(scene3dKey(`cameraPresets.${preset.id}`)), name: selected.name }))
   }
   const applyPhotoMotionPreset = (presetId: string) => {
     if (!selected || selected.type !== 'image' || selected.locked) return
@@ -1366,7 +1366,7 @@ export function SceneAnimatorPanel() {
     setSelectedKeyframeId(null)
     setSelectedEventId(null)
     setProgress(0)
-    setMessage(`${t(scene3dKey(`cameraPresets.${preset.id}`))} prepared as a ${preset.duration}s cinematic photo shot.`)
+    setMessage(t('animator.photoPrepared', { preset: t(scene3dKey(`cameraPresets.${preset.id}`)), duration: preset.duration }))
   }
   const confirmPresetRemoval = () => window.confirm(t('animator.removeEffect'))
   const removeLayerMotionPreset = () => {
@@ -1583,7 +1583,7 @@ export function SceneAnimatorPanel() {
     const payload = JSON.stringify({ version: 1, keyframes: getSceneKeyframes(selected) }, null, 2)
     keyframeClipboardRef.current = payload
     void navigator.clipboard?.writeText(payload).catch(() => {})
-    setMessage(`${getSceneKeyframes(selected).length} keyframes copied.`)
+    setMessage(t('animator.keyframesCopied', { count: getSceneKeyframes(selected).length }))
   }
   const pasteTimelineKeyframes = async () => {
     if (!selected || selected.locked) { setMessage(t('animator.unlockBeforePaste')); return }
@@ -1599,7 +1599,7 @@ export function SceneAnimatorPanel() {
       const timing = getSceneLayerTiming({ ...selected, animation: { ...selected.animation, duration: pastedDuration, trimStart: 0, trimEnd: pastedDuration } })
       const effectiveEnd = timing.offset + timing.span / timing.speed
       updateScene(current => ({ ...current, duration: Math.max(current.duration, effectiveEnd) }))
-      setSelectedKeyframeId(frames[0].id); setSelectedEventId(null); setProgress(timing.offset / Math.max(.1, Math.max(scene.duration, effectiveEnd))); setMessage(`${frames.length} keyframes pasted.`)
+      setSelectedKeyframeId(frames[0].id); setSelectedEventId(null); setProgress(timing.offset / Math.max(.1, Math.max(scene.duration, effectiveEnd))); setMessage(t('animator.keyframesPasted', { count: frames.length }))
     } catch (error) { setMessage(error instanceof Error ? error.message : t('animator.invalidClipboard')) }
   }
   const exportScene = () => {
@@ -2290,7 +2290,7 @@ export function SceneAnimatorPanel() {
         const layers = ensureCutoutFacePlayback(synced, current.duration, fps, current.dialogueBeats ?? [], cutoutDialogueText) as AnimatorLayer[]
         return { ...current, layers }
       })
-      if (announce) setMessage(`${next.name} guardado.`)
+      if (announce) setMessage(t('animator.sceneSavedName', { name: next.name }))
     } catch (error) {
       setCharacterKitError(error instanceof Error ? error.message : t('animator.kitSaveFailed'))
     }
@@ -2320,11 +2320,11 @@ export function SceneAnimatorPanel() {
           const layers = ensureCutoutFacePlayback(synced, current.duration, fps, current.dialogueBeats ?? [], cutoutDialogueText) as AnimatorLayer[]
           return { ...current, layers }
         })
-        setMessage(`${characterKitDraft.name} ya estaba en la escena. Actualicé boca y ojos.`)
+        setMessage(t('animator.kitAlreadyInScene', { name: characterKitDraft.name }))
         return
       }
       updateScene(current => ({ ...current, layers: normalizeZ([...current.layers, ...mounted]) }))
-      setSelectedId(mounted[0].id); setMessage(`${characterKitDraft.name} está en la escena. Preview mueve boca y parpadeo.`)
+      setSelectedId(mounted[0].id); setMessage(t('animator.kitMountedPreview', { name: characterKitDraft.name }))
     } catch (error) { setCharacterKitError(error instanceof Error ? error.message : t('animator.kitMountFailed')) }
   }
   const removeCharacterKit = async () => {
@@ -2358,7 +2358,7 @@ export function SceneAnimatorPanel() {
     updateScene(current => carrySceneSidecars(current, next))
     setSelectedId(next.layers.find(layer => layer.id === 'hero')?.id ?? next.layers.find(layer => layer.type !== 'camera')?.id ?? null)
     setSelectedKeyframeId(null); setSelectedEventId(null); setSelectedPresetId(''); setProgress(0)
-    setMessage(`${narrativeTemplate.title} mounted as an editable ${next.duration}-second scene.`)
+    setMessage(t('animator.narrativeMounted', { title: narrativeTemplate.title, duration: next.duration }))
   }
   const sendImageToPanoramaLoop = () => {
     if (!selected || selected.type !== 'image' || !selected.source) return
@@ -2446,33 +2446,33 @@ export function SceneAnimatorPanel() {
     const assertScene = () => {
       const current = sceneRef.current
       if (request.sceneName && normalize(request.sceneName) !== normalize(current.name)) {
-        throw new Error(`La escena abierta es “${current.name}”, no “${request.sceneName}”.`)
+        throw new Error(t('agent.sceneMismatch', { open: current.name, requested: request.sceneName }))
       }
       return current
     }
     const exactLayer = (name: string) => {
       const matches = sceneRef.current.layers.filter(layer => normalize(layer.name) === normalize(name))
-      if (matches.length !== 1) throw new Error(matches.length ? `La capa “${name}” no es inequívoca.` : `No existe la capa “${name}”.`)
+      if (matches.length !== 1) throw new Error(matches.length ? t('agent.layerAmbiguous', { name }) : t('agent.layerMissing', { name }))
       return matches[0]
     }
     const exactOutput = async (name: string, types: Array<'audio' | 'image' | 'video' | 'model3d'>) => {
       const library = await fetchOutputs(0, 0, { workspace })
       const matches = library.outputs.filter(output => types.includes(output.type as typeof types[number]) && normalize(output.name) === normalize(name))
-      if (matches.length !== 1) throw new Error(matches.length ? `El output “${name}” no es inequívoco.` : `No existe el output “${name}” en este workspace.`)
+      if (matches.length !== 1) throw new Error(matches.length ? t('agent.outputAmbiguous', { name }) : t('agent.outputMissing', { name }))
       return matches[0]
     }
     if (request.type === 'create_3d_scene') {
       if (!request.reset && normalize(sceneRef.current.name) === normalize(request.sceneName)) {
-        return { message: `La escena editable “${sceneRef.current.name}” ya está abierta.`, sceneId: sceneRef.current.name, layerIds: sceneRef.current.layers.map(layer => layer.id) }
+        return { message: t('agent.sceneAlreadyOpen', { name: sceneRef.current.name }), sceneId: sceneRef.current.name, layerIds: sceneRef.current.layers.map(layer => layer.id) }
       }
       const next = blankScene()
-      next.name = request.sceneName || 'Rhythmic scene'
+      next.name = request.sceneName || t('agent.rhythmicSceneDefault')
       next.duration = Math.max(1, Math.min(600, request.durationSeconds))
       next.width = Math.max(320, Math.min(7680, Math.round(request.width)))
       next.height = Math.max(240, Math.min(4320, Math.round(request.height)))
       next.fps = request.fps
       replaceScene(next); setSelectedId(null); setProgress(0)
-      return { message: `He creado la escena editable “${next.name}”.`, sceneId: next.name }
+      return { message: t('agent.sceneCreated', { name: next.name }), sceneId: next.name }
     }
     if (request.type === 'set_3d_scene_properties') {
       const current = assertScene()
@@ -2484,36 +2484,36 @@ export function SceneAnimatorPanel() {
         fps: request.fps ?? current.fps,
       }
       replaceScene(next)
-      return { message: `He ajustado “${next.name}” a ${next.duration}s, ${next.width}×${next.height}, ${next.fps ?? 30} FPS.`, sceneId: next.name }
+      return { message: t('agent.sceneAdjusted', { name: next.name, duration: next.duration, width: next.width, height: next.height, fps: next.fps ?? 30 }), sceneId: next.name }
     }
     if (request.type === 'add_3d_scene_layer') {
       assertScene()
       const existing = sceneRef.current.layers.filter(layer => normalize(layer.name) === normalize(request.layerName))
-      if (existing.length > 1) throw new Error(`La capa “${request.layerName}” no es inequívoca.`)
-      if (existing[0]) return { message: `La capa “${request.layerName}” ya existe; reutilizo su ID estable.`, sceneId: sceneRef.current.name, layerIds: [existing[0].id] }
+      if (existing.length > 1) throw new Error(t('agent.layerAmbiguous', { name: request.layerName }))
+      if (existing[0]) return { message: t('agent.layerExists', { name: request.layerName }), sceneId: sceneRef.current.name, layerIds: [existing[0].id] }
       if (request.layerType === 'camera') {
         addCameraRef.current()
         const added = sceneRef.current.layers.at(-1)
-        if (!added) throw new Error('No se pudo crear la cámara.')
+        if (!added) throw new Error(t('agent.cameraCreateFailed'))
         updateScene(current => ({ ...current, layers: current.layers.map(layer => layer.id === added.id ? { ...layer, name: request.layerName } : layer) }))
-        return { message: `He añadido la cámara “${request.layerName}”.`, sceneId: sceneRef.current.name, layerIds: [added.id] }
+        return { message: t('agent.cameraAdded', { name: request.layerName }), sceneId: sceneRef.current.name, layerIds: [added.id] }
       }
-      if (!request.outputName) throw new Error('Una capa visual necesita el nombre exacto de un output.')
+      if (!request.outputName) throw new Error(t('agent.visualNeedsOutput'))
       const output = await exactOutput(request.outputName, [request.layerType === 'overlay' ? 'image' : request.layerType])
       addLayerRef.current(request.layerType, output.url, request.layerName, output.thumbnail_url ?? undefined)
       const added = sceneRef.current.layers.find(layer => normalize(layer.name) === normalize(request.layerName))
-      return { message: `He añadido “${request.layerName}” desde ${output.name}.`, sceneId: sceneRef.current.name, layerIds: added ? [added.id] : [] }
+      return { message: t('agent.layerAddedFrom', { name: request.layerName, output: output.name }), sceneId: sceneRef.current.name, layerIds: added ? [added.id] : [] }
     }
     if (request.type === 'update_3d_scene_layer') {
       assertScene(); const layer = exactLayer(request.layerName)
       updateScene(current => ({ ...current, layers: current.layers.map(item => item.id === layer.id ? { ...item, visible: request.visible ?? item.visible, locked: request.locked ?? item.locked } : item) }))
-      return { message: `He actualizado la capa “${layer.name}”.`, sceneId: sceneRef.current.name, layerIds: [layer.id] }
+      return { message: t('agent.layerUpdated', { name: layer.name }), sceneId: sceneRef.current.name, layerIds: [layer.id] }
     }
     if (request.type === 'remove_3d_scene_layer') {
       assertScene(); const layer = exactLayer(request.layerName)
-      if (layer.locked) throw new Error(`Desbloquea “${layer.name}” antes de eliminarla.`)
+      if (layer.locked) throw new Error(t('agent.unlockBeforeDelete', { name: layer.name }))
       updateScene(current => ({ ...current, layers: current.layers.filter(item => item.id !== layer.id) }))
-      return { message: `He eliminado la capa “${layer.name}”.`, sceneId: sceneRef.current.name, layerIds: [layer.id] }
+      return { message: t('agent.layerRemoved', { name: layer.name }), sceneId: sceneRef.current.name, layerIds: [layer.id] }
     }
     if (request.type === 'attach_3d_scene_audio' || request.type === 'analyze_3d_scene_audio') {
       assertScene()
@@ -2525,71 +2525,71 @@ export function SceneAnimatorPanel() {
         updateScene(current => ({ ...current, audioTracks: [...(current.audioTracks ?? []), attached] }))
       }
       setRhythmTrackId(track.id)
-      if (request.type === 'attach_3d_scene_audio') return { message: `He adjuntado ${output.name} a la escena.`, sceneId: sceneRef.current.name, audioTrackId: track.id, outputNames: [output.name] }
+      if (request.type === 'attach_3d_scene_audio') return { message: t('agent.audioAttached', { name: output.name }), sceneId: sceneRef.current.name, audioTrackId: track.id, outputNames: [output.name] }
       let analysis = agentRhythmAnalysesRef.current.get(track.id)
       if (!analysis) {
         analysis = await analyzeAudio({ audio_path: track.filename, transcribe: false, extract_vocals: false })
-        if (!analysis.beats.length) throw new Error('No se detectó una rejilla estable de beats en esta pista.')
+        if (!analysis.beats.length) throw new Error(t('agent.noBeatGrid'))
         agentRhythmAnalysesRef.current.set(track.id, analysis)
       }
       setRhythmAnalysis(analysis); setRhythmAnalysisTrackId(track.id)
-      return { message: `Ritmo listo: ${analysis.bpm.toFixed(1)} BPM y ${analysis.beats.length} beats.`, sceneId: sceneRef.current.name, audioTrackId: track.id, analysisId: track.id, bpm: analysis.bpm, beatCount: analysis.beats.length, downbeatCount: analysis.downbeats.length, rhythmGrid: { duration: analysis.duration, bpm: analysis.bpm, beats: analysis.beats.slice(0, 200), downbeats: analysis.downbeats.slice(0, 200) } }
+      return { message: t('agent.rhythmReady', { bpm: analysis.bpm.toFixed(1), beats: analysis.beats.length }), sceneId: sceneRef.current.name, audioTrackId: track.id, analysisId: track.id, bpm: analysis.bpm, beatCount: analysis.beats.length, downbeatCount: analysis.downbeats.length, rhythmGrid: { duration: analysis.duration, bpm: analysis.bpm, beats: analysis.beats.slice(0, 200), downbeats: analysis.downbeats.slice(0, 200) } }
     }
     if (request.type === 'apply_3d_choreography') {
       const current = assertScene(); const layer = exactLayer(request.layerName)
-      if (layer.locked) throw new Error(`Desbloquea “${layer.name}” antes de generar keyframes.`)
+      if (layer.locked) throw new Error(t('agent.unlockBeforeKeyframes', { name: layer.name }))
       const track = (current.audioTracks ?? []).find(item => normalize(item.filename) === normalize(request.audioOutputName) || normalize(item.name) === normalize(request.audioOutputName))
-      if (!track) throw new Error(`El audio “${request.audioOutputName}” no está adjunto a la escena.`)
+      if (!track) throw new Error(t('agent.audioNotAttached', { name: request.audioOutputName }))
       let analysis = agentRhythmAnalysesRef.current.get(track.id)
       if (!analysis && request.rhythmGrid) {
         analysis = { duration: request.rhythmGrid.duration, sample_rate: 0, bpm: request.rhythmGrid.bpm, beats: request.rhythmGrid.beats, downbeats: request.rhythmGrid.downbeats, sections: [], onset_envelope: [], lyrics: null, vocals_path: null }
         agentRhythmAnalysesRef.current.set(track.id, analysis)
       }
-      if (!analysis) throw new Error('Analiza el audio una vez antes de aplicar la coreografía.')
+      if (!analysis) throw new Error(t('agent.analyzeBeforeChoreography'))
       const map = buildSceneRhythmMap(analysis, track.startTime, current.duration, request.cueSource)
-      if (!map.cues.length) throw new Error('Los beats detectados no coinciden con la duración de la escena.')
+      if (!map.cues.length) throw new Error(t('agent.beatsMissDuration'))
       const profile = layer.type === 'camera' && request.profile === 'peek' ? 'camera-punch' : request.profile
       updateScene(sceneValue => ({ ...sceneValue, layers: sceneValue.layers.map(item => item.id === layer.id ? applySceneRhythmToLayer(item, map, { profile, sceneDuration: sceneValue.duration, intensity: request.intensity }) as AnimatorLayer : item) }))
-      return { message: `He convertido ${map.cues.length} ${request.cueSource} en keyframes editables de “${layer.name}”.`, sceneId: current.name, layerIds: [layer.id], audioTrackId: track.id, analysisId: track.id }
+      return { message: t('agent.choreographyApplied', { count: map.cues.length, cues: request.cueSource, name: layer.name }), sceneId: current.name, layerIds: [layer.id], audioTrackId: track.id, analysisId: track.id }
     }
     if (request.type === 'save_3d_scene') {
       assertScene(); const saved = await persistSceneRef.current()
-      if (!saved) throw new Error('No se pudo guardar la escena editable.')
-      return { message: `He guardado la escena editable como ${saved}.`, sceneId: sceneRef.current.name, outputNames: [saved] }
+      if (!saved) throw new Error(t('agent.saveFailed'))
+      return { message: t('agent.savedAs', { name: saved }), sceneId: sceneRef.current.name, outputNames: [saved] }
     }
     if (request.type === 'export_3d_scene') {
       const current = assertScene()
-      if (!current.layers.some(layer => layer.visible && isVisualLayer(layer))) throw new Error('La escena necesita una capa visual visible antes de exportar.')
+      if (!current.layers.some(layer => layer.visible && isVisualLayer(layer))) throw new Error(t('agent.needVisibleLayer'))
       await waitForModelViewersRef.current()
       const saved = await publishRecordingRef.current(await recordToBlobRef.current(), sceneRef.current)
-      return { message: `He publicado el MP4 como ${saved.name}.`, sceneId: current.name, outputNames: [saved.name] }
+      return { message: t('agent.publishedMp4', { name: saved.name }), sceneId: current.name, outputNames: [saved.name] }
     }
-    if (request.type === 'open_3d_scene') throw new Error('La apertura estructurada se realiza mediante el control de escenas existente.')
-    throw new Error('Operación 3D no reconocida.')
-  }), [workspace, updateScene])
+    if (request.type === 'open_3d_scene') throw new Error(t('agent.openViaLibrary'))
+    throw new Error(t('agent.unknownOperation'))
+  }), [workspace, updateScene, t])
   useEffect(() => listenForAgentSceneControl(async request => {
     const current = sceneRef.current
     if (request.type === 'save_3d_scene') {
       if (request.sceneName && normalizeSceneLookupName(request.sceneName) !== normalizeSceneLookupName(current.name)) {
-        throw new Error(`La escena abierta es “${current.name}”, no “${request.sceneName}”; no he guardado otra escena por error.`)
+        throw new Error(t('agent.sceneMismatchSave', { open: current.name, requested: request.sceneName }))
       }
       const savedName = await persistSceneRef.current()
-      if (!savedName) throw new Error('HocusPocus no pudo guardar la escena 3D abierta.')
-      return `He guardado “${current.name}” como ${savedName}. Sus capas y keyframes siguen siendo editables.`
+      if (!savedName) throw new Error(t('agent.saveOpenFailed'))
+      return t('agent.savedEditable', { name: current.name, saved: savedName })
     }
     if (request.type === 'export_3d_scene') {
       if (request.sceneName && normalizeSceneLookupName(request.sceneName) !== normalizeSceneLookupName(current.name)) {
-        throw new Error(`La escena abierta es “${current.name}”, no “${request.sceneName}”; no he renderizado otra escena por error.`)
+        throw new Error(t('agent.sceneMismatchExport', { open: current.name, requested: request.sceneName }))
       }
       if (!current.layers.some(layer => layer.visible && isVisualLayer(layer))) {
-        throw new Error('Añade al menos una capa visual visible antes de exportar la escena 3D.')
+        throw new Error(t('agent.addVisibleLayer'))
       }
       setPublishing(true); setMessage(null)
       try {
         await waitForModelViewersRef.current()
         const blob = await recordToBlobRef.current()
         const saved = await publishRecordingRef.current(blob, sceneRef.current)
-        return `He terminado y publicado el MP4 de “${current.name}” en Videos como ${saved.name}.`
+        return t('agent.exportedToVideos', { name: current.name, saved: saved.name })
       } catch (error) {
         setMessage(error instanceof Error ? error.message : t('animator.export3dFailed'))
         throw error
@@ -2602,25 +2602,27 @@ export function SceneAnimatorPanel() {
     const matches = library.outputs.filter(file => sceneOutputMatchesName(file, request.sceneName))
     if (!matches.length) {
       const available = library.outputs.slice(0, 8).map(file => `“${sceneLibraryTitle(file.name)}”`).join(', ')
-      throw new Error(`No existe una escena guardada llamada “${request.sceneName}” en este workspace.${available ? ` Disponibles: ${available}.` : ''}`)
+      throw new Error(available
+        ? t('agent.sceneMissingAvailable', { name: request.sceneName, available })
+        : t('agent.sceneMissing', { name: request.sceneName }))
     }
-    if (matches.length > 1) throw new Error(`Hay varias escenas guardadas llamadas “${request.sceneName}”; indica el nombre completo del archivo.`)
+    if (matches.length > 1) throw new Error(t('agent.sceneAmbiguous', { name: request.sceneName }))
     const response = await fetch(matches[0].url)
-    if (!response.ok) throw new Error(`No se pudo cargar la escena guardada “${request.sceneName}”.`)
+    if (!response.ok) throw new Error(t('agent.sceneLoadFailed', { name: request.sceneName }))
     const next = sceneFromLibraryPayload(await response.json()) as AnimatorScene
     const layerMatches = request.layerName
       ? next.layers.filter(layer => normalizeSceneLookupName(layer.name) === normalizeSceneLookupName(request.layerName))
       : []
-    if (layerMatches.length > 1) throw new Error(`La escena contiene varias capas llamadas “${request.layerName}”; renómbralas antes de seleccionarlas con el Wizard.`)
-    if (request.layerName && !layerMatches.length) throw new Error(`La escena “${next.name}” no contiene una capa llamada “${request.layerName}”.`)
-    if (!importSceneRef.current(JSON.stringify(next), `Opened ${sceneLibraryTitle(matches[0].name)}`)) {
-      throw new Error(`La escena guardada “${request.sceneName}” no se pudo abrir en Video 3D.`)
+    if (layerMatches.length > 1) throw new Error(t('agent.layersAmbiguousWizard', { name: request.layerName }))
+    if (request.layerName && !layerMatches.length) throw new Error(t('agent.layerMissingInScene', { scene: next.name, name: request.layerName }))
+    if (!importSceneRef.current(JSON.stringify(next), t('animator.openedLabel', { label: sceneLibraryTitle(matches[0].name) }))) {
+      throw new Error(t('agent.sceneOpenFailed', { name: request.sceneName }))
     }
     const target = layerMatches[0] ?? next.layers[0]
     setSelectedId(target?.id ?? null)
     const result = target
-      ? `He abierto “${next.name}” y seleccionado la capa “${target.name}”.`
-      : `He abierto “${next.name}”; la escena no contiene capas.`
+      ? t('agent.openedWithLayer', { scene: next.name, layer: target.name })
+      : t('agent.openedEmpty', { scene: next.name })
     setMessage(result)
     return result
   }), [workspace, t])
@@ -2628,20 +2630,20 @@ export function SceneAnimatorPanel() {
     const normalize = normalizeSceneLookupName
     const current = sceneRef.current
     if (request.sceneName && normalize(request.sceneName) !== normalize(current.name)) {
-      throw new Error(`La escena abierta es “${current.name}”, no “${request.sceneName}”. Abre primero la escena correcta.`)
+      throw new Error(t('agent.sceneMismatchRhythm', { open: current.name, requested: request.sceneName }))
     }
     const layerMatches = request.layerName
       ? current.layers.filter(layer => normalize(layer.name) === normalize(request.layerName))
       : []
-    if (layerMatches.length > 1) throw new Error(`Hay varias capas llamadas “${request.layerName}”; renómbralas o selecciona una manualmente.`)
+    if (layerMatches.length > 1) throw new Error(t('agent.layersAmbiguousManual', { name: request.layerName }))
     const eligibleLayers = current.layers.filter(layer => layer.visible)
     const target = layerMatches[0]
       ?? (!request.layerName && selectedId ? current.layers.find(layer => layer.id === selectedId) : undefined)
       ?? (!request.layerName && eligibleLayers.length === 1 ? eligibleLayers[0] : undefined)
     if (!target) throw new Error(request.layerName
-      ? `No existe la capa “${request.layerName}” en “${current.name}”.`
-      : 'Selecciona una capa inequívoca en Video 3D o indica su nombre al Wizard.')
-    if (target.locked) throw new Error(`Desbloquea “${target.name}” antes de generar keyframes rítmicos.`)
+      ? t('agent.layerMissingInScene', { scene: current.name, name: request.layerName })
+      : t('agent.pickUnambiguousLayer'))
+    if (target.locked) throw new Error(t('agent.unlockBeforeRhythm', { name: target.name }))
 
     const attachedMatches = request.audioOutputName
       ? (current.audioTracks ?? []).filter(track => normalize(track.name) === normalize(request.audioOutputName) || normalize(track.filename) === normalize(request.audioOutputName))
@@ -2649,7 +2651,7 @@ export function SceneAnimatorPanel() {
     const outputMatches = request.audioOutputName
       ? outputs.filter(output => output.type === 'audio' && normalize(output.name) === normalize(request.audioOutputName))
       : []
-    if (attachedMatches.length > 1 || outputMatches.length > 1) throw new Error(`El audio “${request.audioOutputName}” no es inequívoco.`)
+    if (attachedMatches.length > 1 || outputMatches.length > 1) throw new Error(t('agent.audioAmbiguous', { name: request.audioOutputName }))
     let track: NonNullable<AnimatorScene['audioTracks']>[number] | undefined = attachedMatches[0]
     if (!track && outputMatches[0]) {
       track = { id: uid(), filename: outputMatches[0].name, name: outputMatches[0].name.replace(/\.[^.]+$/, ''), kind: 'music' as const, startTime: 0, volume: 1 }
@@ -2659,15 +2661,15 @@ export function SceneAnimatorPanel() {
       track = tracks.find(item => item.kind === 'music') ?? (tracks.length === 1 ? tracks[0] : undefined)
     }
     if (!track) throw new Error(request.audioOutputName
-      ? `No existe el output de audio “${request.audioOutputName}” ni está adjunto a la escena.`
-      : 'Adjunta o indica un MP3/WAV de la galería antes de aplicar ritmo.')
+      ? t('agent.audioMissing', { name: request.audioOutputName })
+      : t('agent.attachAudioFirst'))
 
     setRhythmBusy(true); setRhythmError(null)
     try {
       const analysis = await analyzeAudio({ audio_path: track.filename, transcribe: false, extract_vocals: false })
-      if (!analysis.beats.length) throw new Error('No se detectó una rejilla estable de beats en esta pista.')
+      if (!analysis.beats.length) throw new Error(t('agent.noBeatGrid'))
       const map = buildSceneRhythmMap(analysis, track.startTime, current.duration, request.cueSource)
-      if (!map.cues.length) throw new Error('Los beats detectados no coinciden con la duración actual de la escena.')
+      if (!map.cues.length) throw new Error(t('agent.beatsMissCurrentDuration'))
       const profile = target.type === 'camera' && request.profile === 'peek' ? 'camera-punch' : request.profile
       updateScene(sceneValue => ({
         ...sceneValue,
@@ -2681,16 +2683,25 @@ export function SceneAnimatorPanel() {
       setRhythmTrackId(track.id); setRhythmAnalysis(analysis); setRhythmAnalysisTrackId(track.id)
       setRhythmCueSource(request.cueSource); setRhythmProfile(profile); setRhythmIntensity(request.intensity)
       setProgress(map.cues[0].time / current.duration)
-      const result = `He analizado ${track.name}: ${analysis.bpm.toFixed(1)} BPM, ${analysis.beats.length} beats y ${analysis.downbeats.length} downbeats. Apliqué ${map.cues.length} ${request.cueSource} con perfil ${profile} a “${target.name}” como keyframes editables.`
+      const result = t('agent.rhythmApplied', {
+        track: track.name,
+        bpm: analysis.bpm.toFixed(1),
+        beats: analysis.beats.length,
+        downbeats: analysis.downbeats.length,
+        count: map.cues.length,
+        cues: request.cueSource,
+        profile,
+        layer: target.name,
+      })
       setMessage(result)
       return result
     } catch (error) {
-      setRhythmError(error instanceof Error ? error.message : 'No se pudo aplicar el ritmo solicitado por el Wizard.')
+      setRhythmError(error instanceof Error ? error.message : t('agent.rhythmWizardFailed'))
       throw error
     } finally {
       setRhythmBusy(false)
     }
-  }), [outputs, selectedId, updateScene])
+  }), [outputs, selectedId, updateScene, t])
   const animateCutoutDialogue = () => {
     const text = cutoutDialogueText.trim()
     if (!text) { setMessage(t('animator.writeDialogueFirst')); return }
@@ -3089,8 +3100,8 @@ export function SceneAnimatorPanel() {
       </div>
       {selected && <div className="space-y-1 rounded border border-fuchsia-400/20 bg-fuchsia-400/[.025] p-2"><div className="text-[9px] text-fuchsia-100">{t('animator.suggestions', { name: selected.name })}</div><div className="flex flex-wrap gap-1">{copilotSuggestions.map(suggestion => <button key={suggestion} type="button" disabled={copilotBusy || selected.locked} onClick={() => { setCopilotIntent(suggestion); setCopilotError(null) }} className="rounded border border-fuchsia-300/25 px-1.5 py-0.5 text-left text-[8px] text-fuchsia-100 hover:bg-fuchsia-400/10 disabled:opacity-40">{suggestion}</button>)}</div></div>}
       <SceneRecipePanel disabled={playing || recording || publishing || saving} outputs={outputs} characterKits={characterKitLibrary} onApply={applyRecipeScene} />
-      <button type="button" disabled={playing || recording || publishing || saving} onClick={() => setTemplateComposerOpen(true)} className="w-full rounded border border-cyan-400/40 p-2 text-xs text-cyan-100 disabled:opacity-40">Plantillas · crear con mis assets de Library</button>
-      <a href="/scene-template-review" target="_blank" rel="noopener noreferrer" className="block rounded border border-cyan-500/30 p-2 text-center text-xs text-cyan-200">Laboratorio · catálogo de escenas candidatas y editables ↗</a>
+      <button type="button" disabled={playing || recording || publishing || saving} onClick={() => setTemplateComposerOpen(true)} className="w-full rounded border border-cyan-400/40 p-2 text-xs text-cyan-100 disabled:opacity-40">{t('animator.createFromLibrary')}</button>
+      <a href="/scene-template-review" target="_blank" rel="noopener noreferrer" className="block rounded border border-cyan-500/30 p-2 text-center text-xs text-cyan-200">{t('animator.labCatalog')}</a>
       <div className="relative"><button onClick={() => setAddOpen(value => !value)} className="w-full rounded bg-accent-blue px-2.5 py-2 text-xs text-white flex items-center justify-center gap-1"><Plus size={13} /> {t('animator.addLayer')}</button>{addOpen && <div className="absolute z-[1100] mt-1 max-h-[75vh] w-full space-y-1 overflow-y-auto rounded border border-border bg-bg-primary p-1 shadow-xl"><button onClick={addCamera} className="w-full rounded px-2 py-1.5 text-left text-[11px] text-cyan-200 hover:bg-bg-hover">{t('animator.addCamera')}</button><div className="px-2 pt-1 text-[8px] font-medium uppercase tracking-wider text-text-muted">{t('animator.atmospherePresets')}</div><div className="grid grid-cols-2 gap-1">{ATMOSPHERE_KINDS.map(kind => <button key={kind} onClick={() => addAtmosphere(kind)} title={`${t(`atmosphere.labels.${kind}`)} — ${t(`atmosphere.descriptions.${kind}`, { defaultValue: ATMOSPHERE_DESCRIPTIONS[kind] })}`} className="truncate rounded border border-border px-2 py-1.5 text-left text-[9px] text-purple-200 hover:border-purple-400/60 hover:bg-bg-hover">{t(`atmosphere.labels.${kind}`)}</button>)}</div><button onClick={() => { setAssetExplorer('layer-model'); setAddOpen(false) }} className="w-full rounded px-2 py-1.5 text-left text-[11px] hover:bg-bg-hover">{t('animator.selectGenerated3d')}</button><button onClick={() => { setAddOpen(false); modelInputRef.current?.click() }} className="w-full rounded px-2 py-1.5 text-left text-[11px] hover:bg-bg-hover">{t('animator.importGlb')}</button><button onClick={() => { setAssetExplorer('layer-media'); setAddOpen(false) }} className="w-full rounded px-2 py-1.5 text-left text-[11px] hover:bg-bg-hover">{t('animator.selectGeneratedMedia')}</button><button onClick={() => { setAddOpen(false); mediaInputRef.current?.click() }} className="w-full rounded px-2 py-1.5 text-left text-[11px] hover:bg-bg-hover">{t('animator.importMedia')}</button><button onClick={() => { setAddOpen(false); overlayInputRef.current?.click() }} className="w-full rounded px-2 py-1.5 text-left text-[11px] hover:bg-bg-hover">{t('animator.importOverlay')}</button></div>}</div>
       <input ref={modelInputRef} type="file" accept=".glb,model/gltf-binary" className="hidden" onChange={event => { const file = event.target.files?.[0]; if (file) addOrReassign('model3d', file) }} /><input ref={mediaInputRef} type="file" accept="image/*,video/*" className="hidden" onChange={event => { const file = event.target.files?.[0]; if (file) addOrReassign(file.type.startsWith('video/') ? 'video' : 'image', file) }} /><input ref={overlayInputRef} type="file" accept="image/png,image/webp" multiple className="hidden" onChange={event => [...(event.target.files ?? [])].forEach(file => addOrReassign('overlay', file))} />
       <div><div className="mb-1.5 text-[10px] font-medium uppercase tracking-wider text-text-muted">{t('animator.layers')}</div><div className="space-y-1">{[...scene.layers].sort((a, b) => b.z - a.z).map(layer => <div key={layer.id} onClick={() => setSelectedId(layer.id)} className={`flex cursor-pointer items-center gap-1.5 rounded border p-1.5 text-[10px] ${selectedId === layer.id ? 'border-accent-blue bg-accent-blue/10' : 'border-border bg-bg-primary'}`}><div className="h-7 w-7 shrink-0 overflow-hidden rounded bg-bg-active flex items-center justify-center">{layer.thumbnail ? <img src={layer.thumbnail} alt="" className="h-full w-full object-cover" /> : iconFor(layer.type)}</div><div className="min-w-0 flex-1"><div className="truncate">{layer.name}</div><div className="text-[9px] text-text-muted">{t('animator.layerMeta', { type: t(`layerTypes.${layer.type}` as 'layerTypes.camera'), z: layer.z })}{layer.missingAsset ? t('animator.missingAssetSuffix') : ''}</div></div><button onClick={event => { event.stopPropagation(); updateLayer(layer.id, item => ({ ...item, visible: !item.visible })) }} title={t('animator.visibility')}>{layer.visible ? <Eye size={12} /> : <EyeOff size={12} />}</button><div className="flex flex-col"><button title={t('animator.bringForward')} onClick={event => { event.stopPropagation(); moveLayerZ(layer.id, 1) }}><ChevronUp size={12} /></button><button title={t('animator.sendBackward')} onClick={event => { event.stopPropagation(); moveLayerZ(layer.id, -1) }}><ChevronDown size={12} /></button></div><button onClick={event => { event.stopPropagation(); updateScene(current => ({ ...current, layers: normalizeZ(current.layers.filter(item => item.id !== layer.id)) })); if (selectedId === layer.id) setSelectedId(null) }} className="text-red-400"><Trash2 size={12} /></button></div>)}</div></div>
@@ -3201,7 +3212,7 @@ export function SceneAnimatorPanel() {
       </div>
       {message && <p className="text-[10px] text-text-secondary">{message}</p>}
     </aside>
-    {templateComposerOpen && <TemplateComposerDialog key={workspace} workspace={workspace} onClose={() => setTemplateComposerOpen(false)} onApply={next => importScene(JSON.stringify(next), 'Plantilla creada con assets de Library; revisa el encuadre antes de exportar.')} />}
+    {templateComposerOpen && <TemplateComposerDialog key={workspace} workspace={workspace} onClose={() => setTemplateComposerOpen(false)} onApply={next => importScene(JSON.stringify(next), t('animator.templateFromLibrary'))} />}
     <SceneAnimatorExplorer
       purpose={assetExplorer}
       models={generatedModels}
