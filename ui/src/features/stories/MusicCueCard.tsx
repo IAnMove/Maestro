@@ -1,4 +1,5 @@
-import { Copy, ExternalLink, Film, Languages, Loader2, Music, Palette, RefreshCcw, Sparkles, Upload } from 'lucide-react'
+import { Copy, ExternalLink, Film, Languages, Loader2, Music, Palette, RefreshCcw, Sparkles } from 'lucide-react'
+import { StoryAudioPicker } from './StoryAudioPicker'
 import * as api from '../../api/client'
 import { useUiTranslation } from '../../i18n'
 import { button, completeGenerationButton, input, panel, Field } from './storyLabChrome'
@@ -140,9 +141,14 @@ export function MusicCueCard({
                 onClick={() => void generateMusicCueAudio(cue.id)}>
                 {generatingAudio ? <Loader2 size={13} className="animate-spin" /> : <Music size={13} />} {t('music.generateTrack')}
               </button>
-              <button className={button} disabled={cueBusy} onClick={() => onImportCustomMp3(cue.id)}>
-                <Upload size={12} /> {t('music.importCustomMp3')}
-              </button>
+              <StoryAudioPicker
+                workspace={workspace}
+                projectId={`${project.id}:${cue.id}:custom`}
+                label={t('music.importCustomMp3')}
+                accept=".mp3,audio/mpeg"
+                disabled={cueBusy}
+                onChoose={item => { if (item) onImportCustomMp3(cue.id, item) }}
+              />
             </div>
           </div>
           <div className="space-y-2.5 rounded-lg border border-blue-500/30 bg-blue-500/5 p-3">
@@ -170,9 +176,14 @@ export function MusicCueCard({
                 target="_blank" rel="noreferrer">
                 <ExternalLink size={12} /> {t('music.openLyria')}
               </a>
-              <button className={button} disabled={cueBusy} onClick={() => onImportLyria(cue.id)}>
-                <Upload size={12} /> {t('music.importGenerated')}
-              </button>
+              <StoryAudioPicker
+                workspace={workspace}
+                projectId={`${project.id}:${cue.id}:lyria`}
+                label={t('music.importGenerated')}
+                accept="audio/*"
+                disabled={cueBusy}
+                onChoose={item => { if (item) onImportLyria(cue.id, item) }}
+              />
             </div>
           </div>
         </div>
