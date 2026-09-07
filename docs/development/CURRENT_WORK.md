@@ -45,8 +45,9 @@ Al cerrar esta revisión el taller de habla (#200), la limpieza documental
 (#198) se mezcló en development el 07/09 (`fae7d3f6`). Estado por dominio:
 
 - **Selector universal de recursos (PR 2)**: modal común transaccional sobre
-  `AssetExplorerDialog`. Rama `feat/asset-picker-modal`. Contrato #207 ya
-  integrado. Cursor: no ejecutada (cuota). No mezclar hasta que lo pidan.
+  `AssetExplorerDialog`. PR [#208](https://github.com/IAnMove/hocuspocus/pull/208),
+  rama `feat/asset-picker-modal`. Contrato #207 ya integrado. Cursor: no
+  ejecutada (cuota). No mezclar hasta que lo pidan.
 - **Vídeo procedural**: conservar el checkpoint `work/procedural-video-pilot-checkpoint`;
   consultar [PROCEDURAL_VIDEO_ROADMAP](PROCEDURAL_VIDEO_ROADMAP.md) y el documento del
   subdominio asignado. No mezclar el checkpoint en bloque ni asumir que todo su
