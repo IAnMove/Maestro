@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Box, Cpu, Images, Loader2, Palette, Play, RefreshCw, Square, Upload, X } from 'lucide-react'
+import { Box, Cpu, Loader2, Palette, Play, RefreshCw, Square, X } from 'lucide-react'
 import { useSerializedPoll } from '../../hooks/useSerializedPoll'
 import { useUiTranslation } from '../../i18n'
 import { useStore } from '../../stores/useStore'
@@ -7,13 +7,13 @@ import { Hunyuan3DAdvancedSettings } from './Hunyuan3DAdvancedSettings'
 import { ModelSelector } from './ModelSelector'
 import { Model3DEngineInputs } from './Model3DEngineInputs'
 import { model3dInputState } from '../../lib/model3dInputState'
+import { AssetInput } from '../../features/asset-picker/AssetInput.tsx'
 import {
   cancelHunyuan3DJob,
   fetchOutputs,
   fetchHunyuan3DCapabilities,
   fetchHunyuan3DJob,
   startHunyuan3DJob,
-  uploadImage,
   type ApiOutput,
   type Hunyuan3DCapabilities,
   type Hunyuan3DJob,
@@ -25,58 +25,45 @@ type RetextureSource = { path: string; name: string; thumbnail?: string | null }
 
 const ACTIVE_3D_JOB_STATUSES = new Set(['queued', 'waiting', 'waiting_resource', 'running', 'cancelling'])
 
-function ViewUpload({ view, value, busy, required, disabled = false, onUpload, onBrowse, onRemove }: {
+function asImageOutput(value?: UploadedView): ApiOutput | undefined {
+  if (!value) return undefined
+  return { name: value.name, type: 'image', mode: null, size: 0, created_at: 0, url: value.url, thumbnail_url: value.url }
+}
+
+function HunyuanViewField({
+  view, value, required, disabled = false, items, onChoose,
+}: {
   view: ViewName
   value?: UploadedView
-  busy: boolean
   required?: boolean
   disabled?: boolean
-  onUpload: (file: File) => void
-  onBrowse: () => void
-  onRemove: () => void
+  items: ApiOutput[]
+  onChoose: (item: ApiOutput | null) => void
 }) {
   const { t } = useUiTranslation('scene3d')
-  const inputRef = useRef<HTMLInputElement>(null)
   const viewLabel = t(`views.${view}`)
   return (
     <div className="min-w-0">
-      <div className="text-[10px] text-text-muted uppercase tracking-wider mb-1">
-        {viewLabel}{required ? ' *' : ''}
-      </div>
       {disabled ? (
         <div aria-disabled="true" className="flex aspect-square items-center justify-center rounded-lg border border-border opacity-40"><X size={18} aria-label={t('engines.unavailable')} /></div>
-      ) : value ? (
-        <div className="relative aspect-square rounded-lg overflow-hidden border border-border bg-bg-primary group">
-          <img src={value.url} alt={viewLabel} className="w-full h-full object-cover" />
-          <button type="button" onClick={onRemove} className="absolute top-1 right-1 p-1 rounded-full bg-black/60 text-white hover:bg-red-600 transition-colors" aria-label={t('hunyuan.removeAria', { view: viewLabel })}>
-            <X size={11} />
-          </button>
-          <div className="absolute inset-x-0 bottom-0 bg-black/60 px-1.5 py-1 text-[9px] text-white truncate">{value.name}</div>
-        </div>
       ) : (
-        <div className="flex aspect-square w-full flex-col gap-1 rounded-lg border border-dashed border-border bg-bg-primary p-1">
-          <button type="button" disabled={busy} onClick={() => inputRef.current?.click()} aria-label={t('hunyuan.uploadAria', { view: viewLabel })} className="flex min-h-0 flex-1 flex-col items-center justify-center gap-0.5 rounded text-text-muted transition-colors hover:bg-bg-hover hover:text-accent-blue disabled:opacity-50">
-            {busy ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
-            <span className="text-[8px]">{busy ? t('hunyuan.uploading') : t('hunyuan.upload')}</span>
-          </button>
-          <button type="button" disabled={busy} onClick={onBrowse} aria-label={t('hunyuan.chooseAria', { view: viewLabel })} className="flex min-h-0 flex-1 flex-col items-center justify-center gap-0.5 rounded border-t border-border text-text-muted transition-colors hover:bg-bg-hover hover:text-accent-blue disabled:opacity-50">
-            <Images size={14} />
-            <span className="text-[8px]">{t('hunyuan.fromApp')}</span>
-          </button>
-        </div>
+        <AssetInput
+          label={`${viewLabel}${required ? ' *' : ''}`}
+          placeholder={t('hunyuan.fromApp')}
+          items={items}
+          value={asImageOutput(value)}
+          accept="image/*"
+          optional={!required}
+          constraints={{ kinds: ['image'], maxCount: 1, optional: !required }}
+          onChoose={onChoose}
+        />
       )}
-      <input ref={inputRef} type="file" accept="image/*" disabled={disabled} className="hidden" onChange={event => {
-        const file = event.target.files?.[0]
-        if (file) onUpload(file)
-        event.target.value = ''
-      }} />
     </div>
   )
 }
 
 export function Hunyuan3DPanel() {
   const { t } = useUiTranslation('scene3d')
-  const viewLabel = (view: ViewName) => t(`views.${view}`)
   const activeWorkspace = useStore(state => state.activeWorkspace)
   const enabledModels = useStore(state => state.enabledModels)
   const toggleModelEnabled = useStore(state => state.toggleModelEnabled)
@@ -91,13 +78,11 @@ export function Hunyuan3DPanel() {
   const [retextureSources, setRetextureSources] = useState<RetextureSource[]>([])
   const [sourceModel, setSourceModel] = useState<RetextureSource | null>(null)
   const [sourcesLoading, setSourcesLoading] = useState(false)
-  const [uploadingModel, setUploadingModel] = useState(false)
+
   const [capabilityError, setCapabilityError] = useState<string | null>(null)
   const [views, setViews] = useState<Partial<Record<ViewName, UploadedView>>>({})
-  const [uploadingView, setUploadingView] = useState<ViewName | null>(null)
+
   const [imageSources, setImageSources] = useState<ApiOutput[]>([])
-  const [imagePickerView, setImagePickerView] = useState<ViewName | null>(null)
-  const [imagesLoading, setImagesLoading] = useState(false)
   const [preset, setPreset] = useState('balanced')
   const [textureMode, setTextureMode] = useState('v2-turbo')
   const [steps, setSteps] = useState(5)
@@ -121,7 +106,6 @@ export function Hunyuan3DPanel() {
   const [error, setError] = useState<string | null>(null)
   const completedJobRef = useRef<string | null>(null)
   const imageLoadRef = useRef(0)
-  const modelInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     fetchHunyuan3DCapabilities().then(setCapabilities).catch(err => {
@@ -153,7 +137,6 @@ export function Hunyuan3DPanel() {
 
   const loadImageSources = useCallback(async () => {
     const requestId = ++imageLoadRef.current
-    setImagesLoading(true)
     setError(null)
     try {
       const { outputs: files } = await fetchOutputs(200, 0, {
@@ -165,29 +148,25 @@ export function Hunyuan3DPanel() {
       if (requestId !== imageLoadRef.current) return
       setImageSources([])
       setError(err instanceof Error ? err.message : t('hunyuan.imagesFailed'))
-    } finally {
-      if (requestId === imageLoadRef.current) setImagesLoading(false)
     }
   }, [activeWorkspace, t])
 
-  const openImagePicker = (view: ViewName) => {
-    setImagePickerView(view)
+  useEffect(() => {
     void loadImageSources()
-  }
+  }, [loadImageSources])
 
-  const selectImageSource = (view: ViewName, file: ApiOutput) => {
-    setViews(current => ({
-      ...current,
-      [view]: { path: file.name, name: file.name, url: file.url, workspace: activeWorkspace },
-    }))
-    setImagePickerView(null)
+  const chooseView = (view: ViewName, item: ApiOutput | null) => {
+    setViews(current => {
+      if (!item) {
+        const next = { ...current }
+        delete next[view]
+        return next
+      }
+      return { ...current, [view]: { path: item.name, name: item.name, url: item.url, workspace: activeWorkspace } }
+    })
   }
 
   useEffect(() => {
-    imageLoadRef.current += 1
-    setImagesLoading(false)
-    setImageSources([])
-    setImagePickerView(null)
     setViews(current => {
       const next = { ...current }
       let changed = false
@@ -204,7 +183,6 @@ export function Hunyuan3DPanel() {
   useEffect(() => {
     if (!external3d) return
     setOperation('generate')
-    setImagePickerView(null)
     if (!selectedModel?.resolutions?.includes(resolution)) setResolution(1024)
   }, [external3d, selectedModel, resolution])
 
@@ -249,36 +227,6 @@ export function Hunyuan3DPanel() {
   useEffect(() => {
     if (textureMode === 'pbr' && outputFormat !== 'glb') setOutputFormat('glb')
   }, [textureMode, outputFormat])
-
-  const uploadView = async (view: ViewName, file: File) => {
-    setUploadingView(view)
-    setError(null)
-    try {
-      const result = await uploadImage(file)
-      setViews(current => ({ ...current, [view]: { path: result.path, name: file.name, url: result.url } }))
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t('hunyuan.uploadFailed'))
-    } finally {
-      setUploadingView(null)
-    }
-  }
-
-  const uploadSourceModel = async (file: File) => {
-    if (!/\.glb$/i.test(file.name)) {
-      setError(t('hunyuan.glbOnly'))
-      return
-    }
-    setUploadingModel(true)
-    setError(null)
-    try {
-      const result = await uploadImage(file)
-      setSourceModel({ path: result.path, name: file.name })
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t('hunyuan.glbUploadFailed'))
-    } finally {
-      setUploadingModel(false)
-    }
-  }
 
   const activeJobId = job?.job_id
   const activeJobStatus = job?.status
@@ -401,14 +349,27 @@ export function Hunyuan3DPanel() {
           {operation === 'retexture' && <div className="space-y-2 rounded-lg border border-purple-400/30 bg-purple-500/[.06] p-3">
             <div className="flex items-center justify-between gap-2">
               <div><div className="text-[10px] font-medium uppercase tracking-wider text-purple-200">{t('hunyuan.sourceGlb')}</div><p className="mt-0.5 text-[9px] text-text-muted">{t('hunyuan.sourceGlbHelp')}</p></div>
-              <div className="flex gap-1">
-                <button type="button" onClick={() => void loadRetextureSources()} title={t('hunyuan.refreshGallery')} className="rounded border border-border p-1.5 text-text-muted hover:text-text-primary"><RefreshCw size={11} className={sourcesLoading ? 'animate-spin' : ''} /></button>
-                <button type="button" disabled={uploadingModel} onClick={() => modelInputRef.current?.click()} className="flex items-center gap-1 rounded border border-border px-2 py-1 text-[9px] text-text-secondary disabled:opacity-50">{uploadingModel ? <Loader2 size={10} className="animate-spin" /> : <Upload size={10} />} {t('hunyuan.import')}</button>
-                <input ref={modelInputRef} type="file" accept=".glb,model/gltf-binary" className="hidden" onChange={event => { const file = event.target.files?.[0]; if (file) void uploadSourceModel(file); event.target.value = '' }} />
-              </div>
+              <button type="button" onClick={() => void loadRetextureSources()} title={t('hunyuan.refreshGallery')} className="rounded border border-border p-1.5 text-text-muted hover:text-text-primary"><RefreshCw size={11} className={sourcesLoading ? 'animate-spin' : ''} /></button>
             </div>
-            {sourcesLoading ? <div className="flex items-center gap-1.5 py-3 text-[9px] text-text-muted"><Loader2 size={11} className="animate-spin" /> {t('hunyuan.loadingGlbs')}</div> : retextureSources.length > 0 && <div className="grid max-h-48 grid-cols-3 gap-1.5 overflow-y-auto pr-0.5">{retextureSources.map(file => <button key={file.path} type="button" onClick={() => setSourceModel(file)} title={file.name} className={`relative aspect-square overflow-hidden rounded border ${sourceModel?.path === file.path ? 'border-purple-300 ring-1 ring-purple-300/50' : 'border-border hover:border-purple-400/60'}`}>{file.thumbnail ? <img src={file.thumbnail} alt="" className="h-full w-full object-cover" loading="lazy" /> : <span className="flex h-full items-center justify-center bg-bg-tertiary"><Box size={16} className="text-text-muted" /></span>}<span className="absolute inset-x-0 bottom-0 truncate bg-black/65 px-1 py-0.5 text-[7px] text-white">{file.name}</span></button>)}</div>}
-            {sourceModel ? <div className="flex items-center justify-between gap-2 rounded border border-purple-300/30 bg-bg-primary px-2 py-1.5"><span className="truncate text-[9px] text-purple-100">{sourceModel.name}</span><button type="button" onClick={() => setSourceModel(null)} className="text-text-muted hover:text-red-300"><X size={11} /></button></div> : <p className="text-[9px] text-amber-300">{t('hunyuan.chooseOrImport')}</p>}
+            <AssetInput
+              label={t('hunyuan.sourceGlb')}
+              placeholder={t('hunyuan.chooseOrImport')}
+              items={retextureSources.map(file => ({
+                name: file.name, type: 'model3d' as const, mode: null, size: 0, created_at: 0,
+                url: file.thumbnail || '', thumbnail_url: file.thumbnail || '',
+              }))}
+              value={sourceModel ? {
+                name: sourceModel.name, type: 'model3d', mode: null, size: 0, created_at: 0,
+                url: sourceModel.thumbnail || '', thumbnail_url: sourceModel.thumbnail || '',
+              } : undefined}
+              accept=".glb,model/gltf-binary"
+              optional
+              constraints={{ kinds: ['model3d'], maxCount: 1, optional: true }}
+              onChoose={item => {
+                if (!item) setSourceModel(null)
+                else setSourceModel({ path: item.name, name: item.name, thumbnail: item.thumbnail_url || item.url })
+              }}
+            />
             <p className="text-[8px] leading-relaxed text-text-muted">{t('hunyuan.retextureHelp')}</p>
           </div>}
           <div>
@@ -441,38 +402,18 @@ export function Hunyuan3DPanel() {
             </div>
             <div className="grid grid-cols-4 gap-2">
               {(['front', 'left', 'right', 'back'] as ViewName[]).map(view => (
-                <ViewUpload key={view} disabled={!isMultiview && view !== 'front'} view={view} value={views[view]} busy={uploadingView === view} required={isMultiview && view === 'front'} onUpload={file => void uploadView(view, file)} onBrowse={() => openImagePicker(view)} onRemove={() => setViews(current => ({ ...current, [view]: undefined }))} />
+                <HunyuanViewField
+                  key={view}
+                  view={view}
+                  value={views[view]}
+                  disabled={!isMultiview && view !== 'front'}
+                  required={isMultiview && view === 'front'}
+                  items={imageSources}
+                  onChoose={item => chooseView(view, item)}
+                />
               ))}
             </div>
             {!isMultiview && <p role="note" className="mt-2 text-[10px] text-text-muted">✕ {t(selectedModel?.multiview_reason === 'camera_contract' ? 'engines.cameraContract' : 'engines.singleImage')}</p>}
-            {imagePickerView && (isMultiview || imagePickerView === 'front') && (
-              <div className="mt-2 rounded-lg border border-accent-blue/30 bg-bg-primary p-2">
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <div>
-                    <div className="text-[10px] font-medium text-text-primary">{t('hunyuan.pickerTitle', { view: viewLabel(imagePickerView) })}</div>
-                    <p className="text-[8px] text-text-muted">{t('hunyuan.pickerHelp')}</p>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <button type="button" disabled={imagesLoading} onClick={() => void loadImageSources()} aria-label={t('hunyuan.refreshImages')} className="rounded border border-border p-1.5 text-text-muted hover:text-text-primary disabled:opacity-50"><RefreshCw size={11} className={imagesLoading ? 'animate-spin' : ''} /></button>
-                    <button type="button" onClick={() => setImagePickerView(null)} aria-label={t('hunyuan.closePicker')} className="rounded border border-border p-1.5 text-text-muted hover:text-text-primary"><X size={11} /></button>
-                  </div>
-                </div>
-                {imagesLoading ? (
-                  <div className="flex items-center justify-center gap-1.5 py-5 text-[9px] text-text-muted"><Loader2 size={12} className="animate-spin" /> {t('hunyuan.loadingImages')}</div>
-                ) : imageSources.length ? (
-                  <div role="listbox" aria-label={t('hunyuan.pickerAria', { view: viewLabel(imagePickerView) })} className="grid max-h-52 grid-cols-3 gap-1.5 overflow-y-auto pr-0.5">
-                    {imageSources.map(file => (
-                      <button key={file.name} type="button" role="option" aria-selected={views[imagePickerView]?.path === file.name} aria-label={file.name} onClick={() => selectImageSource(imagePickerView, file)} title={file.name} className="relative aspect-square overflow-hidden rounded border border-border bg-bg-tertiary hover:border-accent-blue focus:border-accent-blue">
-                        <img src={file.thumbnail_url || file.url} alt="" className="h-full w-full object-cover" loading="lazy" />
-                        <span className="absolute inset-x-0 bottom-0 truncate bg-black/70 px-1 py-0.5 text-[7px] text-white">{file.name}</span>
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="py-4 text-center text-[9px] text-text-muted">{t('hunyuan.noImages')}</p>
-                )}
-              </div>
-            )}
           </div>
 
           <Hunyuan3DAdvancedSettings
