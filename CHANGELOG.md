@@ -6,6 +6,11 @@ in [app/docs/CHANGELOG.md](app/docs/CHANGELOG.md).
 
 ## [Unreleased]
 
+- Host RAM guard: a systemd user service outside Pinokio's Chromium cgroup
+  stops runaway Node agents (Grok/Codex `MainThread`) when available RAM
+  falls below 2 GiB, so the kernel OOM killer does not take Pinokio down
+  with them. Install with `python3 scripts/ram_guard.py --install`.
+
 ## [0.9.0] - 2026-08-24
 
 First HocusPocus preview. Product versioning is independent of the Maestro
