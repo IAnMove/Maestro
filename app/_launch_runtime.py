@@ -126,7 +126,12 @@ from services import debug_trace
 from routers.lan_auth import create_lan_auth_router
 from services.durable_generation_queue import DurableGenerationQueue
 from services.lan_auth import LanAuthMiddleware, describe_lan_auth_startup
-from services.media_paths import MediaPathNotAllowed, resolve_permitted_media_path, resolve_voice_ref_paths
+from services.media_paths import (
+    MediaPathNotAllowed,
+    resolve_permitted_media_path,
+    resolve_story_cover_audio,
+    resolve_voice_ref_paths,
+)
 from services.upload_stream import (
     UploadTooLargeError,
     UploadTranscodeError,
@@ -1087,6 +1092,19 @@ def _resolve_request_media_path(
         raise HTTPException(status_code=400, detail="Media path is not allowed") from None
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="Media file not found") from None
+
+
+def _story_cover_reference_path(filename: str, workspace: str) -> str | None:
+    """Resolve a cover reference from uploads/audio or the active workspace."""
+    try:
+        return resolve_story_cover_audio(
+            filename,
+            uploads_audio_root=os.path.join(os.getcwd(), "uploads", "audio"),
+            uploads_root=os.path.join(os.getcwd(), "uploads"),
+            workspace_root=_workspace_dir(workspace),
+        )
+    except (MediaPathNotAllowed, FileNotFoundError, ValueError):
+        return None
 
 
 def _workspace_file_count(path: str) -> int:
@@ -31861,12 +31879,11 @@ def start_story_music_candidates_job(body: dict):
         raise HTTPException(status_code=400, detail="Lyrics are required for a vocal song")
     reference_audio_path = None
     if model in minimax_music_service.COVER_MODELS:
-        reference_name = os.path.basename(
-            str(body.get("reference_audio_filename") or "").strip()
+        reference_audio_path = _story_cover_reference_path(
+            str(body.get("reference_audio_filename") or ""),
+            workspace,
         )
-        upload_root = os.path.realpath(os.path.join(os.getcwd(), "uploads", "audio"))
-        reference_audio_path = _safe_join(upload_root, reference_name) if reference_name else None
-        if not reference_audio_path or not os.path.isfile(reference_audio_path):
+        if not reference_audio_path:
             raise HTTPException(
                 status_code=400,
                 detail="Upload a valid reference song before generating a cover",
@@ -32016,10 +32033,11 @@ async def generate_story_music_candidates(body: dict):
     model = str(body.get("model") or "music-3.0").strip()
     reference_audio_path = None
     if model in {"music-cover", "music-cover-free"}:
-        reference_name = os.path.basename(str(body.get("reference_audio_filename") or "").strip())
-        upload_root = os.path.realpath(os.path.join(os.getcwd(), "uploads", "audio"))
-        reference_audio_path = _safe_join(upload_root, reference_name) if reference_name else None
-        if not reference_audio_path or not os.path.isfile(reference_audio_path):
+        reference_audio_path = _story_cover_reference_path(
+            str(body.get("reference_audio_filename") or ""),
+            workspace,
+        )
+        if not reference_audio_path:
             raise HTTPException(status_code=400, detail="Upload a valid reference song before generating a cover")
     try:
         candidates = await asyncio.to_thread(

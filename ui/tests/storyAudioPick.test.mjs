@@ -6,6 +6,7 @@ import {
   coverPatchFromOutput,
   cueCandidateFromOutput,
   isCustomMp3Output,
+  isUploadedAudioOutput,
 } from '../src/features/stories/storyAudioPick.ts'
 
 const live = { projectId: 'story-1', cueId: 'cue-1' }
@@ -56,6 +57,20 @@ test('stale project or cue is ignored; wav is rejected as custom mp3', () => {
   assert.equal(commitStoryAudioChoice(live, live, { ...audio, name: 'take.wav', path: 'take.wav', url: '/take.wav' }, true).action, 'reject')
   const applied = commitStoryAudioChoice(live, live, audio, true)
   assert.equal(applied.action, 'apply')
+})
+
+test('device mp3 import still applies after upload-audio transcodes to wav', () => {
+  const uploaded = {
+    ...audio,
+    name: 'a1b2c3d4.wav',
+    path: '/app/uploads/audio/a1b2c3d4.wav',
+    url: '/api/v1/uploads/audio/a1b2c3d4.wav',
+  }
+  assert.equal(isUploadedAudioOutput(uploaded), true)
+  assert.equal(isCustomMp3Output(uploaded), true)
+  const applied = commitStoryAudioChoice(live, live, uploaded, true)
+  assert.equal(applied.action, 'apply')
+  assert.equal(isCustomMp3Output({ ...audio, name: 'take.wav', path: 'outputs/take.wav', url: '/api/v1/file/take.wav?workspace=film' }), false)
 })
 
 test('audioBindingFilename prefers the path basename', () => {
