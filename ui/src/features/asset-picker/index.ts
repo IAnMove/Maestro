@@ -6,6 +6,7 @@ export {
   checkCompatibility,
   matchCatalogByOutput,
   outputToPickerItem,
+  voiceRefFromOutput,
   resolveCatalogMatch,
 } from './adapters.ts'
 export { confirmPickerChoice, livePickerItem, matchOutputByPicker } from './confirmChoice.ts'

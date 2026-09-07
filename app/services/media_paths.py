@@ -100,3 +100,34 @@ def resolve_permitted_media_path(
             return candidate
     raise FileNotFoundError("Permitted media file was not found")
 
+
+def resolve_voice_ref_paths(
+    refs: Iterable[str],
+    *,
+    uploads_root: str,
+    workspace_root: str,
+) -> list[str]:
+    """Resolve SeedVC voice refs to real files under uploads or the workspace.
+
+    Upload-audio stores files in uploads/audio/; the UI must send that
+    subfolder (or an absolute path). Bare filenames only match a workspace
+    file or a file sitting directly in uploads/. Unresolvable entries are
+    dropped so a stale ref cannot crash generation.
+    """
+    resolved: list[str] = []
+    for value in refs:
+        if not isinstance(value, str) or not value.strip() or "\x00" in value:
+            continue
+        try:
+            resolved.append(
+                resolve_permitted_media_path(
+                    value,
+                    uploads_root=uploads_root,
+                    workspace_root=workspace_root,
+                    kinds=("audio", "video"),
+                )
+            )
+        except (MediaPathNotAllowed, FileNotFoundError, ValueError):
+            continue
+    return resolved
+

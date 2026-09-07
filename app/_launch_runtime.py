@@ -126,7 +126,7 @@ from services import debug_trace
 from routers.lan_auth import create_lan_auth_router
 from services.durable_generation_queue import DurableGenerationQueue
 from services.lan_auth import LanAuthMiddleware, describe_lan_auth_startup
-from services.media_paths import MediaPathNotAllowed, resolve_permitted_media_path
+from services.media_paths import MediaPathNotAllowed, resolve_permitted_media_path, resolve_voice_ref_paths
 from services.upload_stream import (
     UploadTooLargeError,
     UploadTranscodeError,
@@ -23812,7 +23812,11 @@ def _run_generation(job_id: str, *, finalize: bool = True) -> bool:
             # Pop them out of raw_params so they don't leak into the
             # generation handler (other handlers don't understand them).
             pp_voice_clone_enabled = bool(raw_params.pop("voice_clone_enabled", False))
-            pp_voice_clone_refs = raw_params.pop("voice_clone_refs", None) or []
+            pp_voice_clone_refs = resolve_voice_ref_paths(
+                raw_params.pop("voice_clone_refs", None) or [],
+                uploads_root=os.path.join(os.getcwd(), "uploads"),
+                workspace_root=_workspace_dir(job.get("workspace")),
+            )
             pp_voice_clone_mode = raw_params.pop("voice_clone_mode", "single")
 
             defer_output_publication = bool(

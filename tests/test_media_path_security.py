@@ -3,7 +3,11 @@ from pathlib import Path
 
 import pytest
 
-from services.media_paths import MediaPathNotAllowed, resolve_permitted_media_path
+from services.media_paths import (
+    MediaPathNotAllowed,
+    resolve_permitted_media_path,
+    resolve_voice_ref_paths,
+)
 
 
 ROOT = Path(__file__).parents[1]
@@ -78,6 +82,48 @@ def test_permitted_media_path_rejects_a_symlink_escape(tmp_path):
         )
 
 
+def test_permitted_media_path_resolves_audio_upload_subdir(tmp_path):
+    uploads = tmp_path / "uploads"
+    workspace = tmp_path / "workspace"
+    audio = uploads / "audio"
+    audio.mkdir(parents=True)
+    workspace.mkdir()
+    sample = audio / "9f2.wav"
+    sample.write_bytes(b"RIFF")
+
+    assert resolve_permitted_media_path(
+        "audio/9f2.wav",
+        uploads_root=str(uploads),
+        workspace_root=str(workspace),
+        kinds=("audio",),
+    ) == str(sample.resolve())
+    with pytest.raises(FileNotFoundError):
+        resolve_permitted_media_path(
+            "9f2.wav",
+            uploads_root=str(uploads),
+            workspace_root=str(workspace),
+            kinds=("audio",),
+        )
+
+
+def test_resolve_voice_ref_paths_keeps_audio_subdir_and_workspace_names(tmp_path):
+    uploads = tmp_path / "uploads"
+    workspace = tmp_path / "workspace"
+    audio = uploads / "audio"
+    audio.mkdir(parents=True)
+    workspace.mkdir()
+    uploaded = audio / "9f2.wav"
+    clip = workspace / "hero.wav"
+    uploaded.write_bytes(b"RIFF")
+    clip.write_bytes(b"RIFF")
+
+    assert resolve_voice_ref_paths(
+        ["audio/9f2.wav", "hero.wav", "missing.wav", "9f2.wav"],
+        uploads_root=str(uploads),
+        workspace_root=str(workspace),
+    ) == [str(uploaded.resolve()), str(clip.resolve())]
+
+
 def test_permitted_media_path_distinguishes_missing_from_forbidden(tmp_path):
     uploads = tmp_path / "uploads"
     workspace = tmp_path / "workspace"
@@ -112,6 +158,21 @@ def test_audio_trim_and_analysis_endpoints_use_the_shared_resolver():
             if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
         ]
         assert "_resolve_request_media_path" in calls, name
+
+
+def test_generation_resolves_voice_clone_refs_before_seedvc():
+    tree = ast.parse(LAUNCH.read_text(encoding="utf-8"), filename=str(LAUNCH))
+    run = next(
+        node for node in tree.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and node.name == "_run_generation"
+    )
+    calls = [
+        node.func.id
+        for node in ast.walk(run)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+    ]
+    assert "resolve_voice_ref_paths" in calls
 
 
 def test_adopting_audio_is_confined_to_audio_the_uploader_would_not_transcode():
