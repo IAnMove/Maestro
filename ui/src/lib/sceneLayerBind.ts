@@ -64,20 +64,21 @@ export function applyLayerSourceCommit(
 }
 
 export async function bindLocalLayerFiles(
-  live: LayerSourceLive,
+  getLive: () => LayerSourceLive,
   pending: LayerSourceCapture | null,
   kind: SceneLayerBindKind,
   files: File[],
   sink: LayerBindSink,
   onError: (message: string) => void,
+  upload: (file: File) => Promise<{ filename: string; url: string }> = uploadLocalAsset,
 ): Promise<LayerSourceCapture | null> {
-  const capture = pending?.kind === kind ? pending : captureLayerBind(live, kind, pending?.reassignId ?? null)
+  const capture = pending?.kind === kind ? pending : captureLayerBind(getLive(), kind, pending?.reassignId ?? null)
   const selected = capture.reassignId ? files.slice(0, 1) : files
   for (const file of selected) {
     if (!localFileMatchesKind(kind, file)) continue
     try {
-      const uploaded = await uploadLocalAsset(file)
-      applyLayerSourceCommit(live, capture, outputFromLocalUpload(file, uploaded, kind), sink)
+      const uploaded = await upload(file)
+      applyLayerSourceCommit(getLive(), capture, outputFromLocalUpload(file, uploaded, kind), sink)
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return capture
       onError(error instanceof Error ? error.message : 'Upload failed')

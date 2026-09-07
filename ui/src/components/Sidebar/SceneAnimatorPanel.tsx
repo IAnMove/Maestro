@@ -1040,7 +1040,7 @@ export function SceneAnimatorPanel() {
     setReassignId(reassignLayerId); setAddOpen(false); input.current?.click()
   }
   const pickLocalLayerFiles = async (kind: SceneLayerBindKind, files: File[]) => {
-    pendingBindRef.current = await bindLocalLayerFiles(liveLayerSource(), pendingBindRef.current, kind, files, layerBindSink, message => setMessage(message || t('animator.saveFailed')))
+    pendingBindRef.current = await bindLocalLayerFiles(liveLayerSource, pendingBindRef.current, kind, files, layerBindSink, message => setMessage(message || t('animator.saveFailed')))
   }
   const translateLayer = (id: string, x: number, y: number, useSnap = true) => updateLayer(id, layer => {
     const nextX = useSnap ? snapCoordinate(x) : x; const nextY = useSnap ? snapCoordinate(y) : y
