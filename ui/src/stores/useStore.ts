@@ -1106,7 +1106,7 @@ interface ScheduledPromptSubmission {
   total: number
 }
 
-interface AppState extends LlmSlice, StudioConfigurationSlice {
+export interface AppState extends LlmSlice, StudioConfigurationSlice {
   wangpRestoreError: string
   // Generation mode (top-level: image/video/audio/avatar)
   generationMode: GenerationMode

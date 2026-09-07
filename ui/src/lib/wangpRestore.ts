@@ -1,7 +1,7 @@
-import type { useStore } from '../stores/useStore'
+import type { AppState } from '../stores/useStore'
 import { fetchEditingRestoreAsset } from './wangpUi'
 
-type State = ReturnType<typeof useStore.getState>
+type State = AppState
 let restoreRevision = 0
 
 export function editingInputsChanged() { restoreRevision += 1 }
@@ -20,7 +20,7 @@ export function legacyEditingPath(params: Record<string, unknown>, field: string
 }
 
 /** Media restoration owns a snapshot; missing files and late responses cannot reuse an older job's inputs. */
-export function beginWangpRestore(params: Record<string, unknown>, get: () => State, set: (state: Partial<State>) => void) {
+export function beginWangpRestore(params: Record<string, unknown>, get: () => State, set: (state: Partial<State>) => void): () => Promise<boolean> {
   let revision = ++restoreRevision
   const workspace = get().activeWorkspace
   const metadata = get().selectedOutputMeta
