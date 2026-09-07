@@ -1,26 +1,26 @@
 import { expect, test, type Request } from '@playwright/test'
 import { closeApp, gotoApp } from '../helpers/gotoApp'
 
+async function chooseLibraryFile(page: Parameters<typeof gotoApp>[0], filename: string) {
+  await page.getByRole('button', { name: 'From HocusPocus' }).click()
+  const explorer = page.getByRole('dialog').filter({ has: page.getByTestId('asset-explorer') })
+  await expect(explorer).toBeVisible()
+  await explorer.locator('button[title="' + filename + '"]').click()
+  await explorer.getByRole('button', { name: 'Choose', exact: true }).click()
+}
+
 async function openBackgroundRemovalTools(page: Parameters<typeof gotoApp>[0]) {
   await page.getByRole('button', { name: 'Direct generation', exact: true }).click()
   await page.getByRole('tab', { name: 'Tools', exact: true }).click()
   await page.getByRole('button', { name: 'Remove background', exact: true }).click()
-  const picker = page.getByRole('list', { name: 'Source Image', exact: true })
-  await expect(picker).toBeVisible()
-  await expect(picker.getByRole('button', { name: 'Select image hero.png', exact: true })).toBeVisible()
-  return picker
+  await expect(page.getByRole('button', { name: 'From HocusPocus' })).toBeVisible()
 }
 
 async function openUpscaleTools(page: Parameters<typeof gotoApp>[0]) {
   await page.getByRole('button', { name: 'Direct generation', exact: true }).click()
   await page.getByRole('tab', { name: 'Tools', exact: true }).click()
   await page.getByRole('button', { name: 'Upscale', exact: true }).click()
-  const picker = page.getByRole('list', { name: 'Source Media', exact: true })
-  await expect(picker).toBeVisible()
-  await expect(picker.locator('select')).toHaveCount(0)
-  await expect(picker.getByRole('button', { name: 'Select image hero.png', exact: true })).toBeVisible()
-  await expect(picker).toContainText('Image · 1920×1080')
-  return picker
+  await expect(page.getByRole('button', { name: 'From HocusPocus' })).toBeVisible()
 }
 
 function collectRequests(page: Parameters<typeof gotoApp>[0], pathname: string): Request[] {
@@ -37,12 +37,12 @@ test('runs Remove Background from direct Tools and exposes the derived asset', a
   const statuses = collectRequests(page, '/api/v1/status/tool-bg-e2e')
 
   try {
-    const picker = await openBackgroundRemovalTools(page)
+    await openBackgroundRemovalTools(page)
     const run = page.getByRole('button', { name: 'Remove Background', exact: true })
     await expect(run).toBeDisabled()
     await expect(page.getByRole('status')).toContainText('Choose an image from the library')
 
-    await picker.getByRole('button', { name: 'Select image hero.png', exact: true }).click()
+    await chooseLibraryFile(page, 'hero.png')
     await expect(page.getByRole('img', { name: 'hero.png', exact: true })).toBeVisible()
     await expect(run).toBeEnabled()
 
@@ -81,9 +81,7 @@ test('runs Remove Background from direct Tools and exposes the derived asset', a
     await page.getByRole('tab', { name: 'Tools', exact: true }).click()
     await page.getByRole('button', { name: 'Remove background', exact: true }).click()
     await page.getByRole('button', { name: 'Clear', exact: true }).click()
-    const reusablePicker = page.getByRole('list', { name: 'Source Image', exact: true })
-    await expect(reusablePicker.getByRole('button', { name: 'Select image hero-no-background.png', exact: true })).toBeVisible()
-    await reusablePicker.getByRole('button', { name: 'Select image hero-no-background.png', exact: true }).click()
+    await chooseLibraryFile(page, 'hero-no-background.png')
     await expect(page.locator('aside').getByRole('img', { name: 'hero-no-background.png', exact: true })).toBeVisible()
   } finally {
     await closeApp(page, session)
@@ -95,8 +93,8 @@ test('shows progress and lets the user cancel a Remove Background run', async ({
   const cancellations = collectRequests(page, '/api/v1/cancel/tool-bg-e2e')
 
   try {
-    const picker = await openBackgroundRemovalTools(page)
-    await picker.getByRole('button', { name: 'Select image hero.png', exact: true }).click()
+    await openBackgroundRemovalTools(page)
+    await chooseLibraryFile(page, 'hero.png')
     await page.getByRole('button', { name: 'Remove Background', exact: true }).click()
     await expect(page.getByRole('button', { name: 'Stop', exact: true })).toBeVisible({ timeout: 7_000 })
 
@@ -112,8 +110,8 @@ test('keeps a tool failure visible in the activity card', async ({ page }) => {
   const session = await gotoApp(page, { backgroundRemovalMode: 'fail' })
 
   try {
-    const picker = await openBackgroundRemovalTools(page)
-    await picker.getByRole('button', { name: 'Select image hero.png', exact: true }).click()
+    await openBackgroundRemovalTools(page)
+    await chooseLibraryFile(page, 'hero.png')
     await page.getByRole('button', { name: 'Remove Background', exact: true }).click()
     await expect(page.getByText('Generation Failed', { exact: true })).toBeVisible({ timeout: 7_000 })
     await expect(page.getByText('rembg test failure', { exact: true })).toBeVisible()
@@ -128,11 +126,11 @@ test('runs the shared Upscale action from an image and publishes a derived asset
   const statuses = collectRequests(page, '/api/v1/status/tool-upscale-e2e')
 
   try {
-    const picker = await openUpscaleTools(page)
+    await openUpscaleTools(page)
     const run = page.getByRole('button', { name: 'Upscale Clip', exact: true })
     await expect(run).toBeDisabled()
 
-    await picker.getByRole('button', { name: 'Select image hero.png', exact: true }).click()
+    await chooseLibraryFile(page, 'hero.png')
     await expect(page.getByRole('img', { name: 'hero.png', exact: true })).toBeVisible()
     const imageRun = page.getByRole('button', { name: 'Upscale Image', exact: true })
     await expect(imageRun).toBeEnabled()

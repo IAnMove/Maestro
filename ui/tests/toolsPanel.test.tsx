@@ -10,6 +10,7 @@ function installDom() {
     document: dom.window.document,
     HTMLElement: dom.window.HTMLElement,
     HTMLButtonElement: dom.window.HTMLButtonElement,
+    HTMLInputElement: dom.window.HTMLInputElement,
     HTMLImageElement: dom.window.HTMLImageElement,
     Event: dom.window.Event,
     MutationObserver: dom.window.MutationObserver,
@@ -20,7 +21,7 @@ function installDom() {
 
 installDom()
 
-test('Tools exposes exact library images for background removal', async () => {
+test('Tools exposes exact library images for background removal', { concurrency: false }, async () => {
   const { render, screen, waitFor, fireEvent, cleanup } = await import('@testing-library/react')
   const { ToolsPanel } = await import('../src/components/Sidebar/ToolsPanel.tsx')
   const { useStore } = await import('../src/stores/useStore.ts')
@@ -50,24 +51,23 @@ test('Tools exposes exact library images for background removal', async () => {
   } as never)
   try {
     render(<ToolsPanel />)
-    await waitFor(() => screen.getByRole('button', { name: 'Select image hero.png' }))
-    const picker = screen.getByRole('list', { name: 'Source Image' })
-    assert.equal(picker.querySelector('select'), null)
-    assert.match(picker.textContent || '', /Image · 1920×1080/)
+    await waitFor(() => screen.getByRole('button', { name: 'From HocusPocus' }))
     const runButton = screen.getByRole('button', { name: 'Remove Background' })
     assert.equal((runButton as HTMLButtonElement).disabled, true)
     assert.match(screen.getByRole('status').textContent || '', /Choose an image from the library/i)
-    assert.ok(screen.getByText('Upload an image'))
-    assert.ok(screen.getByRole('button', { name: 'Select image hero.png' }))
-
-    fireEvent.click(screen.getByRole('button', { name: 'Select image hero.png' }))
+    fireEvent.click(screen.getByRole('button', { name: 'From HocusPocus' }))
+    const explorer = await screen.findByTestId('asset-explorer')
+    assert.equal(explorer.querySelector('select'), null)
+    const cards = await screen.findAllByTitle('hero.png')
+    const card = cards.find((node: HTMLElement) => node.tagName === 'BUTTON') || cards[0]
+    fireEvent.click(card)
+    fireEvent.click(screen.getByRole('button', { name: 'Choose' }))
     assert.equal(useStore.getState().toolsSourceAssetId, 'asset-hero')
     assert.equal(useStore.getState().toolsSourcePath, 'hero.png')
     assert.equal(useStore.getState().toolsSourceKind, 'image')
     assert.equal(useStore.getState().toolsSourceWorkspace, 'default')
     const selectedPreview = screen.getByRole('img', { name: 'hero.png' })
     assert.match(selectedPreview.parentElement?.className || '', /linear-gradient/)
-    assert.equal(screen.getByRole('button', { name: 'Select image hero.png' }).getAttribute('aria-pressed'), 'true')
     assert.equal((runButton as HTMLButtonElement).disabled, false)
   } finally {
     cleanup()
@@ -75,7 +75,7 @@ test('Tools exposes exact library images for background removal', async () => {
   }
 })
 
-test('upscale accepts an image while revoice remains video-only', async () => {
+test('upscale accepts an image while revoice remains video-only', { concurrency: false }, async () => {
   const { render, screen, fireEvent, cleanup } = await import('@testing-library/react')
   const { ToolsPanel } = await import('../src/components/Sidebar/ToolsPanel.tsx')
   const { useStore } = await import('../src/stores/useStore.ts')
@@ -145,7 +145,7 @@ test('upscale accepts an image while revoice remains video-only', async () => {
   }
 })
 
-test('video tools can run only with a video source', async () => {
+test('video tools can run only with a video source', { concurrency: false }, async () => {
   const { render, screen, fireEvent, cleanup } = await import('@testing-library/react')
   const { ToolsPanel } = await import('../src/components/Sidebar/ToolsPanel.tsx')
   const { useStore } = await import('../src/stores/useStore.ts')
@@ -185,7 +185,7 @@ test('video tools can run only with a video source', async () => {
   }
 })
 
-test('Tools submits background removal only once while the request is pending', async () => {
+test('Tools submits background removal only once while the request is pending', { concurrency: false }, async () => {
   const { useStore } = await import('../src/stores/useStore.ts')
   const previousFetch = globalThis.fetch
   const previousSetInterval = globalThis.setInterval

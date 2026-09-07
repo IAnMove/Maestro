@@ -201,7 +201,7 @@ export function AssetExplorerDialog({
       open={open}
       title={title}
       onClose={onClose}
-      className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 p-4"
+      className="fixed inset-0 z-[130] flex items-center justify-center bg-black/70 p-4"
       onMouseDown={event => { if (event.target === event.currentTarget) onClose() }}
     >
       {open ? (

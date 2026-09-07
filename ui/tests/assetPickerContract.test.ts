@@ -3,7 +3,9 @@ import test from 'node:test'
 import type { AssetCatalogItem } from '../src/api/assets.ts'
 import type { ApiOutput } from '../src/api/outputs.ts'
 import {
+  catalogItemToOutput,
   catalogItemToPickerItem,
+  matchCatalogByOutput,
   checkCompatibility,
   confirmPickerChoice,
   createCatalogQuerySession,
@@ -36,6 +38,16 @@ function catalogItem(overrides: Partial<AssetCatalogItem> & Pick<AssetCatalogIte
     ...overrides,
   }
 }
+
+test('catalog items map to outputs and match back by name and url', () => {
+  const item = catalogItem({ id: 'asset-hero', filename: 'hero.png' })
+  const output = catalogItemToOutput(item, 'default')
+  assert.ok(output)
+  assert.equal(output?.name, 'hero.png')
+  assert.equal(output?.type, 'image')
+  assert.equal(output?.url, '/api/v1/file/hero.png')
+  assert.equal(matchCatalogByOutput([item], output!, 'default')?.id, 'asset-hero')
+})
 
 test('homonymous files in different workspaces keep distinct refs', () => {
   const alpha = catalogItemToPickerItem(catalogItem({
