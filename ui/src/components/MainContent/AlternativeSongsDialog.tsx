@@ -4,7 +4,6 @@ import { Loader2, Music2, Trash2, X } from 'lucide-react'
 import {
   attachAlternativeSong,
   fetchAlternativeSongs,
-  fetchOutputs,
   fetchVideoEditorExport,
   mountAlternativeSong,
   deleteAlternativeSong,
@@ -14,6 +13,8 @@ import {
 } from '../../api/client'
 import { useUiTranslation } from '../../i18n'
 import { useStore } from '../../stores/useStore'
+import { AssetInput } from '../../features/asset-picker/AssetInput.tsx'
+import { useWorkspaceOutputs } from '../../lib/studioAssetPick.ts'
 
 // Kept exported for the focused DOM contract test.
 // eslint-disable-next-line react-refresh/only-export-components
@@ -36,19 +37,14 @@ export function AlternativeSongsDialog({ name, onClose }: { name: string; onClos
   const loadOutputs = useStore(s => s.loadOutputs)
   const setMediaFilter = useStore(s => s.setMediaFilter)
   const [list, setList] = useState<AlternativeSongList | null>(null)
-  const [audio, setAudio] = useState<ApiOutput[]>([])
-  const [selectedAudio, setSelectedAudio] = useState('')
+  const [selectedAudio, setSelectedAudio] = useState<ApiOutput | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
+  const audioItems = useWorkspaceOutputs(workspace, 'audio')
 
   const reload = useCallback(async () => {
-    const [songs, outputs] = await Promise.all([
-      fetchAlternativeSongs(name, workspace),
-      fetchOutputs(80, 0, { workspace, mediaType: 'audio' }),
-    ])
+    const songs = await fetchAlternativeSongs(name, workspace)
     setList(songs)
-    setAudio(outputs.outputs)
-    if (outputs.outputs[0]) setSelectedAudio(current => current || outputs.outputs[0].name)
   }, [name, workspace])
 
   useEffect(() => {
@@ -96,7 +92,8 @@ export function AlternativeSongsDialog({ name, onClose }: { name: string; onClos
 
   const attach = () => run('attach', async () => {
     if (!selectedAudio) throw new Error(t('alternativeSongs.pickSong'))
-    await attachAlternativeSong(name, selectedAudio, workspace)
+    const scope = selectedAudio.workspace_id || workspace
+    await attachAlternativeSong(name, selectedAudio.name, scope)
   })
 
   const mount = (song: AlternativeSong) => run(`mount-${song.id}`, async () => {
@@ -142,17 +139,20 @@ export function AlternativeSongsDialog({ name, onClose }: { name: string; onClos
             </p>
           )}
 
-          <div className="flex gap-2">
-            <select
-              value={selectedAudio}
-              onChange={event => setSelectedAudio(event.target.value)}
-              className="min-w-0 flex-1 rounded-lg border border-border bg-bg-tertiary px-2 py-2 text-xs text-text-primary"
-            >
-              <option value="">{t('alternativeSongs.chooseSong')}</option>
-              {audio.map(item => (
-                <option key={item.name} value={item.name}>{item.name}</option>
-              ))}
-            </select>
+          <div className="flex gap-2 items-end">
+            <div className="min-w-0 flex-1">
+              <AssetInput
+                label={t('alternativeSongs.chooseSong')}
+                placeholder={t('alternativeSongs.chooseSong')}
+                items={audioItems}
+                value={selectedAudio ?? undefined}
+                accept="audio/*,.mp3,.wav,.flac,.ogg,.m4a,.aac"
+                workspaceId={workspace}
+                optional={Boolean(selectedAudio)}
+                constraints={{ kinds: ['audio'], maxCount: 1, optional: true }}
+                onChoose={item => setSelectedAudio(item)}
+              />
+            </div>
             <button
               type="button"
               onClick={() => void attach()}
