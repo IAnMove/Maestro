@@ -30,6 +30,7 @@ import { cameraEyeAtTime, cameraLookAtTime } from './camera.ts'
 import { scene3dClipLocalTime } from './clock.ts'
 import { cylinderUvOffset, isCylinderBackdrop, slotMountKey } from './backdrop.ts'
 import { scene3dSlotColor } from './document.ts'
+import { paintDrive } from './driveMotion.ts'
 import type { Scene3DClipCatalogEntry, Scene3DDocument, Scene3DLight, Scene3DSlot } from './types.ts'
 
 export const CYLINDER_RADIUS = 12
@@ -62,6 +63,10 @@ export type GpuWorld = {
   floor: Mesh
   dressing: Object3D | null
   dressingReady: boolean
+  driveWheels: Mesh[]
+  driveRoad: Texture | null
+  driveMovers: Object3D[]
+  driveSpeed: number
   slots: Map<string, SlotGpu>
 }
 
@@ -264,6 +269,8 @@ export function paintWorld(world: GpuWorld, document: Scene3DDocument, sceneSeco
   world.camera.lookAt(look[0], look[1], look[2])
   world.camera.updateProjectionMatrix()
   applyLoopOffset(world, sceneSeconds)
+  const bg = document.slots.find(isCylinderBackdrop)
+  paintDrive(world, sceneSeconds, bg?.loop?.speed ?? world.driveSpeed)
   for (const gpu of world.slots.values()) {
     if (!gpu.mixer) continue
     const clip = gpu.animations.find((_clip: { duration?: number }, index: number) => clipMatches(gpu, index))
@@ -334,7 +341,11 @@ export function createWorld(host: HTMLDivElement, light: Scene3DLight, fov: numb
   )
   floor.rotation.x = -Math.PI / 2
   scene.add(floor)
-  return { renderer, scene, camera, dir, floor, dressing: null, dressingReady: true, slots: new Map() }
+  return {
+    renderer, scene, camera, dir, floor, dressing: null, dressingReady: true,
+    driveWheels: [], driveRoad: null, driveMovers: [], driveSpeed: 0,
+    slots: new Map(),
+  }
 }
 
 export function disposeWorld(world: GpuWorld) {

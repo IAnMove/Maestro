@@ -8,6 +8,8 @@ import {
   type Object3D,
 } from 'three'
 import { cafeGroup, type CafeMaps } from './cafeSet.ts'
+import { driveGroup, isDriveDressing, type DriveMaps } from './driveSet.ts'
+import { clearDrive } from './driveMotion.ts'
 import type { GpuWorld } from './gpu.ts'
 import type { Scene3DDressing } from './types.ts'
 
@@ -60,11 +62,24 @@ function spaceGroup(): Object3D {
   return root
 }
 
-export function syncDressing(world: GpuWorld, kind: Scene3DDressing | undefined, maps?: CafeMaps) {
+export function syncDressing(
+  world: GpuWorld,
+  kind: Scene3DDressing | undefined,
+  maps?: { cafe?: CafeMaps; drive?: DriveMaps },
+) {
   dropDressing(world)
-  world.floor.visible = kind !== 'space' && kind !== 'treadmill' && kind !== 'cafe'
+  clearDrive(world)
+  world.floor.visible = kind !== 'space' && kind !== 'treadmill' && kind !== 'cafe' && !isDriveDressing(kind)
   if (kind === 'street') world.dressing = streetGroup()
   if (kind === 'space') world.dressing = spaceGroup()
-  if (kind === 'cafe') world.dressing = cafeGroup(maps ?? { facade: null, floor: null, back: null })
+  if (kind === 'cafe') world.dressing = cafeGroup(maps?.cafe ?? { facade: null, floor: null, back: null })
+  if (isDriveDressing(kind)) {
+    const built = driveGroup(kind, maps?.drive ?? { paint: null, glass: null, front: null, rear: null, road: null, building: null })
+    world.dressing = built.root
+    world.driveWheels = built.wheels
+    world.driveRoad = built.roadMap
+    world.driveMovers = built.movers
+    world.driveSpeed = 0.2
+  }
   if (world.dressing) world.scene.add(world.dressing)
 }

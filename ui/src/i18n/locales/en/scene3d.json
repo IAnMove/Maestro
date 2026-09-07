@@ -951,6 +951,9 @@
       "pursuit": "Pursuit / run",
       "side": "Side profile",
       "front": "Front set",
+      "chase": "Chase cam",
+      "hood": "Hood cam",
+      "wing": "Wing cam",
       "musical": "Musical orbit"
     },
     "template": {
@@ -968,7 +971,13 @@
       "walk-void": "Walk in the void",
       "dance-orbit": "Dance orbit",
       "dance-stage": "Dance stage",
-      "cafe-dance": "Cafe dance"
+      "cafe-dance": "Cafe dance",
+      "drive-chase": "Drive chase",
+      "drive-hood": "Drive hood",
+      "drive-wing": "Drive coast wing",
+      "drive-orbit": "Drive orbit",
+      "drive-tunnel": "Drive tunnel",
+      "drive-hero": "Drive with hero"
     }
   },
   "agent": {

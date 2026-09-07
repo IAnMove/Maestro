@@ -66,6 +66,9 @@ export function cameraLookAtTime(
   duration: number,
   slots: readonly Scene3DSlot[] = [],
 ): Vec3 {
+  if (camera.family === 'chase' || camera.family === 'hood' || camera.family === 'wing') {
+    return camera.family === 'hood' ? [0, 0.82, -14] : [0, 0.7, -0.55]
+  }
   if (camera.family === 'follow' || camera.family === 'pursuit' || camera.family === 'side' || camera.family === 'front') {
     return slotLook(slots, 'subject_1', camera.look)
   }
@@ -97,6 +100,17 @@ export function cameraEyeAtTime(
     const productHeight = camera.family === 'product' ? Math.min(height, 1.15) : height
     const musicalTurns = camera.family === 'musical' ? turns * 2 : turns
     return orbitEye(look, radius, productHeight, s * musicalTurns * Math.PI * 2)
+  }
+  if (camera.family === 'chase') {
+    const sway = Math.sin(sceneSeconds * 1.35) * 0.16
+    return [0.28 + sway, 1.18, 5.45]
+  }
+  if (camera.family === 'hood') {
+    const bump = Math.sin(sceneSeconds * 10) * 0.03
+    return [0, 1.04 + bump, -0.85]
+  }
+  if (camera.family === 'wing') {
+    return [5.15, 0.95, 1.65]
   }
   if (camera.family === 'front') {
     return [look[0], look[1] - 0.08, look[2] + 4.05]

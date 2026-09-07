@@ -11,6 +11,9 @@ export type Scene3DCameraFamily =
   | 'musical'
   | 'side'
   | 'front'
+  | 'chase'
+  | 'hood'
+  | 'wing'
 
 export type Scene3DSlotId = 'subject_1' | 'subject_2' | 'background' | 'prop'
 
@@ -30,6 +33,12 @@ export const SCENE3D_TEMPLATE_IDS = [
   'dance-orbit',
   'dance-stage',
   'cafe-dance',
+  'drive-chase',
+  'drive-hood',
+  'drive-wing',
+  'drive-orbit',
+  'drive-tunnel',
+  'drive-hero',
 ] as const
 
 export type Scene3DTemplateId = (typeof SCENE3D_TEMPLATE_IDS)[number]
@@ -46,7 +55,7 @@ export type Scene3DLoop = {
   speed: number
 }
 
-export type Scene3DDressing = 'none' | 'street' | 'space' | 'treadmill' | 'cafe'
+export type Scene3DDressing = 'none' | 'street' | 'space' | 'treadmill' | 'cafe' | 'drive-city' | 'drive-coast' | 'drive-tunnel'
 
 export type Scene3DSlot = {
   id: string

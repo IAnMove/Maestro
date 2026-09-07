@@ -951,6 +951,9 @@
       "pursuit": "Persecución / carrera",
       "side": "Perfil de lado",
       "front": "Set de frente",
+      "chase": "Cámara de persecución",
+      "hood": "Cámara de capó",
+      "wing": "Cámara de aleta",
       "musical": "Órbita musical"
     },
     "template": {
@@ -968,7 +971,13 @@
       "walk-void": "Caminar en el vacío",
       "dance-orbit": "Órbita de baile",
       "dance-stage": "Escenario de baile",
-      "cafe-dance": "Baile en la cafetería"
+      "cafe-dance": "Baile en la cafetería",
+      "drive-chase": "Persecución en coche",
+      "drive-hood": "Capó en marcha",
+      "drive-wing": "Costa en perfil",
+      "drive-orbit": "Órbita en marcha",
+      "drive-tunnel": "Túnel en marcha",
+      "drive-hero": "Héroe al volante"
     }
   },
   "agent": {

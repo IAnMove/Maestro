@@ -3,6 +3,7 @@ import { TextureLoader } from 'three'
 import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js'
 import { adoptCafeMaps, loadCafeMaps } from './cafeSet.ts'
 import { syncDressing } from './dressing.ts'
+import { adoptDriveMaps, isDriveDressing, loadDriveMaps } from './driveSet.ts'
 import {
   applyLight,
   catalogFromClips,
@@ -162,20 +163,30 @@ export const Scene3DStage = forwardRef<Scene3DStageHandle, Props>(function Scene
   useEffect(() => {
     const world = worldRef.current
     if (!world) return
-    if (document.dressing !== 'cafe') {
-      world.dressingReady = true
-      syncDressing(world, document.dressing)
-      return
+    if (document.dressing === 'cafe') {
+      world.dressingReady = false
+      syncDressing(world, 'cafe')
+      let gone = false
+      void loadCafeMaps().then(maps => {
+        if (!adoptCafeMaps(maps, () => !gone && worldRef.current === world)) return
+        syncDressing(world, 'cafe', { cafe: maps })
+        world.dressingReady = true
+      })
+      return () => { gone = true }
     }
-    world.dressingReady = false
-    syncDressing(world, 'cafe')
-    let gone = false
-    void loadCafeMaps().then(maps => {
-      if (!adoptCafeMaps(maps, () => !gone && worldRef.current === world)) return
-      syncDressing(world, 'cafe', maps)
-      world.dressingReady = true
-    })
-    return () => { gone = true }
+    if (isDriveDressing(document.dressing)) {
+      world.dressingReady = false
+      syncDressing(world, document.dressing)
+      let gone = false
+      void loadDriveMaps().then(maps => {
+        if (!adoptDriveMaps(maps, () => !gone && worldRef.current === world)) return
+        syncDressing(world, document.dressing, { drive: maps })
+        world.dressingReady = true
+      })
+      return () => { gone = true }
+    }
+    world.dressingReady = true
+    syncDressing(world, document.dressing)
   }, [document.dressing])
 
   useEffect(() => {
