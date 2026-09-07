@@ -64,12 +64,69 @@ test('the 3D Video library dialog paginates saved scenes and opens a previewed p
     render(<SceneLibraryDialog open workspace="default" onClose={() => undefined} onPickFile={() => undefined} onOpenScene={scene => opened.push(scene.name)} />)
     await waitFor(() => assert.ok(screen.getAllByText('Station loop 0').length >= 1))
     assert.match(screen.getByText(/saved · page/).textContent || '', /9 saved · page 1 \/ 2/)
+    assert.equal(screen.queryByRole('button', { name: 'Open scene' }), null)
     fireEvent.click(screen.getByLabelText('Next page'))
     await waitFor(() => assert.ok(screen.getAllByText('Station loop 8').length >= 1))
     fireEvent.click(screen.getByLabelText('Previous page'))
     await waitFor(() => assert.ok(screen.getAllByText('Station loop 0').length >= 1))
-    fireEvent.click(screen.getByRole('button', { name: 'Open in 3D Video' }))
+    fireEvent.doubleClick(screen.getAllByText('Station loop 0')[0])
+    assert.deepEqual(opened, [])
+    fireEvent.click(screen.getAllByText('Station loop 0')[0])
+    fireEvent.click(screen.getByRole('button', { name: 'Open scene' }))
     await waitFor(() => assert.deepEqual(opened, ['Station loop 0']))
+  } finally {
+    cleanup()
+    globalThis.fetch = originalFetch
+  }
+})
+
+test('closing the library before a scene fetch settles does not replace the current project', { concurrency: false }, async () => {
+  const { render, screen, fireEvent, waitFor, cleanup } = await import('@testing-library/react')
+  const { SceneLibraryDialog } = await import('../src/components/Sidebar/SceneLibraryDialog.tsx')
+  const originalFetch = globalThis.fetch
+  const sceneFile = {
+    name: '2026-08-25-22h21m00s_Station-loop-0_aaaaaa.scene.json',
+    type: 'scene',
+    mode: null,
+    size: 12,
+    created_at: 1000,
+    url: '/api/v1/file/scene-0.scene.json',
+    thumbnail_url: '/api/v1/file/scene-0.scene.preview.png',
+  }
+  const sampleScene = {
+    version: 1,
+    name: 'Station loop 0',
+    width: 1280,
+    height: 720,
+    duration: 10,
+    layers: [{
+      id: 'plate', name: 'Plate', type: 'image', source: '/api/v1/file/plate.jpg', visible: true, z: 0,
+      transform: { x: 50, y: 50, scale: 1, opacity: 1 },
+      animation: { start: { x: 50, y: 50, scale: 1 }, end: { x: 50, y: 50, scale: 1 }, duration: 10, curve: 'linear' },
+    }],
+  }
+  let releaseScene: ((value: Response) => void) | undefined
+  const sceneGate = new Promise<Response>(resolve => { releaseScene = resolve })
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    const url = String(input)
+    if (url.includes('/api/v1/outputs') && url.includes('media_type=scene')) {
+      return new Response(JSON.stringify({ outputs: [sceneFile], total: 1 }), { headers: { 'content-type': 'application/json' } })
+    }
+    if (url.includes('/api/v1/file/scene-0.scene.json')) return sceneGate
+    throw new Error(`Unexpected request: ${url}`)
+  }) as typeof fetch
+  const opened: string[] = []
+  try {
+    const view = render(<SceneLibraryDialog open workspace="default" onClose={() => undefined} onPickFile={() => undefined} onOpenScene={scene => opened.push(scene.name)} />)
+    await waitFor(() => assert.ok(screen.getAllByText('Station loop 0').length >= 1))
+    fireEvent.click(screen.getAllByText('Station loop 0')[0])
+    fireEvent.click(screen.getByRole('button', { name: 'Open scene' }))
+    view.rerender(<SceneLibraryDialog open={false} workspace="default" onClose={() => undefined} onPickFile={() => undefined} onOpenScene={scene => opened.push(scene.name)} />)
+    view.rerender(<SceneLibraryDialog open workspace="default" onClose={() => undefined} onPickFile={() => undefined} onOpenScene={scene => opened.push(scene.name)} />)
+    releaseScene?.(new Response(JSON.stringify(sampleScene), { headers: { 'content-type': 'application/json' } }))
+    await Promise.resolve()
+    await Promise.resolve()
+    assert.deepEqual(opened, [])
   } finally {
     cleanup()
     globalThis.fetch = originalFetch
