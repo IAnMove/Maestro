@@ -67,7 +67,19 @@
     "typeAudio": "Audio",
     "typeScene": "Escena",
     "typeComic": "Cómic",
-    "typeDocument": "Documento"
+    "typeDocument": "Documento",
+    "sortLabel": "Orden",
+    "sortCreatedDesc": "Más recientes",
+    "sortCreatedAsc": "Más antiguos",
+    "sortNameAsc": "Nombre A–Z",
+    "sortNameDesc": "Nombre Z–A",
+    "kindFilter": "Tipo",
+    "kindAll": "Todos los tipos compatibles",
+    "loading": "Cargando recursos…",
+    "loadFailed": "No se pudieron cargar los recursos.",
+    "retry": "Reintentar",
+    "noResults": "Ningún recurso coincide con esta búsqueda.",
+    "filteredHidden": "El recurso seleccionado está oculto por el filtro actual."
   },
   "picker": {
     "unknownDate": "Fecha desconocida",

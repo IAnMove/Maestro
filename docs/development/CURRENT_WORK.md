@@ -1,6 +1,6 @@
 # Estado de desarrollo y punto de entrada
 
-Verificado el 7 de septiembre de 2026 contra `origin/development` **`6e7fa3fa`**.
+Verificado el 7 de septiembre de 2026 contra `origin/development` **`f1855ab7`**.
 Es una fotografía con evidencia, no un sustituto de Git. Antes de reservar trabajo:
 `git fetch origin development`, consultar PR abiertos y comprobar sus archivos.
 
@@ -33,6 +33,7 @@ no autorizan acciones ni representan el estado actual.
 | Plantillas musicales vídeo 3D | #204 | Cámara `side` y plantillas de videoclip; `Scene3DWorkspace` ya no está reservado por un PR abierto |
 | Copy i18n de Vídeo 3D / compositor | #205 | No cubre todo el chrome restante del laboratorio de plantillas |
 | Inventario selector universal | #206 | Contrato e inventario; no implementa el picker |
+| Contrato selector (PR 1) | #207, merge `f1855ab7` | Identidad, sort/paginación y adapters. No es el modal transaccional |
 
 La integración es en **development**. No implica que el servidor local esté usando
 esa revisión ni que exista una publicación de aplicación en main.
@@ -43,10 +44,10 @@ Al cerrar esta revisión el taller de habla (#200), la limpieza documental
 (#199) y el contrato attemptId (#201) ya están integrados. Escenas 3D reales
 (#198) se mezcló en development el 07/09 (`fae7d3f6`). Estado por dominio:
 
-- **Selector universal de recursos (PR 1)**: contrato, adaptadores e identidad
-  por ID/ubicación, consulta paginada/ordenada del catálogo. PR
-  [#207](https://github.com/IAnMove/hocuspocus/pull/207), rama
-  `feat/asset-picker-contract`. Inventario #206 ya integrado. Cursor: no ejecutada (cuota). No mezclar hasta que lo pidan.
+- **Selector universal de recursos (PR 2)**: modal común transaccional sobre
+  `AssetExplorerDialog`. PR [#208](https://github.com/IAnMove/hocuspocus/pull/208),
+  rama `feat/asset-picker-modal`. Contrato #207 ya integrado. Cursor: no
+  ejecutada (cuota). No mezclar hasta que lo pidan.
 - **Vídeo procedural**: conservar el checkpoint `work/procedural-video-pilot-checkpoint`;
   consultar [PROCEDURAL_VIDEO_ROADMAP](PROCEDURAL_VIDEO_ROADMAP.md) y el documento del
   subdominio asignado. No mezclar el checkpoint en bloque ni asumir que todo su

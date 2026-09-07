@@ -1,11 +1,23 @@
 import { useMemo, useState } from 'react'
-import { Box, ChevronLeft, ChevronRight, FileAudio, FolderOpen, Image as ImageIcon, Video, X } from 'lucide-react'
+import { FolderOpen, X } from 'lucide-react'
 import type { ApiOutput } from '../../api/outputs'
+import type { AssetKind } from '../../api/assets'
+import {
+  ASSET_PICKER_PAGE_SIZE,
+  checkCompatibility,
+  filterPickerItems,
+  isSameRef,
+  outputToPickerItem,
+  paginatePickerItems,
+  sortPickerItems,
+  type AssetConstraints,
+  type CatalogSort,
+  type PickerItem,
+} from '../../features/asset-picker'
 import { useUiTranslation } from '../../i18n'
+import { ExplorerFooter, ExplorerGallery, ExplorerPreview, ExplorerToolbar } from './AssetExplorerChrome.tsx'
 import { assetPreviewUrl, formatAssetDate } from './assetExplorer.ts'
 import { ModalShell } from './ModalShell'
-
-const PAGE_SIZE = 12
 
 export function AssetPickTrigger({
   label,
@@ -49,17 +61,28 @@ type BodyProps = {
   selectedName?: string
   allowNone?: boolean
   noneLabel?: string
+  workspaceId?: string
+  constraints?: AssetConstraints
+  status?: 'ready' | 'loading' | 'error'
+  onRetry?: () => void
   onChoose: (item: ApiOutput | null) => void
   onClose: () => void
 }
 
-function explorerTypeKey(type: ApiOutput['type']) {
-  if (type === 'model3d') return 'explorer.typeModel' as const
-  if (type === 'video') return 'explorer.typeVideo' as const
-  if (type === 'audio') return 'explorer.typeAudio' as const
-  if (type === 'scene') return 'explorer.typeScene' as const
-  if (type === 'comic') return 'explorer.typeComic' as const
-  return 'explorer.typeImage' as const
+function compatibleKinds(items: PickerItem[], constraints?: AssetConstraints) {
+  const present = [...new Set(items.map(item => item.kind))]
+  return constraints?.kinds?.length ? present.filter(kind => constraints.kinds.includes(kind)) : present
+}
+
+function confirmOutput(items: ApiOutput[], item: PickerItem | null, onChoose: (item: ApiOutput | null) => void, onClose: () => void) {
+  if (item) {
+    const output = items.find(entry => entry.name === item.filename)
+    if (!output) return
+    onChoose(output)
+  } else {
+    onChoose(null)
+  }
+  onClose()
 }
 
 function AssetExplorerBody({
@@ -69,29 +92,33 @@ function AssetExplorerBody({
   selectedName,
   allowNone,
   noneLabel,
+  workspaceId,
+  constraints,
+  status = 'ready',
+  onRetry,
   onChoose,
   onClose,
 }: BodyProps) {
   const { t } = useUiTranslation('common')
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(0)
-  const [selected, setSelected] = useState<ApiOutput | null>(
-    () => items.find(item => item.name === selectedName) ?? items[0] ?? null,
+  const [sort, setSort] = useState<CatalogSort>('created_desc')
+  const [kind, setKind] = useState<AssetKind | ''>('')
+  const pickerItems = useMemo(
+    () => items.map(item => outputToPickerItem(item, workspaceId || '')),
+    [items, workspaceId],
   )
-  const filtered = useMemo(() => {
-    const needle = query.trim().toLowerCase()
-    if (!needle) return items
-    return items.filter(item => item.name.toLowerCase().includes(needle) || item.type.includes(needle))
-  }, [items, query])
-  const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
-  const safePage = Math.min(page, pages - 1)
-  const visible = filtered.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE)
-  const preview = selected ? assetPreviewUrl(selected) : ''
-
-  const choose = (item: ApiOutput | null) => {
-    onChoose(item)
-    onClose()
-  }
+  const [picked, setPicked] = useState<PickerItem | null>(null)
+  const selected = picked ?? pickerItems.find(item => item.filename === selectedName) ?? null
+  const filtered = useMemo(
+    () => sortPickerItems(filterPickerItems(pickerItems, query, kind ? [kind] : constraints?.kinds), sort),
+    [constraints, kind, pickerItems, query, sort],
+  )
+  const { pages, safePage, visible } = paginatePickerItems(filtered, page, ASSET_PICKER_PAGE_SIZE)
+  const compatibility = selected && constraints ? checkCompatibility(selected, constraints, 0) : { allowed: true as const }
+  const stillInCatalog = selected ? pickerItems.some(item => isSameRef(item.ref, selected.ref)) : false
+  const selectedStillVisible = selected ? filtered.some(item => isSameRef(item.ref, selected.ref)) : true
+  const emptyLabel = pickerItems.length && query.trim() ? t('explorer.noResults') : t('explorer.empty')
 
   return (
     <div
@@ -111,93 +138,47 @@ function AssetExplorerBody({
           <X size={13} />
         </button>
       </div>
-      <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2">
-        <input
-          type="search"
-          value={query}
-          onChange={event => { setQuery(event.target.value); setPage(0) }}
-          placeholder={t('explorer.search')}
-          className="min-w-48 flex-1 rounded border border-border bg-bg-primary px-2 py-1.5 text-xs text-text-primary"
-        />
-        {allowNone && (
-          <button type="button" onClick={() => choose(null)} className="rounded border border-border px-2 py-1 text-[10px] text-text-secondary">
-            {noneLabel ?? t('explorer.none')}
-          </button>
-        )}
-      </div>
+      <ExplorerToolbar
+        query={query}
+        kind={kind}
+        kinds={compatibleKinds(pickerItems, constraints)}
+        sort={sort}
+        allowNone={allowNone}
+        noneLabel={noneLabel}
+        onQuery={value => { setQuery(value); setPage(0) }}
+        onKind={value => { setKind(value); setPage(0) }}
+        onSort={value => { setSort(value); setPage(0) }}
+        onClear={() => confirmOutput(items, null, onChoose, onClose)}
+      />
       <div className="grid min-h-0 flex-1 gap-3 overflow-hidden p-4 md:grid-cols-[minmax(0,1fr)_240px]">
         <div className="min-h-0 overflow-y-auto">
-          {visible.length ? (
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-              {visible.map(item => {
-                const thumb = assetPreviewUrl(item)
-                return (
-                  <button
-                    key={item.name}
-                    type="button"
-                    title={item.name}
-                    onClick={() => setSelected(item)}
-                    onDoubleClick={() => choose(item)}
-                    className={`overflow-hidden rounded-lg border text-left ${selected?.name === item.name ? 'border-accent-blue ring-1 ring-accent-blue/40' : 'border-border hover:border-accent-blue/50'}`}
-                  >
-                    <div className="flex aspect-square items-center justify-center bg-black/40">
-                      {thumb ? (
-                        <img src={thumb} alt="" className="h-full w-full object-cover" loading="lazy" />
-                      ) : item.type === 'model3d' ? (
-                        <Box size={22} className="text-cyan-200" />
-                      ) : item.type === 'video' ? (
-                        <Video size={22} className="text-text-muted" />
-                      ) : item.type === 'audio' ? (
-                        <FileAudio size={22} className="text-amber-200" />
-                      ) : (
-                        <ImageIcon size={22} className="text-text-muted" />
-                      )}
-                    </div>
-                    <div className="truncate px-1.5 pt-1 text-[9px] text-text-secondary">{item.name}</div>
-                    <div className="truncate px-1.5 pb-1 text-[8px] text-text-muted">{formatAssetDate(item)}</div>
-                  </button>
-                )
-              })}
-            </div>
-          ) : (
-            <p className="py-16 text-center text-[11px] text-text-muted">{t('explorer.empty')}</p>
-          )}
+          <ExplorerGallery
+            status={status}
+            visible={visible}
+            selected={selected}
+            emptyLabel={emptyLabel}
+            onRetry={onRetry}
+            onPick={setPicked}
+          />
         </div>
         <aside className="flex min-h-[200px] flex-col rounded-lg border border-border bg-bg-tertiary p-2">
-          {selected ? (
-            <>
-              <div className="flex aspect-video items-center justify-center overflow-hidden rounded bg-black/50">
-                {preview ? (
-                  <img src={preview} alt={t('explorer.previewAria', { name: selected.name })} className="h-full w-full object-contain" />
-                ) : selected.type === 'model3d' ? (
-                  <Box size={36} className="text-cyan-200" />
-                ) : selected.type === 'audio' ? (
-                  <FileAudio size={36} className="text-amber-200" />
-                ) : (
-                  <Video size={36} className="text-text-muted" />
-                )}
-              </div>
-              <div className="mt-2 break-all text-[11px] font-medium text-text-primary">{selected.name}</div>
-              <div className="mt-0.5 text-[9px] text-text-muted">
-                {t(explorerTypeKey(selected.type))} · {t('explorer.created', { date: formatAssetDate(selected) || '—' })}
-              </div>
-              <button type="button" onClick={() => choose(selected)} className="mt-auto rounded bg-accent-blue px-2 py-1.5 text-[10px] text-white">
-                {t('explorer.choose')}
-              </button>
-            </>
-          ) : (
-            <p className="m-auto text-center text-[10px] text-text-muted">{t('explorer.selectHint')}</p>
-          )}
+          <ExplorerPreview
+            selected={selected}
+            selectedStillVisible={selectedStillVisible}
+            compatibility={compatibility}
+          />
         </aside>
       </div>
-      <div className="flex items-center justify-between gap-2 border-t border-border px-4 py-2">
-        <span className="text-[10px] text-text-muted">{t('explorer.page', { shown: visible.length, total: filtered.length })}</span>
-        <div className="flex gap-1">
-          <button type="button" onClick={onClose} className="rounded border border-border px-2 py-1 text-[10px] text-text-secondary">{t('actions.cancel')}</button>
-          <button type="button" aria-label={t('explorer.previousPage')} disabled={safePage <= 0} onClick={() => setPage(value => Math.max(0, value - 1))} className="rounded border border-border p-1.5 disabled:opacity-30"><ChevronLeft size={13} /></button>
-          <button type="button" aria-label={t('explorer.nextPage')} disabled={safePage + 1 >= pages} onClick={() => setPage(value => value + 1)} className="rounded border border-border p-1.5 disabled:opacity-30"><ChevronRight size={13} /></button>
-        </div>
-      </div>
+      <ExplorerFooter
+        shown={visible.length}
+        total={filtered.length}
+        safePage={safePage}
+        pages={pages}
+        canConfirm={Boolean(selected) && compatibility.allowed && stillInCatalog}
+        onCancel={onClose}
+        onPage={setPage}
+        onConfirm={() => selected && confirmOutput(items, selected, onChoose, onClose)}
+      />
     </div>
   )
 }
@@ -216,7 +197,14 @@ export function AssetExplorerDialog({
       className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 p-4"
       onMouseDown={event => { if (event.target === event.currentTarget) onClose() }}
     >
-      {open ? <AssetExplorerBody key={`${title}:${body.selectedName ?? ''}:${body.items.length}`} title={title} onClose={onClose} {...body} /> : null}
+      {open ? (
+        <AssetExplorerBody
+          key={`${title}:${body.selectedName ?? ''}`}
+          title={title}
+          onClose={onClose}
+          {...body}
+        />
+      ) : null}
     </ModalShell>
   )
 }
