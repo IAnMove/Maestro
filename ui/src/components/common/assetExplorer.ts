@@ -1,9 +1,11 @@
 import type { ApiOutput } from '../../api/outputs'
 import { formatCreatedDate, knownCreatedAt } from '../../features/asset-picker/titles.ts'
+import { isOverlayFilename } from '../../lib/sceneLayerSource.ts'
 
 export type AssetExplorerPurpose =
   | 'layer-model'
   | 'layer-media'
+  | 'layer-overlay'
   | 'narrative-hero'
   | 'narrative-plate'
   | 'narrative-prop'
@@ -11,7 +13,7 @@ export type AssetExplorerPurpose =
   | 'scene-audio'
 
 export type ExplorerChoiceHandlers = {
-  addLayer: (type: 'model3d' | 'video' | 'image', url: string, name: string, thumbnail?: string) => void
+  addLayer: (type: 'model3d' | 'video' | 'image' | 'overlay', url: string, name: string, thumbnail?: string) => void
   setHero: (name: string) => void
   setPlate: (name: string) => void
   setProp: (name: string) => void
@@ -37,6 +39,7 @@ export function assetsForExplorer(
   audio: ApiOutput[],
 ): ApiOutput[] {
   if (purpose === 'layer-model') return models
+  if (purpose === 'layer-overlay') return media.filter(item => item.type === 'image' && isOverlayFilename(item.name))
   if (purpose === 'layer-media' || purpose === 'narrative-plate' || purpose === 'narrative-foreground') return media
   if (purpose === 'scene-audio') return audio
   return visuals
@@ -47,6 +50,7 @@ export function explorerTitleKey(
 ): 'animator.generatedModels' | 'animator.generatedMedia' | 'animator.chooseAudio' | 'animator.chooseAsset' {
   if (purpose === 'layer-model') return 'animator.generatedModels'
   if (purpose === 'layer-media') return 'animator.generatedMedia'
+  if (purpose === 'layer-overlay') return 'animator.chooseAsset'
   if (purpose === 'scene-audio') return 'animator.chooseAudio'
   return 'animator.chooseAsset'
 }
@@ -73,6 +77,10 @@ export function applyExplorerChoice(
 ): void {
   if (purpose === 'layer-model' && item) {
     handlers.addLayer('model3d', item.url, item.name, item.thumbnail_url ?? undefined)
+    return
+  }
+  if (purpose === 'layer-overlay' && item) {
+    handlers.addLayer('overlay', item.url, item.name, item.thumbnail_url ?? undefined)
     return
   }
   if (purpose === 'layer-media' && item) {
