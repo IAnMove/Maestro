@@ -950,6 +950,7 @@
       "encounter": "Two-shot / OTS",
       "pursuit": "Pursuit / run",
       "side": "Side profile",
+      "front": "Front set",
       "musical": "Musical orbit"
     },
     "template": {
@@ -966,7 +967,8 @@
       "space-float": "Space float",
       "walk-void": "Walk in the void",
       "dance-orbit": "Dance orbit",
-      "dance-stage": "Dance stage"
+      "dance-stage": "Dance stage",
+      "cafe-dance": "Cafe dance"
     }
   },
   "agent": {
