@@ -379,6 +379,14 @@ class MiniMaxH3Pipeline:
         self._interrupt = False
         self._early_stop = False
 
+    def finalize_loras(self):
+        """Keep native ConvRot math after MMGP 3.7.6 installs Linear LoRA hooks."""
+        from shared.qtypes.int8_convrot import install_native_lora_forwards
+
+        installed = install_native_lora_forwards(self.transformer)
+        if installed:
+            print(f"[H3 Advanced LoRA] Preserved native ConvRot activation math for {installed} adapter-targeted layer(s).")
+
     def set_offload_handoff(self, shared_offloadobj, private_offloadobj):
         self._shared_offloadobj = shared_offloadobj
         self._private_offloadobj = private_offloadobj
