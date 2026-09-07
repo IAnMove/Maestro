@@ -1,8 +1,11 @@
 import { useEffect, useMemo } from 'react'
-import { ImagePlus, Upload, X } from 'lucide-react'
+import { X } from 'lucide-react'
 import * as api from '../../api/client'
 import { useStore } from '../../stores/useStore'
 import { useUiTranslation } from '../../i18n'
+import type { ApiOutput } from '../../api/outputs'
+import { AssetInput } from '../../features/asset-picker/AssetInput.tsx'
+import { studioMediaPath, useWorkspaceOutputs } from '../../lib/studioAssetPick.ts'
 
 function useAssetPreview(file: File | null, path: string | null) {
   const url = useMemo(
@@ -16,56 +19,38 @@ function useAssetPreview(file: File | null, path: string | null) {
   return url
 }
 
-function ClipDropZone({ file, path, onFile, onClear }: {
-  file: File | null
-  path: string | null
-  onFile: (f: File) => void
-  onClear: () => void
-}) {
-  const { t } = useUiTranslation('studio')
-  const previewUrl = useAssetPreview(file, path)
-  return (
-    <div
-      className="relative border border-dashed border-border rounded-lg p-2 flex items-center justify-center gap-1 cursor-pointer hover:border-border-light transition-colors min-h-[60px]"
-      onDrop={e => {
-        e.preventDefault()
-        const f = e.dataTransfer.files[0]
-        if (f && f.type.startsWith('image/')) onFile(f)
-      }}
-      onDragOver={e => e.preventDefault()}
-      onClick={() => {
-        const input = document.createElement('input')
-        input.type = 'file'
-        input.accept = 'image/*'
-        input.onchange = (ev) => {
-          const f = (ev.target as HTMLInputElement).files?.[0]
-          if (f) onFile(f)
-        }
-        input.click()
-      }}
-    >
-      {previewUrl ? (
-        <>
-          <img
-            src={previewUrl}
-            alt="clip"
-            className="w-full h-full object-cover rounded absolute inset-0"
-          />
-          <button
-            onClick={e => { e.stopPropagation(); onClear() }}
-            className="absolute top-1 right-1 bg-bg-primary/80 rounded-full p-0.5 hover:bg-bg-hover z-10"
-          >
-            <X size={10} />
-          </button>
-        </>
-      ) : (
-        <>
-          <Upload size={14} className="text-text-muted" />
-          <span className="text-[10px] text-text-muted">{t('multiClip.startImage')}</span>
-        </>
-      )}
-    </div>
-  )
+function imageOutputFromPath(path: string | null, workspace: string): ApiOutput | undefined {
+  if (!path) return undefined
+  const name = path.replace(/\\/g, '/').split('/').pop() || path
+  const url = api.getStoredAssetUrl(path)
+  return {
+    name,
+    type: 'image',
+    mode: null,
+    size: 0,
+    created_at: 0,
+    url,
+    thumbnail_url: url,
+    workspace_id: workspace,
+    path,
+  }
+}
+
+function imageOutputFromClip(file: File | null, path: string | null, workspace: string): ApiOutput | undefined {
+  const fromPath = imageOutputFromPath(path, workspace)
+  if (fromPath) return fromPath
+  if (!file) return undefined
+  return {
+    name: file.name,
+    type: 'image',
+    mode: null,
+    size: file.size,
+    created_at: 0,
+    url: '',
+    thumbnail_url: '',
+    workspace_id: workspace,
+    path: '',
+  }
 }
 
 export function MultiClipEditor() {
@@ -81,7 +66,26 @@ export function MultiClipEditor() {
   const addClipKeyframe = useStore(s => s.addClipKeyframe)
   const removeClipKeyframe = useStore(s => s.removeClipKeyframe)
   const slidingWindowSeconds = useStore(s => s.slidingWindowSeconds)
+  const activeWorkspace = useStore(s => s.activeWorkspace)
+  const imageItems = useWorkspaceOutputs(activeWorkspace, 'image')
   const openIndex = focusedClipIndex
+
+  const chooseStart = (clipIndex: number, item: ApiOutput | null) => {
+    const live = useStore.getState().clips
+    if (!live[clipIndex]) return
+    if (!item) {
+      setClipStartImage(clipIndex, null)
+      return
+    }
+    setClipStartImage(clipIndex, null, studioMediaPath(item))
+  }
+
+  const chooseKeyframe = (clipIndex: number, item: ApiOutput | null) => {
+    if (!item) return
+    const live = useStore.getState().clips
+    if (!live[clipIndex]) return
+    addClipKeyframe(clipIndex, null, studioMediaPath(item))
+  }
 
   if (clips.length === 0) return null
 
@@ -117,32 +121,34 @@ export function MultiClipEditor() {
             </button>
             {openIndex !== i ? null : (
             <>
-            <ClipDropZone
-              file={clip.startImage}
-              path={clip.startImagePath}
-              onFile={f => setClipStartImage(i, f)}
-              onClear={() => setClipStartImage(i, null)}
+            <AssetInput
+              label={t('multiClip.startImage')}
+              placeholder={t('multiClip.startImage')}
+              items={imageItems}
+              value={imageOutputFromClip(clip.startImage, clip.startImagePath, activeWorkspace)}
+              accept="image/*"
+              workspaceId={activeWorkspace}
+              optional={Boolean(clip.startImagePath || clip.startImage)}
+              constraints={{ kinds: ['image'], maxCount: 1, optional: true }}
+              onChoose={item => chooseStart(i, item)}
             />
 
             <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 <span className="text-[10px] uppercase tracking-wider text-text-muted">
                   {t('multiClip.keyframes', { count: clip.keyframes.length })}
                 </span>
-                <label className="inline-flex cursor-pointer items-center gap-1 rounded border border-border px-1.5 py-1 text-[10px] text-text-secondary hover:border-border-light">
-                  <ImagePlus size={12} />
-                  {tCommon('actions.add')}
-                  <input
-                    type="file"
+                <div className="min-w-[8rem]">
+                  <AssetInput
+                    label={tCommon('actions.add')}
+                    placeholder={tCommon('actions.add')}
+                    items={imageItems}
                     accept="image/*"
-                    className="hidden"
-                    onChange={event => {
-                      const file = event.target.files?.[0]
-                      if (file) addClipKeyframe(i, file)
-                      event.currentTarget.value = ''
-                    }}
+                    workspaceId={activeWorkspace}
+                    constraints={{ kinds: ['image'], maxCount: 1, optional: false }}
+                    onChoose={item => chooseKeyframe(i, item)}
                   />
-                </label>
+                </div>
               </div>
               {clip.keyframes.length > 0 && (
                 <div className="grid grid-cols-4 gap-1.5">
