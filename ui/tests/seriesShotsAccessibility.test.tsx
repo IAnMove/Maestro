@@ -22,6 +22,10 @@ function installDom() {
 
 installDom()
 
+const originalFetch = globalThis.fetch
+globalThis.fetch = (async () => new Response(JSON.stringify({ outputs: [], total: 0 }), { headers: { 'content-type': 'application/json' } })) as typeof fetch
+test.after(() => { globalThis.fetch = originalFetch })
+
 test('Series Shots controls have programmatic names and selection state', async () => {
   const { render, screen, fireEvent, cleanup } = await import('@testing-library/react')
   const { ensureUiI18n } = await import('../src/i18n/index.ts')
@@ -64,7 +68,9 @@ test('Series Shots controls have programmatic names and selection state', async 
   assert.ok(screen.getByRole('textbox', { name: t('shots.promptAria', { order: 1 }) }))
   assert.ok(screen.getByRole('checkbox', { name: t('shots.includeAria', { id: 'asset-1', order: 1 }) }))
   assert.ok(screen.getByRole('checkbox', { name: t('shots.excludeAria', { id: 'asset-1', order: 1 }) }))
-  assert.ok(screen.getByLabelText(t('shots.composedStart')))
-  assert.ok(screen.getByLabelText(t('shots.composedEnd')))
+  assert.ok(screen.getByRole('button', { name: t('shots.composedStart') }))
+  assert.ok(screen.getByRole('button', { name: t('shots.composedEnd') }))
+  assert.equal(screen.getAllByRole('button', { name: 'From HocusPocus' }).length, 2)
+  assert.equal(screen.getAllByRole('button', { name: 'From my computer' }).length, 2)
   cleanup()
 })

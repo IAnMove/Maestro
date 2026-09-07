@@ -24,7 +24,7 @@
     "name": "New character name",
     "baseImage": "Base image",
     "importBase": "Upload base and create draft",
-    "importHint": "PNG, JPEG or WebP, up to 20 MiB. Choosing a file does not upload it. Upload creates a pending base, not an approved character. Files are retained even if you discard the draft.",
+    "importHint": "PNG, JPEG or WebP, up to 20 MiB. Choosing a file or a HocusPocus image does not upload it. Upload creates a pending base, not an approved character. Files are retained even if you discard the draft.",
     "pose": "Editing pose",
     "approvePose": "I have reviewed this base image",
     "singlePack": "Current limit: one mouth pack per character. Patches are bound to their exact pose and source; do not overwrite a working pack to prepare another view.",

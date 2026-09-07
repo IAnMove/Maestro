@@ -24,7 +24,7 @@
     "name": "Nombre del nuevo personaje",
     "baseImage": "Imagen base",
     "importBase": "Subir base y crear borrador",
-    "importHint": "PNG, JPEG o WebP, hasta 20 MiB. Elegir archivo no lo sube. La subida crea una base pendiente, no un personaje aprobado. Los archivos se conservan aunque descartes el borrador.",
+    "importHint": "PNG, JPEG o WebP, hasta 20 MiB. Elegir un archivo o una imagen de HocusPocus no la sube. La subida crea una base pendiente, no un personaje aprobado. Los archivos se conservan aunque descartes el borrador.",
     "pose": "Pose en edición",
     "approvePose": "He revisado esta imagen base",
     "singlePack": "Límite actual: un pack de bocas por personaje. Los parches corresponden a su pose y fuente exactas; no sobrescribas un pack válido para preparar otra vista.",

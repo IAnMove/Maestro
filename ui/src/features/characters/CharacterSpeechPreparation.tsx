@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { LabsLibraryPick } from '../../lib/LabsLibraryPick'
 import { useUiTranslation } from '../../i18n'
 import { speechPreparationReadiness } from '../../lib/characterSpeechPreparation'
 import type { CharacterKit } from '../../lib/characterKit'
@@ -39,7 +40,7 @@ function SpeechWorkspace({ workspace, services = speechLibraryServices }: Props)
         {draft && !library?.kits[draft.id] && <option value={draft.id}>{draft.name}</option>}
       </select>
     </label>
-    <ImportSpeechBase controller={controller} />
+    <ImportSpeechBase workspace={workspace} controller={controller} />
     {draft && <SpeechDraftEditor key={draft.id} kit={draft} workspace={workspace} controller={controller} />}
     <div className="flex flex-wrap gap-2">
       <button type="button" className={button} disabled={busy || !dirty || !draft?.base} onClick={controller.save}>{t('speechWorkshop.save')}</button>
@@ -52,7 +53,7 @@ function SpeechWorkspace({ workspace, services = speechLibraryServices }: Props)
   </section>
 }
 
-function ImportSpeechBase({ controller }: { controller: Controller }) {
+function ImportSpeechBase({ workspace, controller }: { workspace: string; controller: Controller }) {
   const { t } = useUiTranslation('characters')
   const { busy, dirty, library } = controller
   const [name, setName] = useState('')
@@ -62,6 +63,7 @@ function ImportSpeechBase({ controller }: { controller: Controller }) {
       <div className="mt-2 flex flex-wrap items-end gap-2">
         <label className="text-xs text-text-secondary">{t('speechWorkshop.name')}<input aria-label={t('speechWorkshop.name')} disabled={busy || dirty} value={name} onChange={event => setName(event.target.value)} className="mt-1 block rounded border border-border bg-bg-primary p-2" /></label>
         <label className="text-xs text-text-secondary">{t('speechWorkshop.baseImage')}<input aria-label={t('speechWorkshop.baseImage')} type="file" accept="image/png,image/jpeg,image/webp" disabled={busy || dirty} onChange={event => setFile(event.target.files?.[0] ?? null)} className="mt-1 block max-w-full" /></label>
+        <LabsLibraryPick workspace={workspace} disabled={busy || dirty} onFile={setFile} />
         <button type="button" disabled={busy || dirty || !library || !name.trim() || !file} onClick={() => { if (file) controller.importBase(name, file) }} className={button}>{t('speechWorkshop.importBase')}</button>
       </div>
       <p className="mt-2 text-xs text-text-muted">{t('speechWorkshop.importHint')}</p>

@@ -30,6 +30,8 @@ import {
 } from './model'
 import { COMIC_EFFECTS, COMIC_LAYOUTS, createEffect } from './presets'
 import { useComicStore } from './store'
+import { AssetInput } from '../asset-picker/AssetInput.tsx'
+import { asImageOutput, useWorkspaceImageOutputs } from '../../lib/labsImagePick'
 import { clearStagedComicHandoffs, comicProvenanceAfterReplan, readStagedComicDirectorRequest } from './provenance'
 import { useComicLineageValidation, validateComicLineage } from './useComicLineageValidation'
 import { captureComicPage, exportComicCbz, exportComicJson, exportComicPagePng, exportComicPdf } from './export'
@@ -344,34 +346,30 @@ function AssetsPanel() {
   const { t } = useUiTranslation('comics')
   const outputs = useStore(state => state.outputs)
   const loadOutputs = useStore(state => state.loadOutputs)
+  const workspace = useStore(state => state.activeWorkspace)
+  const catalogImages = useWorkspaceImageOutputs(workspace)
   const assets = useComicStore(state => state.project.assets)
-  const fileRef = useRef<HTMLInputElement>(null)
   const [source, setSource] = useState<'maestro' | 'project'>('maestro')
   const [busy, setBusy] = useState(false)
   const [prompt, setPrompt] = useState('')
   const [provider, setProvider] = useState<'maestro' | 'minimax'>('maestro')
   const [generationError, setGenerationError] = useState('')
-  const images = outputs.filter(output => output.type === 'image')
+  const images = catalogImages.length ? catalogImages : outputs.filter(output => output.type === 'image')
   useEffect(() => { if (!outputs.length) loadOutputs() }, [loadOutputs, outputs.length])
+  const pickerItems = source === 'maestro'
+    ? images
+    : Object.values(assets).map(asset => asImageOutput(asset.id, asset.source, asset.thumbnail || asset.source))
 
-  const uploadFiles = async (files: FileList | null) => {
-    if (!files?.length) return
-    setBusy(true)
-    try {
-      for (const file of Array.from(files)) {
-        const uploaded = await api.uploadImage(file)
-        insertAssetIntoPage({
-          id: comicId('asset'),
-          name: file.name,
-          kind: 'upload',
-          source: uploaded.url,
-          createdAt: new Date().toISOString(),
-        })
+  const insertPicked = (item: api.ApiOutput | null) => {
+    if (!item) return
+    if (source === 'project') {
+      const asset = Object.values(assets).find(entry => entry.id === item.name)
+      if (asset) {
+        insertAssetIntoPage(asset)
+        return
       }
-    } finally {
-      setBusy(false)
-      if (fileRef.current) fileRef.current.value = ''
     }
+    insertAssetIntoPage(assetFromOutput(item))
   }
 
   const generateOne = async () => {
@@ -396,10 +394,15 @@ function AssetsPanel() {
         <button className={`${button} ${source === 'maestro' ? 'border-accent-blue text-accent-blue' : ''}`} onClick={() => setSource('maestro')}>{t('assets.hocuspocus')}</button>
         <button className={`${button} ${source === 'project' ? 'border-accent-blue text-accent-blue' : ''}`} onClick={() => setSource('project')}>{t('assets.project')}</button>
       </div>
-      <button className={`${button} w-full`} onClick={() => fileRef.current?.click()} disabled={busy}>
-        {busy ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />} {t('assets.upload')}
-      </button>
-      <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={event => uploadFiles(event.target.files)} />
+      <AssetInput
+        label={t('assets.upload')}
+        placeholder={t('assets.hint')}
+        items={pickerItems}
+        accept="image/*"
+        disabled={busy}
+        constraints={{ kinds: ['image'], maxCount: 1, optional: false }}
+        onChoose={insertPicked}
+      />
       <div className="rounded-lg border border-border bg-bg-tertiary/40 p-2 space-y-2">
         <div className="grid grid-cols-2 gap-1">
           <button className={`${button} ${provider === 'maestro' ? 'border-accent-blue text-accent-blue' : ''}`} onClick={() => setProvider('maestro')}>{t('assets.local')}</button>
@@ -412,22 +415,6 @@ function AssetsPanel() {
         {generationError && <p className="text-[10px] text-red-400">{generationError}</p>}
       </div>
       <p className="text-[10px] text-text-muted">{t('assets.hint')}</p>
-      <div className="grid grid-cols-2 gap-2 max-h-[58vh] overflow-y-auto pr-1">
-        {(source === 'maestro' ? images : Object.values(assets)).map(item => {
-          const asset = 'kind' in item ? item : assetFromOutput(item)
-          return (
-            <button
-              key={'kind' in item ? item.id : item.name}
-              onClick={() => insertAssetIntoPage(asset)}
-              className="rounded-md overflow-hidden border border-border bg-bg-tertiary hover:border-accent-blue text-left"
-              title={asset.name}
-            >
-              <img src={asset.thumbnail || asset.source} alt="" className="w-full aspect-square object-cover" loading="lazy" />
-              <span className="block truncate p-1 text-[9px] text-text-muted">{asset.name}</span>
-            </button>
-          )
-        })}
-      </div>
     </div>
   )
 }
@@ -1762,16 +1749,20 @@ export function ComicDirectorPanel({
           <div key={character.id} className="rounded border border-border p-2 text-[10px]">
             <div className="flex justify-between"><b className="text-text-primary">{character.name}</b><button onClick={() => patch('characters', request.characters.filter(item => item.id !== character.id))}><Trash2 size={11} /></button></div>
             <p className="text-text-muted mt-1">{character.description}</p>
-            <select
-              className={`${input} mt-2`}
-              value={character.referenceAssetId || ''}
-              onChange={event => patch('characters', request.characters.map(item => item.id === character.id
-                ? { ...item, referenceAssetId: event.target.value || undefined }
-                : item))}
-            >
-              <option value="">{t('characters.noIdentity')}</option>
-              {Object.values(project.assets).map(asset => <option key={asset.id} value={asset.id}>{asset.name}</option>)}
-            </select>
+            <AssetInput
+              label={t('characters.noIdentity')}
+              placeholder={t('characters.noIdentity')}
+              items={Object.values(project.assets).map(asset => asImageOutput(asset.id, asset.source, asset.thumbnail || asset.source))}
+              value={character.referenceAssetId && project.assets[character.referenceAssetId]
+                ? asImageOutput(character.referenceAssetId, project.assets[character.referenceAssetId].source, project.assets[character.referenceAssetId].thumbnail || project.assets[character.referenceAssetId].source)
+                : undefined}
+              accept="image/*"
+              optional
+              constraints={{ kinds: ['image'], maxCount: 1, optional: true }}
+              onChoose={item => patch('characters', request.characters.map(entry => entry.id === character.id
+                ? { ...entry, referenceAssetId: item?.name || undefined }
+                : entry))}
+            />
             <p className="mt-1 text-[9px] text-text-muted">
               {t('characters.minimaxHint')}
             </p>

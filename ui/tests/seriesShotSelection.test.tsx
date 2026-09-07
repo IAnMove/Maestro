@@ -18,6 +18,10 @@ function installDom() {
 
 installDom()
 
+const originalFetch = globalThis.fetch
+globalThis.fetch = (async () => new Response(JSON.stringify({ outputs: [], total: 0 }), { headers: { 'content-type': 'application/json' } })) as typeof fetch
+test.after(() => { globalThis.fetch = originalFetch })
+
 function makeEpisode(approved: boolean) {
   return {
     id: 'episode-1',

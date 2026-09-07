@@ -4,6 +4,9 @@ import { Check, Loader2 } from 'lucide-react'
 import * as api from '../../api/client'
 import { getModelMode, resolveResolution, useStore } from '../../stores/useStore'
 import { useUiTranslation } from '../../i18n'
+import { AssetInput } from '../asset-picker/AssetInput.tsx'
+import { useWorkspaceImageOutputs } from '../../lib/labsImagePick'
+import type { ApiOutput } from '../../api/outputs'
 
 import { generateImageAsset } from '../../lib/imageGeneration'
 import { MINIMAX_IMAGE_API_MODEL } from '../../lib/externalModels'
@@ -465,7 +468,6 @@ export function StoryLabPanel() {
   const [styleModelDownloading, setStyleModelDownloading] = useState('')
   const [styleModelDownloadError, setStyleModelDownloadError] = useState('')
   const smartAssetRef = useRef<HTMLInputElement>(null)
-  const uploadRef = useRef<HTMLInputElement>(null)
   const musicCoverRef = useRef<HTMLInputElement>(null)
   const lyriaUploadRef = useRef<HTMLInputElement>(null)
   const lyriaUploadCueId = useRef('')
@@ -476,6 +478,7 @@ export function StoryLabPanel() {
   const styleConversionCancelRequested = useRef(false)
   const generationAbortRef = useRef<AbortController | null>(null)
   const [uploadTarget, setUploadTarget] = useState<{ kind: 'world' | 'character' | 'location'; id?: string } | null>(null)
+  const imageItems = useWorkspaceImageOutputs(activeWorkspace)
   const projectOperationBusy = Boolean(activeProjectOperations[project.id])
   const musicCandidateOptions = useMemo(() => {
     const seen = new Set<string>()
@@ -1696,26 +1699,24 @@ export function StoryLabPanel() {
     })
   }
 
-  const uploadVisual = async (files: FileList | null) => {
-    if (!files?.length || !uploadTarget) return
+  const applyPickedVisual = async (item: ApiOutput) => {
+    if (!uploadTarget) return
     const sourceProjectId = project.id
+    const target = uploadTarget
     beginProjectOperation(sourceProjectId)
     setImageBusy('upload')
     try {
-      for (const file of Array.from(files)) {
-        const uploaded = await api.uploadImage(file)
-        addAsset({
-          id: storyId('asset'), name: file.name, source: uploaded.url, prompt: '',
-          provider: 'upload', createdAt: new Date().toISOString(),
-          approval: 'draft', variantKind: 'original',
-        }, uploadTarget, false, sourceProjectId)
-      }
+      addAsset({
+        id: storyId('asset'), name: item.name, source: item.url, prompt: '',
+        provider: 'upload', createdAt: new Date().toISOString(),
+        approval: 'draft', variantKind: 'original',
+      }, target, false, sourceProjectId)
+      setUploadTarget(null)
     } catch (error) {
       setNotice({ kind: 'error', text: (error as Error).message })
     } finally {
       setImageBusy('')
       endProjectOperation(sourceProjectId)
-      if (uploadRef.current) uploadRef.current.value = ''
     }
   }
 
@@ -3867,7 +3868,6 @@ export function StoryLabPanel() {
       generateVisual,
       requestUpload: target => {
         setUploadTarget(target)
-        uploadRef.current?.click()
       },
       removeReference,
     }}>
@@ -3914,6 +3914,21 @@ export function StoryLabPanel() {
       {notice && (
         <div className={`px-3 py-2 text-xs border-b border-border ${notice.kind === 'error' ? 'text-red-300 bg-red-500/10' : 'text-emerald-300 bg-emerald-500/10'}`}>
           {notice.text}
+        </div>
+      )}
+      {uploadTarget && (
+        <div className="border-b border-border px-3 py-2">
+          <AssetInput
+            label={t('world.addReference')}
+            placeholder={t('world.addReference')}
+            items={imageItems}
+            accept="image/*"
+            constraints={{ kinds: ['image'], maxCount: 1, optional: true }}
+            onChoose={item => {
+              if (!item) { setUploadTarget(null); return }
+              void applyPickedVisual(item)
+            }}
+          />
         </div>
       )}
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
@@ -4336,7 +4351,7 @@ export function StoryLabPanel() {
           </div>
         </div>
       </div>
-      <input ref={uploadRef} type="file" accept="image/*" multiple className="hidden" onChange={event => uploadVisual(event.target.files)} />
+
       <input ref={smartAssetRef} type="file" accept="image/*" multiple className="hidden"
         onChange={event => void analyzeSmartAssets(Array.from(event.target.files || []))} />
       <input ref={lyriaUploadRef} type="file" accept="audio/*" className="hidden"
