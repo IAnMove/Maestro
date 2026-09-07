@@ -146,6 +146,7 @@ export const Scene3DStage = forwardRef<Scene3DStageHandle, Props>(function Scene
     },
     endExport() {
       exportLockRef.current = null
+      documentRef.current = document
     },
   }))
 
@@ -154,7 +155,10 @@ export const Scene3DStage = forwardRef<Scene3DStageHandle, Props>(function Scene
     if (!host) return
     const world = createWorld(host, documentRef.current.light, documentRef.current.camera.fov)
     worldRef.current = world
-    const resize = () => resizeWorld(world, host)
+    const resize = () => {
+      if (exportLockRef.current) return
+      resizeWorld(world, host)
+    }
     resize()
     const observer = new ResizeObserver(resize)
     observer.observe(host)

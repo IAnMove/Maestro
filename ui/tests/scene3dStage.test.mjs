@@ -228,17 +228,24 @@ test('world3d export paints and publishes the snapshot after the live scene chan
   const snapshot = applyScene3DTemplate('drive-chase')
   const live = { current: snapshot }
   const painted = []
+  const calls = []
+  let pinned = null
   const handle = {
     paint(_seconds, document) {
       painted.push((document ?? live.current).templateId)
       return { tagName: 'CANVAS' }
     },
-    beginExport() {},
-    endExport() {},
-    setExportSize() {},
-    restoreSize() {},
+    beginExport(document) {
+      pinned = document
+      calls.push('beginExport')
+    },
+    endExport() { calls.push('endExport') },
+    setExportSize() { calls.push('setExportSize') },
+    restoreSize() { calls.push('restoreSize') },
   }
   const frozen = startWorld3DExport(handle, snapshot, { width: 1280, height: 720 })
+  assert.notEqual(frozen, snapshot)
+  assert.equal(pinned, frozen)
   live.current = applyScene3DTemplate('cafe-dance')
   frozen.camera.family = 'hood'
   assert.equal(snapshot.camera.family, 'chase')
@@ -248,6 +255,7 @@ test('world3d export paints and publishes the snapshot after the live scene chan
   assert.equal(frame.tagName, 'CANVAS')
   assert.deepEqual(painted, ['drive-chase'])
   finishWorld3DExport(handle)
+  assert.deepEqual(calls, ['beginExport', 'setExportSize', 'endExport', 'restoreSize'])
 })
 
 test('world3d export paint fails closed when the stage is gone', () => {

@@ -74,9 +74,10 @@ export function Scene3DWorkspace({ width, height }: Props) {
     sceneDocRef.current = sceneDoc
   }, [sceneDoc])
 
-  useEffect(() => {
-    exportingRef.current = exporting
-  }, [exporting])
+  const setExportingFlag = (value: boolean) => {
+    exportingRef.current = value
+    setExporting(value)
+  }
 
   useEffect(() => {
     const host = window as Window & { __world3dStage?: Scene3DStageHandle | null }
@@ -180,8 +181,10 @@ export function Scene3DWorkspace({ width, height }: Props) {
 
   const exportScene = async () => {
     const stage = stageRef.current
-    if (!stage || exporting || playing) return
-    setExporting(true)
+    if (!stage || exportingRef.current || playing) return
+    dragRef.current = null
+    setExplorerSlot(null)
+    setExportingFlag(true)
     setExportNote(t('stage.exporting'))
     try {
       const result = await exportWorld3DDocument(stage, sceneDoc, workspace, (index, total) => {
@@ -193,7 +196,7 @@ export function Scene3DWorkspace({ width, height }: Props) {
     } catch (error) {
       setExportNote(error instanceof Error ? error.message : t('stage.exportFailed'))
     } finally {
-      setExporting(false)
+      setExportingFlag(false)
     }
   }
 
@@ -217,7 +220,7 @@ export function Scene3DWorkspace({ width, height }: Props) {
         className="relative w-full overflow-hidden rounded-lg border border-border bg-[#10141c]"
         style={{ aspectRatio: `${width} / ${height}` }}
         onPointerDown={event => {
-          if (!canMutateWorld3DScene(exporting)) return
+          if (!canMutateWorld3DScene(exportingRef.current)) return
           const id = hitSlot(event.clientX, event.clientY, event.currentTarget)
           if (!id) return
           const slot = sceneDoc.slots.find(item => item.id === id)
@@ -259,7 +262,7 @@ export function Scene3DWorkspace({ width, height }: Props) {
             {t(`stage.family.${family}`)}
           </button>
         ))}
-        <button type="button" disabled={exporting} onClick={() => { if (canMutateWorld3DScene(exporting)) setPlaying(current => !current) }} className="rounded border border-border bg-bg-primary px-2 py-1 disabled:opacity-40">
+        <button type="button" disabled={exporting} onClick={() => { if (canMutateWorld3DScene(exportingRef.current)) setPlaying(current => !current) }} className="rounded border border-border bg-bg-primary px-2 py-1 disabled:opacity-40">
           {playing ? t('stage.pause') : t('stage.play')}
         </button>
         <button
