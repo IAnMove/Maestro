@@ -518,6 +518,12 @@
       "reason": "Imports the public Zustand facade; it should survive slice extraction unchanged."
     },
     {
+      "file": "ui/tests/studioEditPicker.test.tsx",
+      "target": "ui/src/stores/useStore.ts",
+      "classification": "behavior",
+      "reason": "Imports the public Zustand facade; it should survive slice extraction unchanged."
+    },
+    {
       "file": "ui/tests/tabFilterSearch.test.tsx",
       "target": "ui/src/stores/useStore.ts",
       "classification": "behavior",

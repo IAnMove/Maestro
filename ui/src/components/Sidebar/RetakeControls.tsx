@@ -1,9 +1,11 @@
-import { useRef, useCallback } from 'react'
-import { Upload, X } from 'lucide-react'
+import { useCallback } from 'react'
+import { X } from 'lucide-react'
 import { useStore } from '../../stores/useStore'
 import { useUiTranslation } from '../../i18n'
 import { VideoTimelineSelector } from '../shared/VideoTimelineSelector'
 import * as api from '../../api/client'
+import { StudioSourceField } from '../../lib/StudioSourceField.tsx'
+import { useWorkspaceOutputs } from '../../lib/studioAssetPick.ts'
 
 export function RetakeControls() {
   const { t } = useUiTranslation('studio')
@@ -18,7 +20,8 @@ export function RetakeControls() {
   const editRegenerateAudio = useStore(s => s.editRegenerateAudio)
   const setEditVideo = useStore(s => s.setEditVideo)
   const clearEditVideo = useStore(s => s.clearEditVideo)
-  const fileRef = useRef<HTMLInputElement>(null)
+  const activeWorkspace = useStore(s => s.activeWorkspace)
+  const videoItems = useWorkspaceOutputs(activeWorkspace, 'video')
 
   const handleUpload = useCallback(async (file: File) => {
     try {
@@ -36,28 +39,16 @@ export function RetakeControls() {
     }
   }, [setEditVideo])
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    const file = e.dataTransfer.files[0]
-    if (file && file.type.startsWith('video/')) handleUpload(file)
-  }, [handleUpload])
-
   return (
     <div className="space-y-3">
-      {/* Video Upload or Timeline */}
       {!editVideoFile ? (
-        <div
-          onDragOver={e => e.preventDefault()}
-          onDrop={handleDrop}
-          onClick={() => fileRef.current?.click()}
-          className="border-2 border-dashed border-border rounded-lg p-6 text-center cursor-pointer hover:border-accent-blue/50 hover:bg-bg-hover/30 transition-all"
-        >
-          <Upload size={24} className="mx-auto mb-2 text-text-muted" />
-          <p className="text-xs text-text-secondary">{t('chrome.dropVideo')}</p>
-          <p className="text-[9px] text-text-muted mt-1">{t('chrome.dropVideoHint')}</p>
-          <input ref={fileRef} type="file" accept="video/*" className="hidden"
-            onChange={e => { if (e.target.files?.[0]) handleUpload(e.target.files[0]) }} />
-        </div>
+        <StudioSourceField
+          label={t('chrome.dropVideo')}
+          items={videoItems}
+          accept="video/*"
+          kinds={['video']}
+          onFile={handleUpload}
+        />
       ) : (
         <div className="relative">
           <button onClick={clearEditVideo}

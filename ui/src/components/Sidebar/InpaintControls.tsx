@@ -1,9 +1,11 @@
-import { useState, useRef, useCallback, useEffect } from 'react'
-import { Upload, X, Eye, AlertTriangle, Download } from 'lucide-react'
+import { useState, useCallback, useEffect } from 'react'
+import { X, Eye, AlertTriangle, Download } from 'lucide-react'
 import { useStore } from '../../stores/useStore'
 import { useUiTranslation } from '../../i18n'
 import { VideoTimelineSelector } from '../shared/VideoTimelineSelector'
 import * as api from '../../api/client'
+import { StudioSourceField } from '../../lib/StudioSourceField.tsx'
+import { useWorkspaceOutputs } from '../../lib/studioAssetPick.ts'
 
 export function InpaintControls() {
   const { t } = useUiTranslation('studio')
@@ -35,7 +37,8 @@ export function InpaintControls() {
   const [samStatusError, setSamStatusError] = useState<string | null>(null)
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [showingMask, setShowingMask] = useState(false)
-  const fileRef = useRef<HTMLInputElement>(null)
+  const activeWorkspace = useStore(s => s.activeWorkspace)
+  const videoItems = useWorkspaceOutputs(activeWorkspace, 'video')
 
   // Reusable status check — used both on mount AND after upload so the
   // user gets the install prompt immediately when they switch to
@@ -86,12 +89,6 @@ export function InpaintControls() {
       setError(t('inpaint.uploadFailed'))
     }
   }, [setEditVideo, refreshSamStatus, t])
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    const file = e.dataTransfer.files[0]
-    if (file && file.type.startsWith('video/')) handleUpload(file)
-  }, [handleUpload])
 
   // Preview Mask: single-frame only (fast, for visual feedback)
   const handlePreviewMask = async () => {
@@ -156,18 +153,13 @@ export function InpaintControls() {
 
       {/* Video Upload */}
       {!editVideoFile ? (
-        <div
-          onDragOver={e => e.preventDefault()}
-          onDrop={handleDrop}
-          onClick={() => fileRef.current?.click()}
-          className="border-2 border-dashed border-border rounded-lg p-6 text-center cursor-pointer hover:border-accent-blue/50 hover:bg-bg-hover/30 transition-all"
-        >
-          <Upload size={24} className="mx-auto mb-2 text-text-muted" />
-          <p className="text-xs text-text-secondary">{t('chrome.dropVideo')}</p>
-          <p className="text-[9px] text-text-muted mt-1">{t('inpaint.dropHint')}</p>
-          <input ref={fileRef} type="file" accept="video/*" className="hidden"
-            onChange={e => { if (e.target.files?.[0]) handleUpload(e.target.files[0]) }} />
-        </div>
+        <StudioSourceField
+          label={t('chrome.dropVideo')}
+          items={videoItems}
+          accept="video/*"
+          kinds={['video']}
+          onFile={handleUpload}
+        />
       ) : (
         <div className="relative">
           <button onClick={() => { clearEditVideo(); setShowingMask(false); setSamTarget('') }}

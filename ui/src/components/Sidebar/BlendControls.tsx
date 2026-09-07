@@ -1,25 +1,21 @@
-import { useState, useRef, useCallback, useEffect } from 'react'
-import { X, Film, ArrowRight } from 'lucide-react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
+import { X, ArrowRight } from 'lucide-react'
 import { useStore } from '../../stores/useStore'
 import { useUiTranslation } from '../../i18n'
 import * as api from '../../api/client'
+import type { ApiOutput } from '../../api/outputs'
+import { StudioSourceField } from '../../lib/StudioSourceField.tsx'
+import { useWorkspaceOutputs } from '../../lib/studioAssetPick.ts'
 
-function ClipDropZone({ label, file, url, duration, onUpload, onClear }: {
+function ClipDropZone({ label, file, url, duration, items, onUpload, onClear }: {
   label: string
   file: File | null
   url: string
   duration: number
+  items: ApiOutput[]
   onUpload: (file: File) => void
   onClear: () => void
 }) {
-  const fileRef = useRef<HTMLInputElement>(null)
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    const f = e.dataTransfer.files[0]
-    if (f && (f.type.startsWith('video/') || f.type.startsWith('image/'))) onUpload(f)
-  }, [onUpload])
-
   if (file) {
     return (
       <div className="relative rounded-lg overflow-hidden border border-border flex-1">
@@ -41,20 +37,13 @@ function ClipDropZone({ label, file, url, duration, onUpload, onClear }: {
   }
 
   return (
-    <div
-      onDragOver={e => e.preventDefault()}
-      onDrop={handleDrop}
-      onClick={() => fileRef.current?.click()}
-      className="flex-1 border-2 border-dashed border-border rounded-lg p-3 text-center cursor-pointer hover:border-accent-blue transition-colors"
-    >
-      <Film size={14} className="mx-auto mb-1 text-text-muted" />
-      <p className="text-[10px] text-text-secondary">{label}</p>
-      <input
-        ref={fileRef}
-        type="file"
+    <div className="flex-1 min-w-0">
+      <StudioSourceField
+        label={label}
+        items={items}
         accept="video/*,image/*"
-        className="hidden"
-        onChange={e => { const f = e.target.files?.[0]; if (f) onUpload(f) }}
+        kinds={['image', 'video']}
+        onFile={onUpload}
       />
     </div>
   )
@@ -85,6 +74,12 @@ export function BlendControls() {
   const anchorStrength = useStore(s => s.blendAnchorStrength)
   const setAnchorStrength = useStore(s => s.setBlendAnchorStrength)
   const ensureTransitionLoraForBlend = useStore(s => s.ensureTransitionLoraForBlend)
+  const activeWorkspace = useStore(s => s.activeWorkspace)
+  const library = useWorkspaceOutputs(activeWorkspace)
+  const clipItems = useMemo(
+    () => library.filter(item => item.type === 'image' || item.type === 'video'),
+    [library],
+  )
 
   // On blend mode mount, make sure the LTX-2.3 transition LoRA is installed
   // and active. Idempotent — fires once per mount; the helper itself no-ops
@@ -155,6 +150,7 @@ export function BlendControls() {
           file={blendClipA}
           url={blendClipAUrl}
           duration={blendClipADuration}
+          items={clipItems}
           onUpload={f => uploadClip(f, 'A')}
           onClear={clearBlendClipA}
         />
@@ -164,6 +160,7 @@ export function BlendControls() {
           file={blendClipB}
           url={blendClipBUrl}
           duration={blendClipBDuration}
+          items={clipItems}
           onUpload={f => uploadClip(f, 'B')}
           onClear={clearBlendClipB}
         />
