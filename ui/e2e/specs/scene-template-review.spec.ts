@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises'
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page } from '@playwright/test'
 import { closeApp } from '../helpers/gotoApp'
 import { installApiRoutes, type ApiRouteSession } from '../helpers/apiRoutes'
 import { lockUiLanguage } from '../helpers/lockUiLanguage'
@@ -174,6 +174,11 @@ async function readAutosave(page: Page): Promise<SceneLike | null> {
   })
 }
 
+async function confirmLibraryScene(dialog: Locator, title: string): Promise<void> {
+  await dialog.getByText(title, { exact: true }).first().click()
+  await dialog.getByRole('button', { name: 'Open scene', exact: true }).click()
+}
+
 test('opens cinema-establishing in the real editor, saves exact scene JSON, and reopens the saved scene', async ({ page }) => {
   const session = await prepareReviewPage(page)
   const state = reviewRouteState()
@@ -225,8 +230,7 @@ test('opens cinema-establishing in the real editor, saves exact scene JSON, and 
     await page.getByRole('button', { name: 'Open scene', exact: true }).first().click()
     const dialog = page.getByRole('dialog', { name: 'Open 3D Video scene' })
     await expect(dialog).toBeVisible()
-    await expect(dialog.getByText('review', { exact: true }).first()).toBeVisible()
-    await dialog.getByRole('button', { name: 'Open in 3D Video', exact: true }).click()
+    await confirmLibraryScene(dialog, 'review')
 
     await expect(sceneName).toHaveValue('Ajuste prueba')
     await expect.poll(() => state.fileRequests.length).toBeGreaterThan(0)
@@ -292,7 +296,7 @@ test('Library template bindings survive the real editor save and reopen without 
     await name.fill('Not saved')
     await page.getByRole('button', { name: 'Open scene', exact: true }).first().click()
     const library = page.getByRole('dialog', { name: 'Open 3D Video scene' })
-    await library.getByRole('button', { name: 'Open in 3D Video', exact: true }).click()
+    await confirmLibraryScene(library, 'review')
     await expect(name).toHaveValue('Library binding roundtrip')
     await expect.poll(() => readAutosave(page)).toEqual(saved)
     expect(state.recordingRequests).toHaveLength(0)
