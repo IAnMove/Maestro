@@ -1,3 +1,4 @@
+import { scene3dPlaybackSpeed } from './clock.ts'
 import { parseScene3DLoop } from './backdrop.ts'
 import { durableScene3DSourceUrl, parseScene3DSourceRef } from './slotSource.ts'
 import { SCENE3D_TEMPLATE_IDS, type Scene3DDocument, type Scene3DSlot, type Scene3DTemplateId } from './types.ts'
@@ -91,5 +92,5 @@ export function parseScene3DDocument(raw: unknown): Scene3DDocument | null {
     || value.dressing === 'drive-city' || value.dressing === 'drive-coast' || value.dressing === 'drive-tunnel'
     ? value.dressing
     : undefined
-  return { ...value, slots, templateId, dressing } as Scene3DDocument
+  return { ...value, slots, templateId, dressing, playbackSpeed: scene3dPlaybackSpeed(value.playbackSpeed) } as Scene3DDocument
 }

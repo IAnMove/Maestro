@@ -1,0 +1,189 @@
+{
+  "title": "Estudio de escenas 3D",
+  "subtitle": "Elige un plano, coloca tus objetos y pulsa Reproducir.",
+  "templates": "Biblioteca de planos",
+  "search": "Buscar plantillas",
+  "all": "Todas",
+  "noResults": "No hay plantillas para esta búsqueda.",
+  "play": "Reproducir",
+  "pause": "Pausar",
+  "restart": "Volver al inicio",
+  "timeline": "Posición en la escena",
+  "speed": "Velocidad",
+  "speedHelp": "Se aplica a la reproducción y al MP4 exportado.",
+  "outputDuration": "Resultado: {{seconds}} s",
+  "camera": "Cámara",
+  "objects": "Objetos",
+  "translate": "Mover",
+  "rotate": "Girar Y",
+  "scale": "Escalar",
+  "size": "Tamaño",
+  "smaller": "Más pequeño",
+  "larger": "Más grande",
+  "reset": "Restablecer transformación",
+  "gizmoHelp": "Arrastra un eje para mover. Usa el control central para escalar proporcionalmente.",
+  "selectObject": "Selecciona un objeto",
+  "position": "Posición (m)",
+  "yaw": "Giro Y (°)",
+  "keepAssets": "Conservar mis objetos al cambiar de plano",
+  "cameraHelp": "Puedes cambiar la cámara; tus objetos conservan su identidad.",
+  "category": {
+    "cinema": "Cine",
+    "product": "Producto",
+    "music": "Videoclip",
+    "space": "Espacio",
+    "drive": "Conducción"
+  },
+  "template": {
+    "two-shot": {
+      "title": "Plano de dos",
+      "description": "Encuadre equilibrado de dos sujetos con aproximación suave."
+    },
+    "product-orbit": {
+      "title": "Órbita de producto",
+      "description": "Vuelta pausada al producto con luz principal cálida."
+    },
+    "hero-push": {
+      "title": "Acercamiento al protagonista",
+      "description": "Cámara baja y avance suave hacia el protagonista."
+    },
+    "over-shoulder": {
+      "title": "Sobre el hombro",
+      "description": "Sujetos escalonados para encuadrar una conversación con profundidad."
+    },
+    "tracking": {
+      "title": "Seguimiento lateral",
+      "description": "Composición de perfil con aire por delante del sujeto."
+    },
+    "crane-reveal": {
+      "title": "Revelado de grúa",
+      "description": "Ascenso desde un punto bajo hasta un encuadre abierto."
+    },
+    "establishing": {
+      "title": "Órbita de situación",
+      "description": "Arco amplio para presentar el entorno y un objeto."
+    },
+    "run-loop": {
+      "title": "Carrera continua",
+      "description": "Corredor estable con mundo deslizante; añade un clip de carrera."
+    },
+    "neon-run": {
+      "title": "Sprint neón",
+      "description": "Luz fría y fondo rápido para un clip de carrera enérgico."
+    },
+    "block-street": {
+      "title": "Ritmo callejero",
+      "description": "Plano de perfil relajado con desplazamiento urbano más lento."
+    },
+    "space-float": {
+      "title": "Flotación espacial",
+      "description": "Sujeto elevado entre rocas con un arco de cámara suave."
+    },
+    "walk-void": {
+      "title": "Paseo en el vacío",
+      "description": "Entorno mínimo y aproximación frontal para un clip de paseo."
+    },
+    "dance-orbit": {
+      "title": "Órbita de baile",
+      "description": "Media órbita que mantiene legible al intérprete."
+    },
+    "dance-stage": {
+      "title": "Escenario urbano",
+      "description": "Decorado urbano amplio con arco musical pausado."
+    },
+    "cafe-dance": {
+      "title": "Actuación en el café",
+      "description": "Composición frontal de cuerpo entero en el café texturizado."
+    },
+    "drive-chase": {
+      "title": "Cámara de persecución",
+      "description": "Vista trasera del coche con carretera móvil y oscilación leve."
+    },
+    "drive-hood": {
+      "title": "Sobre el capó",
+      "description": "Vista frontal inmersiva con vibración de carretera contenida."
+    },
+    "drive-wing": {
+      "title": "Perfil costero",
+      "description": "Vista lateral baja del coche junto al fondo costero."
+    },
+    "drive-orbit": {
+      "title": "Órbita del coche",
+      "description": "Barrido bajo que revela la carretera en movimiento."
+    },
+    "drive-tunnel": {
+      "title": "Viaje por el túnel",
+      "description": "Cámara frontal enmarcada por el entorno del túnel."
+    },
+    "drive-hero": {
+      "title": "Retrato del conductor",
+      "description": "Composición de persecución con un personaje reemplazable."
+    },
+    "portrait-arc": {
+      "title": "Arco de retrato",
+      "description": "Órbita íntima corta con aire sobre la cabeza."
+    },
+    "duo-diagonal": {
+      "title": "Diálogo en diagonal",
+      "description": "Dos sujetos en diagonal alrededor de un objeto central."
+    },
+    "high-angle": {
+      "title": "Revelado en picado",
+      "description": "Un punto de vista elevado revela al sujeto y el objeto cercano."
+    },
+    "wide-tableau": {
+      "title": "Escena de conjunto",
+      "description": "Dos sujetos y un objeto cercano en una composición amplia."
+    },
+    "product-detail": {
+      "title": "Detalle de producto",
+      "description": "Encuadre oblicuo cercano para observar la superficie del objeto."
+    },
+    "product-pair": {
+      "title": "Comparación de productos",
+      "description": "Dos productos comparten una composición frontal simétrica y pausada."
+    },
+    "product-pedestal": {
+      "title": "Revelado sobre pedestal",
+      "description": "Coloca el producto sobre un soporte y revélalo desde abajo."
+    },
+    "duet-stage": {
+      "title": "Dúo en escena",
+      "description": "Dos intérpretes comparten escenario; asigna un clip de animación a cada uno."
+    },
+    "cafe-duet": {
+      "title": "Dúo en el café",
+      "description": "Dos intérpretes enmarcan la entrada del café a ambos lados."
+    },
+    "stage-crane": {
+      "title": "Grúa sobre el escenario",
+      "description": "Revela a un intérprete y un objeto escénico con cámara ascendente."
+    },
+    "space-encounter": {
+      "title": "Encuentro espacial",
+      "description": "Dos sujetos suspendidos se miran entre referencias rocosas."
+    },
+    "space-survey": {
+      "title": "Exploración espacial",
+      "description": "Órbita amplia y elevada alrededor de un sujeto y un objeto cercano."
+    },
+    "drive-coast-reveal": {
+      "title": "Revelado de la costa",
+      "description": "Una grúa revela el coche sobre la carretera costera."
+    },
+    "drive-city-wide": {
+      "title": "Plano urbano abierto",
+      "description": "Órbita amplia y baja que sitúa el coche en la ciudad."
+    },
+    "drive-tunnel-wing": {
+      "title": "Perfil en el túnel",
+      "description": "Una cámara lateral baja muestra el coche dentro del túnel."
+    }
+  },
+  "gallerySearch": "Buscar en el catálogo",
+  "galleryPlaceholder": "Retrato, baile, naves…",
+  "galleryCount": "{{count}} plantillas",
+  "focusEditor": "Ampliar editor",
+  "exitFocus": "Salir de pantalla completa",
+  "fullscreenUnavailable": "Este navegador no permite la pantalla completa."
+}

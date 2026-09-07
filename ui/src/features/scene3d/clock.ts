@@ -26,3 +26,12 @@ export function scene3dClipLocalTime(
   if (options.loop === false) return Math.min(clipDuration, elapsed)
   return elapsed % clipDuration
 }
+
+/** A rate of 2 exports the same complete shot in half the time. */
+export function scene3dPlaybackSpeed(value: number | undefined): number {
+  return typeof value === 'number' && Number.isFinite(value) ? Math.max(0.25, Math.min(4, value)) : 1
+}
+
+export function scene3dOutputDuration(document: { duration: number; playbackSpeed?: number }): number {
+  return document.duration / scene3dPlaybackSpeed(document.playbackSpeed)
+}

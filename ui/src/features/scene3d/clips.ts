@@ -29,3 +29,15 @@ export function clipBindingError(
   if (result && 'code' in result) return result
   return null
 }
+
+/** Reusing a GLB does not reload it, so retain its known animation choices. */
+export function retainSlotClipCatalogs(
+  previous: readonly { id: string; sourceUrl: string }[],
+  next: readonly { id: string; sourceUrl: string }[],
+  catalogs: Record<string, Scene3DClipCatalogEntry[]>,
+): Record<string, Scene3DClipCatalogEntry[]> {
+  return Object.fromEntries(next.flatMap(slot => {
+    const old = previous.find(item => item.id === slot.id)
+    return old?.sourceUrl === slot.sourceUrl && catalogs[slot.id] ? [[slot.id, catalogs[slot.id]]] : []
+  }))
+}

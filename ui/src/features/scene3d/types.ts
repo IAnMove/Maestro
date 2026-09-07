@@ -39,6 +39,21 @@ export const SCENE3D_TEMPLATE_IDS = [
   'drive-orbit',
   'drive-tunnel',
   'drive-hero',
+  'portrait-arc',
+  'duo-diagonal',
+  'high-angle',
+  'wide-tableau',
+  'product-detail',
+  'product-pair',
+  'product-pedestal',
+  'duet-stage',
+  'cafe-duet',
+  'stage-crane',
+  'space-encounter',
+  'space-survey',
+  'drive-coast-reveal',
+  'drive-city-wide',
+  'drive-tunnel-wing',
 ] as const
 
 export type Scene3DTemplateId = (typeof SCENE3D_TEMPLATE_IDS)[number]
@@ -102,6 +117,8 @@ export type Scene3DDocument = {
   height: number
   fps: 24 | 30 | 60
   duration: number
+  /** Timeline rate; exported duration is duration / playbackSpeed. */
+  playbackSpeed?: number
   templateId: Scene3DTemplateId
   camera: Scene3DCamera
   light: Scene3DLight

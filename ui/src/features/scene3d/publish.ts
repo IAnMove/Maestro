@@ -1,3 +1,4 @@
+import { scene3dOutputDuration } from './clock.ts'
 import { saveSceneRecording } from '../../api/video3d.ts'
 import type { Scene3DDocument } from './types.ts'
 import { world3dExportSize } from './exportMp4.ts'
@@ -10,7 +11,7 @@ export function world3dRecordingStub(document: Scene3DDocument) {
     width: size.width,
     height: size.height,
     fps: document.fps === 60 ? 60 : 30,
-    duration: document.duration,
+    duration: scene3dOutputDuration(document),
     layers: [] as unknown[],
   }
 }
@@ -25,6 +26,7 @@ export async function publishWorld3DRecording(
     prompt: '',
     recipe: {
       engine: 'world3d',
+      document,
       templateId: document.templateId,
       slots: document.slots.map(slot => ({
         id: slot.id,
