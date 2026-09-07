@@ -162,6 +162,43 @@ test('Changing media, model or workspace while Viggle inspects does not submit s
   }
 })
 
+test('Opening the Viggle tab drops a leftover Recast trim so the full clip is submitted', async () => {
+  const { useStore } = await import('../src/stores/useStore')
+  const initial = useStore.getState()
+  try {
+    useStore.setState({
+      generationMode: 'avatar',
+      editSubMode: 'recast',
+      editVideoDuration: 20,
+      editStartTime: 2,
+      editEndTime: 5,
+      params: { ...initial.params, model_type: 'scail2_14B_recast_fast' },
+      models: [
+        { model_type: 'viggle_animate', name: 'Viggle' },
+        { model_type: 'scail2_14B_recast_fast', name: 'SCAIL Recast Fast' },
+      ] as never,
+      selectModel: async id => { useStore.setState(s => ({ params: { ...s.params, model_type: id } })) },
+    })
+    useStore.getState().setEditSubMode('recast', 'viggle')
+    assert.equal(useStore.getState().editStartTime, 0)
+    assert.equal(useStore.getState().editEndTime, 20)
+    assert.equal(useStore.getState().params.model_type, 'viggle_animate')
+
+    useStore.setState({ editStartTime: 1, editEndTime: 4 })
+    useStore.getState().setEditSubMode('recast', 'viggle')
+    assert.equal(useStore.getState().editStartTime, 1)
+    assert.equal(useStore.getState().editEndTime, 4)
+
+    useStore.setState({ editStartTime: 3, editEndTime: 8, editVideoDuration: 12 })
+    useStore.getState().setEditSubMode('recast', 'scail')
+    assert.equal(useStore.getState().editStartTime, 3)
+    assert.equal(useStore.getState().editEndTime, 8)
+    assert.equal(useStore.getState().params.model_type, 'scail2_14B_recast_fast')
+  } finally {
+    useStore.setState(initial)
+  }
+})
+
 test('Only Auto image editing for Viggle inherits the source canvas', () => {
   const state = {
     generationMode: 'image', resolutionPreset: 'auto', aspectRatio: 'auto',

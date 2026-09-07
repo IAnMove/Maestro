@@ -2208,7 +2208,13 @@ export const useStore = create<AppState>((set, get) => {
     const wantsViggle = mode === 'recast' && recastEngine === 'viggle'
     const engineChange = mode === 'recast' && recastEngine !== undefined
       && (current === 'viggle_animate') !== wantsViggle
-    set({ editSubMode: mode })
+    // Viggle has no trim UI. A leftover Recast/Retake range would be sent as
+    // start_time/end_time and silently cut the clip (or reject a short one).
+    const enteringViggle = wantsViggle && (engineChange || mode !== prev)
+    set({
+      editSubMode: mode,
+      ...(enteringViggle ? { editStartTime: 0, editEndTime: s.editVideoDuration || 0 } : {}),
+    })
     if ((mode === prev && !engineChange) || s.generationMode !== 'avatar') return
     // Recast uses SCAIL-2 Replace; Repaint uses the proven SCAIL-2 Animate
     // path from Studio Video/Frames. Swap recipes when moving between those
