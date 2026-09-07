@@ -3,8 +3,11 @@ import { Plus, X } from 'lucide-react'
 import { useStore } from '../../stores/useStore'
 import { useUiTranslation } from '../../i18n'
 import { ChoiceControl } from '../shared/ChoiceControl'
-import { FileUploadZone } from '../shared/FileUploadZone'
 import * as api from '../../api/client'
+import type { ApiOutput } from '../../api/outputs'
+import { AssetInput } from '../../features/asset-picker/AssetInput.tsx'
+import { applyChosenStudioMedia, studioMediaPath, useWorkspaceOutputs } from '../../lib/studioAssetPick.ts'
+import { fileFromStudioOutput } from '../../lib/studioInputsPick.ts'
 
 export function AudioModeSection() {
   const { t } = useUiTranslation('studio')
@@ -14,7 +17,9 @@ export function AudioModeSection() {
   const audioGuideFilename = useStore(s => s.audioGuideFilename)
   const setAudioGuideFilename = useStore(s => s.setAudioGuideFilename)
   const [videoGuideFilename, setVideoGuideFilename] = useState<string | null>(null)
-  const [uploading, setUploading] = useState(false)
+  const activeWorkspace = useStore(s => s.activeWorkspace)
+  const audioItems = useWorkspaceOutputs(activeWorkspace, 'audio')
+  const videoItems = useWorkspaceOutputs(activeWorkspace, 'video')
 
   // Dynamic multi-voice state
   const ttsVoiceCount = useStore(s => s.ttsVoiceCount)
@@ -70,7 +75,6 @@ export function AudioModeSection() {
   }
 
   const handleLegacyUpload = async (file: File, paramKey: 'audio_guide' | 'audio_guide2' | 'video_guide', setFilename: (n: string | null) => void) => {
-    setUploading(true)
     try {
       // Route audio_guide uploads through /api/v1/upload-audio, which
       // accepts both audio AND video files (extracting the audio track
@@ -95,23 +99,6 @@ export function AudioModeSection() {
       }
     } catch (e) {
       console.error('Upload failed:', e)
-    } finally {
-      setUploading(false)
-    }
-  }
-
-  const handleVoiceUpload = async (file: File, index: number) => {
-    setUploading(true)
-    try {
-      const result = await api.uploadImage(file)
-      setTtsVoiceFile(index, file.name, result.path)
-      // Also set legacy params for backward compat
-      const key = index === 0 ? 'audio_guide' : `audio_guide${index + 1}`
-      setParam(key as keyof import('../../types').GenerateParams, result.path)
-    } catch (e) {
-      console.error('Upload failed:', e)
-    } finally {
-      setUploading(false)
     }
   }
 
@@ -119,6 +106,44 @@ export function AudioModeSection() {
     setTtsVoiceFile(index, null, null)
     const key = index === 0 ? 'audio_guide' : `audio_guide${index + 1}`
     setParam(key as keyof import('../../types').GenerateParams, undefined)
+  }
+
+  const chooseAudioGuide = (item: ApiOutput | null) => {
+    if (!item) {
+      setParam('audio_guide', undefined)
+      setAudioGuideFilename(null)
+      return
+    }
+    if (item.type === 'video') {
+      void fileFromStudioOutput(item).then(file => handleLegacyUpload(file, 'audio_guide', setAudioGuideFilename))
+      return
+    }
+    setParam('audio_guide', studioMediaPath(item))
+    setAudioGuideFilename(item.name)
+    applyChosenStudioMedia(item, next => {
+      if (next.duration > 0) setDurationSeconds(Math.round(next.duration * 10) / 10)
+    })
+  }
+
+  const chooseVideoGuide = (item: ApiOutput | null) => {
+    if (!item) {
+      setParam('video_guide', undefined)
+      setVideoGuideFilename(null)
+      return
+    }
+    setParam('video_guide', studioMediaPath(item))
+    setVideoGuideFilename(item.name)
+  }
+
+  const chooseVoice = (index: number, item: ApiOutput | null) => {
+    if (!item) {
+      clearVoice(index)
+      return
+    }
+    const path = studioMediaPath(item)
+    setTtsVoiceFile(index, item.name, path)
+    const key = index === 0 ? 'audio_guide' : `audio_guide${index + 1}`
+    setParam(key as keyof import('../../types').GenerateParams, path)
   }
 
   return (
@@ -185,12 +210,15 @@ export function AudioModeSection() {
                   <label className="text-[9px] text-text-muted uppercase tracking-wider block mb-1">
                     {t('audio.voiceN', { n: i + 1 })}
                   </label>
-                  <FileUploadZone
-                    label={uploading ? '...' : t('audio.dropAudio')}
-                    accept=".wav,.mp3,.flac,.ogg,.m4a"
-                    filename={voice.filename}
-                    onFile={f => handleVoiceUpload(f, i)}
-                    onClear={() => clearVoice(i)}
+                  <AssetInput
+                    label={t('audio.dropAudio')}
+                    placeholder={t('audio.dropAudio')}
+                    items={audioItems}
+                    accept=".wav,.mp3,.flac,.ogg,.m4a,audio/*"
+                    workspaceId={activeWorkspace}
+                    optional={Boolean(voice.filename)}
+                    constraints={{ kinds: ['audio'], maxCount: 1, optional: true }}
+                    onChoose={item => chooseVoice(i, item)}
                   />
                   <input
                     type="text"
@@ -260,15 +288,15 @@ export function AudioModeSection() {
           <label className="text-[11px] text-text-muted uppercase tracking-wider mb-1.5 block">
             {t('audio.audioFile')}
           </label>
-          <FileUploadZone
-            label={uploading ? t('chrome.uploading') : t('audio.dropAudioOrVideo')}
-            accept=".wav,.mp3,.flac,.ogg,.m4a,.mp4,.mov,.mkv,.webm,.avi,.m4v"
-            filename={audioGuideFilename}
-            onFile={file => handleLegacyUpload(file, 'audio_guide', setAudioGuideFilename)}
-            onClear={() => {
-              setParam('audio_guide', undefined)
-              setAudioGuideFilename(null)
-            }}
+          <AssetInput
+            label={t('audio.dropAudioOrVideo')}
+            placeholder={t('audio.dropAudioOrVideo')}
+            items={[...audioItems, ...videoItems]}
+            accept=".wav,.mp3,.flac,.ogg,.m4a,.mp4,.mov,.mkv,.webm,.avi,.m4v,audio/*,video/*"
+            workspaceId={activeWorkspace}
+            optional={Boolean(audioGuideFilename)}
+            constraints={{ kinds: ['audio', 'video'], maxCount: 1, optional: true }}
+            onChoose={chooseAudioGuide}
           />
         </div>
       )}
@@ -302,15 +330,15 @@ export function AudioModeSection() {
           <label className="text-[11px] text-text-muted uppercase tracking-wider mb-1.5 block">
             {t('audio.controlVideo')}
           </label>
-          <FileUploadZone
-            label={uploading ? t('chrome.uploading') : t('audio.dropVideoMp4')}
-            accept=".mp4,.webm,.mkv"
-            filename={videoGuideFilename}
-            onFile={file => handleLegacyUpload(file, 'video_guide', setVideoGuideFilename)}
-            onClear={() => {
-              setParam('video_guide', undefined)
-              setVideoGuideFilename(null)
-            }}
+          <AssetInput
+            label={t('audio.dropVideoMp4')}
+            placeholder={t('audio.dropVideoMp4')}
+            items={videoItems}
+            accept=".mp4,.webm,.mkv,video/*"
+            workspaceId={activeWorkspace}
+            optional={Boolean(videoGuideFilename)}
+            constraints={{ kinds: ['video'], maxCount: 1, optional: true }}
+            onChoose={chooseVideoGuide}
           />
         </div>
       )}
