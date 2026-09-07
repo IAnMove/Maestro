@@ -1,22 +1,19 @@
-import type { ChangeEvent } from 'react'
-import { ChevronDown, ChevronRight, Film, Languages, Music, Palette, RefreshCcw, Sparkles, Upload } from 'lucide-react'
+import { ChevronDown, ChevronRight, Film, Languages, Music, Palette, RefreshCcw, Sparkles } from 'lucide-react'
 import * as api from '../../api/client'
 import { useUiTranslation } from '../../i18n'
 import { button, completeGenerationButton, input, panel, Field } from './storyLabChrome'
 import { musicCandidateDisplayName, musicPromptLimit, storySongBrief } from './storyLabMusic'
 import { clampStoryMusicDuration, storyMusicDurationMax, storyMusicGenerationReady } from './musicModel'
+import { StoryAudioPicker } from './StoryAudioPicker'
 import type { StoryMusicTabProps } from './StoryMusicTab'
 
 export function ManualSongPanel({
   project, patch, productionBusy, musicWritingReady, minimaxConfigured, storyVideoConfigurationReady, workspace,
   musicVersionStyle, setMusicVersionStyle, musicVersionLanguage, setMusicVersionLanguage, lyricsTranslationLanguage,
-  setLyricsTranslationLanguage, openMusicalTrailer, musicCoverRef, uploadCoverReference, writeStorySong, adaptStoryLyrics,
+  setLyricsTranslationLanguage, openMusicalTrailer, uploadCoverReference, writeStorySong, adaptStoryLyrics,
   translateManualSongLyrics, createManualSongVersion, generateMinimaxSongs,
 }: StoryMusicTabProps) {
   const { t } = useUiTranslation('storyLab')
-  const onCover = (event: ChangeEvent<HTMLInputElement>) => {
-    void uploadCoverReference(event.target.files?.[0])
-  }
   return (
     <details className={`${panel} group`}>
       <summary className="cursor-pointer list-none flex items-center justify-between gap-2">
@@ -42,12 +39,17 @@ export function ManualSongPanel({
               </select>
             </label>
           </div>
-          {project.music.mode === 'cover' && <>
-            <input ref={musicCoverRef} type="file" accept="audio/*" className="hidden" onChange={onCover} />
-            <button className={`${button} w-full`} disabled={productionBusy === 'music'} onClick={() => musicCoverRef.current?.click()}>
-              <Upload size={13} /> {project.music.coverReferenceName ? t('music.replaceCover', { name: project.music.coverReferenceName }) : t('music.uploadCover')}
-            </button>
-          </>}
+          {project.music.mode === 'cover' && (
+            <StoryAudioPicker
+              workspace={workspace}
+              projectId={project.id}
+              label={project.music.coverReferenceName ? t('music.replaceCover', { name: project.music.coverReferenceName }) : t('music.uploadCover')}
+              accept="audio/*"
+              disabled={productionBusy === 'music'}
+              selectedName={project.music.coverReferenceName}
+              onChoose={item => { if (item) uploadCoverReference(item) }}
+            />
+          )}
           <Field label={t('music.songBrief')} value={project.music.brief || storySongBrief(project, project.music.targetDurationSeconds)}
             onChange={brief => patch({ music: { ...project.music, brief } })} rows={5} />
           <button className={`${button} w-full`} disabled={productionBusy === 'music'} onClick={() => void writeStorySong()}>

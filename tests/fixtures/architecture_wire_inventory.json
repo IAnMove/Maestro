@@ -506,7 +506,19 @@
       "reason": "Imports the public Zustand facade; it should survive slice extraction unchanged."
     },
     {
+      "file": "ui/tests/mixerSfxPicker.test.tsx",
+      "target": "ui/src/stores/useStore.ts",
+      "classification": "behavior",
+      "reason": "Imports the public Zustand facade; it should survive slice extraction unchanged."
+    },
+    {
       "file": "ui/tests/modelSelectorEditModes.test.tsx",
+      "target": "ui/src/stores/useStore.ts",
+      "classification": "behavior",
+      "reason": "Imports the public Zustand facade; it should survive slice extraction unchanged."
+    },
+    {
+      "file": "ui/tests/omniReferencePicker.test.tsx",
       "target": "ui/src/stores/useStore.ts",
       "classification": "behavior",
       "reason": "Imports the public Zustand facade; it should survive slice extraction unchanged."
@@ -554,6 +566,12 @@
       "reason": "Imports the public Zustand facade; it should survive slice extraction unchanged."
     },
     {
+      "file": "ui/tests/studioSectionsPicker.test.tsx",
+      "target": "ui/src/stores/useStore.ts",
+      "classification": "behavior",
+      "reason": "Imports the public Zustand facade; it should survive slice extraction unchanged."
+    },
+    {
       "file": "ui/tests/tabFilterSearch.test.tsx",
       "target": "ui/src/stores/useStore.ts",
       "classification": "behavior",
@@ -567,6 +585,12 @@
     },
     {
       "file": "ui/tests/toolsPanel.test.tsx",
+      "target": "ui/src/stores/useStore.ts",
+      "classification": "behavior",
+      "reason": "Imports the public Zustand facade; it should survive slice extraction unchanged."
+    },
+    {
+      "file": "ui/tests/videoEditMultiClipPicker.test.tsx",
       "target": "ui/src/stores/useStore.ts",
       "classification": "behavior",
       "reason": "Imports the public Zustand facade; it should survive slice extraction unchanged."

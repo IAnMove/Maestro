@@ -1087,6 +1087,7 @@
     "retry": "Retry",
     "loadAssetsFailed": "Could not load assets.",
     "incompatibleKind": "Type incompatible with this filter.",
+    "needsCatalogIdentity": "This slot needs a Library asset with a durable id. A local file is not enough.",
     "pickerAria": "Template asset picker",
     "kindImage": "Image",
     "kindGlb": "GLB",

@@ -6,6 +6,8 @@ import type { AssetCatalogItem } from '../src/api/assets.ts'
 import type { Scene } from '../src/types/index.ts'
 import { ALL_SCENE_TEMPLATES, CANDIDATE_SCENE_TEMPLATES } from '../src/features/sceneTemplates/catalog.ts'
 
+Object.assign(globalThis, { React })
+
 const dom = new JSDOM('<!doctype html><html><body /></html>', { url: 'http://localhost/' })
 Object.assign(globalThis, {
   window: dom.window,
@@ -56,29 +58,46 @@ function installAssetFetch({
 } = {}) {
   const fixture = assetsFor(workspace, heroMetadata)
   const calls: Array<{ url: string; init?: RequestInit }> = []
-  globalThis.fetch = (async (input, init) => {
+  const heroDetailFetches = { count: 0 }
+  const previous = globalThis.fetch
+  const mock: typeof fetch = (async (input, init) => {
     const url = String(input)
     calls.push({ url, init })
     if (url.includes('/api/v1/assets?')) {
       const query = new URL(url, 'http://localhost').searchParams
+      if (query.get('workspace') && query.get('workspace') !== workspace) {
+        if (typeof previous === 'function') return previous(input, init)
+      }
       const kind = query.get('kind')
-      const assets = fixture.all.filter(item => !kind || item.kind === kind)
+      const assets = fixture.all.filter(item => !kind || item.kind === kind || kind.split(',').includes(item.kind))
       return responseFor({ assets, total: assets.length })
     }
     if (url.includes('/api/v1/assets/')) {
-      const id = decodeURIComponent(url.slice(url.lastIndexOf('/') + 1))
+      const id = decodeURIComponent(url.slice(url.lastIndexOf('/') + 1).split('?')[0])
       const selected = fixture.all.find(item => item.id === id)
-      if (!selected) return responseFor({ detail: 'missing' }, 404)
-      if (detailMode === '404' && selected.id === fixture.hero.id) return responseFor({ detail: 'missing' }, 404)
-      if (detailMode === 'source-change' && selected.id === fixture.hero.id) {
+      if (!selected) {
+        if (typeof previous === 'function') return previous(input, init)
+        return responseFor({ detail: 'missing' }, 404)
+      }
+      if (selected.id === fixture.hero.id) heroDetailFetches.count += 1
+      if (detailMode === '404' && selected.id === fixture.hero.id && heroDetailFetches.count > 1) return responseFor({ detail: 'missing' }, 404)
+      if (detailMode === 'source-change' && selected.id === fixture.hero.id && heroDetailFetches.count > 1) {
         const filename = 'hero-replaced.png'
         return responseFor({ ...selected, filename, locations: [{ workspace_id: workspace, filename, url: `/api/v1/file/${filename}?workspace=${workspace}` }], url: `/api/v1/file/${filename}?workspace=${workspace}` })
       }
       return responseFor(selected)
     }
+    if (typeof previous === 'function') return previous(input, init)
     throw new Error(`Unexpected non-catalog request: ${url}`)
   }) as typeof fetch
-  return { fixture, calls }
+  globalThis.fetch = mock
+  return {
+    fixture,
+    calls,
+    restore() {
+      if (globalThis.fetch === mock) globalThis.fetch = previous
+    },
+  }
 }
 
 async function renderDialog(props: { workspace?: string; onClose?: () => void; onApply?: (scene: Scene) => boolean } = {}) {
@@ -88,18 +107,28 @@ async function renderDialog(props: { workspace?: string; onClose?: () => void; o
   return { ...view, screen, fireEvent, waitFor, cleanup, TemplateComposerDialog }
 }
 
+function clickLast(view: Awaited<ReturnType<typeof renderDialog>>, name: string | RegExp, exact = false) {
+  const buttons = view.screen.getAllByRole('button', exact && typeof name === 'string' ? { name, exact: true } : { name })
+  view.fireEvent.click(buttons[buttons.length - 1])
+}
+
+async function pickLibraryFile(view: Awaited<ReturnType<typeof renderDialog>>, filename: string) {
+  clickLast(view, /From HocusPocus/)
+  await view.waitFor(() => assert.ok(document.querySelector(`button[title="${filename}"]`)))
+  view.fireEvent.click(document.querySelector(`button[title="${filename}"]`) as HTMLButtonElement)
+  clickLast(view, 'Choose', true)
+  await view.waitFor(() => assert.ok(view.screen.getAllByText(filename).length >= 1))
+}
+
 async function selectHeroAndPlate(view: Awaited<ReturnType<typeof renderDialog>>) {
-  const hero = await view.screen.findByRole('button', { name: /Select hero-/ })
-  view.fireEvent.click(hero)
+  await pickLibraryFile(view, 'hero-default.png')
   view.fireEvent.click(view.screen.getByRole('button', { name: 'Background (required)' }))
-  const plate = await view.screen.findByRole('button', { name: /Select plate-/ })
-  view.fireEvent.click(plate)
+  await pickLibraryFile(view, 'plate-default.png')
   view.fireEvent.click(view.screen.getByRole('checkbox', { name: /I have saved what I need/ }))
 }
 
 test('expone 24 referencias más 24 movimientos y habilita BPM/intensidad sólo en plantillas rítmicas', { concurrency: false }, async () => {
-  const originalFetch = globalThis.fetch
-  installAssetFetch()
+  const installed = installAssetFetch()
   try {
     const view = await renderDialog()
     const selector = view.screen.getByRole('combobox', { name: 'Action / template' }) as HTMLSelectElement
@@ -115,13 +144,12 @@ test('expone 24 referencias más 24 movimientos y habilita BPM/intensidad sólo 
     assert.equal((view.screen.getByRole('spinbutton', { name: 'Pulse intensity' }) as HTMLInputElement).disabled, false)
     view.cleanup()
   } finally {
-    globalThis.fetch = originalFetch
+    installed.restore()
   }
 })
 
 test('selecciona hero y fondo canónicos y aplica provided_only con lineage de catálogo', { concurrency: false }, async () => {
-  const originalFetch = globalThis.fetch
-  const { fixture, calls } = installAssetFetch()
+  const { fixture, calls, restore } = installAssetFetch()
   const applied: Scene[] = []
   let closed = 0
   try {
@@ -143,49 +171,52 @@ test('selecciona hero y fondo canónicos y aplica provided_only con lineage de c
     assert.ok(calls.some(call => call.url.endsWith(`/assets/${fixture.plate.id}`)))
     view.cleanup()
   } finally {
-    globalThis.fetch = originalFetch
+    restore()
   }
 })
 
 test('mantiene assets heredados visibles pero no seleccionables ni aplicables', { concurrency: false }, async () => {
-  const originalFetch = globalThis.fetch
-  installAssetFetch({ heroMetadata: 'legacy' })
+  const installed = installAssetFetch({ heroMetadata: 'legacy' })
   let applied = 0
   try {
     const view = await renderDialog({ onApply: () => { applied += 1; return true } })
-    const hero = await view.screen.findByRole('button', { name: /Select hero-default\.png/ }) as HTMLButtonElement
-    assert.equal(hero.disabled, true)
-    assert.match(hero.textContent || '', /metadatos canónicos/i)
+    clickLast(view, /From HocusPocus/)
+    await view.waitFor(() => assert.ok(document.querySelector('button[title="hero-default.png"]')))
+    view.fireEvent.click(document.querySelector('button[title="hero-default.png"]') as HTMLButtonElement)
+    clickLast(view, 'Choose', true)
+    const alert = await view.screen.findByRole('alert')
+    assert.match(alert.textContent || '', /metadatos canónicos/i)
+    assert.equal(view.screen.queryAllByText('hero-default.png').length, 0)
     assert.equal((view.screen.getByRole('button', { name: 'Create and open in editor' }) as HTMLButtonElement).disabled, true)
     assert.equal(applied, 0)
     view.cleanup()
   } finally {
-    globalThis.fetch = originalFetch
+    installed.restore()
   }
 })
 
 test('cambia de plantilla y workspace reinicia bindings, y cerrar cancela sin aplicar', { concurrency: false }, async () => {
-  const originalFetch = globalThis.fetch
-  installAssetFetch()
+  const installed = installAssetFetch()
+  let otherFetch: ReturnType<typeof installAssetFetch> | undefined
   let closed = 0
   let applied = 0
   try {
     const view = await renderDialog({ onClose: () => { closed += 1 }, onApply: () => { applied += 1; return true } })
-    const hero = await view.screen.findByRole('button', { name: /Select hero-default\.png/ })
-    view.fireEvent.click(hero)
-    assert.equal(hero.getAttribute('aria-pressed'), 'true')
+    await pickLibraryFile(view, 'hero-default.png')
 
     const selector = view.screen.getByRole('combobox', { name: 'Action / template' })
     view.fireEvent.change(selector, { target: { value: 'music-pulse' } })
-    const resetHero = await view.screen.findByRole('button', { name: /Select hero-default\.png/ })
-    assert.equal(resetHero.getAttribute('aria-pressed'), 'false')
+    await view.waitFor(() => assert.equal(view.screen.queryAllByText('hero-default.png').length, 0))
+    assert.ok(view.screen.getAllByText('Unassigned').length >= 1)
 
     const other = assetsFor('other')
-    installAssetFetch({ workspace: 'other' })
+    otherFetch = installAssetFetch({ workspace: 'other' })
     view.rerender(<view.TemplateComposerDialog workspace="other" onClose={() => { closed += 1 }} onApply={() => { applied += 1; return true }} />)
-    const otherHero = await view.screen.findByRole('button', { name: /Select hero-other\.png/ })
-    assert.equal(otherHero.getAttribute('aria-pressed'), 'false')
-    assert.equal(view.screen.queryByRole('button', { name: /Select hero-default\.png/ }), null)
+    await view.waitFor(() => assert.equal(view.screen.queryAllByText('hero-default.png').length, 0))
+    clickLast(view, /From HocusPocus/)
+    await view.waitFor(() => assert.ok(document.querySelector('button[title="hero-other.png"]')))
+    assert.equal(document.querySelector('button[title="hero-default.png"]'), null)
+    clickLast(view, 'Cancel', true)
     assert.equal(other.hero.id, 'asset-hero-other')
 
     view.fireEvent.click(view.screen.getByRole('button', { name: 'Close' }))
@@ -193,15 +224,17 @@ test('cambia de plantilla y workspace reinicia bindings, y cerrar cancela sin ap
     assert.equal(applied, 0)
     view.cleanup()
   } finally {
-    globalThis.fetch = originalFetch
+    otherFetch?.restore()
+    installed.restore()
   }
 })
 
 test('404 y cambio de fuente al revalidar impiden aplicar y nunca generan assets', { concurrency: false }, async () => {
-  const originalFetch = globalThis.fetch
+  const restores: Array<() => void> = []
   try {
     for (const detailMode of ['404', 'source-change']) {
-      const { calls } = installAssetFetch({ detailMode })
+      const { calls, restore } = installAssetFetch({ detailMode })
+      restores.push(restore)
       let applied = 0
       const view = await renderDialog({ onApply: () => { applied += 1; return true } })
       await selectHeroAndPlate(view)
@@ -214,6 +247,6 @@ test('404 y cambio de fuente al revalidar impiden aplicar y nunca generan assets
       view.cleanup()
     }
   } finally {
-    globalThis.fetch = originalFetch
+    for (const restore of restores.reverse()) restore()
   }
 })

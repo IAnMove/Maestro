@@ -458,7 +458,6 @@ test('Story Lab music tab is extracted with i18n chrome', async () => {
       onImportCustomMp3={cueId => { imports.push(cueId) }}
       onImportLyria={() => {}}
       onCopied={() => {}}
-      musicCoverRef={{ current: null }}
       uploadCoverReference={() => {}}
       writeStorySong={() => {}}
       adaptStoryLyrics={() => {}}
@@ -471,9 +470,9 @@ test('Story Lab music tab is extracted with i18n chrome', async () => {
   assert.ok(document.getElementById('story-review-music'))
   assert.ok(screen.getByRole('heading', { name: 'Music bible' }))
   fireEvent.click(screen.getByRole('button', { name: /Generate LLM suggestions/ }))
-  fireEvent.click(screen.getAllByRole('button', { name: /Import custom MP3/ })[0])
   assert.deepEqual(generated, ['music'])
-  assert.deepEqual(imports, ['cue-story'])
+  assert.ok(screen.getAllByRole('button', { name: /From HocusPocus/ }).length >= 1)
+  assert.equal(imports.length, 0)
   cleanup()
 })
 
@@ -633,7 +632,6 @@ test('Story Lab productions tab is extracted with i18n chrome', async () => {
       onNavigate={() => {}}
       onOpenIssue={() => {}}
       minimaxConfigured
-      musicCoverRef={{ current: null }}
       uploadCoverReference={() => {}}
       writeStorySong={() => {}}
       adaptStoryLyrics={() => {}}
