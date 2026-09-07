@@ -87,6 +87,11 @@ import type {
 } from './types'
 import type { AspectRatio, ModelOptions, ResolutionPreset } from '../../types'
 import { clampStoryMusicDuration, isAceStepMusicModel, isLocalMusicModel, songWriteTarget } from './musicModel'
+import {
+  commitStoryAudioChoice,
+  coverPatchFromOutput,
+  cueCandidateFromOutput,
+} from './storyAudioPick'
 import { listenForAgentStoryDraft, listenForAgentStorySection, listenForAgentStoryVisualGeneration } from '../../lib/uiBus'
 
 const storyLookupName = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9]+/g, ' ').trim().toLowerCase()
@@ -468,11 +473,6 @@ export function StoryLabPanel() {
   const [styleModelDownloading, setStyleModelDownloading] = useState('')
   const [styleModelDownloadError, setStyleModelDownloadError] = useState('')
   const smartAssetRef = useRef<HTMLInputElement>(null)
-  const musicCoverRef = useRef<HTMLInputElement>(null)
-  const lyriaUploadRef = useRef<HTMLInputElement>(null)
-  const lyriaUploadCueId = useRef('')
-  const customMusicUploadRef = useRef<HTMLInputElement>(null)
-  const customMusicUploadCueId = useRef('')
   const musicQueueCancelRequested = useRef(false)
   const activeMusicJobId = useRef('')
   const styleConversionCancelRequested = useRef(false)
@@ -2578,35 +2578,25 @@ export function StoryLabPanel() {
     }
   }
 
-  const uploadCoverReference = async (file?: File) => {
-    if (!file) return
-    const sourceProjectId = project.id
-    if (file.size > 50 * 1024 * 1024) {
+  const uploadCoverReference = (item: ApiOutput) => {
+    const capture = { projectId: project.id }
+    const commit = commitStoryAudioChoice({ projectId: project.id }, capture, item)
+    if (commit.action !== 'apply') return
+    if (commit.item.size > 50 * 1024 * 1024) {
       setNotice({ kind: 'error', text: t('notice.coverTooLarge') })
       return
     }
-    const activity = beginStoryActivity('uploading_music_reference', `Uploading cover reference “${file.name}”…`, 1)
-    setProductionBusy('music')
-    try {
-      const uploaded = await api.uploadAudio(file)
-      updateProjectById(sourceProjectId, current => ({
-        ...current,
-        music: {
-          ...current.music,
-          mode: 'cover',
-          coverReferenceFilename: uploaded.filename,
-          coverReferenceName: file.name,
-        },
-      }))
-      setNotice({ kind: 'ok', text: t('notice.coverUploaded') })
-    } catch (error) {
-      activity.fail(error)
-      setNotice({ kind: 'error', text: t('notice.coverUploadFailed', { message: (error as Error).message }) })
-    } finally {
-      activity.finish()
-      setProductionBusy(null)
-      if (musicCoverRef.current) musicCoverRef.current.value = ''
-    }
+    const patch = coverPatchFromOutput(commit.item)
+    updateProjectById(capture.projectId, current => ({
+      ...current,
+      music: {
+        ...current.music,
+        mode: patch.mode,
+        coverReferenceFilename: patch.coverReferenceFilename,
+        coverReferenceName: patch.coverReferenceName,
+      },
+    }))
+    setNotice({ kind: 'ok', text: t('notice.coverUploaded') })
   }
 
   const generateMinimaxSongs = async () => {
@@ -3122,105 +3112,75 @@ export function StoryLabPanel() {
     }
   }
 
-  const uploadLyriaResult = async (file?: File) => {
-    const cueId = lyriaUploadCueId.current
-    if (!file || !cueId) return
-    const sourceProjectId = project.id
-    const cue = useStoryStore.getState().projects[sourceProjectId]?.music.cues.find(item => item.id === cueId)
-    if (!cue) return
-    const activity = beginStoryActivity('uploading_music', `Importing Google Lyria result “${file.name}”…`, 1)
-    setMusicCueBusy(`lyria-upload:${cueId}`)
-    try {
-      const uploaded = await api.uploadAudio(file)
-      const language = cue.lyricsLanguage || project.language
-      const version = nextMusicCandidateVersion(cue.candidates, language, project.language)
-      const candidate = {
-        id: storyId('song'),
-        displayName: `${cue.title} · ${language} · v${version}`,
-        title: cue.title,
-        language,
-        version,
-        name: file.name || uploaded.filename,
-        source: uploaded.url,
-        prompt: cue.lyriaPrompt,
-        lyrics: cue.lyrics,
-        provider: 'lyria' as const,
-        model: 'lyria-3-pro-preview',
-        durationSeconds: 0,
-        createdAt: new Date().toISOString(),
+  const uploadLyriaResult = (cueId: string, item: ApiOutput) => {
+    const capture = { projectId: project.id, cueId }
+    const live = useStoryStore.getState().projects[capture.projectId]
+    const cue = live?.music.cues.find(entry => entry.id === cueId)
+    const commit = commitStoryAudioChoice({ projectId: live?.id || '', cueId: cue?.id }, capture, item)
+    if (commit.action !== 'apply' || !live || !cue) return
+    const language = cue.lyricsLanguage || live.language
+    const version = nextMusicCandidateVersion(cue.candidates, language, live.language)
+    const candidate = cueCandidateFromOutput(commit.item, {
+      role: 'lyria',
+      id: storyId('song'),
+      title: cue.title,
+      language,
+      version,
+      prompt: cue.lyriaPrompt,
+      lyrics: cue.lyrics,
+    })
+    updateProjectById(capture.projectId, current => {
+      const target = current.music.cues.find(entry => entry.id === cueId)
+      if (target) {
+        target.candidates.push(candidate)
+        target.selectedCandidateId = candidate.id
       }
-      updateProjectById(sourceProjectId, current => {
-        const target = current.music.cues.find(item => item.id === cueId)
-        if (target) {
-          target.candidates.push(candidate)
-          target.selectedCandidateId = candidate.id
-        }
-        return current
-      })
-      setNotice({ kind: 'ok', text: t('notice.lyriaImported', { title: cue.title }) })
-    } catch (error) {
-      activity.fail(error, 'uploading_music')
-      setNotice({ kind: 'error', text: t('notice.lyriaImportFailed', { message: (error as Error).message }) })
-    } finally {
-      activity.finish()
-      setMusicCueBusy('')
-      lyriaUploadCueId.current = ''
-      if (lyriaUploadRef.current) lyriaUploadRef.current.value = ''
-    }
+      return current
+    })
+    setNotice({ kind: 'ok', text: t('notice.lyriaImported', { title: cue.title }) })
   }
 
-  const uploadCustomMusic = async (file?: File) => {
-    if (!file) return
-    const cueId = customMusicUploadCueId.current
-    const sourceProjectId = project.id
-    const current = useStoryStore.getState().projects[sourceProjectId]
+  const uploadCustomMusic = (cueId: string, item: ApiOutput) => {
+    const capture = { projectId: project.id, cueId }
+    const current = useStoryStore.getState().projects[capture.projectId]
     if (!current) return
-    const cue = current.music.cues.find(item => item.id === cueId)
-    const destination = cue?.title || current.title || 'Story music'
-    const activity = beginStoryActivity('uploading_music', `Importing custom audio “${file.name}”…`, 1)
-    setMusicCueBusy(`custom-upload:${cueId || 'story'}`)
-    try {
-      const uploaded = await api.uploadAudio(file)
-      const language = cue?.lyricsLanguage || current.music.lyricsLanguage || current.language
-      const existing = cue?.candidates || current.music.candidates
-      const version = nextMusicCandidateVersion(existing, language, current.language)
-      const candidate: StoryMusicCandidate = {
-        id: storyId('song'),
-        displayName: `${destination} · custom MP3 · v${version}`,
-        title: destination,
-        language,
-        version,
-        name: file.name || uploaded.filename,
-        source: uploaded.url,
-        prompt: cue?.style || current.music.style,
-        lyrics: cue?.lyrics || current.music.lyrics,
-        provider: 'local',
-        model: 'custom-audio-upload',
-        durationSeconds: 0,
-        createdAt: new Date().toISOString(),
-      }
-      updateProjectById(sourceProjectId, latest => {
-        const target = latest.music.cues.find(item => item.id === cueId)
-        if (target) {
-          target.candidates.push(candidate)
-          target.selectedCandidateId = candidate.id
-        } else {
-          latest.music.candidates.push(candidate)
-          latest.music.selectedCandidateId = candidate.id
-        }
-        return latest
-      })
-      setMusicProductionCandidateId(candidate.id)
-      setNotice({ kind: 'ok', text: t('notice.customAudioImported', { title: destination }) })
-    } catch (error) {
-      activity.fail(error, 'uploading_music')
-      setNotice({ kind: 'error', text: t('notice.customAudioFailed', { message: (error as Error).message }) })
-    } finally {
-      activity.finish()
-      setMusicCueBusy('')
-      customMusicUploadCueId.current = ''
-      if (customMusicUploadRef.current) customMusicUploadRef.current.value = ''
+    const cue = current.music.cues.find(entry => entry.id === cueId)
+    const commit = commitStoryAudioChoice(
+      { projectId: current.id, cueId: cue?.id || cueId },
+      capture,
+      item,
+      true,
+    )
+    if (commit.action !== 'apply') {
+      if (commit.action === 'reject') setNotice({ kind: 'error', text: t('notice.customAudioFailed', { message: 'mp3' }) })
+      return
     }
+    const destination = cue?.title || current.title || 'Story music'
+    const language = cue?.lyricsLanguage || current.music.lyricsLanguage || current.language
+    const existing = cue?.candidates || current.music.candidates
+    const version = nextMusicCandidateVersion(existing, language, current.language)
+    const candidate = cueCandidateFromOutput(commit.item, {
+      role: 'custom',
+      id: storyId('song'),
+      title: destination,
+      language,
+      version,
+      prompt: cue?.style || current.music.style,
+      lyrics: cue?.lyrics || current.music.lyrics,
+    })
+    updateProjectById(capture.projectId, latest => {
+      const target = latest.music.cues.find(entry => entry.id === cueId)
+      if (target) {
+        target.candidates.push(candidate)
+        target.selectedCandidateId = candidate.id
+      } else {
+        latest.music.candidates.push(candidate)
+        latest.music.selectedCandidateId = candidate.id
+      }
+      return latest
+    })
+    setMusicProductionCandidateId(candidate.id)
+    setNotice({ kind: 'ok', text: t('notice.customAudioImported', { title: destination }) })
   }
 
   const generateMusicCueAudio = async (
@@ -4244,16 +4204,9 @@ export function StoryLabPanel() {
                 translateMusicCueLyrics={translateMusicCueLyrics}
                 generateMusicCueAudio={generateMusicCueAudio}
                 openMusicalTrailer={openMusicalTrailer}
-                onImportCustomMp3={cueId => {
-                  customMusicUploadCueId.current = cueId
-                  customMusicUploadRef.current?.click()
-                }}
-                onImportLyria={cueId => {
-                  lyriaUploadCueId.current = cueId
-                  lyriaUploadRef.current?.click()
-                }}
+                onImportCustomMp3={uploadCustomMusic}
+                onImportLyria={uploadLyriaResult}
                 onCopied={text => setNotice({ kind: 'ok', text })}
-                musicCoverRef={musicCoverRef}
                 uploadCoverReference={uploadCoverReference}
                 writeStorySong={writeStorySong}
                 adaptStoryLyrics={adaptStoryLyrics}
@@ -4331,7 +4284,6 @@ export function StoryLabPanel() {
                 onNavigate={tabId => openStorySection(tabId)}
                 onOpenIssue={openProductionReviewIssue}
                 minimaxConfigured={Boolean(servicesConfig?.minimax_api_key_set)}
-                musicCoverRef={musicCoverRef}
                 uploadCoverReference={uploadCoverReference}
                 writeStorySong={writeStorySong}
                 adaptStoryLyrics={adaptStoryLyrics}
@@ -4354,10 +4306,6 @@ export function StoryLabPanel() {
 
       <input ref={smartAssetRef} type="file" accept="image/*" multiple className="hidden"
         onChange={event => void analyzeSmartAssets(Array.from(event.target.files || []))} />
-      <input ref={lyriaUploadRef} type="file" accept="audio/*" className="hidden"
-        onChange={event => void uploadLyriaResult(event.target.files?.[0])} />
-      <input ref={customMusicUploadRef} type="file" accept=".mp3,audio/mpeg,audio/*" className="hidden"
-        onChange={event => void uploadCustomMusic(event.target.files?.[0])} />
     </div>
     </StoryLabVisualsProvider>
   )
