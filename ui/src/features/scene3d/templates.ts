@@ -18,7 +18,13 @@ export const SCENE3D_TEMPLATES: readonly Scene3DTemplate[] = [
   { id: 'tracking', camera: 'follow', duration: 6, slots: ['subject_1', 'background'] },
   { id: 'crane-reveal', camera: 'reveal', duration: 6, slots: ['subject_1', 'background'] },
   { id: 'establishing', camera: 'orbit', duration: 8, slots: ['background', 'prop'] },
-  { id: 'run-loop', camera: 'pursuit', duration: 8, slots: ['subject_1', 'background'] },
+  { id: 'run-loop', camera: 'side', duration: 8, slots: ['subject_1', 'background'] },
+  { id: 'neon-run', camera: 'side', duration: 6, slots: ['subject_1', 'background'] },
+  { id: 'block-street', camera: 'side', duration: 6, slots: ['subject_1', 'background'] },
+  { id: 'space-float', camera: 'musical', duration: 6, slots: ['subject_1', 'background'] },
+  { id: 'walk-void', camera: 'establishment', duration: 6, slots: ['subject_1', 'background'] },
+  { id: 'dance-orbit', camera: 'orbit', duration: 6, slots: ['subject_1', 'background'] },
+  { id: 'dance-stage', camera: 'musical', duration: 8, slots: ['subject_1', 'background'] },
 ]
 
 const LAYOUTS: Record<Scene3DTemplateId, Partial<Record<Scene3DSlotId, Pick<Scene3DSlot, 'position' | 'rotationY' | 'scale'>>>> = {
@@ -56,6 +62,30 @@ const LAYOUTS: Record<Scene3DTemplateId, Partial<Record<Scene3DSlotId, Pick<Scen
     subject_1: { position: [0, 0, 0], rotationY: 1.57, scale: 1 },
     background: { position: [0, 0, 0], rotationY: 0, scale: 1 },
   },
+  'neon-run': {
+    subject_1: { position: [0, 0, 0], rotationY: 1.57, scale: 1 },
+    background: { position: [0, 0, 0], rotationY: 0, scale: 1 },
+  },
+  'block-street': {
+    subject_1: { position: [0, 0, 0], rotationY: 1.57, scale: 1 },
+    background: { position: [0, 0, 0], rotationY: 0, scale: 1 },
+  },
+  'space-float': {
+    subject_1: { position: [0, 0.7, 0], rotationY: 0.35, scale: 1 },
+    background: { position: [0, 0, 0], rotationY: 0, scale: 1 },
+  },
+  'walk-void': {
+    subject_1: { position: [0, 0, 0], rotationY: 0.25, scale: 1 },
+    background: { position: [0, 0, 0], rotationY: 0, scale: 1 },
+  },
+  'dance-orbit': {
+    subject_1: { position: [0, 0, 0], rotationY: 0, scale: 1 },
+    background: { position: [0, 0, 0], rotationY: 0, scale: 1 },
+  },
+  'dance-stage': {
+    subject_1: { position: [0, 0, 0], rotationY: 0.2, scale: 1 },
+    background: { position: [0, 0, 0], rotationY: 0, scale: 1 },
+  },
 }
 
 function emptySlot(id: Scene3DSlotId): Scene3DSlot {
@@ -80,17 +110,38 @@ export function applyScene3DTemplate(id: Scene3DTemplateId): Scene3DDocument {
   document.camera = {
     ...document.camera,
     family: template.camera,
+    ...(template.camera === 'side' ? { fov: 38 } : {}),
   }
   document.slots = template.slots.map(slotId => {
     const slot = emptySlot(slotId)
     const pose = layout[slotId]
     const next = pose ? { ...slot, ...pose } : slot
-    if (template.id === 'run-loop' && slotId === 'background') {
-      return { ...next, media: 'image', loop: { cylinder: true, speed: 0.18 } }
+    const cylinder = CYLINDER_BY_TEMPLATE[template.id]
+    if (cylinder && slotId === 'background') {
+      return { ...next, media: 'image', loop: { cylinder: true, speed: cylinder.speed } }
     }
     return next
   })
+  document.dressing = DRESSING_BY_TEMPLATE[template.id]
   return document
+}
+
+const CYLINDER_BY_TEMPLATE: Partial<Record<Scene3DTemplateId, { speed: number }>> = {
+  'run-loop': { speed: -0.18 },
+  'neon-run': { speed: -0.26 },
+  'block-street': { speed: -0.16 },
+  'space-float': { speed: 0.05 },
+  'walk-void': { speed: 0.08 },
+  'dance-orbit': { speed: 0.04 },
+  'dance-stage': { speed: 0.03 },
+}
+
+const DRESSING_BY_TEMPLATE: Partial<Record<Scene3DTemplateId, Scene3DDocument['dressing']>> = {
+  'run-loop': 'treadmill',
+  'neon-run': 'treadmill',
+  'block-street': 'treadmill',
+  'space-float': 'space',
+  'dance-stage': 'street',
 }
 
 export function patchScene3DSlot(

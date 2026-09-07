@@ -9,6 +9,7 @@ export type Scene3DCameraFamily =
   | 'pursuit'
   | 'product'
   | 'musical'
+  | 'side'
 
 export type Scene3DSlotId = 'subject_1' | 'subject_2' | 'background' | 'prop'
 
@@ -21,6 +22,12 @@ export const SCENE3D_TEMPLATE_IDS = [
   'crane-reveal',
   'establishing',
   'run-loop',
+  'neon-run',
+  'block-street',
+  'space-float',
+  'walk-void',
+  'dance-orbit',
+  'dance-stage',
 ] as const
 
 export type Scene3DTemplateId = (typeof SCENE3D_TEMPLATE_IDS)[number]
@@ -36,6 +43,8 @@ export type Scene3DLoop = {
   cylinder: boolean
   speed: number
 }
+
+export type Scene3DDressing = 'none' | 'street' | 'space' | 'treadmill'
 
 export type Scene3DSlot = {
   id: string
@@ -77,6 +86,7 @@ export type Scene3DDocument = {
   templateId: Scene3DTemplateId
   camera: Scene3DCamera
   light: Scene3DLight
+  dressing?: Scene3DDressing
   slots: Scene3DSlot[]
 }
 

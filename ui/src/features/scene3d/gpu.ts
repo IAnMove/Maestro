@@ -33,7 +33,7 @@ import { scene3dSlotColor } from './document.ts'
 import type { Scene3DClipCatalogEntry, Scene3DDocument, Scene3DLight, Scene3DSlot } from './types.ts'
 
 export const CYLINDER_RADIUS = 12
-export const CYLINDER_HEIGHT = 10
+export const CYLINDER_HEIGHT = 18
 
 export const MAX_VIEW_WIDTH = 1280
 export const MAX_VIEW_HEIGHT = 720
@@ -59,6 +59,8 @@ export type GpuWorld = {
   scene: Scene
   camera: PerspectiveCamera
   dir: DirectionalLight
+  floor: Mesh
+  dressing: Object3D | null
   slots: Map<string, SlotGpu>
 }
 
@@ -330,7 +332,7 @@ export function createWorld(host: HTMLDivElement, light: Scene3DLight, fov: numb
   )
   floor.rotation.x = -Math.PI / 2
   scene.add(floor)
-  return { renderer, scene, camera, dir, slots: new Map() }
+  return { renderer, scene, camera, dir, floor, dressing: null, slots: new Map() }
 }
 
 export function disposeWorld(world: GpuWorld) {
