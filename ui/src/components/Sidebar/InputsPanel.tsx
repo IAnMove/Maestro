@@ -1,8 +1,12 @@
 import { useState, useMemo, useEffect } from 'react'
-import { X, Upload, Plus, Music, Film, Mic, Layers, Loader2, AlertTriangle } from 'lucide-react'
+import { X, Upload, Music, Film, Mic, Layers, Loader2, AlertTriangle } from 'lucide-react'
 import { useStore } from '../../stores/useStore'
 import { useUiTranslation } from '../../i18n'
 import * as api from '../../api/client'
+import type { AssetCatalogItem, AssetKind } from '../../api/assets'
+import type { ApiOutput } from '../../api/outputs'
+import { AssetInput } from '../../features/asset-picker/AssetInput.tsx'
+import { catalogOutputsFor, fileFromStudioOutput } from '../../lib/studioInputsPick.ts'
 
 // A reference clip has to be long enough to carry a subject or a motion, and short enough that its
 // conditioning rows don't dwarf the shot being generated. Mirrors the backend validator.
@@ -140,6 +144,19 @@ export function InputsPanel() {
   const [compositeBusy, setCompositeBusy] = useState(false)
   const [compositeNotice, setCompositeNotice] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null)
   const [startImageSize, setStartImageSize] = useState<ImageSize | null>(null)
+  const [catalogAssets, setCatalogAssets] = useState<AssetCatalogItem[]>([])
+  const [pickError, setPickError] = useState('')
+  const activeWorkspace = useStore(s => s.activeWorkspace)
+
+  useEffect(() => {
+    const controller = new AbortController()
+    api.fetchAssets({ workspace: activeWorkspace, limit: 100, signal: controller.signal })
+      .then(result => { if (!controller.signal.aborted) setCatalogAssets(result.assets) })
+      .catch(error => { if (!controller.signal.aborted) console.error('Asset catalog failed:', error) })
+    return () => controller.abort()
+  }, [activeWorkspace])
+
+  const itemsOf = (...kinds: AssetKind[]) => catalogOutputsFor(catalogAssets, activeWorkspace, kinds)
 
   // ── Inject capability + window layout ──────────────────────────────
   const supportsInject = useMemo(() => {
@@ -298,12 +315,6 @@ export function InputsPanel() {
     input.click()
   }
 
-  const dropOnReferenceTile = (file: File) => {
-    if (isH3) setParam('h3_reference_mode', 'references')
-    if (supportsRefVideo && file.type.startsWith('video/')) void attachReferenceVideo(file)
-    else if (!isH3 || h3ReferenceCount < 12) addImageRef(file)
-  }
-
   // Extend mode: the source video to continue from.
   const handleAddExtendSource = async (file: File) => {
     if (!file.type.startsWith('video/')) return
@@ -346,17 +357,15 @@ export function InputsPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.video_prompt_type, params.image_refs, params.frames_positions])
 
-  const pickFile = (accept: string, onFile: (f: File) => void) => {
-    const input = document.createElement('input')
-    input.type = 'file'
-    input.accept = accept
-    input.onchange = e => {
-      const f = (e.target as HTMLInputElement).files?.[0]
-      if (f) onFile(f)
+  const withPickedFile = async (item: ApiOutput, then: (file: File) => void | Promise<void>) => {
+    setPickError('')
+    try {
+      await then(await fileFromStudioOutput(item))
+    } catch (error) {
+      console.error('Studio picker failed:', error)
+      setPickError(tCommon('picker.uploadFailed'))
     }
-    input.click()
   }
-  const pickImage = (onFile: (f: File) => void) => pickFile('image/*', onFile)
 
   const createCompositeStartImage = async () => {
     const storedStart = Array.isArray(params.image_start)
@@ -790,6 +799,35 @@ export function InputsPanel() {
     setParam('audio_prompt_type', cur.includes(flag) ? cur.replace(flag, '') : cur + flag)
   }
 
+  const applyFrame = (item: ApiOutput) => { void withPickedFile(item, handleAddFrameSmart) }
+  const applyExtend = (item: ApiOutput) => {
+    void withPickedFile(item, async file => {
+      const typed = file.type.startsWith('video/') ? file : new File([file], item.name, { type: 'video/mp4' })
+      await handleAddExtendSource(typed)
+    })
+  }
+  const applySoundtrack = (item: ApiOutput) => { void withPickedFile(item, handleAddSoundtrack) }
+  const applyControlVid = (item: ApiOutput) => { void withPickedFile(item, handleAddControlVid) }
+  const applyGuideVid = (item: ApiOutput) => { void withPickedFile(item, handleAddGuideVid) }
+  const applyVoiceRef = (item: ApiOutput) => { void withPickedFile(item, setDirectorVoiceRef) }
+  const applyH3Ref = (kind: 'video' | 'audio', item: ApiOutput) => {
+    void withPickedFile(item, file => addH3Reference(kind, file))
+  }
+  const applyReference = (item: ApiOutput) => {
+    void withPickedFile(item, async file => {
+      if (isH3) setParam('h3_reference_mode', 'references')
+      if (supportsRefVideo && (file.type.startsWith('video/') || item.type === 'video')) {
+        await attachReferenceVideo(file)
+        return
+      }
+      const modelRoom = maxRefs == null ? 1 : Math.max(0, maxRefs - imageRefs.length)
+      const available = isH3
+        ? Math.max(0, Math.min(modelRoom, 9 - imageRefs.length, 12 - h3ReferenceCount))
+        : modelRoom
+      if (available > 0) addImageRef(file)
+    })
+  }
+
   const selectedFrameTile = frameTiles.find(t => t.key === selected) || null
 
   return (
@@ -808,7 +846,7 @@ export function InputsPanel() {
             </div>
           </div>
         ) : (
-          <AddTile label={t('inputs.extendFrom')} icon={<Film size={18} />} onClick={() => pickFile('video/*', handleAddExtendSource)} onDropFile={handleAddExtendSource} dropAccept="video" />
+          <InputsAssetSlot label={t('inputs.extendFrom')} items={itemsOf('video')} accept="video/*" kinds={['video']} onChoose={applyExtend} />
         ))}
 
         {/* Unified "Frame" tiles — start / end / injected keyframes, one concept,
@@ -842,8 +880,14 @@ export function InputsPanel() {
           </div>
         ))}
         {canAddFrame && (
-          <AddTile label={frameUploading ? t('chrome.uploading') : t('inputs.frame')} icon={<Plus size={18} />}
-            onClick={() => pickImage(handleAddFrameSmart)} onDropFile={handleAddFrameSmart} dropAccept="image" />
+          <InputsAssetSlot
+            label={frameUploading ? t('chrome.uploading') : t('inputs.frame')}
+            items={itemsOf('image')}
+            accept="image/*"
+            kinds={['image']}
+            disabled={frameUploading}
+            onChoose={applyFrame}
+          />
         )}
 
         {/* Soundtrack (audio) */}
@@ -852,7 +896,7 @@ export function InputsPanel() {
             imgSrc={null} selected={selected === 'audio'} onClear={removeSoundtrack}
             onSelect={() => setSelected(selected === 'audio' ? null : 'audio')} />
         ) : supportsSoundtrack && (
-          <AddTile label={t('inputs.soundtrack')} icon={<Music size={18} />} onClick={() => pickFile('.wav,.mp3,.flac,.ogg,.m4a,.mp4,.mov,.mkv,.webm', handleAddSoundtrack)} onDropFile={handleAddSoundtrack} />
+          <InputsAssetSlot label={t('inputs.soundtrack')} items={itemsOf('audio', 'video')} accept=".wav,.mp3,.flac,.ogg,.m4a,.mp4,.mov,.mkv,.webm,audio/*,video/*" kinds={['audio', 'video']} onChoose={applySoundtrack} />
         )}
 
         {/* Control video */}
@@ -861,7 +905,7 @@ export function InputsPanel() {
             imgSrc={null} selected={selected === 'ctrlvid'} onClear={removeControlVid}
             onSelect={() => setSelected(selected === 'ctrlvid' ? null : 'ctrlvid')} />
         ) : supportsControlVid && (
-          <AddTile label={t('inputs.controlVideo')} icon={<Film size={18} />} onClick={() => pickFile('.mp4,.webm,.mkv,.mov', handleAddControlVid)} onDropFile={handleAddControlVid} dropAccept="video" />
+          <InputsAssetSlot label={t('inputs.controlVideo')} items={itemsOf('video')} accept=".mp4,.webm,.mkv,.mov,video/*" kinds={['video']} onChoose={applyControlVid} />
         )}
 
         {/* Guide video (motion source) — guide_custom_choices models (SCAIL-2 etc.) */}
@@ -870,7 +914,7 @@ export function InputsPanel() {
             imgSrc={null} selected={selected === 'guidevid'} onClear={removeGuideVid}
             onSelect={() => setSelected(selected === 'guidevid' ? null : 'guidevid')} />
         ) : supportsGuideVid && (
-          <AddTile label={t('inputs.controlVideo')} icon={<Film size={18} />} onClick={() => pickFile('.mp4,.webm,.mkv,.mov', handleAddGuideVid)} onDropFile={handleAddGuideVid} dropAccept="video" />
+          <InputsAssetSlot label={t('inputs.controlVideo')} items={itemsOf('video')} accept=".mp4,.webm,.mkv,.mov,video/*" kinds={['video']} onChoose={applyGuideVid} />
         )}
 
         {/* Voice reference (ID-LoRA) — keeps the speaker's voice consistent. */}
@@ -880,7 +924,7 @@ export function InputsPanel() {
             onClear={() => { setDirectorVoiceRef(null); if (selected === 'voiceref') setSelected(null) }}
             onSelect={() => setSelected(selected === 'voiceref' ? null : 'voiceref')} />
         ) : (
-          <AddTile label={t('inputs.voiceRef')} icon={<Mic size={18} />} onClick={() => pickFile('.wav,.mp3,.flac,.ogg,.m4a', setDirectorVoiceRef)} onDropFile={setDirectorVoiceRef} dropAccept="audio" />
+          <InputsAssetSlot label={t('inputs.voiceRef')} items={itemsOf('audio')} accept=".wav,.mp3,.flac,.ogg,.m4a,audio/*" kinds={['audio']} onChoose={applyVoiceRef} />
         ))}
 
         {/* Reference images (ordered; first = main subject/landscape). Drag to reorder. */}
@@ -908,12 +952,12 @@ export function InputsPanel() {
           </div>
         ))}
         {supportsRefs && canAddRef && (!isH3 || (imageRefs.length < 9 && h3ReferenceCount < 12)) && (
-          <AddTile
+          <InputsAssetSlot
             label={supportsRefVideo ? t('inputs.referenceMixed') : t('inputs.reference')}
-            icon={<Plus size={18} />}
-            onClick={pickReferences}
-            onDropFile={dropOnReferenceTile}
-            dropAccept={supportsRefVideo ? ['image', 'video'] : 'image'}
+            items={itemsOf(...(supportsRefVideo ? (['image', 'video'] as const) : (['image'] as const)))}
+            accept={supportsRefVideo ? 'image/*,video/*' : 'image/*'}
+            kinds={supportsRefVideo ? ['image', 'video'] : ['image']}
+            onChoose={applyReference}
           />
         )}
 
@@ -926,9 +970,7 @@ export function InputsPanel() {
             onSelect={() => setSelected(selected === `h3-video-${i}` ? null : `h3-video-${i}`)} />
         ))}
         {isH3 && h3RefVideos.length < 3 && h3ReferenceCount < 12 && (
-          <AddTile label={t('inputs.videoRef')} icon={<Film size={18} />}
-            onClick={() => pickFile('.mp4,.mov,.mkv,.webm,.avi,.m4v', f => void addH3Reference('video', f))}
-            onDropFile={f => void addH3Reference('video', f)} dropAccept="video" />
+          <InputsAssetSlot label={t('inputs.videoRef')} items={itemsOf('video')} accept=".mp4,.mov,.mkv,.webm,.avi,.m4v,video/*" kinds={['video']} onChoose={item => applyH3Ref('video', item)} />
         )}
         {isH3 && h3RefAudios.map((path, i) => (
           <Tile key={`h3-audio-${i}`} role={t('inputs.audioRefN', { n: i + 1 })} filledIcon={<Music size={20} />}
@@ -937,11 +979,10 @@ export function InputsPanel() {
             onSelect={() => setSelected(selected === `h3-audio-${i}` ? null : `h3-audio-${i}`)} />
         ))}
         {isH3 && h3RefAudios.length < 3 && h3ReferenceCount < 12 && (
-          <AddTile label={t('inputs.audioRef')} icon={<Music size={18} />}
-            onClick={() => pickFile('.wav,.mp3,.flac,.ogg,.m4a,.aac', f => void addH3Reference('audio', f))}
-            onDropFile={f => void addH3Reference('audio', f)} dropAccept="audio" />
+          <InputsAssetSlot label={t('inputs.audioRef')} items={itemsOf('audio')} accept=".wav,.mp3,.flac,.ogg,.m4a,.aac,audio/*" kinds={['audio']} onChoose={item => applyH3Ref('audio', item)} />
         )}
       </div>
+      {pickError && <p className="mt-1 text-[9px] text-red-300" role="status">{pickError}</p>}
 
       {startAspectWarning && (
         <div className="mt-2 rounded-lg border border-amber-500/25 bg-amber-500/10 p-2.5">
@@ -1201,28 +1242,28 @@ function Row({ label, value }: { label: string; value: string }) {
   )
 }
 
-function AddTile({ label, icon, onClick, onDropFile, dropAccept }: {
-  label: string; icon?: React.ReactNode; onClick: () => void
-  // A tile can take more than one kind: the Reference tile accepts stills and, on models that support one,
-  // a reference clip, and decides which input the file belongs to in its drop handler.
-  onDropFile?: (f: File) => void; dropAccept?: 'image' | 'audio' | 'video' | ('image' | 'audio' | 'video')[]
+function InputsAssetSlot({
+  label, items, accept, kinds, disabled, onChoose,
+}: {
+  label: string
+  items: ApiOutput[]
+  accept: string
+  kinds: readonly AssetKind[]
+  disabled?: boolean
+  onChoose: (item: ApiOutput) => void
 }) {
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault()
-    const f = e.dataTransfer.files[0]
-    if (!f || !onDropFile) return
-    const accepted = dropAccept == null ? null : (Array.isArray(dropAccept) ? dropAccept : [dropAccept])
-    if (accepted && !accepted.some(kind => f.type.startsWith(`${kind}/`))) return
-    onDropFile(f)
-  }
   return (
-    <button onClick={onClick}
-      onDrop={onDropFile ? handleDrop : undefined}
-      onDragOver={onDropFile ? (e => e.preventDefault()) : undefined}
-      className="w-[90px] h-[90px] shrink-0 rounded-xl border border-dashed border-border hover:border-accent-blue flex flex-col items-center justify-center gap-1 text-text-muted hover:text-text-primary transition-colors">
-      {icon ?? <Plus size={18} />}
-      <span className="text-[10px] leading-tight text-center px-1 whitespace-pre-line">{label}</span>
-    </button>
+    <div className="w-[10.5rem] shrink-0 rounded-xl border border-dashed border-border p-1.5">
+      <AssetInput
+        label={label}
+        placeholder={label}
+        items={items}
+        accept={accept}
+        disabled={disabled}
+        constraints={{ kinds, maxCount: 1, optional: false }}
+        onChoose={item => { if (item) onChoose(item) }}
+      />
+    </div>
   )
 }
 
