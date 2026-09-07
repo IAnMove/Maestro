@@ -7,6 +7,7 @@ import { scene3dClipLocalTime, scene3dFrameCount, scene3dFrameTime } from '../sr
 import { cloneScene3DDocument, createDefaultScene3DDocument, parseScene3DDocument } from '../src/features/scene3d/document.ts'
 import { applyScene3DTemplate, patchScene3DSlot } from '../src/features/scene3d/templates.ts'
 import { documentFromWorld3DRequest } from '../src/features/scene3d/world3dAgent.ts'
+import { canMutateWorld3DScene, finishWorld3DExport, paintWorld3DExportFrame, startWorld3DExport } from '../src/features/scene3d/exportLock.ts'
 import { evenDim, world3dExportPlan, world3dExportSize } from '../src/features/scene3d/exportMp4.ts'
 import { world3dRecordingStub } from '../src/features/scene3d/publish.ts'
 import { hashSoftwareFrame, renderScene3DSoftware } from '../src/features/scene3d/softwareRender.ts'
@@ -221,4 +222,37 @@ test('wizard can mount the run-loop cylinder template', () => {
   const background = document.slots.find(slot => slot.slot === 'background')
   assert.equal(background?.sourceUrl, '/api/v1/file/street.png')
   assert.equal(background?.loop?.cylinder, true)
+})
+
+test('world3d export paints and publishes the snapshot after the live scene changes', () => {
+  const snapshot = applyScene3DTemplate('drive-chase')
+  const live = { current: snapshot }
+  const painted = []
+  const handle = {
+    paint(_seconds, document) {
+      painted.push((document ?? live.current).templateId)
+      return { tagName: 'CANVAS' }
+    },
+    beginExport() {},
+    endExport() {},
+    setExportSize() {},
+    restoreSize() {},
+  }
+  const frozen = startWorld3DExport(handle, snapshot, { width: 1280, height: 720 })
+  live.current = applyScene3DTemplate('cafe-dance')
+  frozen.camera.family = 'hood'
+  assert.equal(snapshot.camera.family, 'chase')
+  assert.equal(canMutateWorld3DScene(true), false)
+  assert.equal(canMutateWorld3DScene(false), true)
+  const frame = paintWorld3DExportFrame(handle, frozen, 0.5)
+  assert.equal(frame.tagName, 'CANVAS')
+  assert.deepEqual(painted, ['drive-chase'])
+  finishWorld3DExport(handle)
+})
+
+test('world3d export paint fails closed when the stage is gone', () => {
+  assert.throws(
+    () => paintWorld3DExportFrame({ paint: () => null }, applyScene3DTemplate('drive-chase'), 0),
+    /stage|listo|ready/i,
+  )
 })
