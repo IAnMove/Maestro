@@ -34,10 +34,12 @@ type Props = {
 }
 
 export type Scene3DStageHandle = {
-  paint: (seconds: number) => HTMLCanvasElement | null
+  paint: (seconds: number, document?: Scene3DDocument) => HTMLCanvasElement | null
   ready: (slots: readonly Scene3DSlot[]) => boolean
   setExportSize: (width: number, height: number) => void
   restoreSize: () => void
+  beginExport: (document: Scene3DDocument) => void
+  endExport: () => void
 }
 
 function loadSlotGltf(
@@ -107,8 +109,10 @@ export const Scene3DStage = forwardRef<Scene3DStageHandle, Props>(function Scene
   const worldRef = useRef<GpuWorld | null>(null)
   const documentRef = useRef(document)
   const onSlotClipsRef = useRef(onSlotClips)
+  const exportLockRef = useRef<Scene3DDocument | null>(null)
 
   useEffect(() => {
+    if (exportLockRef.current) return
     documentRef.current = document
   }, [document])
 
@@ -117,10 +121,10 @@ export const Scene3DStage = forwardRef<Scene3DStageHandle, Props>(function Scene
   }, [onSlotClips])
 
   useImperativeHandle(ref, () => ({
-    paint(seconds) {
+    paint(seconds, frozen) {
       const world = worldRef.current
       if (!world) return null
-      paintWorld(world, documentRef.current, seconds)
+      paintWorld(world, frozen ?? exportLockRef.current ?? documentRef.current, seconds)
       return world.renderer.domElement
     },
     ready(slots) {
@@ -136,6 +140,14 @@ export const Scene3DStage = forwardRef<Scene3DStageHandle, Props>(function Scene
       const host = hostRef.current
       if (world && host) resizeWorld(world, host)
     },
+    beginExport(next) {
+      exportLockRef.current = next
+      documentRef.current = next
+    },
+    endExport() {
+      exportLockRef.current = null
+      documentRef.current = document
+    },
   }))
 
   useEffect(() => {
@@ -143,7 +155,10 @@ export const Scene3DStage = forwardRef<Scene3DStageHandle, Props>(function Scene
     if (!host) return
     const world = createWorld(host, documentRef.current.light, documentRef.current.camera.fov)
     worldRef.current = world
-    const resize = () => resizeWorld(world, host)
+    const resize = () => {
+      if (exportLockRef.current) return
+      resizeWorld(world, host)
+    }
     resize()
     const observer = new ResizeObserver(resize)
     observer.observe(host)
@@ -156,13 +171,13 @@ export const Scene3DStage = forwardRef<Scene3DStageHandle, Props>(function Scene
 
   useEffect(() => {
     const world = worldRef.current
-    if (!world) return
+    if (!world || exportLockRef.current) return
     applyLight(world.dir, document.light)
   }, [document.light])
 
   useEffect(() => {
     const world = worldRef.current
-    if (!world) return
+    if (!world || exportLockRef.current) return
     if (document.dressing === 'cafe') {
       world.dressingReady = false
       syncDressing(world, 'cafe')
@@ -191,7 +206,7 @@ export const Scene3DStage = forwardRef<Scene3DStageHandle, Props>(function Scene
 
   useEffect(() => {
     const world = worldRef.current
-    if (!world) return
+    if (!world || exportLockRef.current) return
     const loader = new GLTFLoader()
     pruneSlots(world, document.slots)
     for (const slot of document.slots) {
@@ -214,7 +229,7 @@ export const Scene3DStage = forwardRef<Scene3DStageHandle, Props>(function Scene
 
   useEffect(() => {
     const world = worldRef.current
-    if (!world) return
+    if (!world || exportLockRef.current) return
     paintWorld(world, document, sceneSeconds)
   }, [document, sceneSeconds])
 
