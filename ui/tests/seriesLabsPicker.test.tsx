@@ -42,6 +42,16 @@ test('Series canon identity can be chosen from HocusPocus without approving the 
         total: 1,
       }), { headers: { 'content-type': 'application/json' } })
     }
+    if (url.includes('/api/v1/uploads/hero.png') && !init?.method) {
+      return new Response(new Uint8Array([137, 80, 78, 71]), { headers: { 'content-type': 'image/png' } })
+    }
+    if (url.includes('/api/v1/upload') && init?.method === 'POST') {
+      return new Response(JSON.stringify({
+        filename: 'copied.png',
+        path: '/abs/uploads/copied.png',
+        url: '/api/v1/uploads/copied.png',
+      }), { headers: { 'content-type': 'application/json' } })
+    }
     if (url.includes('/assets/import') && init?.method === 'POST') {
       imported.push(JSON.parse(String(init.body || '{}')))
       return new Response(JSON.stringify({ asset: { id: 'asset_1' }, series }), { headers: { 'content-type': 'application/json' } })
@@ -64,7 +74,7 @@ test('Series canon identity can be chosen from HocusPocus without approving the 
     fireEvent.click(card)
     fireEvent.click(screen.getByRole('button', { name: 'Choose' }))
     await waitFor(() => assert.equal(imported.length, 1))
-    assert.equal(imported[0].uploadPath, 'uploads/hero.png')
+    assert.equal(imported[0].uploadPath, '/abs/uploads/copied.png')
     assert.equal(imported[0].ownerType, 'character')
     assert.equal(imported[0].ownerId, character.id)
     assert.equal(imported[0].referenceRole, 'primary_portrait')
