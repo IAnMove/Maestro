@@ -179,6 +179,17 @@ async function confirmLibraryScene(dialog: Locator, title: string): Promise<void
   await dialog.getByRole('button', { name: 'Open scene', exact: true }).click()
 }
 
+async function chooseComposerLibraryFile(page: Page, composer: Locator, filename: string): Promise<void> {
+  await composer.getByRole('button', { name: 'From HocusPocus' }).click()
+  const explorer = page.getByRole('dialog').filter({ has: page.getByTestId('asset-explorer') }).last()
+  await expect(explorer).toBeVisible()
+  const card = explorer.locator(`button[title="${filename}"]`)
+  await expect(card).toBeVisible()
+  await card.click()
+  await explorer.getByRole('button', { name: 'Choose', exact: true }).click()
+  await expect(composer.getByText(filename).first()).toBeVisible()
+}
+
 test('opens cinema-establishing in the real editor, saves exact scene JSON, and reopens the saved scene', async ({ page }) => {
   const session = await prepareReviewPage(page)
   const state = reviewRouteState()
@@ -275,9 +286,9 @@ test('Library template bindings survive the real editor save and reopen without 
     await page.getByRole('button', { name: 'Templates · create with my Library assets' }).click()
     const composer = page.getByRole('dialog', { name: 'Create scene from Library' })
     await expect(composer.getByLabel('Visual BPM')).toBeDisabled()
-    await composer.getByRole('button', { name: 'Select hero(1).svg', exact: true }).click()
+    await chooseComposerLibraryFile(page, composer, 'hero(1).svg')
     await composer.getByRole('button', { name: 'Background (required)', exact: true }).click()
-    await composer.getByRole('button', { name: 'Select plate(1).svg', exact: true }).click()
+    await chooseComposerLibraryFile(page, composer, 'plate(1).svg')
     await composer.getByRole('checkbox').check()
     await composer.getByRole('button', { name: 'Create and open in editor', exact: true }).click()
     await expect(composer).toHaveCount(0)

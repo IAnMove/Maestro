@@ -1087,6 +1087,7 @@
     "retry": "Reintentar",
     "loadAssetsFailed": "No se pudieron cargar los assets.",
     "incompatibleKind": "Tipo incompatible con este filtro.",
+    "needsCatalogIdentity": "Este hueco necesita un asset de Library con id durable. Un archivo local no basta.",
     "pickerAria": "Selector de assets de plantilla",
     "kindImage": "Imagen",
     "kindGlb": "GLB",
