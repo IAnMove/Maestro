@@ -70,6 +70,7 @@ def test_route_rejects_unknown_filters_and_missing_assets(tmp_path: Path):
     assert client.get("/api/v1/assets", params={"workspace": "missing"}).status_code == 404
     assert client.get("/api/v1/assets", params={"collection": "magic"}).status_code == 400
     assert client.get("/api/v1/assets/nope").status_code == 404
+    assert client.get("/api/v1/assets", params={"sort": "magic"}).status_code == 400
 
 
 def test_inbox_legacy_virtual_collection_does_not_move_files(tmp_path: Path):
@@ -85,3 +86,20 @@ def test_inbox_legacy_virtual_collection_does_not_move_files(tmp_path: Path):
     assert response.status_code == 200
     assert [item["filename"] for item in response.json()["assets"]] == ["old.wav"]
     assert old.is_file() and current.is_file()
+
+
+def test_route_sorts_before_pagination(tmp_path: Path):
+    client, roots = _client(tmp_path)
+    for index, name in enumerate(("zeta.png", "alpha.png", "mu.png")):
+        output = roots["default"] / name
+        output.write_bytes(b"image")
+        write_asset_manifest(
+            output,
+            build_asset_manifest(
+                output, asset_id=f"asset_{name}", tool="studio",
+                timing={"created_at": 10 + index, "completed_at": 10 + index},
+            ),
+        )
+    listing = client.get("/api/v1/assets", params={"sort": "name_asc", "limit": 2}).json()
+    assert listing["total"] == 3
+    assert [item["filename"] for item in listing["assets"]] == ["alpha.png", "mu.png"]
