@@ -1,5 +1,6 @@
 import { h3ModelSwitchSettings, restoreSemanticBridgeSettings } from '../lib/h3OptionalSettings'
 import { restoredEditingTrim, restoreWangpSettings, viggleSubmissionOptions } from '../lib/wangpUi'
+import { latestAnchorImage, viggleEditingParameters, type ViggleEditSession } from '../lib/viggleWorkflow'
 import { beginWangpRestore, editingInputsChanged, legacyEditingPath, restoredGenericImageRefs } from '../lib/wangpRestore'
 import { create } from 'zustand'
 import type { GenerateParams, OutputFile, MediaFilter, AspectRatio, ResolutionPreset, ScailResolutionProfile, GenerationDetails, GenerationJob, ModelFamily, ModelDef, GenerationMode, ModelOptions, SystemConfig, SettingsTab, OutputMetadata, MultiClip, ServicesConfig, ProductionProfile, AudioAnalysisResult, PlannedClip, ClipPlan, DirectorClipImage, DirectorImageGenProgress, SpeakerMapping, DirectorSkill, DirectorShotImageGuidance, ShortFilmCharacter, ShortFilmPath, MusicVideoTreatment, CivitAIModel, CivitAIDownload, PipelineListItem, PipelineRepairState, SavedPipelineState, SystemDetectResponse, SystemStats, RecastCharacterMapping, RepaintRegionMapping, H3WindowPlan, DirectorV2PlanJob, DirectorV2PlanResponse } from '../types'
@@ -1112,7 +1113,7 @@ export interface AppState extends LlmSlice, StudioConfigurationSlice {
   generationMode: GenerationMode
   setGenerationMode: (mode: GenerationMode) => void
   editSubMode: import('../types').EditSubMode
-  setEditSubMode: (mode: import('../types').EditSubMode) => void
+  setEditSubMode: (mode: import('../types').EditSubMode, recastEngine?: 'scail' | 'viggle') => void
   // Edit mode state (persists across sub-mode switches)
   editVideoPath: string
   editVideoUrl: string
@@ -1203,6 +1204,9 @@ export interface AppState extends LlmSlice, StudioConfigurationSlice {
     savedImageRefs: File[]
     savedImageRefType: string
     modelType?: string
+    sourceResolution?: string
+    /** Only images published after entering this Viggle trip can be applied. */
+    viggleEditSession?: ViggleEditSession
   } | null
   setEditAnythingStartAnchor: (path: string | null) => void
   setEditAnythingEndAnchor: (path: string | null) => void
@@ -2199,32 +2203,41 @@ export const useStore = create<AppState>((set, get) => {
   // Generation mode
   generationMode: 'video',
   editSubMode: 'retake' as import('../types').EditSubMode,
-  setEditSubMode: (mode: import('../types').EditSubMode) => {
+  setEditSubMode: (mode: import('../types').EditSubMode, recastEngine?: 'scail' | 'viggle') => {
     const s = get()
     const prev = s.editSubMode
-    set({ editSubMode: mode })
-    if (mode === prev || s.generationMode !== 'avatar') return
+    const current = (s.params.model_type as string) || ''
+    const wantsViggle = mode === 'recast' && recastEngine === 'viggle'
+    const engineChange = mode === 'recast' && recastEngine !== undefined
+      && (current === 'viggle_animate') !== wantsViggle
+    // Viggle has no trim UI. A leftover Recast/Retake range would be sent as
+    // start_time/end_time and silently cut the clip (or reject a short one).
+    const enteringViggle = wantsViggle && (engineChange || mode !== prev)
+    set({
+      editSubMode: mode,
+      ...(enteringViggle ? { editStartTime: 0, editEndTime: s.editVideoDuration || 0 } : {}),
+    })
+    if ((mode === prev && !engineChange) || s.generationMode !== 'avatar') return
     // Recast uses SCAIL-2 Replace; Repaint uses the proven SCAIL-2 Animate
     // path from Studio Video/Frames. Swap recipes when moving between those
     // modes and restore the previous LTX edit model when leaving both.
-    const current = (s.params.model_type as string) || ''
     const isScail2 = (mt: string) => s.models.find(m => m.model_type === mt)?.architecture === 'scail2_14B'
     const enteringScail2Edit = mode === 'recast' || mode === 'restyle'
     const leavingScail2Edit = prev === 'recast' || prev === 'restyle'
     if (enteringScail2Edit) {
       const valid = mode === 'recast'
-        ? current === 'viggle_animate' || current === 'scail2_14B_recast_fast' || current === 'scail2_14B'
+        ? wantsViggle ? current === 'viggle_animate' : current === 'scail2_14B_recast_fast' || current === 'scail2_14B'
         : current === 'scail2_14B_fast' || current === 'scail2_14B'
       if (!valid) {
         if (!leavingScail2Edit && !isScail2(current)) {
           _preScail2AvatarModel = current
         }
         const preferred = mode === 'recast'
-          ? 'scail2_14B_recast_fast'
+          ? wantsViggle ? 'viggle_animate' : 'scail2_14B_recast_fast'
           : 'scail2_14B_fast'
         const target = s.models.some(m => m.model_type === preferred)
           ? preferred
-          : s.models.some(m => m.model_type === 'scail2_14B')
+          : !wantsViggle && s.models.some(m => m.model_type === 'scail2_14B')
             ? 'scail2_14B'
             : undefined
         if (target) get().selectModel(target)
@@ -2313,6 +2326,7 @@ export const useStore = create<AppState>((set, get) => {
   setEditAnythingEndAnchor: (path: string | null) => set({ editAnythingEndAnchor: path }),
   sendFrameToImageMode: async (which: 'start' | 'end' | 'recast' | 'repaint') => {
     const state = get()
+    const isViggle = which === 'recast' && state.params.model_type === 'viggle_animate'
     const clipPath = state.editVideoPath
     if (!clipPath) {
       console.error('Edit Anything: no source video loaded')
@@ -2338,6 +2352,7 @@ export const useStore = create<AppState>((set, get) => {
     try {
       let framePath = ''
       let frameUrl = ''
+      let sessionStartedAt = 0
       // Repaint can refine its existing edited frame. The first trip starts
       // from the source trim frame; later trips start from the applied result.
       if (which === 'repaint' && state.editRepaintFramePath) {
@@ -2358,6 +2373,12 @@ export const useStore = create<AppState>((set, get) => {
         const data = await res.json()
         framePath = (which === 'end' ? data.end_path : data.start_path) as string
         frameUrl = (which === 'end' ? data.end_url : data.start_url) as string
+        if (isViggle) {
+          sessionStartedAt = data.session_started_at
+          if (!Number.isFinite(sessionStartedAt) || sessionStartedAt <= 0) {
+            throw new Error('Frame extraction did not return a valid server timestamp')
+          }
+        }
       }
 
       // Use setGenerationMode rather than poking generationMode directly.
@@ -2366,6 +2387,7 @@ export const useStore = create<AppState>((set, get) => {
       // family default), reloads LoRAs, and resets image_mode + the
       // resolution/aspect presets that go with image generation. Without
       // this, the model stays on whatever LTX-2 video model was active.
+      if (isViggle && get().activeWorkspace !== state.activeWorkspace) return
       get().setGenerationMode('image')
 
       // Load the extracted frame into Image mode's REFERENCE images list
@@ -2376,6 +2398,7 @@ export const useStore = create<AppState>((set, get) => {
       // from empty to populated; we leave that to it.
       const blob = await fetch(frameUrl).then(r => r.blob())
       const file = new File([blob], `${which}_frame.png`, { type: blob.type || 'image/png' })
+      if (isViggle && get().activeWorkspace !== state.activeWorkspace) return
       set(s => ({
         // Replace any pre-existing refs with just our extracted frame
         // for the duration of the round-trip. Restored from the
@@ -2385,7 +2408,10 @@ export const useStore = create<AppState>((set, get) => {
         // Make sure no stale i2v fields are populated — those would land
         // in video mode's i2v slot, which isn't what we want here.
         startImage: null,
-        params: { ...s.params, image_start: '', image_mode: 1 },
+        params: { ...s.params, image_start: '', image_mode: 1,
+          ...(state.params.model_type === 'viggle_animate' && /^\d+x\d+$/.test(state.editVideoResolution)
+            ? { resolution: state.editVideoResolution } : {}),
+        },
         editReturnTarget: {
           anchor: which,
           framePath,
@@ -2395,6 +2421,12 @@ export const useStore = create<AppState>((set, get) => {
           savedImageRefs,
           savedImageRefType,
           modelType: state.params.model_type,
+          sourceResolution: state.editVideoResolution,
+          ...(isViggle ? { viggleEditSession: {
+            workspace: state.activeWorkspace,
+            startedAt: sessionStartedAt,
+            previousOutputs: s.outputs.map(({ name, url }) => ({ name, url })),
+          } } : {}),
         },
       }))
     } catch (e) {
@@ -2405,8 +2437,7 @@ export const useStore = create<AppState>((set, get) => {
     const state = get()
     const target = state.editReturnTarget
     if (!target) return
-    // Find the latest image-mode output (newest first in the outputs list).
-    const latestImage = state.outputs.find(o => o.type === 'image')
+    const latestImage = latestAnchorImage(state.outputs, target, state.activeWorkspace, state.browsingUploads)
     if (!latestImage) {
       console.error('Edit Anything return: no image-mode output yet to apply')
       return
@@ -4691,7 +4722,7 @@ export const useStore = create<AppState>((set, get) => {
       return  // Don't fall through to normal generation
     }
 
-    const params: Record<string, unknown> = { ...state.params, generation_mode: state.generationMode, workspace: state.activeWorkspace }
+    const params: Record<string, unknown> = { ...state.params, ...viggleEditingParameters(state), generation_mode: state.generationMode, workspace: state.activeWorkspace }
     const provenance = generationProvenancePayload(submissionContext)
     if (provenance) params.provenance = provenance
     if (scheduledPrompt) {

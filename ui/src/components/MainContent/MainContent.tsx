@@ -25,6 +25,8 @@ const SceneAnimatorPanel = lazy(() => import('../Sidebar/SceneAnimatorPanel')
   .then(module => ({ default: module.SceneAnimatorPanel })))
 const Scene3DEditorPanel = lazy(() => import('../../features/scene3d/Scene3DEditorPanel')
   .then(module => ({ default: module.Scene3DEditorPanel })))
+const CharacterReplacementWorkspace = lazy(() => import('../../features/characterReplacement/CharacterReplacementWorkspace')
+  .then(module => ({ default: module.CharacterReplacementWorkspace })))
 const RigAnimatePanel = lazy(() => import('../Sidebar/RigAnimatePanel')
   .then(module => ({ default: module.RigAnimatePanel })))
 const ComicEditorPanel = lazy(() => import('../../features/comics/ComicEditorPanel')
@@ -605,6 +607,10 @@ export function MainContent() {
           <ProjectsPanel />
         ) : mediaFilter === 'workspaces' ? (
           <WorkspaceCollectionsPanel />
+        ) : mediaFilter === 'character-replacement' ? (
+          <div className="flex-1 min-w-0 overflow-y-auto">
+            <CharacterReplacementWorkspace />
+          </div>
         ) : mediaFilter === 'scene3d' ? (
           <div className="flex-1 overflow-y-auto p-4 md:p-8">
             <div className="max-w-[1600px] mx-auto">

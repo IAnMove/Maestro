@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { X, Globe, BookMarked, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { useStore } from '../../stores/useStore'
 import { useIsMobile } from '../../lib/useIsMobile'
@@ -24,7 +24,6 @@ import { OutpaintControls } from './OutpaintControls'
 import { RetakeControls } from './RetakeControls'
 import { EditAnythingControls } from './EditAnythingControls'
 import { RecastControls } from './RecastControls'
-import { ViggleControls } from './ViggleControls'
 import { WangpModelControls } from './WangpModelControls'
 import { BlendControls } from './BlendControls'
 import { AnchorReturnBanner } from './AnchorReturnBanner'
@@ -39,6 +38,8 @@ import { BrandIdentity } from '../BrandIdentity'
 import { DirectorChat } from './DirectorChat'
 import { useUiTranslation } from '../../i18n'
 
+const ViggleControls = lazy(() => import('./ViggleControls').then(module => ({ default: module.ViggleControls })))
+
 export function Sidebar() {
   const { t } = useUiTranslation('navigation')
   const [toolsCollapsed, setToolsCollapsed] = useState(() =>
@@ -47,6 +48,7 @@ export function Sidebar() {
   const imageMode = useStore(s => s.params.image_mode)
   const modelOptions = useStore(s => s.modelOptions)
   const sidebarOpen = useStore(s => s.sidebarOpen)
+  const mediaFilter = useStore(s => s.mediaFilter)
   const appVersion = useStore(s => s.systemConfig?.app_version)
   const setSidebarOpen = useStore(s => s.setSidebarOpen)
   const setSidebarMode = useStore(s => s.setSidebarMode)
@@ -162,7 +164,9 @@ export function Sidebar() {
       )}
       {isRecast && (
         <>
-          {modelType === 'viggle_animate' ? <ViggleControls /> : <><RecastControls /><PromptInput /></>}
+          {modelType === 'viggle_animate'
+            ? <Suspense fallback={<div role="status">Viggle-Animate…</div>}><ViggleControls /></Suspense>
+            : <><RecastControls /><PromptInput /></>}
         </>
       )}
     </>
@@ -281,6 +285,9 @@ export function Sidebar() {
       )}
     </>
   )
+
+  // This workspace owns its controls in the central area, including on mobile.
+  if (mediaFilter === 'character-replacement') return null
 
   // Mobile: overlay drawer
   if (isMobile) {

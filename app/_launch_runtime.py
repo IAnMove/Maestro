@@ -11454,18 +11454,26 @@ async def extract_frames_endpoint(request: Request):
         video_path: str,
         start_time?: float,    # if provided, extract this frame
         end_time?: float,      # if provided, extract this frame
+        wangp_media?: bool,    # resolve canonical media URLs within their roots
+        workspace?: str,
     }
 
     Returns: {
         start_path, start_url,    # only if start_time provided
         end_path, end_url,        # only if end_time provided
+        session_started_at,      # server Unix seconds, only for wangp_media
     }
     """
     body = await request.json()
     video_path = body.get("video_path")
     if not video_path:
         raise HTTPException(status_code=400, detail="video_path is required")
-    if not os.path.isabs(video_path):
+    if body.get("wangp_media"):
+        try:
+            video_path = _resolve_wangp_visual_media(video_path, body.get("workspace"))
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+    elif not os.path.isabs(video_path):
         # Resolve relative paths against the active workspace + uploads/
         for base in [_workspace_dir(body.get("workspace")), os.path.join(os.getcwd(), "uploads")]:
             cand = os.path.join(base, os.path.basename(video_path))
@@ -11508,6 +11516,9 @@ async def extract_frames_endpoint(request: Request):
         ep = _extract(float(end_time), "end")
         response["end_path"] = ep
         response["end_url"] = f"/api/v1/uploads/{os.path.basename(ep)}"
+    if body.get("wangp_media"):
+        # Compare against output file timestamps from this same server clock.
+        response["session_started_at"] = time.time()
     return response
 
 

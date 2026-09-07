@@ -6,6 +6,46 @@ from pathlib import Path
 import pytest
 from PIL import Image
 from services.wangp_submission import prepare_viggle_recast, preserve_source_audio, resolve_wangp_media, viggle_parameters
+from services.wangp_submission import prepare_generation_inputs
+
+
+def test_legacy_image_opt_in_resolves_ordered_canonical_references_only(tmp_path):
+    uploads, workspace = tmp_path / 'uploads', tmp_path / 'outputs'
+    uploads.mkdir(); workspace.mkdir()
+    (uploads / 'same image.png').write_bytes(b'frame')
+    (workspace / 'same image.png').write_bytes(b'identity')
+    body = {'image_mode': 1, 'canonical_image_refs': True,
+            'image_refs': ['/api/v1/uploads/same%20image.png', '/api/v1/file/same%20image.png?workspace=demo'],
+            'video_guide': '/api/v1/uploads/unrelated.mp4'}
+    prepare_generation_inputs(body, {'image_outputs': True}, 'demo', uploads_dir=uploads, workspace_dir=workspace)
+    assert [Path(value).read_bytes() for value in body['image_refs']] == [b'frame', b'identity']
+    assert 'canonical_image_refs' not in body
+    assert body['video_guide'] == '/api/v1/uploads/unrelated.mp4'
+
+
+@pytest.mark.parametrize('reference', [
+    '/api/v1/file/same.png?workspace=other', '/api/v1/uploads/%2E%2E/outside.png',
+    '/api/v1/uploads/same.png', 'https://example.com/same.png', '/api/v1/uploads/escape.png',
+])
+def test_canonical_image_opt_in_rejects_foreign_missing_and_escaped_media(tmp_path, reference):
+    uploads, workspace = tmp_path / 'uploads', tmp_path / 'outputs'
+    uploads.mkdir(); workspace.mkdir()
+    (workspace / 'same.png').write_bytes(b'must not substitute')
+    outside = tmp_path / 'outside.png'
+    outside.write_bytes(b'outside')
+    (uploads / 'escape.png').symlink_to(outside)
+    body = {'image_mode': 1, 'canonical_image_refs': True, 'image_refs': [reference]}
+    with pytest.raises(ValueError):
+        prepare_generation_inputs(body, {'image_outputs': True}, 'demo', uploads_dir=uploads, workspace_dir=workspace)
+
+
+def test_legacy_references_are_unchanged_without_opt_in_and_video_cannot_opt_in(tmp_path):
+    body = {'image_refs': ['legacy.png'], 'video_guide': 'unchanged.mp4'}
+    prepare_generation_inputs(body, {}, 'demo', uploads_dir=tmp_path, workspace_dir=tmp_path)
+    assert body == {'image_refs': ['legacy.png'], 'video_guide': 'unchanged.mp4'}
+    with pytest.raises(ValueError, match='image generation'):
+        prepare_generation_inputs({'canonical_image_refs': True, 'image_mode': 0, 'image_refs': []},
+                                  {}, 'demo', uploads_dir=tmp_path, workspace_dir=tmp_path)
 
 
 def test_viggle_maps_one_edited_frame_and_keeps_source_identity():

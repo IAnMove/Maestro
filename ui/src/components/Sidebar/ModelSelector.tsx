@@ -47,22 +47,27 @@ export function ModelSelector() {
   // Build grouped model list, filtered by:
   //   1. enabledModels (Settings → System → Model Visibility),
   //   2. nsfw_only gate (Mature Mode must be on for those to appear).
+  const availableForFamily = (familyId: string) => getModelsForFamily(familyId, models, generationMode, effectiveSubMode)
+    .filter(m => !m.tool_only)
+    .filter(m => effectiveSubMode !== 'recast' || m.model_type !== 'viggle_animate')
+    .filter(m => !m.nsfw_only || nsfwMode)
   const groups = modeFamilies.map(family => ({
     family,
-    models: getModelsForFamily(family.id, models, generationMode)
-      .filter(m => !m.tool_only)
-      .filter(m => enabledModels.has(m.model_type))
-      .filter(m => !m.nsfw_only || nsfwMode),
+    models: availableForFamily(family.id).filter(m => enabledModels.has(m.model_type)),
   })).filter(g => g.models.length > 0)
 
   // How many models are available for this mode but NOT enabled — powers the
   // "+N" hint that nudges users toward Settings → Enabled Models.
   const disabledCount = modeFamilies.reduce((n, family) => {
-    const avail = getModelsForFamily(family.id, models, generationMode)
-      .filter(m => !m.tool_only)
-      .filter(m => !m.nsfw_only || nsfwMode)
+    const avail = availableForFamily(family.id)
     return n + avail.filter(m => !enabledModels.has(m.model_type)).length
   }, 0)
+
+  if (effectiveSubMode === 'recast' && currentModelType === 'viggle_animate') {
+    return <div data-wizard-anchor="model" className="rounded-lg border border-border bg-bg-tertiary px-2.5 py-2 text-xs">
+      {currentModel?.name || 'Viggle-Animate'}
+    </div>
+  }
 
   return (
     <div className="relative flex-1 min-w-0" ref={containerRef} data-wizard-anchor="model">

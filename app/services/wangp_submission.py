@@ -22,6 +22,15 @@ class JsonRequest:
 
 def prepare_generation_inputs(body, model_def, workspace, *, uploads_dir, workspace_dir):
     """Validate processor options and resolve new-family media before admission."""
+    canonical_refs = body.pop('canonical_image_refs', False)
+    if canonical_refs:
+        if canonical_refs is not True or not model_def.get('image_outputs') or body.get('image_mode') != 1:
+            raise ValueError('Canonical image references require an image generation request')
+        references = body.get('image_refs')
+        if not isinstance(references, list) or not references or any(not isinstance(value, str) for value in references):
+            raise ValueError('Canonical image references must be a non-empty ordered list')
+        body['image_refs'] = [resolve_wangp_media(value, workspace, uploads_dir=uploads_dir,
+                                                workspace_dir=workspace_dir) for value in references]
     if body.get('spatial_upsampling') or body.get('temporal_upsampling') or body.get('wangp_processor_settings'):
         from shared.wangp1272.processors import validate_selection, validated_settings
         error = validate_selection(body.get('spatial_upsampling', ''), body.get('temporal_upsampling', ''), body.get('image_mode') == 1)
@@ -39,14 +48,24 @@ def prepare_generation_inputs(body, model_def, workspace, *, uploads_dir, worksp
 
 
 def probe_video(path):
+    """Read the display dimensions used by FFmpeg's autorotated frame extraction."""
     result = subprocess.run(
         ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
-         "stream=width,height:format=duration", "-of", "json", os.fspath(path)],
+         "stream=width,height:stream_side_data=rotation:stream_tags=rotate:format=duration",
+         "-of", "json", os.fspath(path)],
         capture_output=True, text=True, check=True, timeout=30,
     )
     info = json.loads(result.stdout)
     stream = info["streams"][0]
-    return int(stream["width"]), int(stream["height"]), float(info["format"]["duration"])
+    width, height = int(stream["width"]), int(stream["height"])
+    rotation = next((item["rotation"] for item in stream.get("side_data_list", [])
+                     if item.get("rotation") is not None), stream.get("tags", {}).get("rotate", 0))
+    try:
+        if math.isclose(float(rotation) % 180, 90, abs_tol=0.01):
+            width, height = height, width
+    except (TypeError, ValueError):
+        pass
+    return width, height, float(info["format"]["duration"])
 
 
 def viggle_parameters(body, *, video, reference, width, height, duration):
