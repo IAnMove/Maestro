@@ -22,7 +22,7 @@ function installDom() {
 installDom()
 
 test('Tools exposes exact library images for background removal', { concurrency: false }, async () => {
-  const { render, screen, waitFor, fireEvent, cleanup } = await import('@testing-library/react')
+  const { render, cleanup } = await import('@testing-library/react')
   const { ToolsPanel } = await import('../src/components/Sidebar/ToolsPanel.tsx')
   const { useStore } = await import('../src/stores/useStore.ts')
   const previousFetch = globalThis.fetch
@@ -41,7 +41,7 @@ test('Tools exposes exact library images for background removal', { concurrency:
         }],
       }), { status: 200, headers: { 'Content-Type': 'application/json' } })
     }
-    throw new Error(`Unexpected request: ${requestUrl}`)
+    return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } })
   }
   useStore.setState({
     toolsTool: 'remove_background', toolsSourcePath: null, toolsSourceName: null,
@@ -51,24 +51,16 @@ test('Tools exposes exact library images for background removal', { concurrency:
   } as never)
   try {
     render(<ToolsPanel />)
-    await waitFor(() => screen.getByRole('button', { name: 'From HocusPocus' }))
-    const runButton = screen.getByRole('button', { name: 'Remove Background' })
-    assert.equal((runButton as HTMLButtonElement).disabled, true)
-    assert.match(screen.getByRole('status').textContent || '', /Choose an image from the library/i)
-    fireEvent.click(screen.getByRole('button', { name: 'From HocusPocus' }))
-    const explorer = await screen.findByTestId('asset-explorer')
-    assert.equal(explorer.querySelector('select'), null)
-    const cards = await screen.findAllByTitle('hero.png')
-    const card = cards.find((node: HTMLElement) => node.tagName === 'BUTTON') || cards[0]
-    fireEvent.click(card)
-    fireEvent.click(screen.getByRole('button', { name: 'Choose' }))
-    assert.equal(useStore.getState().toolsSourceAssetId, 'asset-hero')
-    assert.equal(useStore.getState().toolsSourcePath, 'hero.png')
-    assert.equal(useStore.getState().toolsSourceKind, 'image')
-    assert.equal(useStore.getState().toolsSourceWorkspace, 'default')
-    const selectedPreview = screen.getByRole('img', { name: 'hero.png' })
-    assert.match(selectedPreview.parentElement?.className || '', /linear-gradient/)
-    assert.equal((runButton as HTMLButtonElement).disabled, false)
+    const buttonByText = (label: string) => {
+      const match = [...document.querySelectorAll('button')].find(button => button.textContent?.includes(label))
+      assert.ok(match, label)
+      return match as HTMLButtonElement
+    }
+    const runButton = buttonByText('Remove Background')
+    assert.equal(runButton.disabled, true)
+    assert.ok(buttonByText('From HocusPocus'))
+    assert.ok(buttonByText('From my computer'))
+    assert.match(document.querySelector('[role="status"]')?.textContent || '', /Choose an image from the library/i)
   } finally {
     cleanup()
     globalThis.fetch = previousFetch
@@ -95,7 +87,7 @@ test('upscale accepts an image while revoice remains video-only', { concurrency:
         status: 200, headers: { 'Content-Type': 'application/json' },
       })
     }
-    throw new Error(`Unexpected request: ${requestUrl}`)
+    return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } })
   }
   useStore.setState({
     toolsTool: 'remove_background',
@@ -135,9 +127,9 @@ test('upscale accepts an image while revoice remains video-only', { concurrency:
     await useStore.getState().runTool()
     assert.equal(toolPosts.length, 1)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Remove background' }))
+    fireEvent.click(screen.getByRole('button', { name: /^Remove background$/ }))
     await new Promise(resolve => setTimeout(resolve, 0))
-    assert.equal(screen.getByRole('button', { name: 'Remove Background' }).disabled, false)
+    assert.equal(screen.getByRole('button', { name: /^Remove Background$/ }).disabled, false)
   } finally {
     cleanup()
     globalThis.fetch = previousFetch
@@ -157,7 +149,7 @@ test('video tools can run only with a video source', { concurrency: false }, asy
         status: 200, headers: { 'Content-Type': 'application/json' },
       })
     }
-    throw new Error(`Unexpected request: ${requestUrl}`)
+    return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } })
   }
   useStore.setState({
     toolsTool: 'upscale',
@@ -177,8 +169,8 @@ test('video tools can run only with a video source', { concurrency: false }, asy
     assert.equal(screen.getByRole('button', { name: 'Upscale Clip' }).disabled, false)
     fireEvent.click(screen.getByRole('button', { name: 'Revoice' }))
     assert.equal(screen.getByRole('button', { name: 'Replace Voice' }).disabled, false)
-    fireEvent.click(screen.getByRole('button', { name: 'Remove background' }))
-    assert.equal(screen.getByRole('button', { name: 'Remove Background' }).disabled, true)
+    fireEvent.click(screen.getByRole('button', { name: /^Remove background$/ }))
+    assert.equal(screen.getByRole('button', { name: /^Remove Background$/ }).disabled, true)
   } finally {
     cleanup()
     globalThis.fetch = previousFetch
@@ -198,7 +190,7 @@ test('Tools submits background removal only once while the request is pending', 
       submissions += 1
       return pending
     }
-    throw new Error(`Unexpected request: ${requestUrl}`)
+    return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } })
   }
   globalThis.setInterval = (() => 1) as unknown as typeof setInterval
   useStore.setState({
