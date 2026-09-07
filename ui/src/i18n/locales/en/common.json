@@ -90,7 +90,12 @@
     "titleWithDate": "{{type}} · {{date}}",
     "titleUnknownDate": "{{type}} · Unknown date",
     "incompatibleKind": "This asset type is not allowed here.",
-    "tooMany": "This field cannot accept another asset."
+    "tooMany": "This field cannot accept another asset.",
+    "fromDevice": "From my computer",
+    "fromLibrary": "From HocusPocus",
+    "remove": "Remove",
+    "uploading": "Uploading…",
+    "uploadFailed": "The file could not be uploaded."
   },
   "welcome": {
     "title": "What’s new in HocusPocus",
