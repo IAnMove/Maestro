@@ -60,7 +60,7 @@
     "models/h3_advanced/pipeline.py": {
       "source": "models/minimax_h3/pipeline.py",
       "sha256": "c45672eee493bfdca378d8ae1005cf9a7c5b96bfa63b8e2cc20d9e57b25ce70c",
-      "local_sha256": "6bf728071f1ffae062b2a0af06c8bae103da13f2c459b5e3af58b759ab3e1d66",
+      "local_sha256": "76352884cea6edd68cd8ad6d512213eb46c37cedab8e124f2bf9f0d67efc6be9",
       "adapted": true
     },
     "models/h3_advanced/interrupt.py": {
