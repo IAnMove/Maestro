@@ -14,6 +14,15 @@ export { confirmPickerChoice, livePickerItem, matchOutputByPicker } from './conf
 export { createUploadSession, fileMatchesConstraints, inferUploadKind, uploadLocalAsset } from './upload.ts'
 export { filterPickerItems, paginatePickerItems, sortPickerItems } from './localQuery.ts'
 export { createCatalogQuerySession, queryAssetCatalog, resolveAssetRef } from './query.ts'
+export {
+  confirmExplorerItem,
+  explorerCanConfirm,
+  explorerListModel,
+  explorerToolbarKinds,
+  remotePageCount,
+  resolveExplorerSelection,
+  useRemoteCatalogPage,
+} from './remoteCatalog.ts'
 export { displayAssetTitle, formatCreatedDate, formatUnknownDate, knownCreatedAt } from './titles.ts'
 export {
   ASSET_PICKER_PAGE_SIZE,
