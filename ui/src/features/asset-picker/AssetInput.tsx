@@ -103,6 +103,7 @@ export function AssetInput({
         items={items}
         selected={value}
         workspaceId={workspaceId}
+        remote={Boolean(workspaceId)}
         allowNone={optional}
         constraints={constraints}
         onClose={() => setOpen(false)}

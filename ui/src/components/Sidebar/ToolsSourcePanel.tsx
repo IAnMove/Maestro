@@ -2,6 +2,7 @@ import { Film, Image as ImageIcon, X } from 'lucide-react'
 import type { ApiOutput } from '../../api/outputs'
 import { AssetInput } from '../../features/asset-picker/AssetInput.tsx'
 import type { AssetKind } from '../../api/assets'
+import { useStore } from '../../stores/useStore'
 import { useUiTranslation } from '../../i18n'
 
 export type ToolsPanelTool = 'upscale' | 'revoice' | 'remove_background'
@@ -46,6 +47,7 @@ const SOURCE_ACCEPT: Record<ToolsPanelTool, string> = {
 
 export function ToolsSourcePanel(props: SourceProps) {
   const { t } = useUiTranslation('studio')
+  const workspaceId = useStore(s => s.activeWorkspace)
   const label = props.tool === 'remove_background'
     ? t('tools.sourceImage')
     : props.tool === 'upscale' ? t('tools.sourceMedia') : t('tools.sourceClip')
@@ -58,6 +60,7 @@ export function ToolsSourcePanel(props: SourceProps) {
         items={props.items}
         value={value}
         accept={SOURCE_ACCEPT[props.tool]}
+        workspaceId={workspaceId}
         optional
         constraints={{ kinds: SOURCE_KINDS[props.tool], maxCount: 1, optional: true }}
         onChoose={props.onChoose}

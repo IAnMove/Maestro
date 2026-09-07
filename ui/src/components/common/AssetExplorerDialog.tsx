@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { FolderOpen, X } from 'lucide-react'
 import type { ApiOutput } from '../../api/outputs'
 import type { AssetKind } from '../../api/assets'
@@ -6,11 +6,13 @@ import {
   ASSET_PICKER_PAGE_SIZE,
   checkCompatibility,
   confirmPickerChoice,
+  createCatalogQuerySession,
   filterPickerItems,
   isSameRef,
   livePickerItem,
   outputToPickerItem,
   paginatePickerItems,
+  pickerItemToOutput,
   sortPickerItems,
   type AssetConstraints,
   type CatalogSort,
@@ -67,6 +69,7 @@ type BodyProps = {
   allowNone?: boolean
   noneLabel?: string
   workspaceId?: string
+  remote?: boolean
   constraints?: AssetConstraints
   status?: 'ready' | 'loading' | 'error'
   onRetry?: () => void
@@ -100,6 +103,7 @@ function AssetExplorerBody({
   allowNone,
   noneLabel,
   workspaceId,
+  remote,
   constraints,
   status = 'ready',
   onRetry,
@@ -111,28 +115,83 @@ function AssetExplorerBody({
   const [page, setPage] = useState(0)
   const [sort, setSort] = useState<CatalogSort>('created_desc')
   const [kind, setKind] = useState<AssetKind | ''>('')
-  const pickerItems = useMemo(
+  const [retry, setRetry] = useState(0)
+  const catalogRemote = Boolean(remote && workspaceId)
+  const session = useRef(createCatalogQuerySession())
+  const [remoteItems, setRemoteItems] = useState<PickerItem[]>([])
+  const [remoteTotal, setRemoteTotal] = useState(0)
+  const [remoteStatus, setRemoteStatus] = useState<'ready' | 'loading' | 'error'>(catalogRemote ? 'loading' : 'ready')
+  useEffect(() => () => session.current.dispose(), [])
+  useEffect(() => {
+    if (!catalogRemote || !workspaceId) return
+    const kinds = kind ? [kind] : constraints?.kinds
+    void session.current.run({
+      workspace: workspaceId,
+      search: query.trim() || undefined,
+      sort,
+      kinds,
+      limit: ASSET_PICKER_PAGE_SIZE,
+      offset: page * ASSET_PICKER_PAGE_SIZE,
+    }).then(result => {
+      if (result.stale) return
+      setRemoteItems(result.items)
+      setRemoteTotal(result.total)
+      setRemoteStatus('ready')
+    }).catch(() => setRemoteStatus('error'))
+  }, [catalogRemote, constraints, kind, page, query, retry, sort, workspaceId])
+  const localItems = useMemo(
     () => items.map(item => outputToPickerItem(item, workspaceId || '')),
     [items, workspaceId],
   )
+  const pickerItems = catalogRemote ? remoteItems : localItems
   const [picked, setPicked] = useState<{ workspaceId: string; item: PickerItem } | null>(null)
   const scopedPicked = picked && picked.workspaceId === (workspaceId || '') ? picked.item : null
   const selectedFromValue = selectedOutput
     ? livePickerItem(pickerItems, outputToPickerItem(selectedOutput, workspaceId || ''))
+      ?? (catalogRemote ? outputToPickerItem(selectedOutput, workspaceId || '') : null)
     : null
   const namedMatches = selectedName ? pickerItems.filter(item => item.filename === selectedName) : []
-  const selected = livePickerItem(pickerItems, scopedPicked)
+  const selected = (catalogRemote ? scopedPicked : livePickerItem(pickerItems, scopedPicked))
     ?? selectedFromValue
     ?? (scopedPicked ? null : namedMatches.length === 1 ? namedMatches[0] : null)
   const filtered = useMemo(
-    () => sortPickerItems(filterPickerItems(pickerItems, query, kind ? [kind] : constraints?.kinds), sort),
-    [constraints, kind, pickerItems, query, sort],
+    () => sortPickerItems(filterPickerItems(localItems, query, kind ? [kind] : constraints?.kinds), sort),
+    [constraints, kind, localItems, query, sort],
   )
-  const { pages, safePage, visible } = paginatePickerItems(filtered, page, ASSET_PICKER_PAGE_SIZE)
+  const localPage = paginatePickerItems(filtered, page, ASSET_PICKER_PAGE_SIZE)
+  const pages = catalogRemote
+    ? Math.max(1, Math.ceil(remoteTotal / ASSET_PICKER_PAGE_SIZE) || 1)
+    : localPage.pages
+  const safePage = catalogRemote ? Math.min(page, pages - 1) : localPage.safePage
+  const visible = catalogRemote ? remoteItems : localPage.visible
+  const galleryStatus = catalogRemote ? remoteStatus : status
   const compatibility = selected && constraints ? checkCompatibility(selected, constraints, 0) : { allowed: true as const }
-  const stillInCatalog = Boolean(selected && livePickerItem(pickerItems, selected))
-  const selectedStillVisible = selected ? filtered.some(item => isSameRef(item.ref, selected.ref) && item.url === selected.url) : true
-  const emptyLabel = pickerItems.length && query.trim() ? t('explorer.noResults') : t('explorer.empty')
+  const stillInCatalog = catalogRemote
+    ? Boolean(selected)
+    : Boolean(selected && livePickerItem(pickerItems, selected))
+  const selectedStillVisible = selected
+    ? visible.some(item => isSameRef(item.ref, selected.ref) && item.url === selected.url)
+    : true
+  const emptyLabel = (catalogRemote ? remoteTotal : pickerItems.length) && query.trim() ? t('explorer.noResults') : t('explorer.empty')
+  const toolbarKinds = catalogRemote
+    ? [...(constraints?.kinds?.length ? constraints.kinds : ['image', 'video', 'audio', 'model3d', 'scene'] as const)]
+    : compatibleKinds(localItems, constraints)
+  const confirm = (item: PickerItem | null) => {
+    if (catalogRemote) {
+      if (!item) {
+        onChoose(null)
+        onClose()
+        return
+      }
+      const output = pickerItemToOutput(item)
+      if (!output) return
+      if (constraints && !checkCompatibility(item, constraints, 0).allowed) return
+      onChoose(output)
+      onClose()
+      return
+    }
+    confirmOutput(items, pickerItems, item, workspaceId || '', constraints, onChoose, onClose)
+  }
 
   return (
     <div
@@ -155,23 +214,23 @@ function AssetExplorerBody({
       <ExplorerToolbar
         query={query}
         kind={kind}
-        kinds={compatibleKinds(pickerItems, constraints)}
+        kinds={toolbarKinds}
         sort={sort}
         allowNone={allowNone}
         noneLabel={noneLabel}
         onQuery={value => { setQuery(value); setPage(0) }}
         onKind={value => { setKind(value); setPage(0) }}
         onSort={value => { setSort(value); setPage(0) }}
-        onClear={() => confirmOutput(items, pickerItems, null, workspaceId || '', constraints, onChoose, onClose)}
+        onClear={() => confirm(null)}
       />
       <div className="grid min-h-0 flex-1 gap-3 overflow-hidden p-4 md:grid-cols-[minmax(0,1fr)_240px]">
         <div className="min-h-0 overflow-y-auto">
           <ExplorerGallery
-            status={status}
+            status={galleryStatus}
             visible={visible}
             selected={selected}
             emptyLabel={emptyLabel}
-            onRetry={onRetry}
+            onRetry={catalogRemote ? () => setRetry(value => value + 1) : onRetry}
             onPick={item => setPicked({ workspaceId: workspaceId || '', item })}
           />
         </div>
@@ -185,13 +244,13 @@ function AssetExplorerBody({
       </div>
       <ExplorerFooter
         shown={visible.length}
-        total={filtered.length}
+        total={catalogRemote ? remoteTotal : filtered.length}
         safePage={safePage}
         pages={pages}
         canConfirm={Boolean(selected) && compatibility.allowed && stillInCatalog}
         onCancel={onClose}
         onPage={setPage}
-        onConfirm={() => selected && confirmOutput(items, pickerItems, selected, workspaceId || '', constraints, onChoose, onClose)}
+        onConfirm={() => selected && confirm(selected)}
       />
     </div>
   )
