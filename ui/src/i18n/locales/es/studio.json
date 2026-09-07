@@ -820,6 +820,7 @@
     "audioLimit": "En estas pruebas hubo habla inventada al final. El modo rápido no garantiza un diálogo limpio."
   },
   "wangp": {
+    "visualReadOnly": "Los turnos visuales solo analizan el adjunto; no ejecutan acciones. Quita el adjunto para dar instrucciones de edición.",
     "reselectMedia": "Selecciona de nuevo los medios que faltan antes de generar.",
     "viggleHint": "1. Elige un vídeo. 2. Edita un fotograma para sustituir al personaje, manteniendo pose y encuadre. 3. Genera.",
     "controlVideo": "Vídeo de control",

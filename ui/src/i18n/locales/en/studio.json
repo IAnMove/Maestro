@@ -820,6 +820,7 @@
     "audioLimit": "These tests contained invented speech at the end. Fast mode does not guarantee clean dialogue."
   },
   "wangp": {
+    "visualReadOnly": "Visual turns only analyze the attached media; they do not run actions. Clear the attachment to give editing instructions.",
     "reselectMedia": "Select the missing media again before generating.",
     "viggleHint": "1. Choose a video. 2. Edit one frame to replace the character, keeping the pose and framing. 3. Generate.",
     "controlVideo": "Control video",

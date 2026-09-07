@@ -8,6 +8,17 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def test_face_refiner_advertises_and_enforces_its_cuda_requirement(monkeypatch):
+    import torch
+    from postprocessing.h3_face_refiner.wgp_bridge import H3FaceRefinerBridge
+    from postprocessing.processor_status import handler_reason_disabled, handler_status
+    monkeypatch.setattr(torch.cuda, 'is_available', lambda: False)
+    handler = H3FaceRefinerBridge({}, None)
+    assert handler_status(handler) == 'disabled'
+    assert 'CUDA' in handler_reason_disabled(handler)
+    assert 'CUDA' in handler.validate_upsampling('h3facerefine', 0)
+
+
 def engine_function(path, name, namespace):
     tree = ast.parse((ROOT / path).read_text())
     node = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == name)

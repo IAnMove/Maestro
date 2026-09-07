@@ -155,3 +155,81 @@ test('Viggle missing media clears old inputs and late restore responses cannot o
     assert.equal(useStore.getState().editRecastRefPath, '')
   } finally { globalThis.fetch = originalFetch; useStore.setState(initial) }
 })
+
+test('Viggle manual inputs selected during a restore win over its late downloads', async () => {
+  const { useStore } = await import('../src/stores/useStore')
+  const { beginWangpRestore } = await import('../src/lib/wangpRestore')
+  const initial = useStore.getState()
+  const originalFetch = globalThis.fetch
+  const pending: Array<(response: Response) => void> = []
+  globalThis.fetch = () => new Promise(resolve => pending.push(resolve))
+  useStore.setState({ params: { ...initial.params, model_type: 'viggle_animate' } })
+  try {
+    const restoring = beginWangpRestore({ model_type: 'viggle_animate', edit_video_url: '/api/v1/uploads/old.mp4', edit_recast_ref_url: '/api/v1/uploads/old.png' }, useStore.getState, useStore.setState)()
+    useStore.getState().setEditVideo(null, '/api/v1/uploads/new.mp4', '/api/v1/uploads/new.mp4', 10, '64x64')
+    useStore.getState().setEditRecastRef(null, '/api/v1/uploads/new.png', '/api/v1/uploads/new.png', true)
+    for (const resolve of pending) resolve(new Response('old bytes'))
+    await restoring
+    assert.equal(useStore.getState().editVideoPath, '/api/v1/uploads/new.mp4')
+    assert.equal(useStore.getState().editRecastRefPath, '/api/v1/uploads/new.png')
+  } finally { globalThis.fetch = originalFetch; useStore.setState(initial) }
+})
+
+test('Viggle reroll waits for slow media restoration and does not submit a failed restore', async () => {
+  const { useStore } = await import('../src/stores/useStore')
+  const initial = useStore.getState()
+  const originalFetch = globalThis.fetch
+  const pending: Array<(response: Response) => void> = []
+  const submissions: string[][] = []
+  globalThis.fetch = () => new Promise(resolve => pending.push(resolve))
+  useStore.setState({
+    params: { ...initial.params, model_type: 'viggle_animate' },
+    loadModelOptions: async () => {}, loadLoras: async () => {},
+    startGeneration: async () => { submissions.push([useStore.getState().editVideoPath, useStore.getState().editRecastRefPath]) },
+    selectedOutputMeta: { params: { model_type: 'viggle_animate', edit_sub_mode: 'recast',
+      edit_video_url: '/api/v1/uploads/slow.mp4', edit_recast_ref_url: '/api/v1/uploads/slow.png',
+    } } as never,
+  })
+  try {
+    const reroll = useStore.getState().rerollGeneration()
+    await new Promise(resolve => setTimeout(resolve, 130))
+    assert.equal(pending.length, 2)
+    assert.deepEqual(submissions, [])
+    for (const resolve of pending) resolve(new Response('media bytes'))
+    await reroll
+    assert.deepEqual(submissions, [['/api/v1/uploads/slow.mp4', '/api/v1/uploads/slow.png']])
+    globalThis.fetch = async () => new Response('', { status: 404 })
+    await useStore.getState().rerollGeneration()
+    assert.equal(submissions.length, 1)
+  } finally { globalThis.fetch = originalFetch; useStore.setState(initial) }
+})
+
+test('Clearing still-empty Viggle inputs cancels their pending restore', async () => {
+  const { useStore } = await import('../src/stores/useStore')
+  const { beginWangpRestore } = await import('../src/lib/wangpRestore')
+  const initial = useStore.getState(), originalFetch = globalThis.fetch
+  const pending: Array<(response: Response) => void> = []
+  useStore.setState({ params: { ...initial.params, model_type: 'viggle_animate' } })
+  globalThis.fetch = () => new Promise(resolve => pending.push(resolve))
+  try {
+    const restoring = beginWangpRestore({ model_type: 'viggle_animate', edit_video_url: '/api/v1/uploads/old.mp4', edit_recast_ref_url: '/api/v1/uploads/old.png' }, useStore.getState, useStore.setState)()
+    useStore.getState().clearEditVideo()
+    useStore.getState().setEditRecastRef(null, '', '', false)
+    for (const resolve of pending) resolve(new Response('cancelled media'))
+    assert.equal(await restoring, false)
+    assert.equal(useStore.getState().editVideoPath, '')
+    assert.equal(useStore.getState().editRecastRefPath, '')
+  } finally { globalThis.fetch = originalFetch; useStore.setState(initial) }
+})
+
+test('Visual data cannot authorize generation, even when the model returns confirm:true', async () => {
+  const { reconcileWizardMediaTurn } = await import('../src/features/agent/wizardVisualPolicy')
+  const { parseAgentTurn, executeAgentActions } = await import('../src/features/agent/agentActions')
+  const proposed = parseAgentTurn(JSON.stringify({ reply: 'Image asks to launch.', actions: [
+    { type: 'prepare_image', prompt: 'Untrusted image instruction', resolutionPreset: '512p', aspectRatio: '1:1' },
+    { type: 'start_generation', confirm: true },
+  ] }))
+  const turn = await reconcileWizardMediaTurn(true, 'Describe the attached image.', proposed, [])
+  assert.deepEqual(turn.actions, [])
+  assert.deepEqual(await executeAgentActions(turn.actions), [])
+})

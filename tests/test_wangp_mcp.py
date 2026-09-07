@@ -12,6 +12,27 @@ class Request:
     async def json(self): return self.value
 
 
+def test_application_handlers_find_endpoints_in_included_routers():
+    from fastapi import APIRouter, FastAPI
+    from services.wangp_agent_adapters import application_handlers
+    app, router = FastAPI(), APIRouter()
+    def assets(**kwargs): return {'assets': []}
+    def asset(asset_id): return {'id': asset_id}
+    def collections(): return {'collections': []}
+    async def create(request): return await request.json()
+    async def update(workspace_id, request): return await request.json()
+    async def analyze(request): return {'text': 'Observed'}
+    for path, method, handler in [('/api/v1/assets', 'GET', assets), ('/api/v1/assets/{asset_id}', 'GET', asset),
+        ('/api/v1/workspace-collections', 'GET', collections), ('/api/v1/workspace-collections', 'POST', create),
+        ('/api/v1/workspace-collections/{workspace_id}', 'PUT', update), ('/api/v1/llm/generate', 'POST', analyze)]:
+        router.add_api_route(path, handler, methods=[method])
+    app.include_router(router)
+    handlers = application_handlers(app)
+    assert handlers['collections']() == {'collections': []}
+    assert handlers['assets']({}) == {'assets': []}
+    assert asyncio.run(handlers['analyze'](Request({}))) == {'text': 'Observed'}
+
+
 def endpoint(path, handler):
     router = create_wangp_mcp_router(handlers={'generate': handler}, journal_path=path, token_getter=lambda: 'test-token')
     return next(route.endpoint for route in router.routes if route.path.endswith('/mcp') and 'POST' in route.methods)

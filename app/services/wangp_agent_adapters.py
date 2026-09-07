@@ -2,9 +2,19 @@
 from services.wangp_submission import JsonRequest
 
 
+def _mounted_routes(router):
+    # FastAPI 0.140 retains included routers instead of flattening api.routes.
+    for route in router.routes:
+        included = getattr(route, 'original_router', None)
+        if included is not None:
+            yield from _mounted_routes(included)
+        else:
+            yield route
+
+
 def application_handlers(api):
     def endpoint(path, method):
-        return next(route.endpoint for route in api.routes if getattr(route, 'path', None) == path and method in getattr(route, 'methods', set()))
+        return next(route.endpoint for route in _mounted_routes(api) if getattr(route, 'path', None) == path and method in getattr(route, 'methods', set()))
 
     assets = endpoint('/api/v1/assets', 'GET')
     asset = endpoint('/api/v1/assets/{asset_id}', 'GET')

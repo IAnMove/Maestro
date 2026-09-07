@@ -264,7 +264,7 @@
     "postprocessing/h3_face_refiner/wgp_bridge.py": {
       "source": "postprocessing/h3_face_refiner/wgp_bridge.py",
       "sha256": "ebf8dc3df37fb7222ff97c7fb4c72ebbbfcaf0522f33cea3dc646641964cd2cc",
-      "local_sha256": "eb77ee457f3fcf3b6de98d676e95eff7616415fc3d5cc749cea413a4e920b24c",
+      "local_sha256": "9db8c6099d1d433ab360ef8d48c30843d451f29b54654afa3cd99b74eb9f8a26",
       "adapted": true
     },
     "postprocessing/h3_face_refiner/LICENSE.upstream": {

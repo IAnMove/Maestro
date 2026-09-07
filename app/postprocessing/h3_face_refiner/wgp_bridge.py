@@ -156,9 +156,16 @@ class H3FaceRefinerBridge(SimpleScaleSuffixMixin):
         return [(name, controls[name]) for name in self.CONFIGURABLE_FIELDS]
 
     def enabled(self) -> bool:
-        return True
+        return not self.reason_disabled
+
+    @property
+    def reason_disabled(self) -> str:
+        import torch
+        return "" if torch.cuda.is_available() else "H3 Face Refiner requires CUDA"
 
     def validate_upsampling(self, spatial_upsampling, image_mode: int) -> str:
+        if self.reason_disabled:
+            return self.reason_disabled
         split = self.split_value(spatial_upsampling)
         if image_mode:
             return "H3 Face Refiner is available for videos only"

@@ -17,6 +17,7 @@ export function WizardVisualInput({ media, onChange, workspace, disabled }: {
       </select>
       <WangpMediaInput label={t('wangp.visualEvidence')} kind={kind} path={media?.source} onChoose={item => onChange(item ? { source: item.url, kind, workspace } : null)} />
       <p className="text-text-muted">{t('wangp.visualHint')}</p>
+      <p className="text-text-muted">{t('wangp.visualReadOnly')}</p>
     </fieldset>
   </details>
 }

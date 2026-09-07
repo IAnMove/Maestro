@@ -8,6 +8,10 @@ import tempfile
 from services.wangp_submission import probe_video
 
 
+def _canonical_source(value):
+    return isinstance(value, str) and value.startswith(('/api/v1/uploads/', '/api/v1/file/'))
+
+
 def normalize_media_evidence(value):
     """Retain bounded, local evidence in durable Wizard conversations."""
     if not isinstance(value, list):
@@ -17,7 +21,7 @@ def normalize_media_evidence(value):
         if not isinstance(item, dict) or item.get('kind') not in {'image', 'video'}:
             continue
         source = item.get('source')
-        if not isinstance(source, str) or not source.startswith(('/api/v1/uploads/', '/api/v1/file/')):
+        if not _canonical_source(source):
             continue
         entry = {'source': source[:4096], 'kind': item['kind']}
         if item['kind'] == 'video':
@@ -46,6 +50,9 @@ def analysis_media(media, resolve_media):
     with tempfile.TemporaryDirectory(prefix='hocus-visual-') as temporary:
         paths, evidence = [], []
         for index, item in enumerate(media):
+            raw_source = item.get('source')
+            if not _canonical_source(raw_source):
+                raise ValueError('Visual analysis requires a canonical local media URL from the asset catalog')
             source = resolve_media(item.get('source'))
             if item['kind'] == 'video':
                 frames, timestamps = video_frames(source, temporary)

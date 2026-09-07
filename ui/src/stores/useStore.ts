@@ -1,6 +1,6 @@
 import { h3ModelSwitchSettings, restoreSemanticBridgeSettings } from '../lib/h3OptionalSettings'
 import { restoredEditingTrim, restoreWangpSettings, viggleSubmissionOptions } from '../lib/wangpUi'
-import { beginWangpRestore, legacyEditingPath, restoredGenericImageRefs } from '../lib/wangpRestore'
+import { beginWangpRestore, editingInputsChanged, legacyEditingPath, restoredGenericImageRefs } from '../lib/wangpRestore'
 import { create } from 'zustand'
 import type { GenerateParams, OutputFile, MediaFilter, AspectRatio, ResolutionPreset, ScailResolutionProfile, GenerationDetails, GenerationJob, ModelFamily, ModelDef, GenerationMode, ModelOptions, SystemConfig, SettingsTab, OutputMetadata, MultiClip, ServicesConfig, ProductionProfile, AudioAnalysisResult, PlannedClip, ClipPlan, DirectorClipImage, DirectorImageGenProgress, SpeakerMapping, DirectorSkill, DirectorShotImageGuidance, ShortFilmCharacter, ShortFilmPath, MusicVideoTreatment, CivitAIModel, CivitAIDownload, PipelineListItem, PipelineRepairState, SavedPipelineState, SystemDetectResponse, SystemStats, RecastCharacterMapping, RepaintRegionMapping, H3WindowPlan, DirectorV2PlanJob, DirectorV2PlanResponse } from '../types'
 import { DEFAULT_DIRECT_VIDEO_MASTER_PROMPT } from '../types'
@@ -1633,7 +1633,7 @@ interface AppState extends LlmSlice, StudioConfigurationSlice {
   selectedOutputMeta: OutputMetadata | null
   metadataLoading: boolean
   loadOutputMetadata: (name: string) => Promise<void>
-  loadSettingsFromOutput: () => Promise<void>
+  loadSettingsFromOutput: () => Promise<boolean | void>
   rerollGeneration: () => Promise<void>
   deleteSelectedOutput: () => Promise<void>
   rejoinClipGroup: (groupId: string) => Promise<void>
@@ -2289,7 +2289,9 @@ export const useStore = create<AppState>((set, get) => {
     editRecastRefUrl: mappings[0]?.refUrl || '',
     editRecastRefAligned: mappings[0]?.referenceAlignedToSource === true,
   }),
-  setEditRecastRef: (file, path, url, aligned = false) => set(s => ({
+  setEditRecastRef: (file, path, url, aligned = false) => set(s => {
+    editingInputsChanged()
+    return {
     editRecastRefFile: file,
     editRecastRefPath: path,
     editRecastRefUrl: url,
@@ -2304,7 +2306,8 @@ export const useStore = create<AppState>((set, get) => {
       },
       ...s.editRecastMappings.slice(1),
     ],
-  })),
+    }
+  }),
   editReturnTarget: null,
   setEditAnythingStartAnchor: (path: string | null) => set({ editAnythingStartAnchor: path }),
   setEditAnythingEndAnchor: (path: string | null) => set({ editAnythingEndAnchor: path }),
@@ -2579,6 +2582,7 @@ export const useStore = create<AppState>((set, get) => {
   setOutpaintWindowOverlap: (v) => set({ outpaintWindowOverlap: v }),
   setEditVideoPath: (path) => set({ editVideoPath: path }),
   setEditVideo: (file, path, url, duration, resolution) => set(state => {
+    editingInputsChanged()
     if (state.editVideoUrl && state.editVideoUrl !== url && state.editVideoUrl.startsWith('blob:')) {
       URL.revokeObjectURL(state.editVideoUrl)
     }
@@ -2589,6 +2593,7 @@ export const useStore = create<AppState>((set, get) => {
     }
   }),
   clearEditVideo: () => set(state => {
+    editingInputsChanged()
     if (state.editVideoUrl.startsWith('blob:')) URL.revokeObjectURL(state.editVideoUrl)
     if (state.editRepaintFrameUrl.startsWith('blob:')) URL.revokeObjectURL(state.editRepaintFrameUrl)
     return {
@@ -9262,7 +9267,6 @@ export const useStore = create<AppState>((set, get) => {
             .catch(() => {})
         }
       }
-      void finishWangpRestore()
       if (editSubMode === 'outpaint') {
         // Padding (pixels) — preserved as-is; the OutpaintCanvas reads
         // outpaintAspect + outpaintVideoBox to compose, but we also mirror
@@ -9342,14 +9346,14 @@ export const useStore = create<AppState>((set, get) => {
         }
       }
     }
+    return finishWangpRestore()
   },
 
   rerollGeneration: async () => {
     // Await the (now async, self-healing) settings load before generating, so a
     // slow on-demand metadata fetch can't let the reroll fire with stale params.
-    await get().loadSettingsFromOutput()
-    // Small delay to let state settle, then generate
-    setTimeout(() => get().startGeneration(), 100)
+    if (await get().loadSettingsFromOutput() === false) return
+    await get().startGeneration()
   },
 
   // ── Director Pipeline (server-side) ──────────────────────────────

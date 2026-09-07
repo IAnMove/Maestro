@@ -76,7 +76,11 @@ de velocidad de Qwen3.8 en esta máquina.
 Wizard puede adjuntar imágenes o un vídeo al turno. El análisis de vídeo envía
 hasta ocho fotogramas repartidos por su duración, con sus tiempos, sin audio.
 La preparación conserva el prompt literal y presenta el contenido visual como
-datos, sin autoridad para ordenar acciones. Un LLM local sin visión rechaza la
+datos, sin autoridad para ordenar acciones. Los turnos con adjunto son solo de
+análisis: las acciones sugeridas por el modelo no se ejecutan ni contestan una
+confirmación pendiente. Para dar instrucciones de edición, se retira el adjunto
+y se usa un turno de texto o el cliente MCP. Solo se aceptan URLs canónicas del
+catálogo, que se conservan con los tiempos en mensajes y trazas. Un LLM local sin visión rechaza la
 entrada visual; no responde fingiendo haberla visto. Los archivos temporales se
 eliminan al terminar la llamada.
 

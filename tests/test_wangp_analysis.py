@@ -34,7 +34,7 @@ def test_visual_request_cannot_silently_fall_back_to_text(tmp_path):
     Image.new('RGB', (64, 64)).save(source)
     service = SimpleNamespace(supports_vision=lambda: False, generate=lambda **_: pytest.fail('No visual inference available'))
     with pytest.raises(ValueError, match='vision-capable'):
-        generate_with_media(service, {'prompt': 'Describe'}, [{'source': str(source), 'kind': 'image'}], lambda value: value)
+        generate_with_media(service, {'prompt': 'Describe'}, [{'source': '/api/v1/uploads/image.png', 'kind': 'image'}], lambda _: str(source))
 
 
 @pytest.mark.parametrize('audio', [False, True])
@@ -77,7 +77,7 @@ def test_visual_model_change_while_waiting_never_returns_false_evidence(tmp_path
         yield lane
     monkeypatch.setattr(resource_scheduler.coordinator, 'acquire', acquire)
     with pytest.raises(ValueError, match='vision-capable'):
-        generate_with_media(llm_service, {'prompt': 'Describe'}, [{'source': str(source), 'kind': 'image'}], lambda value: value)
+        generate_with_media(llm_service, {'prompt': 'Describe'}, [{'source': '/api/v1/uploads/image.png', 'kind': 'image'}], lambda _: str(source))
     assert len(admissions) == 2  # The stale route was released and retried.
 
 
@@ -88,3 +88,10 @@ def test_visual_evidence_survives_durable_wizard_round_trip(tmp_path):
     write_conversation(str(tmp_path), {'revision': 0, 'messages': [{'id': 'visual-1', 'role': 'assistant',
                        'text': 'Three sampled frames.', 'createdAt': 1, 'mediaEvidence': evidence}]}, base_revision=0)
     assert read_conversation(str(tmp_path))['messages'][0]['mediaEvidence'] == evidence
+
+
+def test_analysis_rejects_noncanonical_sources_before_decoding():
+    service = SimpleNamespace(generate=lambda **_: pytest.fail('No analysis may run'))
+    for source in ('image.png', '/private/uploads/image.png', 'https://example.com/image.png'):
+        with pytest.raises(ValueError, match='canonical'):
+            generate_with_media(service, {'prompt': 'Describe'}, [{'source': source, 'kind': 'image'}], lambda _: pytest.fail('No guessed resolution'))

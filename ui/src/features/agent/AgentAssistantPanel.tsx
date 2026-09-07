@@ -11,7 +11,6 @@ import {
   wizardLlmRequestSchema,
   parseAgentTurn,
   protectUserVerbatimSegments,
-  reconcileAgentTurnWithRequest,
   type AgentActionResult,
 } from './agentActions'
 import { applyPollToCard, cardsFromResults, tabForExecutionTarget, type WizardExecutionCard } from './executionCards'
@@ -31,6 +30,7 @@ import i18n, { useUiTranslation } from '../../i18n'
 import { WizardVisualInput, type WizardVisualMedia } from './WizardVisualInput'
 import type { VisualEvidence } from './visualEvidence'
 import { WizardVisualEvidence } from './WizardVisualEvidence'
+import { reconcileWizardMediaTurn } from './wizardVisualPolicy'
 
 export { AgentAvatar, type AgentVisualState } from './AgentAvatar'
 
@@ -422,6 +422,7 @@ export function AgentAssistantPanel({ workspace, tasks, onClose, embedded = fals
   const ask = async (text: string) => {
     const question = text.trim()
     if (!question || busy) return
+    const turnMedia = visualMedia?.workspace === workspace ? [visualMedia] : undefined
     const userMessage: AgentMessage = { id: newId(), role: 'user', text: question, createdAt: Date.now() }
     const nextMessages = [...messages, userMessage].slice(-40)
     setMessages(nextMessages)
@@ -431,7 +432,7 @@ export function AgentAssistantPanel({ workspace, tasks, onClose, embedded = fals
     setState('thinking')
     const traceStartedAt = new Date().toISOString()
     try {
-      if (pendingInput) {
+      if (pendingInput && !turnMedia) {
         const answer = resolveWizardPendingAnswer(pendingInput, question)
         if (!answer) {
           const choices = pendingInput.options.map(option => `“${option.label}”`).join(', ')
@@ -451,7 +452,7 @@ export function AgentAssistantPanel({ workspace, tasks, onClose, embedded = fals
       let mediaEvidence: VisualEvidence[] = []
       const answer = await generateLlmText({
         onMediaEvidence: evidence => { mediaEvidence = evidence },
-        media: visualMedia?.workspace === workspace ? [visualMedia] : undefined,
+        media: turnMedia,
         workspace,
         system_prompt: HOCUSPOCUS_AGENT_SYSTEM_PROMPT,
         prompt: buildAgentTurnPrompt(workspace, nextMessages, tasks, buildAgentAppSnapshot({
@@ -464,7 +465,8 @@ export function AgentAssistantPanel({ workspace, tasks, onClose, embedded = fals
       })
       if (!mountedRef.current) return
       const proposedTurn = parseAgentTurn(answer)
-      const reconciledTurn = await reconcileAgentTurnWithRequest(
+      const reconciledTurn = await reconcileWizardMediaTurn(
+        Boolean(turnMedia),
         question,
         proposedTurn,
         nextMessages.map(message => ({ role: message.role, text: message.text })),

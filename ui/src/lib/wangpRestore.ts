@@ -4,6 +4,13 @@ import { fetchEditingRestoreAsset } from './wangpUi'
 type State = ReturnType<typeof useStore.getState>
 let restoreRevision = 0
 
+export function editingInputsChanged() { restoreRevision += 1 }
+
+function editingInputs(state: State) {
+  return [state.editVideoPath, state.editVideoFile, state.editVideoUrl,
+    state.editRecastRefPath, state.editRecastRefFile, state.editRecastRefUrl]
+}
+
 export function restoredGenericImageRefs(params: Record<string, unknown>, refs: string[] | undefined) {
   return params.model_type === 'viggle_animate' ? [] : refs || []
 }
@@ -14,16 +21,21 @@ export function legacyEditingPath(params: Record<string, unknown>, field: string
 
 /** Media restoration owns a snapshot; missing files and late responses cannot reuse an older job's inputs. */
 export function beginWangpRestore(params: Record<string, unknown>, get: () => State, set: (state: Partial<State>) => void) {
-  const revision = ++restoreRevision
+  let revision = ++restoreRevision
   const workspace = get().activeWorkspace
   const metadata = get().selectedOutputMeta
+  let inputs = editingInputs(get())
   const current = () => revision === restoreRevision && workspace === get().activeWorkspace
     && metadata === get().selectedOutputMeta && get().params.model_type === 'viggle_animate'
+    && editingInputs(get()).every((value, index) => value === inputs[index])
   return async () => {
-    if (params.model_type !== 'viggle_animate' || !current()) return
+    if (params.model_type !== 'viggle_animate') return true
+    if (!current()) return false
     get().clearEditVideo()
     get().setEditRecastRef(null, '', '', false)
     set({ wangpRestoreError: '' })
+    revision = restoreRevision
+    inputs = editingInputs(get())
     const restore = async (kind: 'video' | 'reference') => {
       const field = kind === 'video' ? 'edit_video_url' : 'edit_recast_ref_url'
       const path = String(params[field] || params[kind === 'video' ? 'edit_video_path' : 'edit_recast_ref_path'] || '')
@@ -40,10 +52,13 @@ export function beginWangpRestore(params: Record<string, unknown>, get: () => St
         } else {
           get().setEditRecastRef(file, path, url, true)
         }
+        revision = restoreRevision
+        inputs = editingInputs(get())
       } catch (error) {
         if (current()) set({ wangpRestoreError: `Viggle: ${kind} unavailable (${String(error)}).` })
       }
     }
     await Promise.all([restore('video'), restore('reference')])
+    return current() && !get().wangpRestoreError && Boolean(get().editVideoPath) && Boolean(get().editRecastRefPath)
   }
 }
