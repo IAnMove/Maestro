@@ -1,4 +1,4 @@
-import type { ApiOutput } from '../../api/outputs'
+import { getServerMediaReference, type ApiOutput } from '../../api/outputs'
 import type { AssetCatalogItem, AssetKind } from '../../api/assets'
 import { displayAssetTitle, knownCreatedAt } from './titles.ts'
 import type { AssetConstraints, AssetRef, Compatibility, LegacyOutputRef, PickerItem } from './types.ts'
@@ -83,6 +83,11 @@ export function matchCatalogByOutput(
     const mapped = catalogItemToOutput(item, workspaceId)
     return mapped?.name === output.name && mapped.url === output.url
   })
+}
+
+export function voiceRefFromOutput(item: ApiOutput, workspaceId?: string): { filename: string; path: string } {
+  const ref = getServerMediaReference(item.url, item.name, workspaceId)
+  return { filename: item.name, path: ref?.audio_path || item.name }
 }
 
 export function outputToPickerItem(item: ApiOutput, workspaceId: string): PickerItem {

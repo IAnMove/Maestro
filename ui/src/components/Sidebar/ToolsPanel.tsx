@@ -5,7 +5,7 @@ import { useUiTranslation } from '../../i18n'
 import * as api from '../../api/client'
 import type { AssetCatalogItem } from '../../api/assets'
 import type { ApiOutput } from '../../api/outputs'
-import { catalogItemToOutput, matchCatalogByOutput } from '../../features/asset-picker'
+import { catalogItemToOutput, matchCatalogByOutput, voiceRefFromOutput } from '../../features/asset-picker'
 import { ToolsParamsPanel } from './ToolsParamsPanel'
 import { ToolsSourcePanel, type ToolSource } from './ToolsSourcePanel'
 
@@ -110,7 +110,7 @@ export function ToolsPanel() {
       setRevoiceRef(index, null)
       return
     }
-    setRevoiceRef(index, { filename: item.name, path: item.name })
+    setRevoiceRef(index, voiceRefFromOutput(item, activeWorkspace))
   }
 
   const hasRefs = revoiceRefs.some(r => r && r.path)
