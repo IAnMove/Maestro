@@ -81,6 +81,7 @@ export function parseScene3DDocument(raw: unknown): Scene3DDocument | null {
     ? value.templateId as Scene3DTemplateId
     : 'two-shot'
   const dressing = value.dressing === 'street' || value.dressing === 'space' || value.dressing === 'treadmill' || value.dressing === 'cafe'
+    || value.dressing === 'drive-city' || value.dressing === 'drive-coast' || value.dressing === 'drive-tunnel'
     ? value.dressing
     : undefined
   return { ...value, slots, templateId, dressing } as Scene3DDocument
