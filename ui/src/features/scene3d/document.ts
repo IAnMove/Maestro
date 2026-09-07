@@ -1,4 +1,5 @@
 import { parseScene3DLoop } from './backdrop.ts'
+import { durableScene3DSourceUrl, parseScene3DSourceRef } from './slotSource.ts'
 import { SCENE3D_TEMPLATE_IDS, type Scene3DDocument, type Scene3DSlot, type Scene3DTemplateId } from './types.ts'
 
 const SLOT_COLORS: Record<string, [number, number, number]> = {
@@ -71,11 +72,17 @@ export function parseScene3DDocument(raw: unknown): Scene3DDocument | null {
   const value = raw as Partial<Scene3DDocument>
   if (value.version !== 1 || value.units !== 'meters' || value.up !== 'y') return null
   if (!Array.isArray(value.slots) || !value.camera || !value.light) return null
-  const slots = value.slots.map(slot => ({
-    ...slot,
-    media: slot.media === 'image' ? 'image' as const : 'model3d' as const,
-    loop: parseScene3DLoop(slot.loop),
-  }))
+  const slots = value.slots.map(slot => {
+    const sourceUrl = durableScene3DSourceUrl(typeof slot.sourceUrl === 'string' ? slot.sourceUrl : '')
+    const sourceRef = parseScene3DSourceRef(slot.sourceRef)
+    return {
+      ...slot,
+      sourceUrl,
+      sourceRef: sourceUrl && sourceRef ? sourceRef : undefined,
+      media: slot.media === 'image' ? 'image' as const : 'model3d' as const,
+      loop: parseScene3DLoop(slot.loop),
+    }
+  })
   const templateId: Scene3DTemplateId = typeof value.templateId === 'string'
     && (SCENE3D_TEMPLATE_IDS as readonly string[]).includes(value.templateId)
     ? value.templateId as Scene3DTemplateId
