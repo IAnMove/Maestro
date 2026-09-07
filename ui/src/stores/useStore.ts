@@ -2412,6 +2412,7 @@ export const useStore = create<AppState>((set, get) => {
           ...(isViggle ? { viggleEditSession: {
             workspace: state.activeWorkspace,
             previousOutputs: s.outputs.map(({ name, url }) => ({ name, url })),
+            startedAt: Date.now() / 1000,
           } } : {}),
         },
       }))

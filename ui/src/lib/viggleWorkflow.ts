@@ -3,6 +3,8 @@ import type { OutputFile } from '../types'
 export interface ViggleEditSession {
   workspace: string
   previousOutputs: Array<Pick<OutputFile, 'name' | 'url'>>
+  /** Unix seconds when the image step began; older gallery mtimes cannot apply. */
+  startedAt: number
 }
 
 /** Viggle requires a new edited image from this trip, in its original workspace. */
@@ -17,9 +19,11 @@ export function latestAnchorImage(
   }
   const session = target.viggleEditSession
   if (!session || session.workspace !== workspace || browsingUploads) return undefined
-  return outputs.find(output => output.type === 'image' && !session.previousOutputs.some(
-    previous => previous.name === output.name || previous.url === output.url,
-  ))
+  return outputs.find(output => output.type === 'image'
+    && (output.created_at || 0) >= session.startedAt
+    && !session.previousOutputs.some(
+      previous => previous.name === output.name || previous.url === output.url,
+    ))
 }
 
 /** Keep Auto tied to the source canvas during the Viggle image-editing step. */

@@ -176,7 +176,33 @@ test('Only Auto image editing for Viggle inherits the source canvas', () => {
     { editReturnTarget: null },
     { editReturnTarget: { modelType: 'scail2_14B', sourceResolution: '832x480' } },
     { editReturnTarget: { modelType: 'viggle_animate', sourceResolution: 'invalid' } },
-  ]) assert.deepEqual(viggleEditingParameters({ ...state, ...change }), {})
+  ])   assert.deepEqual(viggleEditingParameters({ ...state, ...change }), {})
+})
+
+test('Viggle does not treat paginated or late-loaded gallery images as new edits', () => {
+  const image = (name: string, createdAt: number): OutputFile => ({
+    name, url: `/api/v1/file/${name}`, type: 'image', mode: 'image',
+    favorite: false, size: 1, created_at: createdAt,
+  })
+  const older = image('older.png', 100)
+  const generated = image('replacement.png', 1_500)
+  const target = {
+    anchor: 'recast',
+    modelType: 'viggle_animate',
+    viggleEditSession: {
+      workspace: 'viggle-test',
+      previousOutputs: [{ name: 'recent.mp4', url: '/api/v1/file/recent.mp4' }],
+      startedAt: 1_000,
+    },
+  }
+  // Images filter / infinite scroll can load older files that were not in the snapshot.
+  assert.equal(latestAnchorImage([older], target, 'viggle-test'), undefined)
+  // An empty snapshot (gallery still loading) must not unlock existing images.
+  assert.equal(latestAnchorImage([older], {
+    ...target,
+    viggleEditSession: { ...target.viggleEditSession, previousOutputs: [] },
+  }, 'viggle-test'), undefined)
+  assert.equal(latestAnchorImage([generated, older], target, 'viggle-test'), generated)
 })
 
 test('A Viggle round trip cannot apply an old gallery image or an image from another workspace', async context => {
@@ -186,12 +212,12 @@ test('A Viggle round trip cannot apply an old gallery image or an image from ano
   const initial = useStore.getState()
   const originalFetch = globalThis.fetch
   context.mock.method(console, 'error', () => {})
-  const image = (name: string, workspace = 'viggle-test'): OutputFile => ({
+  const image = (name: string, workspace = 'viggle-test', createdAt = 1): OutputFile => ({
     name, url: `/api/v1/file/${name}?workspace=${workspace}`, type: 'image', mode: 'image',
-    favorite: false, size: 1, created_at: 1,
+    favorite: false, size: 1, created_at: createdAt,
   })
   const oldImage = image('unrelated.png')
-  const newImage = image('replacement.png')
+  let newImage = image('replacement.png')
   const savedRefs = [new dom.window.File([], 'previous-reference.png')]
   globalThis.fetch = async (input, init) => {
     if (String(input) === '/api/v1/extract-frames') {
@@ -217,6 +243,7 @@ test('A Viggle round trip cannot apply an old gallery image or an image from ano
     await useStore.getState().sendFrameToImageMode('recast')
     const target = useStore.getState().editReturnTarget!
     assert.equal(target.viggleEditSession?.workspace, 'viggle-test')
+    newImage = image('replacement.png', 'viggle-test', (target.viggleEditSession?.startedAt || 0) + 1)
     const view = render(<AnchorReturnBanner />)
     assert.equal(view.getByRole('button', { name: 'Apply & return' }).hasAttribute('disabled'), true)
     await act(async () => { await useStore.getState().applyOutputAsAnchor() })
