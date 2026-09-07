@@ -48,8 +48,9 @@ Al cerrar esta revisión el taller de habla (#200), la limpieza documental
 (#198) se mezcló en development el 07/09 (`fae7d3f6`). Estado por dominio:
 
 - **Selector universal de recursos (PR 4)**: campo de doble origen
-  (`AssetInput`). Rama `feat/asset-picker-input`. Preview #210 ya integrado.
-  Cursor: no ejecutada (cuota). No mezclar hasta que lo pidan.
+  (`AssetInput`). PR [#211](https://github.com/IAnMove/hocuspocus/pull/211), rama
+  `feat/asset-picker-input`. Preview #210 ya integrado. Cursor: no ejecutada
+  (cuota). No mezclar hasta que lo pidan.
 - **Vídeo procedural**: conservar el checkpoint `work/procedural-video-pilot-checkpoint`;
   consultar [PROCEDURAL_VIDEO_ROADMAP](PROCEDURAL_VIDEO_ROADMAP.md) y el documento del
   subdominio asignado. No mezclar el checkpoint en bloque ni asumir que todo su
