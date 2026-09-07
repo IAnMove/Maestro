@@ -6,6 +6,7 @@ import {
   catalogItemToOutput,
   catalogItemToPickerItem,
   matchCatalogByOutput,
+  voiceRefFromOutput,
   checkCompatibility,
   confirmPickerChoice,
   createCatalogQuerySession,
@@ -38,6 +39,41 @@ function catalogItem(overrides: Partial<AssetCatalogItem> & Pick<AssetCatalogIte
     ...overrides,
   }
 }
+
+test('voice refs keep the uploads/audio subfolder the backend can resolve', () => {
+  const uploaded = voiceRefFromOutput({
+    name: '9f2.wav',
+    type: 'audio',
+    mode: null,
+    size: 12,
+    created_at: 1,
+    url: '/api/v1/uploads/audio/9f2.wav',
+    thumbnail_url: '',
+  }, 'default')
+  assert.deepEqual(uploaded, { filename: '9f2.wav', path: 'audio/9f2.wav' })
+
+  const library = voiceRefFromOutput({
+    name: 'hero.wav',
+    type: 'audio',
+    mode: null,
+    size: 12,
+    created_at: 1,
+    url: '/api/v1/file/hero.wav?workspace=default',
+    thumbnail_url: '',
+  }, 'default')
+  assert.deepEqual(library, { filename: 'hero.wav', path: 'hero.wav' })
+
+  const videoUpload = voiceRefFromOutput({
+    name: 'take.mp4',
+    type: 'video',
+    mode: null,
+    size: 12,
+    created_at: 1,
+    url: '/api/v1/uploads/take.mp4',
+    thumbnail_url: '',
+  }, 'default')
+  assert.deepEqual(videoUpload, { filename: 'take.mp4', path: 'take.mp4' })
+})
 
 test('catalog items map to outputs and match back by name and url', () => {
   const item = catalogItem({ id: 'asset-hero', filename: 'hero.png' })

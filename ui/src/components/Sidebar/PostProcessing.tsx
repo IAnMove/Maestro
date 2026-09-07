@@ -4,7 +4,7 @@ import { useStore } from '../../stores/useStore'
 import { useUiTranslation } from '../../i18n'
 import * as api from '../../api/client'
 import type { ApiOutput } from '../../api/outputs'
-import { catalogItemToOutput } from '../../features/asset-picker'
+import { catalogItemToOutput, voiceRefFromOutput } from '../../features/asset-picker'
 import { AssetInput } from '../../features/asset-picker/AssetInput.tsx'
 
 const baseOptions = [
@@ -221,7 +221,7 @@ export function PostProcessing() {
                           accept="audio/*,video/*"
                           optional
                           constraints={{ kinds: ['audio', 'video'], maxCount: 1, optional: true }}
-                          onChoose={item => setVoiceCloneRef(idx, item ? { filename: item.name, path: item.name } : null)}
+                          onChoose={item => setVoiceCloneRef(idx, item ? voiceRefFromOutput(item, activeWorkspace) : null)}
                         />
                         {ref?.path && (
                           <div className="mt-1 flex items-center gap-2 bg-bg-tertiary border border-border rounded-lg px-2 py-1.5">
