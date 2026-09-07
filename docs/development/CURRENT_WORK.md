@@ -1,6 +1,6 @@
 # Estado de desarrollo y punto de entrada
 
-Verificado el 7 de septiembre de 2026 contra `origin/development` **`f1855ab7`**.
+Verificado el 7 de septiembre de 2026 contra `origin/development` **`4cce2452`**.
 Es una fotografía con evidencia, no un sustituto de Git. Antes de reservar trabajo:
 `git fetch origin development`, consultar PR abiertos y comprobar sus archivos.
 
@@ -29,11 +29,13 @@ no autorizan acciones ni representan el estado actual.
 | Inspección GLB y parches faciales | #190, #193, #195 | Router de inspección de #195 todavía sin montar; parches tienen límites de piloto |
 | Taller de habla 2D (preparación manual) | #200 | Panel, borrador, recarga y e2e simulado. El test del panel evita aserciones HTMLElement-vs-null (~260 MiB RSS). No es validación artística de un personaje hablando ni cierra R2–R4 |
 | Series attemptId vs número de plano | #201 | `attempt_id` en un único shot selecciona esa toma histórica. `shot_numbers: [2]` sin `attempt_id` sigue siendo el último eligible del plano 2. No cubre móvil real ni GPU |
-| Escenas 3D reales (editor + AssetExplorer inicial) | #198, merge `fae7d3f6` | No es el selector universal. Conserva doble clic, preselección del primero e identidad por `name` |
+| Escenas 3D reales (editor + AssetExplorer inicial) | #198, merge `fae7d3f6` | Explorador inicial; el contrato transaccional está en #208 |
 | Plantillas musicales vídeo 3D | #204 | Cámara `side` y plantillas de videoclip; `Scene3DWorkspace` ya no está reservado por un PR abierto |
 | Copy i18n de Vídeo 3D / compositor | #205 | No cubre todo el chrome restante del laboratorio de plantillas |
 | Inventario selector universal | #206 | Contrato e inventario; no implementa el picker |
 | Contrato selector (PR 1) | #207, merge `f1855ab7` | Identidad, sort/paginación y adapters. No es el modal transaccional |
+| Modal selector transaccional (PR 2) | #208, merge `059282ed` | Choose/Cancel/None; sin doble clic ni preselección. No es preview real ni dual origin |
+| Set café vídeo 3D | #209 | Decorado texturizado; no es el picker |
 
 La integración es en **development**. No implica que el servidor local esté usando
 esa revisión ni que exista una publicación de aplicación en main.
@@ -44,10 +46,10 @@ Al cerrar esta revisión el taller de habla (#200), la limpieza documental
 (#199) y el contrato attemptId (#201) ya están integrados. Escenas 3D reales
 (#198) se mezcló en development el 07/09 (`fae7d3f6`). Estado por dominio:
 
-- **Selector universal de recursos (PR 2)**: modal común transaccional sobre
-  `AssetExplorerDialog`. PR [#208](https://github.com/IAnMove/hocuspocus/pull/208),
-  rama `feat/asset-picker-modal`. Contrato #207 ya integrado. Cursor: no
-  ejecutada (cuota). No mezclar hasta que lo pidan.
+- **Selector universal de recursos (PR 3)**: preview RAM-safe (un reproductor /
+  un visor GLB). PR [#210](https://github.com/IAnMove/hocuspocus/pull/210), rama
+  `feat/asset-picker-preview`. Modal #208 ya integrado. Cursor: no ejecutada
+  (cuota). No mezclar hasta que lo pidan.
 - **Vídeo procedural**: conservar el checkpoint `work/procedural-video-pilot-checkpoint`;
   consultar [PROCEDURAL_VIDEO_ROADMAP](PROCEDURAL_VIDEO_ROADMAP.md) y el documento del
   subdominio asignado. No mezclar el checkpoint en bloque ni asumir que todo su
