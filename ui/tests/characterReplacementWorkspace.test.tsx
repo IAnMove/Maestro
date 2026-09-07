@@ -107,6 +107,22 @@ test('Choosing the playhead frame is explicit and uses the native video time', a
   } finally { await f.close() }
 })
 
+test('Each workspace starts with explicit inputs and never inherits Studio uploads', async () => {
+  const f = await fixture()
+  try {
+    f.useStore.setState({ editVideoPath: '/api/v1/uploads/studio.mp4', editVideoUrl: '/api/v1/uploads/studio.mp4' })
+    const view = f.render()
+    assert.equal(view.container.querySelector('video'), null)
+    assert.equal(f.session().source, null)
+    await f.act(async () => { f.actions.editReplacementSession('replacement-test', { source: asset('chosen.mp4', 'video') }, 'source') })
+    assert.equal(view.container.querySelector('video')?.getAttribute('src'), '/api/v1/uploads/chosen.mp4')
+    await f.act(async () => { f.useStore.setState({ activeWorkspace: 'another-workspace' }) })
+    assert.equal(view.container.querySelector('video'), null)
+    await f.act(async () => { f.useStore.setState({ activeWorkspace: 'replacement-test' }) })
+    assert.equal(view.container.querySelector('video')?.getAttribute('src'), '/api/v1/uploads/chosen.mp4')
+  } finally { await f.close() }
+})
+
 test('One click sequence generates one exact frame job; edits invalidate its dependent result', async () => {
   const f = await fixture()
   f.seed({})

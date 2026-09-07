@@ -11,18 +11,7 @@ export function useCharacterReplacement() {
   const workspace = useStore(state => state.activeWorkspace)
   const models = useStore(state => state.models)
   const stored = useReplacementSessions(state => state.sessions[workspace])
-  const initial = useMemo(() => {
-    const studio = useStore.getState()
-    const candidate = studio.editVideoUrl || studio.editVideoPath
-    const scope = candidate.startsWith('/api/v1/file/')
-      ? new URL(candidate, 'http://local.invalid').searchParams.get('workspace') : null
-    const url = scope && scope !== workspace ? '' : candidate
-    const source: ApiOutput | null = url ? {
-      name: url.split('/').pop()?.split('?')[0] || 'video', url, type: 'video', mode: null,
-      created_at: 0, size: 0,
-    } : null
-    return newReplacementSession(t('characterReplacement.defaultPrompt'), source)
-  }, [workspace, t])
+  const initial = useMemo(() => newReplacementSession(t('characterReplacement.defaultPrompt')), [t])
   useEffect(() => {
     if (!useReplacementSessions.getState().sessions[workspace]) {
       useReplacementSessions.setState(state => ({ sessions: { ...state.sessions, [workspace]: initial } }))
