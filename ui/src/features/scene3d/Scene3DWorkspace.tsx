@@ -3,14 +3,17 @@ import { fetchOutputs, type ApiOutput } from '../../api/client'
 import { AssetInput } from '../../features/asset-picker/AssetInput.tsx'
 import { useUiTranslation } from '../../i18n'
 import { useStore } from '../../stores/useStore'
-import { cameraEyeAtTime, projectPoint } from './camera.ts'
-import { clipBindingError, resolveScene3DClip } from './clips.ts'
-import { scene3dFrameCount, scene3dFrameTime } from './clock.ts'
+import { Scene3DTemplateBrowser } from './Scene3DTemplateBrowser'
+import { Scene3DTransport } from './Scene3DTransport'
+import { Scene3DTransformPanel } from './Scene3DTransformPanel'
+import type { TransformMode } from './transformGizmo'
+import { clipBindingError, resolveScene3DClip, retainSlotClipCatalogs } from './clips.ts'
+import { scene3dFrameCount, scene3dFrameTime, scene3dPlaybackSpeed } from './clock.ts'
 import { parseScene3DDocument } from './document.ts'
 import { canMutateWorld3DScene } from './exportLock.ts'
 import { exportWorld3DDocument } from './exportFlow.ts'
 import { Scene3DStage, type Scene3DStageHandle } from './Scene3DStage.tsx'
-import { applyScene3DTemplate, patchScene3DSlot, SCENE3D_TEMPLATES, type Scene3DTemplateId } from './templates.ts'
+import { applyScene3DTemplate, patchScene3DSlot, remountScene3DTemplate, type Scene3DTemplateId } from './templates.ts'
 import { commitSlotSourceChoice, pickerOutputFromSlot, type SlotSourceCapture } from './slotSource.ts'
 import type { Scene3DCameraFamily, Scene3DClipCatalogEntry, Scene3DDocument, Scene3DLoop, Scene3DSlot } from './types.ts'
 import { documentFromWorld3DRequest, listenForWorld3DWorkflow } from './world3dAgent.ts'
@@ -47,13 +50,15 @@ function numberField(label: string, value: number, onChange: (value: number) => 
 
 export function Scene3DWorkspace({ width, height }: Props) {
   const { t } = useUiTranslation('scene3d')
+  const { t: editorT } = useUiTranslation('scene3dEditor')
+  const [transformMode, setTransformMode] = useState<TransformMode>('translate')
+  const [keepAssets, setKeepAssets] = useState(true)
   const [sceneDoc, setSceneDoc] = useState<Scene3DDocument>(() => applyScene3DTemplate('two-shot'))
   const [playing, setPlaying] = useState(false)
   const [frame, setFrame] = useState(0)
   const [selectedId, setSelectedId] = useState('subject_1')
   const frameRef = useRef(0)
   const sceneDocRef = useRef(sceneDoc)
-  const dragRef = useRef<{ id: string; startX: number; startZ: number; pointerX: number; pointerY: number } | null>(null)
   const [catalogs, setCatalogs] = useState<Record<string, Scene3DClipCatalogEntry[]>>({})
   const [modelItems, setModelItems] = useState<ApiOutput[]>([])
   const [imageItems, setImageItems] = useState<ApiOutput[]>([])
@@ -65,6 +70,7 @@ export function Scene3DWorkspace({ width, height }: Props) {
   const stageRef = useRef<Scene3DStageHandle>(null)
   const workspace = useStore(s => s.activeWorkspace)
   const fps = sceneDoc.fps
+  const speed = scene3dPlaybackSpeed(sceneDoc.playbackSpeed)
   const count = scene3dFrameCount(sceneDoc.duration, fps)
   const seconds = scene3dFrameTime(frame, sceneDoc.duration, fps)
   const selected = sceneDoc.slots.find(slot => slot.id === selectedId) ?? sceneDoc.slots[0]
@@ -119,7 +125,7 @@ export function Scene3DWorkspace({ width, height }: Props) {
     const origin = performance.now()
     const originFrame = frameRef.current
     const tick = () => {
-      const elapsed = scene3dFrameTime(originFrame, sceneDoc.duration, fps) + (performance.now() - origin) / 1000
+      const elapsed = scene3dFrameTime(originFrame, sceneDoc.duration, fps) + (performance.now() - origin) / 1000 * speed
       const wrapped = elapsed % Math.max(sceneDoc.duration, 0.001)
       const next = Math.min(count - 1, Math.round(wrapped * fps))
       setFrame(current => (current === next ? current : next))
@@ -127,7 +133,7 @@ export function Scene3DWorkspace({ width, height }: Props) {
     }
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
-  }, [playing, sceneDoc.duration, fps, count])
+  }, [playing, sceneDoc.duration, fps, count, speed])
 
   useEffect(() => {
     if (workspaceRef.current && workspaceRef.current !== workspace) generationRef.current += 1
@@ -193,27 +199,14 @@ export function Scene3DWorkspace({ width, height }: Props) {
   const mountTemplate = (id: Scene3DTemplateId) => {
     if (!canMutateWorld3DScene(exportingRef.current)) return
     generationRef.current += 1
-    for (const slot of sceneDoc.slots) revokeIfBlob(slot.sourceUrl)
-    applyScene(applyScene3DTemplate(id))
-    setCatalogs({})
+    const next = remountScene3DTemplate(id, sceneDoc, keepAssets)
+    const keptUrls = new Set(next.slots.map(slot => slot.sourceUrl))
+    for (const slot of sceneDoc.slots) if (!keptUrls.has(slot.sourceUrl)) revokeIfBlob(slot.sourceUrl)
+    setPlaying(false)
+    applyScene(next)
+    setCatalogs(current => retainSlotClipCatalogs(sceneDoc.slots, next.slots, current))
     setFrame(0)
-    setSelectedId(applyScene3DTemplate(id).slots[0]?.id ?? 'subject_1')
-  }
-
-  const hitSlot = (clientX: number, clientY: number, host: HTMLDivElement) => {
-    const bounds = host.getBoundingClientRect()
-    const nx = (clientX - bounds.left) / Math.max(1, bounds.width)
-    const ny = (clientY - bounds.top) / Math.max(1, bounds.height)
-    const eye = cameraEyeAtTime(sceneDoc.camera, seconds, sceneDoc.duration, sceneDoc.slots)
-    let best: { id: string; dist: number } | null = null
-    for (const slot of sceneDoc.slots) {
-      if (slot.slot === 'background') continue
-      const projected = projectPoint(slot.position, eye, sceneDoc.camera.look, sceneDoc.camera.fov, bounds.width / Math.max(1, bounds.height))
-      if (!projected) continue
-      const dist = Math.hypot(projected.x - nx, projected.y - ny)
-      if (dist < 0.08 && (!best || dist < best.dist)) best = { id: slot.id, dist }
-    }
-    return best?.id ?? null
+    setSelectedId(next.slots.find(slot => slot.media === 'model3d')?.id ?? next.slots[0]?.id ?? 'subject_1')
   }
 
   const roundtrip = Boolean(parseScene3DDocument(JSON.parse(JSON.stringify(sceneDoc))))
@@ -221,7 +214,6 @@ export function Scene3DWorkspace({ width, height }: Props) {
   const exportScene = async () => {
     const stage = stageRef.current
     if (!stage || exportingRef.current || playing) return
-    dragRef.current = null
     setExportingFlag(true)
     setExportNote(t('stage.exporting'))
     try {
@@ -240,90 +232,57 @@ export function Scene3DWorkspace({ width, height }: Props) {
 
   return (
     <div className="flex w-full flex-col gap-2" data-testid="scene3d-workspace">
-      <div className="flex flex-wrap gap-1">
-        {SCENE3D_TEMPLATES.map(template => (
-          <button
-            key={template.id}
-            type="button"
-            disabled={exporting}
-            data-testid={`world3d-template-${template.id}`}
-            onClick={() => mountTemplate(template.id)}
-            className={`rounded border px-1.5 py-1 text-[9px] disabled:opacity-40 ${sceneDoc.templateId === template.id ? 'border-cyan-300 bg-cyan-400/10 text-cyan-100' : 'border-border text-text-muted'}`}
-          >
-            {t(`stage.template.${template.id}`)}
-          </button>
-        ))}
-      </div>
+      <details className="rounded-xl border border-border bg-bg-secondary">
+        <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-text-primary">{editorT('templates')} · {editorT(`template.${sceneDoc.templateId}.title`)}</summary>
+      <Scene3DTemplateBrowser selected={sceneDoc.templateId} disabled={exporting} onSelect={mountTemplate} />
+      <label className="flex min-h-10 items-center gap-2 px-1 text-xs text-text-secondary"><input type="checkbox" checked={keepAssets} disabled={exporting} onChange={event => setKeepAssets(event.target.checked)} />{editorT('keepAssets')}</label>
+      </details>
+      <Scene3DTransport playing={playing} disabled={exporting} seconds={seconds} duration={sceneDoc.duration} speed={speed}
+        onToggle={() => { if (canMutateWorld3DScene(exportingRef.current)) setPlaying(current => !current) }}
+        onSeek={time => { if (exportingRef.current) return; setPlaying(false); setFrame(Math.min(count - 1, Math.max(0, Math.round(time * fps)))) }}
+        onSpeed={playbackSpeed => applyScene(current => ({ ...current, playbackSpeed }))} />
       <div
         className="relative w-full overflow-hidden rounded-lg border border-border bg-[#10141c]"
         style={{ aspectRatio: `${width} / ${height}` }}
-        onPointerDown={event => {
-          if (!canMutateWorld3DScene(exportingRef.current)) return
-          const id = hitSlot(event.clientX, event.clientY, event.currentTarget)
-          if (!id) return
-          const slot = sceneDoc.slots.find(item => item.id === id)
-          if (!slot) return
-          setSelectedId(id)
-          dragRef.current = { id, startX: slot.position[0], startZ: slot.position[2], pointerX: event.clientX, pointerY: event.clientY }
-          event.currentTarget.setPointerCapture(event.pointerId)
-        }}
-        onPointerMove={event => {
-          const drag = dragRef.current
-          if (!drag) return
-          const dx = (event.clientX - drag.pointerX) * 0.008
-          const dz = (event.clientY - drag.pointerY) * 0.008
-          applyScene(current => patchScene3DSlot(current, drag.id, {
-            position: [drag.startX + dx, current.slots.find(slot => slot.id === drag.id)?.position[1] ?? 0, drag.startZ + dz],
-          }))
-        }}
-        onPointerUp={() => { dragRef.current = null }}
       >
         <Scene3DStage
           ref={stageRef}
           document={sceneDoc}
           sceneSeconds={seconds}
+          selectedId={selectedId}
+          transformMode={transformMode}
+          editing={!playing && !exporting}
+          onSelect={setSelectedId}
+          onTransform={(id, patch) => applyScene(current => patchScene3DSlot(current, id, patch))}
           onSlotClips={(slotId, clips) => setCatalogs(current => ({ ...current, [slotId]: clips }))}
         />
-        <div className="pointer-events-none absolute left-2 top-2 rounded bg-black/55 px-1.5 py-1 text-[8px] text-cyan-200">
-          {t('stage.badge')} · {t(`stage.template.${sceneDoc.templateId}`)} · {sceneDoc.camera.family} · {seconds.toFixed(2)}s
+        <div className="pointer-events-none absolute left-3 top-3 rounded-lg bg-black/75 px-3 py-2 text-xs text-cyan-200">
+          {t('stage.badge')} · {editorT(`template.${sceneDoc.templateId}.title`)}
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-1.5 text-[9px]">
-        {FAMILIES.map(family => (
-          <button
-            key={family}
-            type="button"
-            disabled={exporting}
-            onClick={() => applyScene(current => ({ ...current, camera: { ...current.camera, family } }))}
-            className={`rounded border px-1.5 py-1 disabled:opacity-40 ${sceneDoc.camera.family === family ? 'border-cyan-300 bg-cyan-400/10 text-cyan-100' : 'border-border text-text-muted'}`}
-          >
-            {t(`stage.family.${family}`)}
-          </button>
-        ))}
-        <button type="button" disabled={exporting} onClick={() => { if (canMutateWorld3DScene(exportingRef.current)) setPlaying(current => !current) }} className="rounded border border-border bg-bg-primary px-2 py-1 disabled:opacity-40">
-          {playing ? t('stage.pause') : t('stage.play')}
-        </button>
+      <div className="flex flex-wrap items-center gap-3">
+        <label className="flex items-center gap-2 text-sm text-text-primary">{editorT('camera')}
+          <select disabled={exporting} value={sceneDoc.camera.family} onChange={event => applyScene(current => ({ ...current, camera: { ...current.camera, family: event.target.value as Scene3DCameraFamily } }))}
+            className="min-h-11 rounded-lg border border-border bg-bg-primary px-3 text-xs disabled:opacity-40">
+            {FAMILIES.map(family => <option key={family} value={family}>{t(`stage.family.${family}`)}</option>)}
+          </select>
+        </label>
         <button
           type="button"
           data-testid="world3d-export"
           disabled={exporting || playing}
           onClick={() => void exportScene()}
-          className="rounded border border-cyan-400/50 bg-cyan-400/10 px-2 py-1 text-cyan-100 disabled:opacity-40"
+          className="ml-auto min-h-11 rounded-lg border border-cyan-400/50 bg-cyan-400/10 px-4 text-xs font-semibold text-cyan-100 disabled:opacity-40"
         >
           {exporting ? t('stage.exporting') : t('stage.export')}
         </button>
-        <span className="text-text-muted">{t('stage.eye', { x: cameraEyeAtTime(sceneDoc.camera, seconds, sceneDoc.duration, sceneDoc.slots)[0].toFixed(2) })}</span>
       </div>
-      {selected && (
-        <div className="flex flex-wrap gap-2 rounded border border-border bg-bg-primary p-1.5" data-testid="scene3d-transforms">
-          <span className="text-[9px] font-medium text-text-primary">{t(`stage.slot.${selected.slot}`)}</span>
-          {numberField('X', selected.position[0], value => applyScene(current => patchScene3DSlot(current, selected.id, { position: [value, selected.position[1], selected.position[2]] })), 0.05, exporting)}
-          {numberField('Y', selected.position[1], value => applyScene(current => patchScene3DSlot(current, selected.id, { position: [selected.position[0], value, selected.position[2]] })), 0.05, exporting)}
-          {numberField('Z', selected.position[2], value => applyScene(current => patchScene3DSlot(current, selected.id, { position: [selected.position[0], selected.position[1], value] })), 0.05, exporting)}
-          {numberField(t('stage.scale'), selected.scale, value => applyScene(current => patchScene3DSlot(current, selected.id, { scale: Math.max(0.05, value) })), 0.05, exporting)}
-          {numberField(t('stage.rotate'), selected.rotationY, value => applyScene(current => patchScene3DSlot(current, selected.id, { rotationY: value })), 0.05, exporting)}
-        </div>
-      )}
+      {selected && <Scene3DTransformPanel slot={selected} mode={transformMode} disabled={exporting || playing} onMode={setTransformMode}
+        onChange={patch => applyScene(current => patchScene3DSlot(current, selected.id, patch))}
+        onReset={() => {
+          const pose = applyScene3DTemplate(sceneDoc.templateId).slots.find(slot => slot.id === selected.id)
+          if (pose) applyScene(current => patchScene3DSlot(current, selected.id, { position: pose.position, scale: pose.scale, rotationY: pose.rotationY }))
+        }} />}
       <div className="grid gap-1.5 md:grid-cols-2">
         {sceneDoc.slots.map(slot => {
           const clips = catalogs[slot.id] ?? []
@@ -334,8 +293,8 @@ export function Scene3DWorkspace({ width, height }: Props) {
             workspaceId: workspace,
           }
           return (
-            <div key={slot.id} className={`rounded border p-1.5 text-[9px] text-text-secondary ${selectedId === slot.id ? 'border-cyan-300 bg-cyan-400/5' : 'border-border bg-bg-primary'}`}>
-              <button type="button" className="block font-medium text-text-primary" onClick={() => setSelectedId(slot.id)}>{t(`stage.slot.${slot.slot}`)}</button>
+            <div key={slot.id} className={`rounded-xl border p-3 text-xs text-text-secondary ${selectedId === slot.id ? 'border-cyan-300 bg-cyan-400/5' : 'border-border bg-bg-primary'}`}>
+              <button type="button" className="block min-h-10 font-semibold text-text-primary" onClick={() => setSelectedId(slot.id)}>{t(`stage.slot.${slot.slot}`)}</button>
               <div className="mt-1">
                 <AssetInput
                   label={t(`stage.slot.${slot.slot}`)}
@@ -391,9 +350,9 @@ export function Scene3DWorkspace({ width, height }: Props) {
           )
         })}
       </div>
-      {clipIssue && <p className="text-[8px] text-red-300">{clipIssue}</p>}
-      {exportNote && <p className="text-[8px] text-cyan-100" data-testid="world3d-export-note">{exportNote}</p>}
-      <p className="text-[8px] text-text-muted">{sceneDoc.templateId === 'run-loop' ? t('stage.runHelp') : t('stage.help')}</p>
+      {clipIssue && <p className="text-xs text-red-300">{clipIssue}</p>}
+      {exportNote && <p className="text-xs text-cyan-100" data-testid="world3d-export-note">{exportNote}</p>}
+      <p className="text-xs text-text-muted">{sceneDoc.templateId === 'run-loop' ? t('stage.runHelp') : t('stage.help')}</p>
       <span data-testid="scene3d-roundtrip" className="hidden">{roundtrip ? 'ok' : 'bad'}</span>
     </div>
   )

@@ -1,0 +1,189 @@
+{
+  "title": "3D scene studio",
+  "subtitle": "Choose a shot, place your objects and press Play.",
+  "templates": "Shot library",
+  "search": "Search templates",
+  "all": "All",
+  "noResults": "No templates match your search.",
+  "play": "Play",
+  "pause": "Pause",
+  "restart": "Back to start",
+  "timeline": "Scene position",
+  "speed": "Speed",
+  "speedHelp": "Applies to playback and MP4 export.",
+  "outputDuration": "Output: {{seconds}} s",
+  "camera": "Camera",
+  "objects": "Objects",
+  "translate": "Move",
+  "rotate": "Rotate Y",
+  "scale": "Scale",
+  "size": "Size",
+  "smaller": "Smaller",
+  "larger": "Larger",
+  "reset": "Reset transform",
+  "gizmoHelp": "Drag an axis to move. Use the centre handle to scale uniformly.",
+  "selectObject": "Select an object",
+  "position": "Position (m)",
+  "yaw": "Rotation Y (°)",
+  "keepAssets": "Keep my objects when changing shots",
+  "cameraHelp": "Camera changes are editable; your objects keep their identity.",
+  "category": {
+    "cinema": "Cinema",
+    "product": "Product",
+    "music": "Music video",
+    "space": "Space",
+    "drive": "Driving"
+  },
+  "template": {
+    "two-shot": {
+      "title": "Two shot",
+      "description": "Balanced framing for two subjects with a slow approach."
+    },
+    "product-orbit": {
+      "title": "Product orbit",
+      "description": "A measured turn around the product with a warm key light."
+    },
+    "hero-push": {
+      "title": "Hero approach",
+      "description": "Low camera and a gentle push toward the subject."
+    },
+    "over-shoulder": {
+      "title": "Over the shoulder",
+      "description": "Staggered subjects frame a conversation in depth."
+    },
+    "tracking": {
+      "title": "Side follow",
+      "description": "Profile composition with room in front of the subject."
+    },
+    "crane-reveal": {
+      "title": "Crane reveal",
+      "description": "Rise from a low viewpoint into a wide composition."
+    },
+    "establishing": {
+      "title": "Establishing orbit",
+      "description": "A broad arc to introduce the environment and a prop."
+    },
+    "run-loop": {
+      "title": "Endless run",
+      "description": "Stable runner framing against a scrolling world; add a run clip."
+    },
+    "neon-run": {
+      "title": "Neon sprint",
+      "description": "Cool light and a fast backdrop for an energetic running clip."
+    },
+    "block-street": {
+      "title": "Street rhythm",
+      "description": "Relaxed profile shot with slower street motion."
+    },
+    "space-float": {
+      "title": "Space float",
+      "description": "Elevated subject framed by rocks and a gentle camera arc."
+    },
+    "walk-void": {
+      "title": "Walk in the void",
+      "description": "Minimal setting and a frontal approach for a walking clip."
+    },
+    "dance-orbit": {
+      "title": "Dance orbit",
+      "description": "A half orbit that keeps the performer legible."
+    },
+    "dance-stage": {
+      "title": "Street stage",
+      "description": "A wide street set with an unhurried musical arc."
+    },
+    "cafe-dance": {
+      "title": "Café performance",
+      "description": "Frontal full-body composition in the textured café set."
+    },
+    "drive-chase": {
+      "title": "Chase camera",
+      "description": "Rear car view with road motion and subtle sway."
+    },
+    "drive-hood": {
+      "title": "On the hood",
+      "description": "Immersive forward view with a restrained road bump."
+    },
+    "drive-wing": {
+      "title": "Coastal profile",
+      "description": "Low side view of the car beside the coastal backdrop."
+    },
+    "drive-orbit": {
+      "title": "Car orbit",
+      "description": "A low sweeping view that reveals the moving road."
+    },
+    "drive-tunnel": {
+      "title": "Tunnel drive",
+      "description": "Forward camera framed by the tunnel environment."
+    },
+    "drive-hero": {
+      "title": "Driver portrait",
+      "description": "Car chase composition with a replaceable character slot."
+    },
+    "portrait-arc": {
+      "title": "Portrait arc",
+      "description": "A short intimate orbit with space above the head."
+    },
+    "duo-diagonal": {
+      "title": "Diagonal dialogue",
+      "description": "Two subjects staged diagonally around a central prop."
+    },
+    "high-angle": {
+      "title": "High-angle reveal",
+      "description": "An elevated viewpoint reveals the subject and surrounding prop."
+    },
+    "wide-tableau": {
+      "title": "Wide tableau",
+      "description": "Two subjects and a foreground prop in a wide composition."
+    },
+    "product-detail": {
+      "title": "Product detail",
+      "description": "Close oblique framing to inspect the object surface."
+    },
+    "product-pair": {
+      "title": "Product comparison",
+      "description": "Two products share a calm, symmetrical frontal composition."
+    },
+    "product-pedestal": {
+      "title": "Pedestal reveal",
+      "description": "Place a product above a supporting prop and reveal it from below."
+    },
+    "duet-stage": {
+      "title": "Stage duet",
+      "description": "Two performers share a wide stage; assign their own animation clips."
+    },
+    "cafe-duet": {
+      "title": "Café duet",
+      "description": "Two performers frame the café entrance from either side."
+    },
+    "stage-crane": {
+      "title": "Stage crane",
+      "description": "Reveal a performer and stage prop with an ascending camera."
+    },
+    "space-encounter": {
+      "title": "Space encounter",
+      "description": "Two suspended subjects face each other between rocky markers."
+    },
+    "space-survey": {
+      "title": "Space survey",
+      "description": "A wide elevated orbit around a subject and a nearby prop."
+    },
+    "drive-coast-reveal": {
+      "title": "Coast reveal",
+      "description": "A crane shot reveals the car against the coastal road."
+    },
+    "drive-city-wide": {
+      "title": "City wide shot",
+      "description": "A broad low orbit situates the car in the city."
+    },
+    "drive-tunnel-wing": {
+      "title": "Tunnel profile",
+      "description": "A low side camera shows the car within the tunnel."
+    }
+  },
+  "gallerySearch": "Search the catalog",
+  "galleryPlaceholder": "Portrait, dance, ships…",
+  "galleryCount": "{{count}} templates",
+  "focusEditor": "Expand editor",
+  "exitFocus": "Exit fullscreen",
+  "fullscreenUnavailable": "This browser cannot enter fullscreen."
+}

@@ -1,4 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
+import { createTransformGizmo, type TransformMode, type TransformPatch } from './transformGizmo.ts'
 import { TextureLoader } from 'three'
 import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js'
 import { adoptCafeMaps, loadCafeMaps } from './cafeSet.ts'
@@ -30,6 +31,11 @@ import type { Scene3DClipCatalogEntry, Scene3DDocument, Scene3DSlot } from './ty
 type Props = {
   document: Scene3DDocument
   sceneSeconds: number
+  selectedId?: string
+  transformMode?: TransformMode
+  editing?: boolean
+  onTransform?: (slotId: string, patch: TransformPatch) => void
+  onSelect?: (slotId: string) => void
   onSlotClips?: (slotId: string, clips: Scene3DClipCatalogEntry[]) => void
 }
 
@@ -102,11 +108,14 @@ function loadSlotImage(
 }
 
 export const Scene3DStage = forwardRef<Scene3DStageHandle, Props>(function Scene3DStage(
-  { document, sceneSeconds, onSlotClips },
+  { document, sceneSeconds, onSlotClips, selectedId, transformMode = 'translate', editing = false, onTransform, onSelect },
   ref,
 ) {
   const hostRef = useRef<HTMLDivElement>(null)
   const worldRef = useRef<GpuWorld | null>(null)
+  const gizmoRef = useRef<ReturnType<typeof createTransformGizmo> | null>(null)
+  const interactionRef = useRef({ onTransform, onSelect })
+  useEffect(() => { interactionRef.current = { onTransform, onSelect } }, [onTransform, onSelect])
   const documentRef = useRef(document)
   const onSlotClipsRef = useRef(onSlotClips)
   const exportLockRef = useRef<Scene3DDocument | null>(null)
@@ -141,6 +150,7 @@ export const Scene3DStage = forwardRef<Scene3DStageHandle, Props>(function Scene
       if (world && host) resizeWorld(world, host)
     },
     beginExport(next) {
+      gizmoRef.current?.hide()
       exportLockRef.current = next
       documentRef.current = next
     },
@@ -155,6 +165,7 @@ export const Scene3DStage = forwardRef<Scene3DStageHandle, Props>(function Scene
     if (!host) return
     const world = createWorld(host, documentRef.current.light, documentRef.current.camera.fov)
     worldRef.current = world
+    gizmoRef.current = createTransformGizmo(world, (id, patch) => interactionRef.current.onTransform?.(id, patch), id => interactionRef.current.onSelect?.(id))
     const resize = () => {
       if (exportLockRef.current) return
       resizeWorld(world, host)
@@ -164,6 +175,8 @@ export const Scene3DStage = forwardRef<Scene3DStageHandle, Props>(function Scene
     observer.observe(host)
     return () => {
       observer.disconnect()
+      gizmoRef.current?.dispose()
+      gizmoRef.current = null
       disposeWorld(world)
       worldRef.current = null
     }
@@ -230,8 +243,9 @@ export const Scene3DStage = forwardRef<Scene3DStageHandle, Props>(function Scene
   useEffect(() => {
     const world = worldRef.current
     if (!world || exportLockRef.current) return
+    gizmoRef.current?.sync(document.slots.find(slot => slot.id === selectedId), transformMode, editing)
     paintWorld(world, document, sceneSeconds)
-  }, [document, sceneSeconds])
+  }, [document, sceneSeconds, selectedId, transformMode, editing])
 
   return <div ref={hostRef} className="absolute inset-0" data-testid="scene3d-stage" />
 })

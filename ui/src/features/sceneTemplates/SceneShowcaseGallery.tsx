@@ -116,7 +116,7 @@ function MediaCard({
       ? <video controls preload="metadata" playsInline src={item.video.url} aria-label={`Vídeo completo de ${item.title}`} onError={onMediaError} className="h-full w-full object-contain" />
       : <button type="button" onClick={onPlay} disabled={busy} className="group relative h-full w-full text-left disabled:cursor-wait disabled:opacity-70" aria-label={`Ver vídeo completo de ${item.title}`}>
         <Preview item={item} failed={posterFailed} onError={onPosterError} />
-        <span className="absolute inset-x-0 bottom-0 bg-black/75 px-3 py-2 text-center text-xs font-medium text-white group-hover:bg-black/60">▶ Ver vídeo completo</span>
+        <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-xl bg-cyan-300 px-5 py-4 text-center text-sm font-bold text-slate-950 shadow-xl group-hover:bg-cyan-200">▶ Ver vídeo completo</span>
       </button>}
     {mediaFailed && <p role="alert" className="absolute inset-x-0 bottom-0 bg-black/90 p-2 text-center text-xs text-amber-200">Vídeo no renderizado en esta instalación.</p>}
   </div>

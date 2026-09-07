@@ -1,3 +1,4 @@
+import { finishTemplateLayers, TEMPLATE_FINISH_VERSION } from './templateFinish'
 import type { Scene } from '../../types'
 import { EXPANDED_CATALOG_VERSION, templateCatalogVersion, getCandidateSceneTemplate, type SceneTemplateDefinition } from './catalog'
 import { backdrop, foreground, type TemplateBindings, type TemplateControls, type TemplateAsset } from './sceneBuilders'
@@ -76,13 +77,13 @@ export function compileCandidateScene(id: string, bindings: TemplateBindings, op
   const ctx = { ...controls, bindings }
   const expanded = templateCatalogVersion(template) === EXPANDED_CATALOG_VERSION
   const background = expanded ? musicMotionBackground(id, ctx) : [backdrop(ctx)]
-  const layers = [...background, ...build(ctx), ...foreground(ctx)]
+  const layers = finishTemplateLayers([...background, ...build(ctx), ...foreground(ctx)], template.family, controls.intensity)
   if (layers.length > 24 || layers.filter(item => item.type === 'model3d').length > 2) throw new Error('La escena excede el presupuesto de 24 capas / 2 GLB.')
   return {
     version: 1, name: `${template.title} · candidata`, generationPolicy: 'provided_only',
     width: 1280, height: 720, fps: 30, duration: controls.duration, layers,
     narrative: { templateId: id, category: template.family, visualIntent: template.description,
-      controls: { ...controls, catalogVersion: templateCatalogVersion(template), templateVersion: template.version, reviewStatus: template.status, renderer: 'layer-compositor-v1' },
+      controls: { ...controls, finishVersion: TEMPLATE_FINISH_VERSION, catalogVersion: templateCatalogVersion(template), templateVersion: template.version, reviewStatus: template.status, renderer: 'layer-compositor-v1' },
       assets: Object.entries(bindings).filter(([, value]) => value).map(([slot, value]) => ({ slot, source: value!.source, name: value!.name, type: value!.type,
         ...(value!.catalogAtAssignment ? { catalogAtAssignment: { ...value!.catalogAtAssignment } } : {}),
       })),

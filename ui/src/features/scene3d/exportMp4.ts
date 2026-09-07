@@ -18,9 +18,10 @@ export function world3dExportSize(width: number, height: number) {
 }
 
 export function world3dExportPlan(duration: number, fps: number) {
-  const count = scene3dFrameCount(duration, fps)
-  const times = Array.from({ length: count }, (_, index) => scene3dFrameTime(index, duration, fps))
-  return { count, fps: fps === 60 ? 60 : 30, times }
+  const rate = fps === 60 ? 60 : 30
+  const count = scene3dFrameCount(duration, rate)
+  const times = Array.from({ length: count }, (_, index) => scene3dFrameTime(index, duration, rate))
+  return { count, fps: rate, times }
 }
 
 function nextPaint(): Promise<void> {

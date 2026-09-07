@@ -150,7 +150,7 @@ export function imageBackdropMesh(slot: Scene3DSlot, texture: Texture | null): M
     depthWrite: false,
     side: isCylinderBackdrop(slot) ? BackSide : DoubleSide,
   })
-  const scale = Math.max(0.2, slot.scale)
+  const scale = Math.max(0.05, slot.scale)
   if (isCylinderBackdrop(slot)) {
     const mesh = new Mesh(new CylinderGeometry(CYLINDER_RADIUS, CYLINDER_RADIUS, CYLINDER_HEIGHT, 48, 1, true), material)
     mesh.position.set(0, CYLINDER_HEIGHT * 0.35 * scale, 0)
@@ -184,10 +184,11 @@ export function placeholderMesh(slot: Scene3DSlot) {
   }
   const color = scene3dSlotColor(slot.slot)
   const mesh = new Mesh(
-    new BoxGeometry(0.6, 1.6, 0.6),
+    new BoxGeometry(0.6, 1.6, 0.6).translate(0, 0.8, 0),
     new MeshStandardMaterial({ color: new Color(color[0] / 255, color[1] / 255, color[2] / 255) }),
   )
-  mesh.position.set(slot.position[0], 0.8, slot.position[2])
+  mesh.position.fromArray(slot.position)
+  mesh.scale.setScalar(slot.scale)
   mesh.rotation.y = slot.rotationY
   return mesh
 }
@@ -366,7 +367,7 @@ export function resizeWorld(world: GpuWorld, host: HTMLDivElement) {
 export function poseLoadedSlot(current: SlotGpu, slot: Scene3DSlot) {
   current.loopSpeed = slot.loop?.speed ?? 0
   current.looping = isCylinderBackdrop(slot)
-  const scale = Math.max(0.2, slot.scale)
+  const scale = Math.max(0.05, slot.scale)
   if (current.kind === 'image' && isCylinderBackdrop(slot)) {
     current.root.position.set(0, CYLINDER_HEIGHT * 0.35 * scale, 0)
     current.root.rotation.y = slot.rotationY
