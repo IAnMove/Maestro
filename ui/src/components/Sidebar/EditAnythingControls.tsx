@@ -3,9 +3,9 @@ import { X, Sparkles } from 'lucide-react'
 import { useStore } from '../../stores/useStore'
 import { useUiTranslation } from '../../i18n'
 import { VideoTimelineSelector } from '../shared/VideoTimelineSelector'
-import * as api from '../../api/client'
+import type { ApiOutput } from '../../api/outputs'
 import { StudioSourceField } from '../../lib/StudioSourceField.tsx'
-import { useWorkspaceOutputs } from '../../lib/studioAssetPick.ts'
+import { applyChosenStudioMedia, useWorkspaceOutputs } from '../../lib/studioAssetPick.ts'
 
 /**
  * Edit Anything sub-mode — prompt-driven video edit via the
@@ -34,20 +34,10 @@ export function EditAnythingControls() {
     void ensureEditAnythingLora()
   }, [ensureEditAnythingLora])
 
-  const handleUpload = useCallback(async (file: File) => {
-    try {
-      const result = await api.uploadImage(file)
-      const url = URL.createObjectURL(file)
-      const video = document.createElement('video')
-      video.src = url
-      video.onloadedmetadata = () => {
-        const duration = video.duration && isFinite(video.duration) ? video.duration : 0
-        const resolution = `${video.videoWidth}x${video.videoHeight}`
-        setEditVideo(file, result.path, url, duration, resolution)
-      }
-    } catch {
-      console.error('Failed to upload video')
-    }
+  const handleChoose = useCallback((item: ApiOutput) => {
+    applyChosenStudioMedia(item, next => {
+      setEditVideo(next.file, next.path, next.url, next.duration, `${next.width}x${next.height}`)
+    })
   }, [setEditVideo])
 
   return (
@@ -75,7 +65,8 @@ export function EditAnythingControls() {
           items={videoItems}
           accept="video/*"
           kinds={['video']}
-          onFile={handleUpload}
+          workspaceId={activeWorkspace}
+          onChoose={handleChoose}
         />
       ) : (
         <div className="relative">

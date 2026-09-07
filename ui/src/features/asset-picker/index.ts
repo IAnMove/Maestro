@@ -10,7 +10,7 @@ export {
   resolveCatalogMatch,
 } from './adapters.ts'
 export { confirmPickerChoice, livePickerItem, matchOutputByPicker } from './confirmChoice.ts'
-export { createUploadSession, inferUploadKind, uploadLocalAsset } from './upload.ts'
+export { createUploadSession, fileMatchesConstraints, inferUploadKind, uploadLocalAsset } from './upload.ts'
 export { filterPickerItems, paginatePickerItems, sortPickerItems } from './localQuery.ts'
 export { createCatalogQuerySession, queryAssetCatalog, resolveAssetRef } from './query.ts'
 export { displayAssetTitle, formatCreatedDate, formatUnknownDate, knownCreatedAt } from './titles.ts'

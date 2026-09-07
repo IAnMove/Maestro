@@ -78,6 +78,76 @@ test('From HocusPocus opens the shared explorer and Remove clears', { concurrenc
   }
 })
 
+test('local pick posts upload once', { concurrency: false }, async () => {
+  const { render, screen, fireEvent, cleanup } = await import('@testing-library/react')
+  const { AssetInput } = await import('../src/features/asset-picker/AssetInput.tsx')
+  const originalFetch = globalThis.fetch
+  const posts: string[] = []
+  globalThis.fetch = (async (input, init) => {
+    const url = typeof input === 'string' ? input : (input as Request).url || String(input)
+    if ((init?.method || 'GET').toUpperCase() === 'POST') posts.push(url)
+    return new Response(JSON.stringify({ filename: 'hero.png', url: '/api/v1/uploads/hero.png', path: 'uploads/hero.png' }), {
+      status: 200, headers: { 'Content-Type': 'application/json' },
+    })
+  }) as typeof fetch
+  const chosen: Array<{ name: string; path?: string; asset_id?: string }> = []
+  try {
+    render(
+      <AssetInput
+        label="Hero"
+        placeholder="Choose"
+        items={[]}
+        workspaceId="default"
+        constraints={{ kinds: ['image'], maxCount: 1, optional: false }}
+        onChoose={item => { if (item) chosen.push({ name: item.name, path: item.path, asset_id: item.asset_id }) }}
+      />,
+    )
+    fireEvent.change(screen.getByTestId('asset-input-file'), {
+      target: { files: [new File(['x'], 'hero.png', { type: 'image/png' })] },
+    })
+    await new Promise(resolve => setTimeout(resolve, 20))
+    assert.equal(posts.length, 1)
+    assert.equal(chosen.length, 1)
+    assert.equal(chosen[0].name, 'hero.png')
+    assert.equal(chosen[0].path, 'uploads/hero.png')
+    assert.equal(chosen[0].asset_id, undefined)
+  } finally {
+    globalThis.fetch = originalFetch
+    cleanup()
+  }
+})
+
+test('incompatible drop does not upload', { concurrency: false }, async () => {
+  const { render, fireEvent, cleanup } = await import('@testing-library/react')
+  const { AssetInput } = await import('../src/features/asset-picker/AssetInput.tsx')
+  const originalFetch = globalThis.fetch
+  let posts = 0
+  globalThis.fetch = (async () => {
+    posts += 1
+    return new Response('{}', { status: 200 })
+  }) as typeof fetch
+  const chosen: string[] = []
+  try {
+    const { container } = render(
+      <AssetInput
+        label="Hero"
+        placeholder="Choose"
+        items={[]}
+        constraints={{ kinds: ['image'], maxCount: 1, optional: false }}
+        onChoose={item => { if (item) chosen.push(item.name) }}
+      />,
+    )
+    const audio = new File(['x'], 'voice.wav', { type: 'audio/wav' })
+    fireEvent.drop(container.firstChild as Element, { dataTransfer: { files: [audio] } })
+    await new Promise(resolve => setTimeout(resolve, 10))
+    assert.equal(posts, 0)
+    assert.deepEqual(chosen, [])
+  } finally {
+    globalThis.fetch = originalFetch
+    cleanup()
+  }
+})
+
 test('failed upload after the field closed does not apply a value', { concurrency: false }, async () => {
   const { render, screen, fireEvent, cleanup } = await import('@testing-library/react')
   const { AssetInput } = await import('../src/features/asset-picker/AssetInput.tsx')

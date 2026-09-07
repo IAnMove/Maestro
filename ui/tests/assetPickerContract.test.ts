@@ -75,14 +75,39 @@ test('voice refs keep the uploads/audio subfolder the backend can resolve', () =
   assert.deepEqual(videoUpload, { filename: 'take.mp4', path: 'take.mp4' })
 })
 
-test('catalog items map to outputs and match back by name and url', () => {
+test('catalog items map to outputs and match back by id', () => {
   const item = catalogItem({ id: 'asset-hero', filename: 'hero.png' })
   const output = catalogItemToOutput(item, 'default')
   assert.ok(output)
   assert.equal(output?.name, 'hero.png')
   assert.equal(output?.type, 'image')
   assert.equal(output?.url, '/api/v1/file/hero.png')
+  assert.equal(output?.asset_id, 'asset-hero')
+  assert.equal(output?.workspace_id, 'default')
   assert.equal(matchCatalogByOutput([item], output!, 'default')?.id, 'asset-hero')
+  const picker = outputToPickerItem(output!, 'default')
+  assert.equal(picker.ref.scheme, 'catalog')
+  if (picker.ref.scheme === 'catalog') assert.equal(picker.ref.id, 'asset-hero')
+})
+
+test('homonymous catalog files are not matched by filename alone', () => {
+  const alpha = catalogItem({
+    id: 'asset-alpha', filename: 'same.png', workspace_ids: ['alpha'],
+    locations: [{ workspace_id: 'alpha', filename: 'same.png', url: '/api/v1/file/same.png?workspace=alpha' }],
+    url: '/api/v1/file/same.png?workspace=alpha',
+  })
+  const beta = catalogItem({
+    id: 'asset-beta', filename: 'same.png', workspace_ids: ['beta'],
+    locations: [{ workspace_id: 'beta', filename: 'same.png', url: '/api/v1/file/same.png?workspace=beta' }],
+    url: '/api/v1/file/same.png?workspace=beta',
+  })
+  const byNameOnly: ApiOutput = {
+    name: 'same.png', type: 'image', mode: null, size: 12, created_at: 1,
+    url: '/api/v1/file/same.png?workspace=beta',
+  }
+  assert.equal(matchCatalogByOutput([alpha, beta], byNameOnly, 'default'), undefined)
+  const chosen = catalogItemToOutput(beta, 'beta')
+  assert.equal(matchCatalogByOutput([alpha, beta], chosen!, 'beta')?.id, 'asset-beta')
 })
 
 test('homonymous files in different workspaces keep distinct refs', () => {

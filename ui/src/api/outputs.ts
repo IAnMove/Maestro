@@ -32,6 +32,11 @@ export interface ApiOutput {
    *  backend hasn't been updated to emit this yet. */
   edit_sub_mode?: string | null
   result_kind?: 'music_video' | 'trailer' | 'series_episode' | 'chapter' | null
+  /** Catalog identity when the item came from /api/v1/assets. Never invent this. */
+  asset_id?: string
+  workspace_id?: string
+  /** Server-resolvable path (uploads/... or workspace filename). */
+  path?: string
 }
 
 // --- Move to Workspace ---

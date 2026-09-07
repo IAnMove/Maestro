@@ -4,9 +4,8 @@ import { useStore } from '../../stores/useStore'
 import { useUiTranslation } from '../../i18n'
 import { VideoTimelineSelector } from '../shared/VideoTimelineSelector'
 import { OutpaintCanvas } from './OutpaintCanvas'
-import * as api from '../../api/client'
 import { StudioSourceField } from '../../lib/StudioSourceField.tsx'
-import { useWorkspaceOutputs } from '../../lib/studioAssetPick.ts'
+import { applyChosenStudioMedia, useWorkspaceOutputs } from '../../lib/studioAssetPick.ts'
 
 /**
  * Outpaint mode controls.
@@ -91,35 +90,15 @@ export function OutpaintControls() {
     return { srcW: parseInt(m[1], 10), srcH: parseInt(m[2], 10) }
   }, [editVideoResolution])
 
-  const handleUpload = useCallback(async (file: File) => {
+  const handleChoose = useCallback((item: import('../../api/outputs').ApiOutput) => {
     setError(null)
-    try {
-      const result = await api.uploadImage(file)
-      const url = URL.createObjectURL(file)
-      const isVideo = file.type.startsWith('video/')
-      if (isVideo) {
-        const video = document.createElement('video')
-        video.src = url
-        video.onloadedmetadata = () => {
-          const duration = video.duration && isFinite(video.duration) ? video.duration : 0
-          const resolution = `${video.videoWidth}x${video.videoHeight}`
-          setEditVideo(file, result.path, url, duration, resolution)
-          // Reset trim window to the full clip so the timeline starts
-          // wide-open. User can narrow with the markers if they want a
-          // partial-window outpaint.
-          setTrimStart(0)
-          setTrimEnd(duration)
-        }
-      } else {
-        const img = new window.Image()
-        img.src = url
-        img.onload = () => {
-          setEditVideo(file, result.path, url, 0, `${img.naturalWidth}x${img.naturalHeight}`)
-        }
+    applyChosenStudioMedia(item, next => {
+      setEditVideo(next.file, next.path, next.url, next.duration, `${next.width}x${next.height}`)
+      if (item.type === 'video') {
+        setTrimStart(0)
+        setTrimEnd(next.duration)
       }
-    } catch {
-      setError('Failed to upload')
-    }
+    })
   }, [setEditVideo, setTrimStart, setTrimEnd])
 
   const isVideoFile = editVideoFile?.type.startsWith('video/')
@@ -151,7 +130,8 @@ export function OutpaintControls() {
           items={mediaItems}
           accept="video/*,image/*"
           kinds={['image', 'video']}
-          onFile={handleUpload}
+          workspaceId={activeWorkspace}
+          onChoose={handleChoose}
         />
       ) : (
         <>

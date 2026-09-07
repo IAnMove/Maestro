@@ -5,7 +5,7 @@ import { useUiTranslation } from '../../i18n'
 import { VideoTimelineSelector } from '../shared/VideoTimelineSelector'
 import * as api from '../../api/client'
 import { StudioSourceField } from '../../lib/StudioSourceField.tsx'
-import { useWorkspaceOutputs } from '../../lib/studioAssetPick.ts'
+import { applyChosenStudioMedia, useWorkspaceOutputs } from '../../lib/studioAssetPick.ts'
 
 export function InpaintControls() {
   const { t } = useUiTranslation('studio')
@@ -70,25 +70,13 @@ export function InpaintControls() {
     refreshSamStatus()
   }, [refreshSamStatus])
 
-  const handleUpload = useCallback(async (file: File) => {
+  const handleChoose = useCallback((item: import('../../api/outputs').ApiOutput) => {
     setError(null)
-    try {
-      const result = await api.uploadImage(file)
-      const url = URL.createObjectURL(file)
-      const video = document.createElement('video')
-      video.src = url
-      video.onloadedmetadata = () => {
-        const duration = video.duration && isFinite(video.duration) ? video.duration : 0
-        const resolution = `${video.videoWidth}x${video.videoHeight}`
-        setEditVideo(file, result.path, url, duration, resolution)
-      }
-      // Re-check after upload in case the user just installed SAM in
-      // another tab while this Inpaint session was open.
-      refreshSamStatus()
-    } catch {
-      setError(t('inpaint.uploadFailed'))
-    }
-  }, [setEditVideo, refreshSamStatus, t])
+    applyChosenStudioMedia(item, next => {
+      setEditVideo(next.file, next.path, next.url, next.duration, `${next.width}x${next.height}`)
+      void refreshSamStatus()
+    })
+  }, [setEditVideo, refreshSamStatus])
 
   // Preview Mask: single-frame only (fast, for visual feedback)
   const handlePreviewMask = async () => {
@@ -158,7 +146,8 @@ export function InpaintControls() {
           items={videoItems}
           accept="video/*"
           kinds={['video']}
-          onFile={handleUpload}
+          workspaceId={activeWorkspace}
+          onChoose={handleChoose}
         />
       ) : (
         <div className="relative">

@@ -1,7 +1,7 @@
 import { getServerMediaReference, type ApiOutput } from '../../api/outputs'
 import type { AssetCatalogItem, AssetKind } from '../../api/assets'
 import { displayAssetTitle, knownCreatedAt } from './titles.ts'
-import type { AssetConstraints, AssetRef, Compatibility, LegacyOutputRef, PickerItem } from './types.ts'
+import type { AssetConstraints, AssetRef, Compatibility, PickerItem } from './types.ts'
 
 const OUTPUT_KIND: Record<ApiOutput['type'], AssetKind> = {
   image: 'image',
@@ -71,6 +71,9 @@ export function catalogItemToOutput(item: AssetCatalogItem, workspaceId: string)
     completed_at: item.completed_at,
     url: location.url || item.url,
     thumbnail_url: item.kind === 'image' ? (location.url || item.url) : '',
+    asset_id: item.id,
+    workspace_id: location.workspace_id || workspaceId,
+    path: location.filename || item.filename,
   }
 }
 
@@ -79,10 +82,18 @@ export function matchCatalogByOutput(
   output: ApiOutput,
   workspaceId: string,
 ): AssetCatalogItem | undefined {
-  return items.find(item => {
+  if (output.asset_id) {
+    const byId = items.find(item => item.id === output.asset_id)
+    if (!byId) return undefined
+    const location = catalogLocation(byId, output.workspace_id || workspaceId) ?? byId.locations[0]
+    if (output.workspace_id && location && location.workspace_id !== output.workspace_id) return undefined
+    return byId
+  }
+  const matches = items.filter(item => {
     const mapped = catalogItemToOutput(item, workspaceId)
-    return mapped?.name === output.name && mapped.url === output.url
+    return mapped?.url === output.url && mapped.name === output.name && mapped.workspace_id === (output.workspace_id || workspaceId)
   })
+  return matches.length === 1 ? matches[0] : undefined
 }
 
 export function voiceRefFromOutput(item: ApiOutput, workspaceId?: string): { filename: string; path: string } {
@@ -93,13 +104,10 @@ export function voiceRefFromOutput(item: ApiOutput, workspaceId?: string): { fil
 export function outputToPickerItem(item: ApiOutput, workspaceId: string): PickerItem {
   const kind = OUTPUT_KIND[item.type]
   const createdAt = knownCreatedAt(item.created_at)
-  const ref: LegacyOutputRef = {
-    version: 1,
-    scheme: 'legacy-output',
-    workspaceId,
-    filename: item.name,
-    outputType: item.type,
-  }
+  const scope = item.workspace_id || workspaceId
+  const ref: AssetRef = item.asset_id
+    ? { version: 1, scheme: 'catalog', id: item.asset_id, workspaceId: scope, filename: item.name }
+    : { version: 1, scheme: 'legacy-output', workspaceId: scope, filename: item.name, outputType: item.type }
   return {
     ref,
     kind,
