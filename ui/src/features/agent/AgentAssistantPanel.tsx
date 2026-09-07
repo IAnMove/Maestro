@@ -11,7 +11,6 @@ import {
   wizardLlmRequestSchema,
   parseAgentTurn,
   protectUserVerbatimSegments,
-  reconcileAgentTurnWithRequest,
   type AgentActionResult,
 } from './agentActions'
 import { applyPollToCard, cardsFromResults, tabForExecutionTarget, type WizardExecutionCard } from './executionCards'
@@ -28,6 +27,10 @@ import { ensureRhythmic3dWorkflowRegistered } from './rhythmic3dWorkflow'
 import { defaultApplicationAdapters } from './applicationAdapters'
 import { enqueueWizardConversationSave, persistQueuedWizardConversation, rebaseStaleWizardConversationHydration, rebaseWizardConversationAfterSave, resolveWizardConversationHydration } from './wizardConversationPersistence'
 import i18n, { useUiTranslation } from '../../i18n'
+import { WizardVisualInput, type WizardVisualMedia } from './WizardVisualInput'
+import type { VisualEvidence } from './visualEvidence'
+import { WizardVisualEvidence } from './WizardVisualEvidence'
+import { reconcileWizardMediaTurn } from './wizardVisualPolicy'
 
 export { AgentAvatar, type AgentVisualState } from './AgentAvatar'
 
@@ -159,6 +162,7 @@ export function AgentAssistantPanel({ workspace, tasks, onClose, embedded = fals
   const [conversationWorkspace, setConversationWorkspace] = useState(workspace)
   const [hydratedWorkspace, setHydratedWorkspace] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
+  const [visualMedia, setVisualMedia] = useState<WizardVisualMedia | null>(null)
   const [state, setState] = useState<AgentVisualState>('idle')
   const [busy, setBusy] = useState(false)
   const [busyMessage, setBusyMessage] = useState('')
@@ -418,6 +422,7 @@ export function AgentAssistantPanel({ workspace, tasks, onClose, embedded = fals
   const ask = async (text: string) => {
     const question = text.trim()
     if (!question || busy) return
+    const turnMedia = visualMedia?.workspace === workspace ? [visualMedia] : undefined
     const userMessage: AgentMessage = { id: newId(), role: 'user', text: question, createdAt: Date.now() }
     const nextMessages = [...messages, userMessage].slice(-40)
     setMessages(nextMessages)
@@ -427,7 +432,7 @@ export function AgentAssistantPanel({ workspace, tasks, onClose, embedded = fals
     setState('thinking')
     const traceStartedAt = new Date().toISOString()
     try {
-      if (pendingInput) {
+      if (pendingInput && !turnMedia) {
         const answer = resolveWizardPendingAnswer(pendingInput, question)
         if (!answer) {
           const choices = pendingInput.options.map(option => `“${option.label}”`).join(', ')
@@ -444,7 +449,11 @@ export function AgentAssistantPanel({ workspace, tasks, onClose, embedded = fals
         setState('success')
         return
       }
+      let mediaEvidence: VisualEvidence[] = []
       const answer = await generateLlmText({
+        onMediaEvidence: evidence => { mediaEvidence = evidence },
+        media: turnMedia,
+        workspace,
         system_prompt: HOCUSPOCUS_AGENT_SYSTEM_PROMPT,
         prompt: buildAgentTurnPrompt(workspace, nextMessages, tasks, buildAgentAppSnapshot({
           workflow: activeWorkflow,
@@ -456,7 +465,8 @@ export function AgentAssistantPanel({ workspace, tasks, onClose, embedded = fals
       })
       if (!mountedRef.current) return
       const proposedTurn = parseAgentTurn(answer)
-      const reconciledTurn = await reconcileAgentTurnWithRequest(
+      const reconciledTurn = await reconcileWizardMediaTurn(
+        Boolean(turnMedia),
         question,
         proposedTurn,
         nextMessages.map(message => ({ role: message.role, text: message.text })),
@@ -478,6 +488,7 @@ export function AgentAssistantPanel({ workspace, tasks, onClose, embedded = fals
         workspace,
         question,
         llmAnswer: answer,
+        mediaEvidence,
         turn,
         results,
       })
@@ -492,6 +503,7 @@ export function AgentAssistantPanel({ workspace, tasks, onClose, embedded = fals
           .join('\n\n'),
         createdAt: Date.now(),
         language: turn.conversationLanguage || undefined,
+        mediaEvidence,
         cards: cards.length ? cards : undefined,
       }
       setMessages(current => [...current, assistantMessage].slice(-40))
@@ -580,6 +592,7 @@ export function AgentAssistantPanel({ workspace, tasks, onClose, embedded = fals
               ? `${expanded ? 'max-w-[min(42rem,70%)]' : 'max-w-[88%]'} whitespace-pre-wrap rounded-2xl rounded-br-sm bg-blue-500/20 px-3 py-2 leading-relaxed text-blue-50`
               : `${expanded ? 'max-w-[min(56rem,86%)]' : 'max-w-[92%]'} rounded-2xl rounded-bl-sm border border-amber-200/10 bg-amber-100/[.045] px-3 py-2 leading-relaxed text-amber-50/85`}>
               {message.role === 'assistant' ? <AgentMarkdown text={message.text} /> : message.text}
+              <WizardVisualEvidence evidence={message.mediaEvidence} />
               {message.cards?.map(card => (
                 <div key={card.id} className="mt-2 rounded-xl border border-amber-200/15 bg-black/20 p-2">
                   <div className="flex items-center justify-between gap-2 text-[10px]">
@@ -667,6 +680,7 @@ export function AgentAssistantPanel({ workspace, tasks, onClose, embedded = fals
       )}
 
       <form onSubmit={submit} className="border-t border-white/10 p-3">
+        <WizardVisualInput media={visualMedia?.workspace === workspace ? visualMedia : null} onChange={setVisualMedia} workspace={workspace} disabled={busy} />
         <div className="flex items-end gap-2 rounded-xl border border-white/10 bg-black/25 p-2 focus-within:border-amber-200/35">
           <Sparkles size={14} className="mb-1 shrink-0 text-amber-200/55" />
           <textarea

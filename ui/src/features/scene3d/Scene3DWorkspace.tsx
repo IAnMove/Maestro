@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { fetchOutputs, type ApiOutput } from '../../api/client'
-import { AssetExplorerDialog } from '../../components/common/AssetExplorerDialog'
+import { AssetInput } from '../../features/asset-picker/AssetInput.tsx'
 import { useUiTranslation } from '../../i18n'
 import { useStore } from '../../stores/useStore'
 import { cameraEyeAtTime, projectPoint } from './camera.ts'
@@ -11,6 +11,7 @@ import { canMutateWorld3DScene } from './exportLock.ts'
 import { exportWorld3DDocument } from './exportFlow.ts'
 import { Scene3DStage, type Scene3DStageHandle } from './Scene3DStage.tsx'
 import { applyScene3DTemplate, patchScene3DSlot, SCENE3D_TEMPLATES, type Scene3DTemplateId } from './templates.ts'
+import { commitSlotSourceChoice, pickerOutputFromSlot, type SlotSourceCapture } from './slotSource.ts'
 import type { Scene3DCameraFamily, Scene3DClipCatalogEntry, Scene3DDocument, Scene3DLoop, Scene3DSlot } from './types.ts'
 import { documentFromWorld3DRequest, listenForWorld3DWorkflow } from './world3dAgent.ts'
 
@@ -54,11 +55,13 @@ export function Scene3DWorkspace({ width, height }: Props) {
   const sceneDocRef = useRef(sceneDoc)
   const dragRef = useRef<{ id: string; startX: number; startZ: number; pointerX: number; pointerY: number } | null>(null)
   const [catalogs, setCatalogs] = useState<Record<string, Scene3DClipCatalogEntry[]>>({})
-  const [explorerSlot, setExplorerSlot] = useState<string | null>(null)
-  const [explorerItems, setExplorerItems] = useState<ApiOutput[]>([])
+  const [modelItems, setModelItems] = useState<ApiOutput[]>([])
+  const [imageItems, setImageItems] = useState<ApiOutput[]>([])
   const [exporting, setExporting] = useState(false)
   const [exportNote, setExportNote] = useState<string | null>(null)
   const exportingRef = useRef(false)
+  const generationRef = useRef(0)
+  const workspaceRef = useRef('')
   const stageRef = useRef<Scene3DStageHandle>(null)
   const workspace = useStore(s => s.activeWorkspace)
   const fps = sceneDoc.fps
@@ -94,6 +97,7 @@ export function Scene3DWorkspace({ width, height }: Props) {
       throw new Error('world3d-export-in-progress')
     }
     const next = documentFromWorld3DRequest(request)
+    generationRef.current += 1
     setSceneDoc(next)
     setFrame(0)
     return { message: next.templateId, templateId: request.templateId, slotIds: next.slots.map(slot => slot.id) }
@@ -125,26 +129,60 @@ export function Scene3DWorkspace({ width, height }: Props) {
     return () => cancelAnimationFrame(raf)
   }, [playing, sceneDoc.duration, fps, count])
 
-  const assignSource = (slotId: string, url: string, media: Scene3DSlot['media'] = 'model3d') => {
+  useEffect(() => {
+    if (workspaceRef.current && workspaceRef.current !== workspace) generationRef.current += 1
+    workspaceRef.current = workspace
+  }, [workspace])
+
+  useEffect(() => {
+    let alive = true
+    Promise.all([
+      fetchOutputs(200, 0, { mediaType: 'model3d', workspace }),
+      fetchOutputs(200, 0, { mediaType: 'image', workspace }),
+    ]).then(([models, images]) => {
+      if (!alive) return
+      setModelItems(models.outputs.filter(item => item.type === 'model3d' && /\.glb$/i.test(item.name)))
+      setImageItems(images.outputs.filter(item => item.type === 'image'))
+    }).catch(() => {
+      if (!alive) return
+      setModelItems([])
+      setImageItems([])
+    })
+    return () => { alive = false }
+  }, [workspace])
+
+  const assignChoice = (slot: Scene3DSlot, capture: SlotSourceCapture, item: ApiOutput | null) => {
+    const commit = commitSlotSourceChoice({
+      generation: generationRef.current,
+      slotId: slot.id,
+      templateId: sceneDocRef.current.templateId,
+      workspaceId: workspaceRef.current || workspace,
+      exporting: exportingRef.current,
+    }, capture, item)
+    if (commit.action === 'ignore') return
     if (!canMutateWorld3DScene(exportingRef.current)) return
-    setSceneDoc(current => patchScene3DSlot(current, slotId, { sourceUrl: url, media, clip: null }))
+    if (commit.action === 'clear') {
+      revokeIfBlob(slot.sourceUrl)
+      setSceneDoc(current => patchScene3DSlot(current, slot.id, { sourceUrl: '', sourceRef: undefined, clip: null }))
+      setCatalogs(current => {
+        const next = { ...current }
+        delete next[slot.id]
+        return next
+      })
+      return
+    }
+    revokeIfBlob(slot.sourceUrl)
+    setSceneDoc(current => patchScene3DSlot(current, slot.id, {
+      sourceUrl: commit.sourceUrl,
+      sourceRef: commit.sourceRef,
+      media: commit.media,
+      clip: commit.clip,
+    }))
     setCatalogs(current => {
       const next = { ...current }
-      delete next[slotId]
+      delete next[slot.id]
       return next
     })
-  }
-
-  const openExplorer = async (slot: Scene3DSlot) => {
-    if (!canMutateWorld3DScene(exportingRef.current)) return
-    setExplorerSlot(slot.id)
-    try {
-      const kind = slot.slot === 'background' ? 'image' : 'model3d'
-      const data = await fetchOutputs(0, 0, { mediaType: kind, workspace })
-      setExplorerItems(kind === 'model3d' ? data.outputs.filter(item => /\.glb$/i.test(item.name)) : data.outputs)
-    } catch {
-      setExplorerItems([])
-    }
   }
 
   const applyScene = (updater: Parameters<typeof setSceneDoc>[0]) => {
@@ -154,6 +192,7 @@ export function Scene3DWorkspace({ width, height }: Props) {
 
   const mountTemplate = (id: Scene3DTemplateId) => {
     if (!canMutateWorld3DScene(exportingRef.current)) return
+    generationRef.current += 1
     for (const slot of sceneDoc.slots) revokeIfBlob(slot.sourceUrl)
     applyScene(applyScene3DTemplate(id))
     setCatalogs({})
@@ -183,7 +222,6 @@ export function Scene3DWorkspace({ width, height }: Props) {
     const stage = stageRef.current
     if (!stage || exportingRef.current || playing) return
     dragRef.current = null
-    setExplorerSlot(null)
     setExportingFlag(true)
     setExportNote(t('stage.exporting'))
     try {
@@ -289,24 +327,32 @@ export function Scene3DWorkspace({ width, height }: Props) {
       <div className="grid gap-1.5 md:grid-cols-2">
         {sceneDoc.slots.map(slot => {
           const clips = catalogs[slot.id] ?? []
+          const capture: SlotSourceCapture = {
+            generation: generationRef.current,
+            slotId: slot.id,
+            templateId: sceneDoc.templateId,
+            workspaceId: workspace,
+          }
           return (
             <div key={slot.id} className={`rounded border p-1.5 text-[9px] text-text-secondary ${selectedId === slot.id ? 'border-cyan-300 bg-cyan-400/5' : 'border-border bg-bg-primary'}`}>
               <button type="button" className="block font-medium text-text-primary" onClick={() => setSelectedId(slot.id)}>{t(`stage.slot.${slot.slot}`)}</button>
-              <button type="button" disabled={exporting} onClick={() => void openExplorer(slot)} className="mt-1 w-full rounded border border-cyan-400/40 bg-cyan-400/10 px-1.5 py-1 text-[9px] text-cyan-100 disabled:opacity-40">
-                {t('stage.fromApp')}
-              </button>
-              <input
-                type="file"
-                disabled={exporting}
-                accept={slot.slot === 'background' ? 'image/*' : '.glb,model/gltf-binary'}
-                className="mt-1 w-full text-[8px] disabled:opacity-40"
-                onChange={event => {
-                  const file = event.target.files?.[0]
-                  if (!file) return
-                  revokeIfBlob(slot.sourceUrl)
-                  assignSource(slot.id, URL.createObjectURL(file), slot.slot === 'background' ? 'image' : 'model3d')
-                }}
-              />
+              <div className="mt-1">
+                <AssetInput
+                  label={t(`stage.slot.${slot.slot}`)}
+                  placeholder={t('stage.fromApp')}
+                  items={slot.slot === 'background' ? imageItems : modelItems}
+                  value={pickerOutputFromSlot(slot.sourceUrl, slot.media, slot.sourceRef)}
+                  accept={slot.slot === 'background' ? 'image/*' : '.glb,model/gltf-binary'}
+                  optional
+                  disabled={exporting}
+                  constraints={{
+                    kinds: slot.slot === 'background' ? ['image'] : ['model3d'],
+                    maxCount: 1,
+                    optional: true,
+                  }}
+                  onChoose={item => assignChoice(slot, capture, item)}
+                />
+              </div>
               {clips.length > 0 && (
                 <select
                   className="mt-1 w-full rounded border border-border bg-bg-tertiary px-1 py-0.5 disabled:opacity-40"
@@ -349,16 +395,6 @@ export function Scene3DWorkspace({ width, height }: Props) {
       {exportNote && <p className="text-[8px] text-cyan-100" data-testid="world3d-export-note">{exportNote}</p>}
       <p className="text-[8px] text-text-muted">{sceneDoc.templateId === 'run-loop' ? t('stage.runHelp') : t('stage.help')}</p>
       <span data-testid="scene3d-roundtrip" className="hidden">{roundtrip ? 'ok' : 'bad'}</span>
-      <AssetExplorerDialog
-        open={Boolean(explorerSlot)}
-        title={t('stage.fromApp')}
-        items={explorerItems}
-        onClose={() => setExplorerSlot(null)}
-        onChoose={item => {
-          if (item && explorerSlot) assignSource(explorerSlot, item.url, item.type === 'image' ? 'image' : 'model3d')
-          setExplorerSlot(null)
-        }}
-      />
     </div>
   )
 }

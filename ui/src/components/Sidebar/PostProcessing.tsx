@@ -5,6 +5,8 @@ import { useUiTranslation } from '../../i18n'
 import * as api from '../../api/client'
 import type { ApiOutput } from '../../api/outputs'
 import { catalogItemToOutput, voiceRefFromOutput } from '../../features/asset-picker'
+import { useWangpProcessors } from './useWangpProcessors'
+import { WangpProcessorOptions } from './WangpProcessorOptions'
 import { AssetInput } from '../../features/asset-picker/AssetInput.tsx'
 
 const baseOptions = [
@@ -33,6 +35,9 @@ const flashvsrOptions = [
 export function PostProcessing() {
   const { t } = useUiTranslation('studio')
   const [open, setOpen] = useState(false)
+  const processors = useWangpProcessors()
+  const temporal = useStore(s => s.params.temporal_upsampling || '')
+  const setParam = useStore(s => s.setParam)
   const spatialUpsampling = useStore(s => s.spatialUpsampling)
   const setSpatialUpsampling = useStore(s => s.setSpatialUpsampling)
   const filmGrainIntensity = useStore(s => s.filmGrainIntensity)
@@ -87,7 +92,7 @@ export function PostProcessing() {
   )
 
   const hasVoiceClone = voiceCloneEnabled && voiceCloneRefs.some(r => r && r.path)
-  const hasAny = spatialUpsampling !== '' || filmGrainIntensity > 0 || hasVoiceClone
+  const hasAny = spatialUpsampling !== '' || temporal !== '' || filmGrainIntensity > 0 || hasVoiceClone
 
   return (
     <div>
@@ -102,6 +107,12 @@ export function PostProcessing() {
 
       {open && (
         <div className="mt-3 space-y-4">
+          {generationMode !== 'image' && <label className="block text-xs">{t('wangp.interpolation')}
+            <select className="w-full bg-bg-tertiary rounded-lg p-2" value={temporal} onChange={event => setParam('temporal_upsampling', event.target.value)}>
+              <option value="">{t('chrome.none')}</option>
+              {processors.filter(option => option.kind === 'temporal').map(option => <option key={option.value} value={option.value} disabled={!option.enabled}>{option.label}{option.reason ? ` (${option.reason})` : ''}</option>)}
+            </select>
+          </label>}
           {/* Spatial Upsampling */}
           <div>
             <label className="text-[11px] text-text-muted uppercase tracking-wider mb-1.5 block">
@@ -112,12 +123,14 @@ export function PostProcessing() {
               onChange={e => setSpatialUpsampling(e.target.value)}
               className="w-full bg-bg-tertiary border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-accent-blue"
             >
+              {processors.filter(option => option.kind === 'spatial' && option.media.includes(generationMode === 'image' ? 'image' : 'video')).map(option => <option key={option.value} value={option.value} disabled={!option.enabled}>{option.label}{option.reason ? ` (${option.reason})` : ''}</option>)}
               {upsamplingOptions.map(opt => (
                 <option key={opt.value} value={opt.value}>{opt.value === '' ? t('chrome.none') : opt.label}</option>
               ))}
             </select>
           </div>
 
+          <WangpProcessorOptions processor={processors.find(option => option.value === spatialUpsampling)} />
           {/* Film Grain Intensity */}
           <div>
             <div className="flex items-center justify-between mb-1.5">

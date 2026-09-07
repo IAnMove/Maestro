@@ -1,4 +1,6 @@
 import { h3ModelSwitchSettings, restoreSemanticBridgeSettings } from '../lib/h3OptionalSettings'
+import { restoredEditingTrim, restoreWangpSettings, viggleSubmissionOptions } from '../lib/wangpUi'
+import { beginWangpRestore, editingInputsChanged, legacyEditingPath, restoredGenericImageRefs } from '../lib/wangpRestore'
 import { create } from 'zustand'
 import type { GenerateParams, OutputFile, MediaFilter, AspectRatio, ResolutionPreset, ScailResolutionProfile, GenerationDetails, GenerationJob, ModelFamily, ModelDef, GenerationMode, ModelOptions, SystemConfig, SettingsTab, OutputMetadata, MultiClip, ServicesConfig, ProductionProfile, AudioAnalysisResult, PlannedClip, ClipPlan, DirectorClipImage, DirectorImageGenProgress, SpeakerMapping, DirectorSkill, DirectorShotImageGuidance, ShortFilmCharacter, ShortFilmPath, MusicVideoTreatment, CivitAIModel, CivitAIDownload, PipelineListItem, PipelineRepairState, SavedPipelineState, SystemDetectResponse, SystemStats, RecastCharacterMapping, RepaintRegionMapping, H3WindowPlan, DirectorV2PlanJob, DirectorV2PlanResponse } from '../types'
 import { DEFAULT_DIRECT_VIDEO_MASTER_PROMPT } from '../types'
@@ -657,6 +659,8 @@ const familyModeMap: Record<string, GenerationMode> = {
   ltxv: 'video',
   ltx2: 'video',
   minimax_h3: 'video',
+  h3_advanced: 'video',
+  sensenova: 'image',
   kandinsky5: 'video',
   tts: 'audio',
   longcat: 'avatar',
@@ -678,6 +682,7 @@ const avatarModelTypes = new Set([
 
 // Model types classified as Video Edit (Kiwi Edit, Chrono Edit)
 const videoEditModelTypes = new Set([
+  'viggle_animate',
   'kiwi_edit',
   'kiwi_edit_instruct_only',
   'kiwi_edit_reference_only',
@@ -742,6 +747,12 @@ const HUNYUAN3D_MODEL_TYPES = [
 
 // Default enabled models (shown by default in selectors)
 const DEFAULT_ENABLED_MODELS = new Set([
+  'viggle_animate',
+  'h3_advanced_fl2va_pruned',
+  'h3_advanced_ref2va_pruned',
+  'h3_advanced_vdn_pruned',
+  'sensenova_u1_5_8b_mot',
+
   // Image
   // Keep the general-purpose Flux default plus the complete Krea 2 family:
   // base RAW/Turbo generation and their identity-preserving Edit variants.
@@ -799,8 +810,9 @@ const DEFAULT_ENABLED_MODELS = new Set([
  * a user who then disables them stays disabled forever. (This is
  * deliberately narrower than auto-enabling every unknown model — only
  * the curated list's own additions are pushed.) */
-const DEFAULTS_VERSION = 10
+const DEFAULTS_VERSION = 11
 const DEFAULTS_ADDED_IN: Record<number, string[]> = {
+  11: ["viggle_animate", "h3_advanced_fl2va_pruned", "h3_advanced_ref2va_pruned", "h3_advanced_vdn_pruned", "sensenova_u1_5_8b_mot"],
   // v1.2.0: the ACE-Step XL SFT pair; LM_4B becomes the music default.
   2: ['ace_step_v1_5_xl_sft', 'ace_step_v1_5_xl_sft_lm_4b'],
   // v1.3.0: SCAIL-2 character animation, base + lightx2v-distilled Fast.
@@ -945,7 +957,7 @@ export function getFamiliesForMode(mode: GenerationMode, allFamilies: ModelFamil
     // Recast and Repaint run on SCAIL-2, which lives under the Wan 2.1
     // family. The remaining edit sub-modes use LTX models.
     if (editSubMode === 'recast' || editSubMode === 'restyle') {
-      return allFamilies.filter(f => f.id === 'wan')
+      return allFamilies.filter(f => f.id === 'wan' || (editSubMode === 'recast' && f.id === 'h3_advanced'))
     }
     return allFamilies.filter(f => f.id === 'ltx2' || f.id === 'ltxv')
   }
@@ -977,7 +989,8 @@ export function getModelsForFamily(familyId: string, allModels: ModelDef[], mode
     // Recast exposes its dedicated native-replacement Fast recipe plus HQ.
     if (editSubMode === 'recast') {
       return familyModels.filter(m =>
-        m.model_type === 'scail2_14B_recast_fast'
+        m.model_type === 'viggle_animate'
+        || m.model_type === 'scail2_14B_recast_fast'
         || m.model_type === 'scail2_14B'
       )
     }
@@ -1093,7 +1106,8 @@ interface ScheduledPromptSubmission {
   total: number
 }
 
-interface AppState extends LlmSlice, StudioConfigurationSlice {
+export interface AppState extends LlmSlice, StudioConfigurationSlice {
+  wangpRestoreError: string
   // Generation mode (top-level: image/video/audio/avatar)
   generationMode: GenerationMode
   setGenerationMode: (mode: GenerationMode) => void
@@ -1188,6 +1202,7 @@ interface AppState extends LlmSlice, StudioConfigurationSlice {
      *  their existing image-mode workflow state. */
     savedImageRefs: File[]
     savedImageRefType: string
+    modelType?: string
   } | null
   setEditAnythingStartAnchor: (path: string | null) => void
   setEditAnythingEndAnchor: (path: string | null) => void
@@ -1618,7 +1633,7 @@ interface AppState extends LlmSlice, StudioConfigurationSlice {
   selectedOutputMeta: OutputMetadata | null
   metadataLoading: boolean
   loadOutputMetadata: (name: string) => Promise<void>
-  loadSettingsFromOutput: () => Promise<void>
+  loadSettingsFromOutput: () => Promise<boolean | void>
   rerollGeneration: () => Promise<void>
   deleteSelectedOutput: () => Promise<void>
   rejoinClipGroup: (groupId: string) => Promise<void>
@@ -2198,7 +2213,7 @@ export const useStore = create<AppState>((set, get) => {
     const leavingScail2Edit = prev === 'recast' || prev === 'restyle'
     if (enteringScail2Edit) {
       const valid = mode === 'recast'
-        ? current === 'scail2_14B_recast_fast' || current === 'scail2_14B'
+        ? current === 'viggle_animate' || current === 'scail2_14B_recast_fast' || current === 'scail2_14B'
         : current === 'scail2_14B_fast' || current === 'scail2_14B'
       if (!valid) {
         if (!leavingScail2Edit && !isScail2(current)) {
@@ -2214,7 +2229,7 @@ export const useStore = create<AppState>((set, get) => {
             : undefined
         if (target) get().selectModel(target)
       }
-    } else if (leavingScail2Edit && isScail2(current)) {
+    } else if (leavingScail2Edit && (isScail2(current) || current === 'viggle_animate')) {
       const restore = _preScail2AvatarModel && s.models.some(m => m.model_type === _preScail2AvatarModel)
         ? _preScail2AvatarModel
         : getDefaultModelForMode('avatar', s.families, s.models)
@@ -2274,7 +2289,9 @@ export const useStore = create<AppState>((set, get) => {
     editRecastRefUrl: mappings[0]?.refUrl || '',
     editRecastRefAligned: mappings[0]?.referenceAlignedToSource === true,
   }),
-  setEditRecastRef: (file, path, url, aligned = false) => set(s => ({
+  setEditRecastRef: (file, path, url, aligned = false) => set(s => {
+    editingInputsChanged()
+    return {
     editRecastRefFile: file,
     editRecastRefPath: path,
     editRecastRefUrl: url,
@@ -2289,7 +2306,8 @@ export const useStore = create<AppState>((set, get) => {
       },
       ...s.editRecastMappings.slice(1),
     ],
-  })),
+    }
+  }),
   editReturnTarget: null,
   setEditAnythingStartAnchor: (path: string | null) => set({ editAnythingStartAnchor: path }),
   setEditAnythingEndAnchor: (path: string | null) => set({ editAnythingEndAnchor: path }),
@@ -2332,6 +2350,7 @@ export const useStore = create<AppState>((set, get) => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             video_path: clipPath,
+            ...(state.params.model_type === 'viggle_animate' ? { wangp_media: true, workspace: state.activeWorkspace } : {}),
             ...(which === 'end' ? { end_time: tStart } : { start_time: tStart }),
           }),
         })
@@ -2375,6 +2394,7 @@ export const useStore = create<AppState>((set, get) => {
           endTime,
           savedImageRefs,
           savedImageRefType,
+          modelType: state.params.model_type,
         },
       }))
     } catch (e) {
@@ -2394,7 +2414,7 @@ export const useStore = create<AppState>((set, get) => {
     // The backend resolver in /api/v1/edit-anything will look in the
     // active workspace's outputs/ for a bare filename, so passing the
     // gallery name is enough.
-    const outputPath = latestImage.name
+    const outputPath = target.modelType === 'viggle_animate' ? latestImage.url : latestImage.name
 
     if (target.anchor === 'recast') {
       set(s => ({
@@ -2429,6 +2449,7 @@ export const useStore = create<AppState>((set, get) => {
     // switch back to Edit Anything. setGenerationMode handles the model
     // swap so they land back on their video model with the right LoRAs.
     get().setGenerationMode('avatar')
+    if (target.modelType === 'viggle_animate') await get().selectModel(target.modelType)
     set({
       editSubMode: target.anchor === 'recast'
         ? 'recast'
@@ -2561,6 +2582,7 @@ export const useStore = create<AppState>((set, get) => {
   setOutpaintWindowOverlap: (v) => set({ outpaintWindowOverlap: v }),
   setEditVideoPath: (path) => set({ editVideoPath: path }),
   setEditVideo: (file, path, url, duration, resolution) => set(state => {
+    editingInputsChanged()
     if (state.editVideoUrl && state.editVideoUrl !== url && state.editVideoUrl.startsWith('blob:')) {
       URL.revokeObjectURL(state.editVideoUrl)
     }
@@ -2571,6 +2593,7 @@ export const useStore = create<AppState>((set, get) => {
     }
   }),
   clearEditVideo: () => set(state => {
+    editingInputsChanged()
     if (state.editVideoUrl.startsWith('blob:')) URL.revokeObjectURL(state.editVideoUrl)
     if (state.editRepaintFrameUrl.startsWith('blob:')) URL.revokeObjectURL(state.editRepaintFrameUrl)
     return {
@@ -3929,6 +3952,7 @@ export const useStore = create<AppState>((set, get) => {
           asset_id: s.toolsSourceAssetId || undefined,
           source_workspace: s.toolsSourceWorkspace || undefined,
           method: s.toolsUpscaleMethod,
+          wangp_processor_settings: s.params.wangp_processor_settings,
           workspace: s.activeWorkspace,
           provenance: { actor: 'user' },
         })
@@ -4418,11 +4442,12 @@ export const useStore = create<AppState>((set, get) => {
     }
 
     if (state.generationMode === 'avatar' && state.editSubMode === 'recast') {
-      const recastMappings = state.editRecastMappings.slice(0, 5)
+      const recastIsViggle = state.params.model_type === 'viggle_animate'
+      const recastMappings = state.editRecastMappings.slice(0, recastIsViggle ? 1 : 5)
       if (
         !state.editVideoPath
         || recastMappings.length === 0
-        || recastMappings.some(mapping => !mapping.target.trim() || !mapping.refPath)
+        || recastMappings.some(mapping => (!recastIsViggle && !mapping.target.trim()) || !mapping.refPath)
       ) return
       const promptText = ((state.params.prompt as string) || '').trim()
 
@@ -4470,6 +4495,7 @@ export const useStore = create<AppState>((set, get) => {
           use_relighting: state.editRecastUseRelighting,
           resolution_profile: state.editRecastResolutionProfile,
           ...(promptText ? { prompt: promptText } : {}),
+          ...viggleSubmissionOptions(state.params, state.spatialUpsampling),
           ...(recastIsScail2 ? {
             model_type: recastModel,
             num_inference_steps: (state.params.num_inference_steps as number) ?? undefined,
@@ -4697,6 +4723,7 @@ export const useStore = create<AppState>((set, get) => {
         requestedFrames = Math.min(maximumFrames, requestedFrames)
       }
       params.video_length = requestedFrames
+      if (state.modelOptions?.wangp_1272) params.video_length = Math.max(1, Math.round(state.durationSeconds * fps))
 
       if (supportsSlidingWindows) {
         const swDefaults = state.modelOptions?.sliding_window_defaults
@@ -4901,7 +4928,7 @@ export const useStore = create<AppState>((set, get) => {
         && state.durationSeconds > state.slidingWindowSeconds
       if (
         hasSlidingWindow
-        && (state.modelOptions?.sliding_window_auto_prompt_pacing === true || params.minimax_h3_reference_sequence === true)
+        && (state.modelOptions?.sliding_window_auto_prompt_pacing === true || state.modelOptions?.wangp_1272 === true || params.minimax_h3_reference_sequence === true)
       ) {
         // H3's structured Context-IR prompt contains semantic line breaks;
         // they are not one prompt per continuation window. Keep the complete
@@ -8558,6 +8585,7 @@ export const useStore = create<AppState>((set, get) => {
     }, s.loraIdByFilename)
   },
 
+  wangpRestoreError: '',
   storageDashboardOpen: false,
   setStorageDashboardOpen: (open) => set({ storageDashboardOpen: open }),
 
@@ -8590,15 +8618,16 @@ export const useStore = create<AppState>((set, get) => {
     }
     if (!selectedOutputMeta?.params) {
       console.warn('[LoadSettings] ABORT — no params available after fetch attempt; button is a no-op')
-      return
+      return false
     }
     const { models } = get()
     const p = selectedOutputMeta.params as Record<string, unknown>
+    const finishWangpRestore = beginWangpRestore(p, get, set)
     const uploadFilenames = selectedOutputMeta.upload_filenames as Record<string, string> | undefined
     console.log('[LoadSettings] applying settings — model_type:', p.model_type, '| param keys:', Object.keys(p).length)
 
     let modelType = (p.model_type as string) || ''
-    if (!modelType) return
+    if (!modelType) return false
 
     // Migrate Recast sidecars made before the dedicated model existed. Those
     // jobs used the general I2V Fast accelerator with replacement conditioning;
@@ -8722,6 +8751,7 @@ export const useStore = create<AppState>((set, get) => {
       settings_version: p.settings_version as number,
     }
 
+    Object.assign(newParams, restoreWangpSettings(p))
     // Copy optional fields — explicitly clear when absent to prevent stale values leaking
     newParams.sliding_window_size = (p.sliding_window_size as number) ?? undefined
     newParams.sliding_window_overlap = (p.sliding_window_overlap as number) ?? undefined
@@ -8949,7 +8979,7 @@ export const useStore = create<AppState>((set, get) => {
 
     // Restore image refs as File objects (for image mode reference images)
     // Skip if this is a KFI (frames injection) output — those refs are handled by ControlVideoSection
-    const imageRefPaths = newParams.image_refs || []
+    const imageRefPaths = restoredGenericImageRefs(p, newParams.image_refs)
     const isKFI = (newParams.video_prompt_type || '').includes('KFI')
     if (imageRefPaths.length > 0 && !isKFI) {
       // Set the ref type from saved params
@@ -9045,7 +9075,7 @@ export const useStore = create<AppState>((set, get) => {
       // (preferred — set by the new endpoints) or falls back to retake_video.
       // We fetch the file by URL so the EditVideoUpload UI shows the same
       // clip the user originally edited.
-      const editVideoPath = (p.edit_video_path as string) || (p.retake_video as string) || ''
+      const editVideoPath = legacyEditingPath(p, 'edit_video_path', String(p.retake_video || ''))
       if (editVideoPath) {
         const fname = editVideoPath.replace(/\\/g, '/').split('/').pop() || ''
         if (fname) {
@@ -9064,6 +9094,7 @@ export const useStore = create<AppState>((set, get) => {
                 const duration = video.duration && isFinite(video.duration) ? video.duration : 0
                 const resolution = `${video.videoWidth}x${video.videoHeight}`
                 get().setEditVideo(file, editVideoPath, url, duration, resolution)
+                set(restoredEditingTrim(p, duration))
               }
               set({ editVideoPath, editVideoUrl: url })
             })
@@ -9216,7 +9247,7 @@ export const useStore = create<AppState>((set, get) => {
               ? '512p'
               : '480p',
         })
-        const recastRef = (p.edit_recast_ref_path as string) || ''
+        const recastRef = legacyEditingPath(p, 'edit_recast_ref_path')
         if (recastRef) {
           const refName = recastRef.replace(/\\/g, '/').split('/').pop() || ''
           // Recast references can be either uploads or Image-mode outputs.
@@ -9315,14 +9346,14 @@ export const useStore = create<AppState>((set, get) => {
         }
       }
     }
+    return finishWangpRestore()
   },
 
   rerollGeneration: async () => {
     // Await the (now async, self-healing) settings load before generating, so a
     // slow on-demand metadata fetch can't let the reroll fire with stale params.
-    await get().loadSettingsFromOutput()
-    // Small delay to let state settle, then generate
-    setTimeout(() => get().startGeneration(), 100)
+    if (await get().loadSettingsFromOutput() === false) return
+    await get().startGeneration()
   },
 
   // ── Director Pipeline (server-side) ──────────────────────────────

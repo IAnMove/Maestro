@@ -57,6 +57,13 @@ export type Scene3DLoop = {
 
 export type Scene3DDressing = 'none' | 'street' | 'space' | 'treadmill' | 'cafe' | 'drive-city' | 'drive-coast' | 'drive-tunnel'
 
+export type Scene3DSourceRef = {
+  workspaceId: string
+  filename: string
+  url: string
+  assetId?: string
+}
+
 export type Scene3DSlot = {
   id: string
   slot: Scene3DSlotId
@@ -64,6 +71,7 @@ export type Scene3DSlot = {
   rotationY: number
   scale: number
   sourceUrl: string
+  sourceRef?: Scene3DSourceRef
   media: Scene3DSlotMedia
   clip: Scene3DClipRef | null
   loop?: Scene3DLoop

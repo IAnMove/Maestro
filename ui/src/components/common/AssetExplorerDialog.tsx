@@ -62,6 +62,7 @@ type BodyProps = {
   title: string
   subtitle?: string
   items: ApiOutput[]
+  selected?: ApiOutput
   selectedName?: string
   allowNone?: boolean
   noneLabel?: string
@@ -94,6 +95,7 @@ function AssetExplorerBody({
   title,
   subtitle,
   items,
+  selected: selectedOutput,
   selectedName,
   allowNone,
   noneLabel,
@@ -115,8 +117,13 @@ function AssetExplorerBody({
   )
   const [picked, setPicked] = useState<{ workspaceId: string; item: PickerItem } | null>(null)
   const scopedPicked = picked && picked.workspaceId === (workspaceId || '') ? picked.item : null
+  const selectedFromValue = selectedOutput
+    ? livePickerItem(pickerItems, outputToPickerItem(selectedOutput, workspaceId || ''))
+    : null
+  const namedMatches = selectedName ? pickerItems.filter(item => item.filename === selectedName) : []
   const selected = livePickerItem(pickerItems, scopedPicked)
-    ?? (scopedPicked ? null : pickerItems.find(item => item.filename === selectedName) ?? null)
+    ?? selectedFromValue
+    ?? (scopedPicked ? null : namedMatches.length === 1 ? namedMatches[0] : null)
   const filtered = useMemo(
     () => sortPickerItems(filterPickerItems(pickerItems, query, kind ? [kind] : constraints?.kinds), sort),
     [constraints, kind, pickerItems, query, sort],
@@ -206,7 +213,7 @@ export function AssetExplorerDialog({
     >
       {open ? (
         <AssetExplorerBody
-          key={`${title}:${body.selectedName ?? ''}`}
+          key={`${title}:${body.selected?.asset_id || body.selected?.url || body.selectedName || ''}`}
           title={title}
           onClose={onClose}
           {...body}

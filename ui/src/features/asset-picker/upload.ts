@@ -5,6 +5,7 @@ import type { AssetKind } from '../../api/assets'
 export type LocalUploadResult = {
   filename: string
   url: string
+  path: string
   kind: AssetKind
 }
 
@@ -28,8 +29,14 @@ export async function uploadLocalAsset(file: File, signal?: AbortSignal): Promis
   return {
     filename: uploaded.filename,
     url: uploaded.url,
+    path: uploaded.path,
     kind,
   }
+}
+
+export function fileMatchesConstraints(file: File, kinds?: readonly AssetKind[]): boolean {
+  if (!kinds?.length) return true
+  return kinds.includes(inferUploadKind(file))
 }
 
 export function createUploadSession() {

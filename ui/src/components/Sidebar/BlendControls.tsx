@@ -2,18 +2,18 @@ import { useState, useCallback, useEffect, useMemo } from 'react'
 import { X, ArrowRight } from 'lucide-react'
 import { useStore } from '../../stores/useStore'
 import { useUiTranslation } from '../../i18n'
-import * as api from '../../api/client'
 import type { ApiOutput } from '../../api/outputs'
 import { StudioSourceField } from '../../lib/StudioSourceField.tsx'
-import { useWorkspaceOutputs } from '../../lib/studioAssetPick.ts'
+import { applyChosenStudioMedia, useWorkspaceOutputs } from '../../lib/studioAssetPick.ts'
 
-function ClipDropZone({ label, file, url, duration, items, onUpload, onClear }: {
+function ClipDropZone({ label, file, url, duration, items, workspaceId, onChoose, onClear }: {
   label: string
   file: File | null
   url: string
   duration: number
   items: ApiOutput[]
-  onUpload: (file: File) => void
+  workspaceId: string
+  onChoose: (item: ApiOutput) => void
   onClear: () => void
 }) {
   if (file) {
@@ -43,7 +43,8 @@ function ClipDropZone({ label, file, url, duration, items, onUpload, onClear }: 
         items={items}
         accept="video/*,image/*"
         kinds={['image', 'video']}
-        onFile={onUpload}
+        workspaceId={workspaceId}
+        onChoose={onChoose}
       />
     </div>
   )
@@ -90,27 +91,13 @@ export function BlendControls() {
 
   const [error, setError] = useState<string | null>(null)
 
-  const uploadClip = useCallback(async (file: File, target: 'A' | 'B') => {
+  const chooseClip = useCallback((item: ApiOutput, target: 'A' | 'B') => {
     setError(null)
-    try {
-      const result = await api.uploadImage(file)
-      const url = URL.createObjectURL(file)
-      if (file.type.startsWith('video/')) {
-        const video = document.createElement('video')
-        video.src = url
-        video.onloadedmetadata = () => {
-          const duration = video.duration && isFinite(video.duration) ? video.duration : 0
-          if (target === 'A') setBlendClipA(file, result.path, url, duration)
-          else setBlendClipB(file, result.path, url, duration)
-        }
-      } else {
-        if (target === 'A') setBlendClipA(file, result.path, url, 0)
-        else setBlendClipB(file, result.path, url, 0)
-      }
-    } catch {
-      setError(t('blend.uploadFailed'))
-    }
-  }, [setBlendClipA, setBlendClipB, t])
+    applyChosenStudioMedia(item, next => {
+      if (target === 'A') setBlendClipA(next.file, next.path, next.url, next.duration)
+      else setBlendClipB(next.file, next.path, next.url, next.duration)
+    })
+  }, [setBlendClipA, setBlendClipB])
 
   const bothLoaded = !!blendClipA && !!blendClipB
 
@@ -151,7 +138,8 @@ export function BlendControls() {
           url={blendClipAUrl}
           duration={blendClipADuration}
           items={clipItems}
-          onUpload={f => uploadClip(f, 'A')}
+          workspaceId={activeWorkspace}
+          onChoose={item => chooseClip(item, 'A')}
           onClear={clearBlendClipA}
         />
         <ArrowRight size={16} className="text-text-muted shrink-0" />
@@ -161,7 +149,8 @@ export function BlendControls() {
           url={blendClipBUrl}
           duration={blendClipBDuration}
           items={clipItems}
-          onUpload={f => uploadClip(f, 'B')}
+          workspaceId={activeWorkspace}
+          onChoose={item => chooseClip(item, 'B')}
           onClear={clearBlendClipB}
         />
       </div>

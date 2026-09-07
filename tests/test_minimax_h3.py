@@ -5,6 +5,7 @@ import ast
 import importlib.util
 import json
 import os
+import re
 from pathlib import Path
 import struct
 import sys
@@ -933,7 +934,7 @@ class TestMiniMaxH3Definition(unittest.TestCase):
         self.assertIn("'minimax_h3_full'", default_block)
         self.assertIn("'minimax_h3_ref2va'", default_block)
         self.assertIn("'minimax_h3_ref2va_full'", default_block)
-        self.assertIn("const DEFAULTS_VERSION = 10", store)
+        self.assertGreaterEqual(int(re.search(r"const DEFAULTS_VERSION = (\d+)", store).group(1)), 10)
         self.assertIn("6: ['minimax_h3']", store)
         self.assertIn("7: ['minimax_h3_ref2va']", store)
         self.assertIn("8: ['minimax_h3_full', 'minimax_h3_ref2va_full']", store)

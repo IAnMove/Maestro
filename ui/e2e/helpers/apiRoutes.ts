@@ -359,6 +359,7 @@ function exactCatalog(): Record<string, ReturnType<typeof json> | { sse: true }>
       provider: 'local',
     }),
     'GET /api/v1/llm/models': json({ models: [] }),
+    'GET /api/v1/wangp/capabilities': json({ processors: [] }),
     'GET /api/v1/jobs': json({ jobs: [] }),
     'GET /api/v1/jobs/recovery': json({ jobs: [] }),
     'GET /api/v1/director/pipelines': json({ pipelines: [], total: 0 }),

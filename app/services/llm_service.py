@@ -350,6 +350,15 @@ def _build_size_hint(info: dict) -> str:
 # size_hint is built automatically from weights_gb + mmproj_gb + KV-cache
 # estimate at module load (see post-loop below).
 MODEL_REGISTRY = {
+    "DeepBeepMeep/Wan2.1": {
+        "label": "Qwen3.8 27B Uncensored (Vision, WanGP)",
+        "gguf_file": "Qwen3_8_27B_Uncensored/Qwen3.8-27B-Uncensored-Q4_K_M.gguf",
+        "mmproj_file": "Qwen3_8_27B_Uncensored/Qwen3.8-27B-Uncensored-vision-f16.gguf",
+        "revision": "850ed9ffca04b4d1ba6b95b5cd6167abedd3fc65",
+        "weights_gb": 16.81, "mmproj_gb": 0.93,
+        "cache_dir_override": "Qwen3_8_27B_Uncensored",
+        "extra_flags": ["-c", "65536", "-np", "1", "-fa", "on", "--cache-type-k", "q4_0", "--cache-type-v", "q4_0"],
+    },
     "unsloth/Qwen3.5-2B-GGUF": {
         "label": "Qwen3.5 2B (Fast)",
         "gguf_file": "Qwen3.5-2B-Q4_K_S.gguf",
@@ -618,6 +627,7 @@ for _repo_id, _info in MODEL_REGISTRY.items():
 # deprecated / experimental variants. A repo id listed here that isn't
 # currently in the registry is simply skipped.
 _PUBLIC_MODEL_ORDER = [
+    "DeepBeepMeep/Wan2.1",
     "Youssofal/Qwen3.6-27B-Abliterated-Heretic-Uncensored-GGUF",
     "Nesuwka/gemma-4-E2B-it-heretic-ara-Q4_K_M-GGUF",
     "Abhiray/gemma-4-E4B-it-heretic-GGUF",                         # default (Recommended)
@@ -1002,6 +1012,10 @@ def is_loaded() -> bool:
     return _process is not None and _process.poll() is None
 
 
+def supports_vision() -> bool:
+    return _vision_available or _provider in ('remote', 'ollama', 'openai', 'minimax', 'grok')
+
+
 def get_status() -> dict:
     return {
         "loaded": is_loaded(),
@@ -1025,6 +1039,7 @@ def _download_gguf(repo_id: str, filename: str, cache_dir: str) -> str:
         repo_id=repo_id,
         filename=filename,
         local_dir=cache_dir,
+        revision=MODEL_REGISTRY.get(repo_id, {}).get("revision"),
     )
     print(f"[LLM] Downloaded to: {downloaded}")
     return downloaded
@@ -2069,6 +2084,7 @@ def generate(
     stop: Optional[list[str]] = None,
     json_schema: Optional[dict] = None,
     cancellation_token=None,
+    require_vision: bool = False,
 ) -> str:
     """Generate text via llama-server's OpenAI-compatible chat endpoint.
 
@@ -2088,6 +2104,10 @@ def generate(
     """
     if not is_loaded():
         raise RuntimeError("LLM not loaded. Call load_model() first.")
+
+    # Routing is locked by _scheduled_llm_request here, after acquiring its lane.
+    if require_vision and not supports_vision():
+        raise ValueError("Select a vision-capable LLM before attaching visual evidence")
 
     # MiniMax M-series completions use max_completion_tokens, reasoning_split
     # and a provider-specific thinking switch. The generic request below uses

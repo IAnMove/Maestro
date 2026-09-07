@@ -4,7 +4,7 @@ import type { ApiOutput } from '../../api/outputs'
 import { useUiTranslation } from '../../i18n'
 import { AssetExplorerDialog, AssetPickTrigger } from '../../components/common/AssetExplorerDialog'
 import type { AssetConstraints } from './types.ts'
-import { createUploadSession } from './upload.ts'
+import { createUploadSession, fileMatchesConstraints } from './upload.ts'
 
 export function AssetInput({
   label,
@@ -15,6 +15,7 @@ export function AssetInput({
   optional,
   constraints,
   disabled,
+  workspaceId,
   onChoose,
 }: {
   label: string
@@ -25,22 +26,31 @@ export function AssetInput({
   optional?: boolean
   constraints?: AssetConstraints
   disabled?: boolean
+  workspaceId?: string
   onChoose: (item: ApiOutput | null) => void
 }) {
   const { t } = useUiTranslation('common')
   const fileRef = useRef<HTMLInputElement>(null)
   const upload = useRef(createUploadSession())
+  const chooseGen = useRef(0)
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  useEffect(() => () => upload.current.abort(), [])
+  useEffect(() => () => {
+    chooseGen.current += 1
+    upload.current.abort()
+  }, [])
 
   const pickLocal = async (file: File | undefined) => {
     if (!file) return
+    if (constraints && !fileMatchesConstraints(file, constraints.kinds)) return
+    const generation = ++chooseGen.current
+    const scope = workspaceId
     setError('')
     setBusy(true)
     try {
       const uploaded = await upload.current.run(file)
+      if (generation !== chooseGen.current) return
       onChoose({
         name: uploaded.filename,
         type: uploaded.kind === 'model3d' ? 'model3d' : uploaded.kind === 'audio' ? 'audio' : uploaded.kind === 'video' ? 'video' : 'image',
@@ -49,12 +59,15 @@ export function AssetInput({
         created_at: Date.now() / 1000,
         url: uploaded.url,
         thumbnail_url: uploaded.kind === 'image' ? uploaded.url : '',
+        workspace_id: scope,
+        path: uploaded.path,
       })
     } catch (caught) {
       if (caught instanceof DOMException && caught.name === 'AbortError') return
+      if (generation !== chooseGen.current) return
       setError(t('picker.uploadFailed'))
     } finally {
-      setBusy(false)
+      if (generation === chooseGen.current) setBusy(false)
       if (fileRef.current) fileRef.current.value = ''
     }
   }
@@ -88,7 +101,8 @@ export function AssetInput({
         open={open}
         title={label}
         items={items}
-        selectedName={value?.name}
+        selected={value}
+        workspaceId={workspaceId}
         allowNone={optional}
         constraints={constraints}
         onClose={() => setOpen(false)}
