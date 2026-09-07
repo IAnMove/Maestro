@@ -48,6 +48,10 @@ running GPU/provider work:
 
 A budget failure fails `--full`. Unknown arguments fail closed.
 
+UI steps inherit the **current PATH** (nvm, Pinokio, direnv). They do not
+spawn a login shell. `set -e` stops the suite at the first failed step: a
+failed UI build does not continue into budget or later `--full` work.
+
 ## Base SHA
 
 GitHub compares a pull request with the current base commit. Locally:

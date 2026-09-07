@@ -8,7 +8,7 @@ HocusPocus exists for creators who do not want a one-off prompt machine. It is a
 
 ## First steps: guide to every section
 
-1. **Studio (sidebar)** — choose an image, video or audio model; write the prompt; add references/LoRAs; then generate. Use it when you want direct, manual control over one asset. The output appears in the gallery and is reusable everywhere else.
+1. **Studio (sidebar)** — choose an image, video or audio model; write the prompt; add references/LoRAs; then generate. Use it when you want direct, manual control over one asset. The output appears in the gallery and is reusable everywhere else. **Tools** (same sidebar) post-processes an existing image or clip — FlashVSR/Lanczos upscale, SeedVC revoice, rembg background removal — and always writes a new file; see the [Studio Tools guide](docs/tools/HOWUSEIT.md).
 2. **Director (sidebar)** — select Music Video, Short Film, Trailer or a story-driven workflow and describe the outcome. The LLM turns the brief into reviewable shots, prompts and references. Choose manual review for control or automatic mode for a complete recoverable pipeline.
 3. **Gallery: All, Images, Videos, Audio, Videoclips, Trailers and Chapters** — browse results by kind. Open an item to inspect it; use it as a reference, send it to an editor, or keep it in the active output folder.
 4. **3D** — create a mesh from text, one image or the four front/left/right/back views. You can upload references or select existing HocusPocus images. Export GLB for later animation or 3D-video composition.
@@ -47,7 +47,7 @@ Detects your GPU, VRAM, and RAM on first launch and picks the right profile, qua
 Direct access to every model and every knob:
 - **Video** — LTX-2.3, Wan1/2, Hunyuan, and many more.
 - **Image** — Flux 2 Klein 9B (default), Qwen Image Edit, and many more
-- **Audio** — TTS: Kugelaudio, Qwen3 TTS. Music: ACE-Step 1.5 XL (default for new Story Lab songs; MiniMax Music remains selectable). SFX: MMAudio
+- **Audio** — TTS: Kugelaudio, Qwen3 TTS. Music: ACE-Step 1.5 XL (default for new Story Lab songs); local MiniMax Music3 (`minimax_music3`, 5–300 s, no API key); remote MiniMax `music-2.6` / `music-3.0` when a key is configured. SFX: MMAudio
 - **Multi-clip generation** with per-clip prompts, seamless overlapping (sliding window) transitions, and shared LoRAs
 - **Blend video Mode** Remember Sora 1 blend mode, where you could overlap two videos, and use AI to blend them together?
 - **Frames Injection (KFI)** for character continuity in long videos
@@ -140,7 +140,7 @@ For a screenshot-led, end-to-end walkthrough, see **[HocusPocus / Experimental: 
 - Character cards combine role, desire, need, flaw, arc, dialogue voice, wardrobe, visual invariants, negative prompts, multiple references, and a selected primary identity image.
 - Export/import a `.storypack` with the editable JSON and available visual assets. Each output folder has a multi-story autosaved library; generated plans and local concept jobs can resume from durable checkpoints after interruption. A logical Workspace collection can link those projects without owning their files.
 - **Productions** offers a review-first hand-off and a complete one-click generation for both media. Comic opens **Director → Comic** and creates a self-contained chapter rather than retelling the master plot; four pages remain the quick-test default, while page count and panels per page are configurable up to the Director limits. Short Film opens **Director → Short Film → Story** with an editable target duration and independently selectable image and video models, and inherits the Story project's selected writing provider instead of silently falling back to the global LLM. Its shot frames can use a local HocusPocus image model or the external MiniMax Image-01 API; the latter does not consume local VRAM and is distinct from the local MiniMax H3 video runtime. Both productions receive the full editable canon, structured cast, locations and labelled visual references. Character images remain attached through planning and MiniMax `image-01` uses the visually prioritised character as its single supported identity reference per request. Adaptation history preserves the selected models when reopening the staged target, or can restore its exact source as a new editable copy.
-- New **Videoclip** songs default to local **ACE-Step 1.5 XL** (`ace_step_v1_5_xl_sft_lm_4b`). MiniMax `music-2.6` / `music-3.0` stay available on the song model selector.
+- New **Videoclip** songs default to local **ACE-Step 1.5 XL** (`ace_step_v1_5_xl_sft_lm_4b`). Local MiniMax Music3 (`minimax_music3`) is a checkpoint in the same selector (5–300 s, default 120). Remote MiniMax `music-2.6` / `music-3.0` stay available when an API key is set. Story Lab writes a **pending** song row (`StoryMusicCandidate.id`) before generate starts so a closed tab can recover the WAV from the sidecar `candidate_id`; see [Story song identity](docs/development/STORY_SONG_IDENTITY.md).
 - **Tráiler cinematográfico** is a standalone Story Lab project type beside **Videoclip**, so movie trailers never require a song. Its four-stage planner creates the concept, protagonists, world and a 6–12-beat trailer arc, then opens the dedicated 15–180 second Trailer Creator. It exposes theatrical, teaser and character formats; narration, dialogue or visual-only storytelling; spoiler and intensity controls; optional minimal title cards; and an editable six-part timed arc from cold open to unresolved final hook. Visual generation can create start frames, route approved references directly through H3 Ref2VA, or run as pure text-to-video without generating or sending any image. A trailer can be reviewed in Director or generated as a recoverable ordered pipeline, then replayed, regenerated clip-by-clip and joined from Story Lab's Assembly view.
 
 ### 💬 Comic Studio — script, characters, pages, translation and animatics
@@ -439,7 +439,7 @@ After clicking **Start**, the launcher shows an **Open Web UI** button once the 
 - **Activity footer** — persistent live job progress and access to current or past **Productions**
 - **Settings drawer** (gear icon) — model visibility, performance auto-tune, services (LLM, API keys, NSFW, theme)
 - **Pinokio menu** — Update, Reset, Install Inpaint Support, LoRA folder shortcuts
-- **Operator guides** — [HOWUSEIT index](docs/HOWUSEIT.md) (Video Editor, Workspaces tab, 3D compositor, Character Kits)
+- **Operator guides** — [HOWUSEIT index](docs/HOWUSEIT.md) (Studio Tools, Video Editor, Workspaces tab, 3D compositor, Character Kits)
 
 ## Sharing on the local network
 

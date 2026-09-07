@@ -699,15 +699,19 @@ status = requests.get(f"{base}/api/v1/video-editor/export/{job['job_id']}").json
 
 ## Image background removal
 
+Operator workflow: [`docs/tools/HOWUSEIT.md`](../../docs/tools/HOWUSEIT.md).
+
 `POST /api/v1/tools/remove-background` queues a standalone image tool job. It
 uses the shared rembg U2Net adapter, never overwrites the source, and publishes
 the transparent PNG plus a canonical `.meta.json` asset manifest in the
-destination workspace. Use an exact `asset_id` from `GET /api/v1/assets?kind=image`
-whenever possible; `source` may be the exact filename, an `/api/v1/file/...`
-URL, or an absolute path already inside the selected uploads/workspace root.
-`source_workspace` is required when the source belongs to another output
-folder. Poll `GET /api/v1/status/{job_id}` and cancel with
-`POST /api/v1/cancel/{job_id}`.
+destination workspace. Accepted image extensions are `.png`, `.jpg`, `.jpeg`,
+and `.webp` (narrower than Tools upscale). Use an exact `asset_id` from
+`GET /api/v1/assets?kind=image` whenever possible; `source` may be the exact
+filename, an `/api/v1/file/...` URL, or an absolute path already inside the
+selected uploads/workspace root. `source_workspace` is required when the
+source belongs to another output folder. Optional `instruction` (max 2 000
+chars) is stored on the job and sidecar; U2Net does not consume it. Poll
+`GET /api/v1/status/{job_id}` and cancel with `POST /api/v1/cancel/{job_id}`.
 
 ```bash
 curl -X POST "$HOCUSPOCUS_URL/api/v1/tools/remove-background" \
@@ -715,7 +719,6 @@ curl -X POST "$HOCUSPOCUS_URL/api/v1/tools/remove-background" \
   -d '{
     "asset_id": "asset_image_123",
     "workspace": "default",
-    "instruction": "preserve the hair edges",
     "provenance": {"actor": "user"}
   }'
 ```
@@ -732,7 +735,10 @@ transparent-PNG technical metadata.
 still image or a video. Send `{ "source": "image.png", "source_kind":
 "image", "asset_id": "...", "source_workspace": "...", "method":
 "flashvsr2", "workspace": "default" }` for an image, or keep the legacy
-`video_path` field with `source_kind: "video"` for a clip. Supported image
+`video_path` field with `source_kind: "video"` for a clip. Methods are
+`flashvsr2` (default), `flashvsr3`, `flashvsr4`, `flashvsr2pass2`,
+`flashvsr2pass4`, `lanczos1.5`, and `lanczos2`. Conflicting `source` /
+`source_path` / `video_path` values return `409`. Supported image
 formats are `.bmp`, `.gif`, `.jpeg`, `.jpg`, `.png`, `.tif`, `.tiff`, and
 `.webp`; supported video formats are `.avi`, `.m4v`, `.mkv`, `.mov`, `.mp4`,
 `.mpeg`, `.mpg`, `.webm`, and `.wmv`. The source must be an exact asset, upload, or
@@ -743,6 +749,19 @@ audio-preserving pipeline and produce a new video. Neither path overwrites its
 source. Poll the returned job with `GET /api/v1/status/{job_id}` and cancel it
 with `POST /api/v1/cancel/{job_id}`. Activity and the canonical asset manifest
 retain the source lineage, method, workspace, provenance, and execution mode.
+
+## Tools revoice
+
+`POST /api/v1/tools/revoice` replaces voices on an existing **video** with
+SeedVC. Body: `{ "video_path": "take.mp4", "voice_ref_paths": ["ref.wav"],
+"mode": "single"|"two", "diffusion_steps": 25, "cfg_rate": 0.5,
+"workspace": "default" }`. At least one and at most two reference paths are
+required (audio or video). `mode` defaults to `single` and any other string
+is coerced to `single`. The worker copies the source to a new `_revoiced`
+file, then converts the copy; the original clip is never mutated. Failure
+when the clip has no audio or SeedVC is unavailable. Same poll/cancel
+endpoints as the other Tools jobs. See
+[`docs/tools/HOWUSEIT.md`](../../docs/tools/HOWUSEIT.md).
 
 ## Gallery mix kinds
 
@@ -835,4 +854,4 @@ These routes always use the server active output folder. They do not accept `?wo
 - `POST /api/v1/director/pipeline/{pid}/resume` and `POST /api/v1/director/pipeline/{pid}/continue` use the singular `pipeline` path.
 - Batch prompt rewrite is UI-only: loop `POST /api/v1/llm/generate` (local LLM) then PUT the chosen prompts.
 
-Operator notes: `docs/video-editor/HOWUSEIT.md`, `docs/workspaces/HOWUSEIT.md`, and `docs/character-kits/HOWUSEIT.md`.
+Operator notes: `docs/tools/HOWUSEIT.md`, `docs/video-editor/HOWUSEIT.md`, `docs/workspaces/HOWUSEIT.md`, and `docs/character-kits/HOWUSEIT.md`.
