@@ -2,6 +2,7 @@
 
 import ast
 import asyncio
+import json
 import os
 from pathlib import Path
 import re
@@ -13,7 +14,7 @@ from fastapi import HTTPException
 from PIL import Image
 import pytest
 
-from services.wangp_submission import JsonRequest
+from services.wangp_submission import JsonRequest, prepare_viggle_recast, probe_video, resolve_wangp_media
 
 
 RUNTIME = Path(__file__).parents[1] / "app" / "_launch_runtime.py"
@@ -147,3 +148,51 @@ def test_legacy_extraction_keeps_absolute_and_relative_paths(extract, absolute):
     result = submit(str(source) if absolute else source.name)
     with Image.open(result["start_path"]) as frame:
         assert frame.size == (832, 480)
+
+
+@pytest.mark.parametrize("rotation", [0, 90, 180, 270])
+def test_display_rotation_keeps_extracted_frame_valid_for_viggle(extract, rotation):
+    submit, uploads, workspace = extract
+    raw = uploads / "raw.mp4"
+    source = uploads / "phone.mp4"
+    make_video(raw, "832x480")
+    subprocess.run(
+        ["ffmpeg", "-v", "error", "-display_rotation", str(rotation),
+         "-i", str(raw), "-c", "copy", str(source)],
+        check=True, capture_output=True,
+    )
+    result = submit("/api/v1/uploads/phone.mp4", wangp_media=True)
+    expected = (480, 832) if rotation in (90, 270) else (832, 480)
+    with Image.open(result["start_path"]) as frame:
+        assert frame.size == expected
+    assert probe_video(source)[:2] == expected
+
+    def resolve(value, selected_workspace):
+        return resolve_wangp_media(
+            value, selected_workspace, uploads_dir=uploads, workspace_dir=workspace,
+        )
+
+    params = prepare_viggle_recast(
+        {"video_path": "/api/v1/uploads/phone.mp4", "ref_image_path": result["start_url"],
+         "workspace": "demo"},
+        resolve, uploads,
+    )
+    assert params["resolution"] == f"{expected[0]}x{expected[1]}"
+    assert params["image_refs"] == [result["start_path"]]
+
+
+@pytest.mark.parametrize(
+    ("metadata", "expected"),
+    [
+        ({}, (832, 480)),
+        ({"tags": {"rotate": "90"}}, (480, 832)),
+        ({"tags": {"rotate": "180"}}, (832, 480)),
+        ({"tags": {"rotate": "270"}}, (480, 832)),
+        ({"side_data_list": [{"rotation": 0}], "tags": {"rotate": "90"}}, (832, 480)),
+        ({"side_data_list": [{"rotation": -90}], "tags": {"rotate": "180"}}, (480, 832)),
+    ],
+)
+def test_probe_uses_display_matrix_before_legacy_rotation_tag(monkeypatch, metadata, expected):
+    payload = {"streams": [{"width": 832, "height": 480, **metadata}], "format": {"duration": "3.5"}}
+    monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: SimpleNamespace(stdout=json.dumps(payload)))
+    assert probe_video("phone.mp4") == (*expected, 3.5)

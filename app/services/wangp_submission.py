@@ -39,14 +39,24 @@ def prepare_generation_inputs(body, model_def, workspace, *, uploads_dir, worksp
 
 
 def probe_video(path):
+    """Read the display dimensions used by FFmpeg's autorotated frame extraction."""
     result = subprocess.run(
         ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
-         "stream=width,height:format=duration", "-of", "json", os.fspath(path)],
+         "stream=width,height:stream_side_data=rotation:stream_tags=rotate:format=duration",
+         "-of", "json", os.fspath(path)],
         capture_output=True, text=True, check=True, timeout=30,
     )
     info = json.loads(result.stdout)
     stream = info["streams"][0]
-    return int(stream["width"]), int(stream["height"]), float(info["format"]["duration"])
+    width, height = int(stream["width"]), int(stream["height"])
+    rotation = next((item["rotation"] for item in stream.get("side_data_list", [])
+                     if item.get("rotation") is not None), stream.get("tags", {}).get("rotate", 0))
+    try:
+        if math.isclose(float(rotation) % 180, 90, abs_tol=0.01):
+            width, height = height, width
+    except (TypeError, ValueError):
+        pass
+    return width, height, float(info["format"]["duration"])
 
 
 def viggle_parameters(body, *, video, reference, width, height, duration):

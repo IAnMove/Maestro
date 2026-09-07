@@ -1,6 +1,7 @@
 import { ArrowLeft, X, Check, SkipForward } from 'lucide-react'
 import { useStore } from '../../stores/useStore'
 import { useUiTranslation } from '../../i18n'
+import { latestAnchorImage } from '../../lib/viggleWorkflow'
 
 /**
  * Persistent banner that drives Edit Anything/Recast/Repaint → Image Mode
@@ -23,6 +24,8 @@ export function AnchorReturnBanner() {
   const { t } = useUiTranslation('studio')
   const target = useStore(s => s.editReturnTarget)
   const outputs = useStore(s => s.outputs)
+  const workspace = useStore(s => s.activeWorkspace)
+  const browsingUploads = useStore(s => s.browsingUploads)
   const apply = useStore(s => s.applyOutputAsAnchor)
   const skip = useStore(s => s.skipAnchorPhase)
   const cancel = useStore(s => s.cancelAnchorReturn)
@@ -40,8 +43,7 @@ export function AnchorReturnBanner() {
         ? t('anchor.repaintFrame')
         : t('anchor.recastRef')
 
-  // Latest image output (newest first, type === 'image')
-  const latestImage = outputs.find(o => o.type === 'image')
+  const latestImage = latestAnchorImage(outputs, target, workspace, browsingUploads)
   const hasLatestImage = !!latestImage
 
   return (

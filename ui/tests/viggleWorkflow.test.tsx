@@ -2,7 +2,8 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import React from 'react'
 import { JSDOM } from 'jsdom'
-import { viggleEditingParameters } from '../src/lib/viggleWorkflow'
+import { latestAnchorImage, viggleEditingParameters } from '../src/lib/viggleWorkflow'
+import type { OutputFile } from '../src/types'
 
 const dom = new JSDOM('<!doctype html><html><body /></html>', { url: 'http://localhost/' })
 Object.assign(globalThis, {
@@ -176,4 +177,83 @@ test('Only Auto image editing for Viggle inherits the source canvas', () => {
     { editReturnTarget: { modelType: 'scail2_14B', sourceResolution: '832x480' } },
     { editReturnTarget: { modelType: 'viggle_animate', sourceResolution: 'invalid' } },
   ]) assert.deepEqual(viggleEditingParameters({ ...state, ...change }), {})
+})
+
+test('A Viggle round trip cannot apply an old gallery image or an image from another workspace', async context => {
+  const { render, act, cleanup } = await import('@testing-library/react')
+  const { useStore } = await import('../src/stores/useStore')
+  const { AnchorReturnBanner } = await import('../src/components/Sidebar/AnchorReturnBanner')
+  const initial = useStore.getState()
+  const originalFetch = globalThis.fetch
+  context.mock.method(console, 'error', () => {})
+  const image = (name: string, workspace = 'viggle-test'): OutputFile => ({
+    name, url: `/api/v1/file/${name}?workspace=${workspace}`, type: 'image', mode: 'image',
+    favorite: false, size: 1, created_at: 1,
+  })
+  const oldImage = image('unrelated.png')
+  const newImage = image('replacement.png')
+  const savedRefs = [new dom.window.File([], 'previous-reference.png')]
+  globalThis.fetch = async (input, init) => {
+    if (String(input) === '/api/v1/extract-frames') {
+      assert.equal(JSON.parse(String(init?.body)).workspace, 'viggle-test')
+      return Response.json({ start_path: 'source-frame.png', start_url: '/api/v1/uploads/source-frame.png' })
+    }
+    assert.equal(String(input), '/api/v1/uploads/source-frame.png')
+    return new Response('FRAME', { headers: { 'content-type': 'image/png' } })
+  }
+  useStore.setState({
+    generationMode: 'avatar', editSubMode: 'recast', activeWorkspace: 'viggle-test', browsingUploads: false,
+    editVideoPath: 'source.mp4', editVideoDuration: 3, editStartTime: 0, editEndTime: 3,
+    editVideoResolution: '1920x1080', outputs: [oldImage], imageRefs: savedRefs, imageRefType: 'saved',
+    params: { ...initial.params, model_type: 'viggle_animate' },
+    editRecastRefPath: '', editRecastMappings: [{
+      id: 'reference', target: '', refFile: null, refPath: '', refUrl: '',
+      additionalRefs: [], referenceAlignedToSource: false,
+    }],
+    setGenerationMode: mode => useStore.setState({ generationMode: mode }),
+    selectModel: async modelType => { useStore.setState(s => ({ params: { ...s.params, model_type: modelType } })) },
+  })
+  try {
+    await useStore.getState().sendFrameToImageMode('recast')
+    const target = useStore.getState().editReturnTarget!
+    assert.equal(target.viggleEditSession?.workspace, 'viggle-test')
+    const view = render(<AnchorReturnBanner />)
+    assert.equal(view.getByRole('button', { name: 'Apply & return' }).hasAttribute('disabled'), true)
+    await act(async () => { await useStore.getState().applyOutputAsAnchor() })
+    assert.equal(useStore.getState().editRecastRefPath, '')
+    assert.equal(useStore.getState().editReturnTarget, target)
+    assert.equal(useStore.getState().generationMode, 'image')
+    // Refreshing an old entry's URL does not make its filename a new output.
+    assert.equal(latestAnchorImage([{ ...oldImage, url: `${oldImage.url}&refresh=1` }], target, 'viggle-test'), undefined)
+    // Other anchor workflows retain their existing ability to choose a gallery image.
+    assert.equal(latestAnchorImage([oldImage], { anchor: 'recast', modelType: 'scail2_14B' }, 'viggle-test'), oldImage)
+
+    await act(async () => {
+      useStore.setState({ activeWorkspace: 'another', outputs: [image('elsewhere.png', 'another')] })
+      await useStore.getState().applyOutputAsAnchor()
+    })
+    assert.equal(view.getByRole('button', { name: 'Apply & return' }).hasAttribute('disabled'), true)
+    assert.equal(useStore.getState().editRecastRefPath, '')
+    await act(async () => {
+      useStore.setState({ activeWorkspace: 'viggle-test', browsingUploads: true, outputs: [newImage] })
+      await useStore.getState().applyOutputAsAnchor()
+    })
+    assert.equal(view.getByRole('button', { name: 'Apply & return' }).hasAttribute('disabled'), true)
+    assert.equal(useStore.getState().editRecastRefPath, '')
+
+    await act(async () => { useStore.setState({ browsingUploads: false, outputs: [newImage, oldImage] }) })
+    assert.equal(view.getByRole('button', { name: 'Apply & return' }).hasAttribute('disabled'), false)
+    await act(async () => { await useStore.getState().applyOutputAsAnchor() })
+    assert.equal(useStore.getState().editRecastRefPath, newImage.url)
+    assert.equal(useStore.getState().editRecastMappings[0].refPath, newImage.url)
+    assert.equal(useStore.getState().generationMode, 'avatar')
+    assert.equal(useStore.getState().editReturnTarget, null)
+    assert.deepEqual(useStore.getState().imageRefs, savedRefs)
+    assert.equal(useStore.getState().imageRefType, 'saved')
+  } finally {
+    cleanup()
+    useStore.setState(initial)
+    globalThis.fetch = originalFetch
+    context.mock.restoreAll()
+  }
 })

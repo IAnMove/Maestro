@@ -117,6 +117,13 @@ La ejecución larga continúa apoyándose en los workflows y eventos canónicos 
 Wizard, o en un cliente externo que conserva los IDs devueltos. Este cambio no
 introduce un segundo scheduler ni un bucle autónomo con acceso al shell.
 
+## Revisión de interfaz aplazada
+
+Las pruebas manuales de Viggle han puesto de manifiesto la falta de espacio útil
+en la columna de herramientas. La [nota de revisión de paneles](STUDIO_PANEL_LAYOUT_REVIEW.md)
+recoge el problema y las alternativas para revisarlas después. No autoriza ni
+implementa un rediseño de navegación durante estas pruebas.
+
 ## Procedencia y límites de validación
 
 El [inventario de fuentes y hashes](../../app/shared/wangp1272/upstream.json)

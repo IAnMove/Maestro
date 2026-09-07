@@ -25,6 +25,16 @@ export function useViggleGenerationGuard() {
     return () => frameCheck.current?.abort()
   }, [isViggle, editVideoPath, editVideoUrl, reference?.refPath, reference?.refUrl, workspace])
 
+  // A completed inspection only applies to the source and workspace it read.
+  const sourceIsCurrent = () => {
+    const current = useStore.getState()
+    return current.params.model_type === modelType && current.generationMode === generationMode
+      && current.editSubMode === editSubMode && current.activeWorkspace === workspace
+      && current.editVideoPath === editVideoPath && current.editVideoUrl === editVideoUrl
+      && current.editRecastMappings[0]?.refPath === reference?.refPath
+      && current.editRecastMappings[0]?.refUrl === reference?.refUrl
+  }
+
   const checkBeforeGenerate = async () => {
     if (frameCheck.current) return false
     if (isViggle) {
@@ -49,10 +59,7 @@ export function useViggleGenerationGuard() {
           setCheckingFrame(false)
         }
       }
-      const current = useStore.getState()
-      if (current.params.model_type !== modelType || current.generationMode !== generationMode
-        || current.editSubMode !== editSubMode || current.activeWorkspace !== workspace
-        || current.editVideoPath !== editVideoPath || current.editRecastMappings[0]?.refPath !== reference?.refPath) return false
+      if (!sourceIsCurrent()) return false
     }
     return true
   }

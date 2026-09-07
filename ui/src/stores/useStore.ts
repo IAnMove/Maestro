@@ -1,6 +1,6 @@
 import { h3ModelSwitchSettings, restoreSemanticBridgeSettings } from '../lib/h3OptionalSettings'
 import { restoredEditingTrim, restoreWangpSettings, viggleSubmissionOptions } from '../lib/wangpUi'
-import { viggleEditingParameters } from '../lib/viggleWorkflow'
+import { latestAnchorImage, viggleEditingParameters, type ViggleEditSession } from '../lib/viggleWorkflow'
 import { beginWangpRestore, editingInputsChanged, legacyEditingPath, restoredGenericImageRefs } from '../lib/wangpRestore'
 import { create } from 'zustand'
 import type { GenerateParams, OutputFile, MediaFilter, AspectRatio, ResolutionPreset, ScailResolutionProfile, GenerationDetails, GenerationJob, ModelFamily, ModelDef, GenerationMode, ModelOptions, SystemConfig, SettingsTab, OutputMetadata, MultiClip, ServicesConfig, ProductionProfile, AudioAnalysisResult, PlannedClip, ClipPlan, DirectorClipImage, DirectorImageGenProgress, SpeakerMapping, DirectorSkill, DirectorShotImageGuidance, ShortFilmCharacter, ShortFilmPath, MusicVideoTreatment, CivitAIModel, CivitAIDownload, PipelineListItem, PipelineRepairState, SavedPipelineState, SystemDetectResponse, SystemStats, RecastCharacterMapping, RepaintRegionMapping, H3WindowPlan, DirectorV2PlanJob, DirectorV2PlanResponse } from '../types'
@@ -1205,6 +1205,8 @@ export interface AppState extends LlmSlice, StudioConfigurationSlice {
     savedImageRefType: string
     modelType?: string
     sourceResolution?: string
+    /** Only images published after entering this Viggle trip can be applied. */
+    viggleEditSession?: ViggleEditSession
   } | null
   setEditAnythingStartAnchor: (path: string | null) => void
   setEditAnythingEndAnchor: (path: string | null) => void
@@ -2318,6 +2320,7 @@ export const useStore = create<AppState>((set, get) => {
   setEditAnythingEndAnchor: (path: string | null) => set({ editAnythingEndAnchor: path }),
   sendFrameToImageMode: async (which: 'start' | 'end' | 'recast' | 'repaint') => {
     const state = get()
+    const isViggle = which === 'recast' && state.params.model_type === 'viggle_animate'
     const clipPath = state.editVideoPath
     if (!clipPath) {
       console.error('Edit Anything: no source video loaded')
@@ -2371,6 +2374,7 @@ export const useStore = create<AppState>((set, get) => {
       // family default), reloads LoRAs, and resets image_mode + the
       // resolution/aspect presets that go with image generation. Without
       // this, the model stays on whatever LTX-2 video model was active.
+      if (isViggle && get().activeWorkspace !== state.activeWorkspace) return
       get().setGenerationMode('image')
 
       // Load the extracted frame into Image mode's REFERENCE images list
@@ -2381,6 +2385,7 @@ export const useStore = create<AppState>((set, get) => {
       // from empty to populated; we leave that to it.
       const blob = await fetch(frameUrl).then(r => r.blob())
       const file = new File([blob], `${which}_frame.png`, { type: blob.type || 'image/png' })
+      if (isViggle && get().activeWorkspace !== state.activeWorkspace) return
       set(s => ({
         // Replace any pre-existing refs with just our extracted frame
         // for the duration of the round-trip. Restored from the
@@ -2404,6 +2409,10 @@ export const useStore = create<AppState>((set, get) => {
           savedImageRefType,
           modelType: state.params.model_type,
           sourceResolution: state.editVideoResolution,
+          ...(isViggle ? { viggleEditSession: {
+            workspace: state.activeWorkspace,
+            previousOutputs: s.outputs.map(({ name, url }) => ({ name, url })),
+          } } : {}),
         },
       }))
     } catch (e) {
@@ -2414,8 +2423,7 @@ export const useStore = create<AppState>((set, get) => {
     const state = get()
     const target = state.editReturnTarget
     if (!target) return
-    // Find the latest image-mode output (newest first in the outputs list).
-    const latestImage = state.outputs.find(o => o.type === 'image')
+    const latestImage = latestAnchorImage(state.outputs, target, state.activeWorkspace, state.browsingUploads)
     if (!latestImage) {
       console.error('Edit Anything return: no image-mode output yet to apply')
       return
