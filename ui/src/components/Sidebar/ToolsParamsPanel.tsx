@@ -90,6 +90,7 @@ function VoiceReferenceInput({ index, ...props }: ParamsProps & { index: number 
   const label = revoiceMode === 'two'
     ? (index === 0 ? t('tools.voiceA') : t('tools.voiceB'))
     : t('tools.referenceVoice')
+  const workspaceId = useStore(s => s.activeWorkspace)
   const value = reference?.path
     ? { name: reference.filename, type: 'audio' as const, mode: null, size: 0, created_at: 0, url: '', thumbnail_url: '' }
     : undefined
@@ -101,6 +102,7 @@ function VoiceReferenceInput({ index, ...props }: ParamsProps & { index: number 
         items={voiceItems}
         value={value}
         accept="audio/*,video/*"
+        workspaceId={workspaceId}
         optional
         constraints={{ kinds: ['audio', 'video'], maxCount: 1, optional: true }}
         onChoose={item => onChooseVoice(index, item)}

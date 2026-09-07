@@ -2,61 +2,18 @@ import { useMemo, useState } from 'react'
 import { FolderOpen, X } from 'lucide-react'
 import type { ApiOutput } from '../../api/outputs'
 import type { AssetKind } from '../../api/assets'
+import { checkCompatibility, outputToPickerItem } from '../../features/asset-picker/adapters.ts'
+import { isSameRef, type AssetConstraints, type CatalogSort, type PickerItem } from '../../features/asset-picker/types.ts'
 import {
-  ASSET_PICKER_PAGE_SIZE,
-  checkCompatibility,
-  confirmPickerChoice,
-  filterPickerItems,
-  isSameRef,
-  livePickerItem,
-  outputToPickerItem,
-  paginatePickerItems,
-  sortPickerItems,
-  type AssetConstraints,
-  type CatalogSort,
-  type PickerItem,
-} from '../../features/asset-picker'
+  confirmExplorerItem,
+  explorerCanConfirm,
+  explorerListModel,
+  resolveExplorerSelection,
+  useRemoteCatalogPage,
+} from '../../features/asset-picker/remoteCatalog.ts'
 import { useUiTranslation } from '../../i18n'
 import { ExplorerFooter, ExplorerGallery, ExplorerPreview, ExplorerToolbar } from './AssetExplorerChrome.tsx'
-import { assetPreviewUrl, formatAssetDate } from './assetExplorer.ts'
 import { ModalShell } from './ModalShell'
-
-export function AssetPickTrigger({
-  label,
-  selected,
-  placeholder,
-  onOpen,
-  disabled,
-}: {
-  label: string
-  selected?: ApiOutput
-  placeholder: string
-  onOpen: () => void
-  disabled?: boolean
-}) {
-  const preview = selected ? assetPreviewUrl(selected) : ''
-  const picked = selected ? outputToPickerItem(selected, '') : null
-  return (
-    <div className="block text-[9px] text-text-muted">
-      {label}
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={onOpen}
-        className="mt-0.5 flex w-full items-center gap-2 rounded border border-border bg-bg-primary px-1.5 py-1 text-left text-[10px] text-text-primary disabled:opacity-40"
-      >
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded bg-bg-active">
-          {preview ? <img src={preview} alt="" className="h-full w-full object-cover" /> : <FolderOpen size={14} className="text-text-muted" />}
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block truncate">{picked?.title ?? placeholder}</span>
-          {picked && <span className="block truncate text-[8px] text-text-muted">{picked.filename}</span>}
-          {selected && <span className="block text-[8px] text-text-muted">{formatAssetDate(selected)}</span>}
-        </span>
-      </button>
-    </div>
-  )
-}
 
 type BodyProps = {
   title: string
@@ -67,28 +24,12 @@ type BodyProps = {
   allowNone?: boolean
   noneLabel?: string
   workspaceId?: string
+  remote?: boolean
   constraints?: AssetConstraints
   status?: 'ready' | 'loading' | 'error'
   onRetry?: () => void
   onChoose: (item: ApiOutput | null) => void
   onClose: () => void
-}
-
-function compatibleKinds(items: PickerItem[], constraints?: AssetConstraints) {
-  const present = [...new Set(items.map(item => item.kind))]
-  return constraints?.kinds?.length ? present.filter(kind => constraints.kinds.includes(kind)) : present
-}
-
-function confirmOutput(
-  items: ApiOutput[],
-  pickerItems: PickerItem[],
-  item: PickerItem | null,
-  workspaceId: string,
-  constraints: AssetConstraints | undefined,
-  onChoose: (item: ApiOutput | null) => void,
-  onClose: () => void,
-) {
-  confirmPickerChoice(items, pickerItems, item, workspaceId, constraints, onChoose, onClose)
 }
 
 function AssetExplorerBody({
@@ -100,6 +41,7 @@ function AssetExplorerBody({
   allowNone,
   noneLabel,
   workspaceId,
+  remote,
   constraints,
   status = 'ready',
   onRetry,
@@ -111,28 +53,54 @@ function AssetExplorerBody({
   const [page, setPage] = useState(0)
   const [sort, setSort] = useState<CatalogSort>('created_desc')
   const [kind, setKind] = useState<AssetKind | ''>('')
-  const pickerItems = useMemo(
+  const [retry, setRetry] = useState(0)
+  const catalogRemote = Boolean(remote && workspaceId)
+  const remotePage = useRemoteCatalogPage({
+    enabled: catalogRemote,
+    workspaceId,
+    query,
+    sort,
+    kind,
+    page,
+    retry,
+    constraints,
+  })
+  const localItems = useMemo(
     () => items.map(item => outputToPickerItem(item, workspaceId || '')),
     [items, workspaceId],
   )
+  const list = explorerListModel({
+    remote: catalogRemote,
+    remoteItems: remotePage.items,
+    remoteTotal: remotePage.total,
+    remoteStatus: remotePage.status,
+    localItems,
+    query,
+    kind,
+    sort,
+    page,
+    constraints,
+    fallbackStatus: status,
+  })
   const [picked, setPicked] = useState<{ workspaceId: string; item: PickerItem } | null>(null)
   const scopedPicked = picked && picked.workspaceId === (workspaceId || '') ? picked.item : null
-  const selectedFromValue = selectedOutput
-    ? livePickerItem(pickerItems, outputToPickerItem(selectedOutput, workspaceId || ''))
-    : null
-  const namedMatches = selectedName ? pickerItems.filter(item => item.filename === selectedName) : []
-  const selected = livePickerItem(pickerItems, scopedPicked)
-    ?? selectedFromValue
-    ?? (scopedPicked ? null : namedMatches.length === 1 ? namedMatches[0] : null)
-  const filtered = useMemo(
-    () => sortPickerItems(filterPickerItems(pickerItems, query, kind ? [kind] : constraints?.kinds), sort),
-    [constraints, kind, pickerItems, query, sort],
-  )
-  const { pages, safePage, visible } = paginatePickerItems(filtered, page, ASSET_PICKER_PAGE_SIZE)
+  const selected = resolveExplorerSelection({
+    remote: catalogRemote,
+    pickerItems: list.pickerItems,
+    scopedPicked,
+    selectedOutput,
+    selectedName,
+    workspaceId: workspaceId || '',
+  })
   const compatibility = selected && constraints ? checkCompatibility(selected, constraints, 0) : { allowed: true as const }
-  const stillInCatalog = Boolean(selected && livePickerItem(pickerItems, selected))
-  const selectedStillVisible = selected ? filtered.some(item => isSameRef(item.ref, selected.ref) && item.url === selected.url) : true
-  const emptyLabel = pickerItems.length && query.trim() ? t('explorer.noResults') : t('explorer.empty')
+  const stillInCatalog = explorerCanConfirm(catalogRemote, list.pickerItems, selected)
+  const selectedStillVisible = selected
+    ? list.visible.some(item => isSameRef(item.ref, selected.ref) && item.url === selected.url)
+    : true
+  const emptyLabel = list.emptyLabelIsNoResults ? t('explorer.noResults') : t('explorer.empty')
+  const confirm = (item: PickerItem | null) => {
+    confirmExplorerItem(catalogRemote, items, list.pickerItems, item, workspaceId || '', constraints, onChoose, onClose)
+  }
 
   return (
     <div
@@ -155,23 +123,23 @@ function AssetExplorerBody({
       <ExplorerToolbar
         query={query}
         kind={kind}
-        kinds={compatibleKinds(pickerItems, constraints)}
+        kinds={list.toolbarKinds}
         sort={sort}
         allowNone={allowNone}
         noneLabel={noneLabel}
         onQuery={value => { setQuery(value); setPage(0) }}
         onKind={value => { setKind(value); setPage(0) }}
         onSort={value => { setSort(value); setPage(0) }}
-        onClear={() => confirmOutput(items, pickerItems, null, workspaceId || '', constraints, onChoose, onClose)}
+        onClear={() => confirm(null)}
       />
       <div className="grid min-h-0 flex-1 gap-3 overflow-hidden p-4 md:grid-cols-[minmax(0,1fr)_240px]">
         <div className="min-h-0 overflow-y-auto">
           <ExplorerGallery
-            status={status}
-            visible={visible}
+            status={list.galleryStatus}
+            visible={list.visible}
             selected={selected}
             emptyLabel={emptyLabel}
-            onRetry={onRetry}
+            onRetry={catalogRemote ? () => setRetry(value => value + 1) : onRetry}
             onPick={item => setPicked({ workspaceId: workspaceId || '', item })}
           />
         </div>
@@ -184,14 +152,14 @@ function AssetExplorerBody({
         </aside>
       </div>
       <ExplorerFooter
-        shown={visible.length}
-        total={filtered.length}
-        safePage={safePage}
-        pages={pages}
+        shown={list.visible.length}
+        total={list.footerTotal}
+        safePage={list.safePage}
+        pages={list.pages}
         canConfirm={Boolean(selected) && compatibility.allowed && stillInCatalog}
         onCancel={onClose}
         onPage={setPage}
-        onConfirm={() => selected && confirmOutput(items, pickerItems, selected, workspaceId || '', constraints, onChoose, onClose)}
+        onConfirm={() => selected && confirm(selected)}
       />
     </div>
   )
