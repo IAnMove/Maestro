@@ -6582,6 +6582,8 @@ def get_model_options(model_type: str):
         # Raw conditioning letters let Studio expose only compatible sub-modes.
         "image_prompt_types_allowed": md.get("image_prompt_types_allowed", ""),
         "minimax_h3_semantic_bridge": md.get("minimax_h3_semantic_bridge", False),
+        "wangp_1272": md.get("wangp_1272", False),
+        "wangp_1272_capabilities": md.get("wangp_1272_capabilities", {}),
         "minimax_h3_fused_turbo": md.get("minimax_h3_fused_turbo", False),
         "omni_reference": md.get("omni_reference", False),
         "omni_reference_limits": md.get("omni_reference_limits"),
@@ -7515,6 +7517,16 @@ def _resolve_model3d_input_path(value: str, workspace: str | None = None) -> str
     return _safe_join(_workspace_dir(workspace), value)
 
 
+@api.get("/api/v1/wangp/capabilities")
+async def wangp_capabilities():
+    from shared.wangp1272.processors import capabilities
+    processors = capabilities()
+    for multiplier in (2, 3, 4):
+        enabled = multiplier != 3 or wgp.server_config.get("rife_version", "v4") == "v4"
+        processors.append(dict(value=f"rife{multiplier}", label=f"RIFE ×{multiplier}", kind="temporal", media=["video"], enabled=enabled, reason="" if enabled else "RIFE ×3 requires version 4.26"))
+    return {"revision": "362c3467a70e1136ceb52eec95907205a8f88543", "processors": processors}
+
+
 @api.get("/api/v1/model3d/capabilities")
 def model3d_capabilities():
     from services import model3d_service
@@ -8248,7 +8260,14 @@ api.include_router(create_llm_router(
     default_llm_repo=_DEFAULT_LLM_REPO,
     ensure_llm_loaded=_ensure_llm_loaded,
     comic_writing_llm=lambda body: _comic_writing_llm(body),
+    resolve_visual_media=lambda value, workspace: _resolve_wangp_visual_media(value, workspace),
 ))
+
+
+def _resolve_wangp_visual_media(value, workspace):
+    from services.wangp_submission import resolve_wangp_media
+    workspace = workspace or _get_active_workspace()
+    return resolve_wangp_media(value, workspace, uploads_dir=os.path.join(os.getcwd(), 'uploads'), workspace_dir=_workspace_dir(workspace))
 
 
 def _build_music_gen_params(model_type: str, lyrics: str, style: str, duration_seconds, seed) -> dict:
@@ -10774,7 +10793,7 @@ async def generate(request: Request):
     from services.generation_provenance import normalize_submission_provenance
 
     body = await request.json()
-    provenance = normalize_submission_provenance(body.pop("provenance", None))
+    provenance = normalize_submission_provenance(body.pop("provenance", None), trusted_tool=getattr(request, "trusted_tool", None))
     collection_id = provenance.get("workspace_id")
     if collection_id and not _workspace_collection_registry.get(collection_id):
         raise HTTPException(status_code=400, detail="Unknown Workspace collection")
@@ -10792,6 +10811,8 @@ async def generate(request: Request):
     is_sfx = body.get("sfx_mode")
     if not body.get("model_type"):
         raise HTTPException(status_code=400, detail="model_type is required")
+    if body.get("model_type") == "viggle_animate":
+        body["prompt"] = "Viggle character replacement"
     if not is_sfx and not body.get("prompt"):
         raise HTTPException(status_code=400, detail="prompt is required")
     # SFX virtual models (mmaudio_*) are frontend-only; skip backend model validation
@@ -10804,6 +10825,13 @@ async def generate(request: Request):
     except Exception:
         _base_model_type = body.get("model_type")
     _generation_model_def = wgp.get_model_def(body["model_type"]) or {}
+    from services.wangp_submission import prepare_generation_inputs
+    try:
+        prepare_generation_inputs(body, _generation_model_def, requested_workspace,
+                                  uploads_dir=os.path.join(os.getcwd(), "uploads"),
+                                  workspace_dir=_workspace_dir(requested_workspace))
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
     try:
         from services.h3_runtime_policy import normalize_optional_conditioning
         normalize_optional_conditioning(body, _generation_model_def)
@@ -11301,6 +11329,13 @@ async def retake_video_endpoint(request: Request):
     video_path = body.get("video_path")
     if not video_path:
         raise HTTPException(status_code=400, detail="video_path is required")
+    if body.get("wangp_media"):
+        from services.wangp_submission import resolve_wangp_media
+        try:
+            workspace = body.get("workspace") or _get_active_workspace()
+            video_path = resolve_wangp_media(video_path, workspace, uploads_dir=os.path.join(os.getcwd(), "uploads"), workspace_dir=_workspace_dir(workspace))
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
     if not os.path.isabs(video_path):
         workspace_dir = _workspace_dir(body.get("workspace"))
         candidate = os.path.join(workspace_dir, video_path)
@@ -18280,6 +18315,19 @@ async def recast_endpoint(request: Request):
     }
     """
     body = await request.json()
+    if body.get("model_type") == "viggle_animate":
+        from services.wangp_submission import JsonRequest, prepare_viggle_recast, resolve_wangp_media, wangp_media_url
+        import subprocess as viggle_subprocess
+        try:
+            params = await asyncio.to_thread(
+                prepare_viggle_recast, body,
+                lambda value, workspace: resolve_wangp_media(value, workspace, uploads_dir=os.path.join(os.getcwd(), "uploads"), workspace_dir=_workspace_dir(workspace)),
+                os.path.join(os.getcwd(), "uploads"),
+                lambda path: wangp_media_url(path, body.get("workspace"), uploads_dir=os.path.join(os.getcwd(), "uploads"), workspace_dir=_workspace_dir(body.get("workspace"))),
+            )
+        except (ValueError, OSError, viggle_subprocess.SubprocessError) as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+        return await generate(JsonRequest(params, trusted_tool=getattr(request, "trusted_tool", None)))
     workspace = body.get("workspace")
 
     video_path = _resolve_recast_media(body.get("video_path"), workspace)
@@ -23266,6 +23314,15 @@ async def tools_upscale(request: Request):
         workspace,
         output_dir,
     ) = _resolve_tool_source(body, expected_kinds=("image", "video"))
+    from shared.wangp1272.processors import validate_selection, validated_settings
+    from services.tools_upscale import processor_backend
+    error = validate_selection("" if method.startswith(("rife", "dlssg")) else method, method if method.startswith(("rife", "dlssg")) else "", source_kind == "image")
+    if error:
+        raise HTTPException(status_code=400, detail=error)
+    try:
+        body["wangp_processor_settings"] = validated_settings(method, body.get("wangp_processor_settings"))
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
     from services.generation_provenance import normalize_submission_provenance
 
     provenance = normalize_submission_provenance({
@@ -23273,7 +23330,7 @@ async def tools_upscale(request: Request):
         "capability": "upscale",
         # Workspace identity is runtime-owned, not browser-authored.
         "workspace_id": workspace,
-    })
+    }, trusted_tool=getattr(request, "trusted_tool", None))
     source_ref = {
         "id": source_asset_id,
         "kind": source_kind,
@@ -23282,7 +23339,7 @@ async def tools_upscale(request: Request):
     }
     transformation = {
         "type": "upscale",
-        "backend": "flashvsr" if str(method).startswith("flashvsr") else "lanczos",
+        "backend": processor_backend(method),
         "method": method,
     }
     try:
@@ -23308,6 +23365,7 @@ async def tools_upscale(request: Request):
             "source_asset_id": source_asset_id,
             "source_kind": source_kind,
             "method": method,
+            "wangp_processor_settings": body.get("wangp_processor_settings") or {},
             "seed": seed,
             "model_type": "post_processing",
             "generation_mode": source_kind,
@@ -36720,6 +36778,16 @@ except Exception as e:
     traceback.print_exc()
 
 
+# Optional external agents use exactly the same admission endpoints and task IDs.
+from routers.wangp_mcp import create_wangp_mcp_router
+from services.wangp_agent_adapters import application_handlers as wangp_agent_handlers
+api.include_router(create_wangp_mcp_router(
+    handlers={"models": lambda args: get_model_options(args['model_type']) if args.get('model_type') else list_models(), "processors": wangp_capabilities, "status": get_status,
+              "generate": generate, "recast": recast_endpoint, "upscale": tools_upscale,
+              **wangp_agent_handlers(api)},
+    journal_path=os.path.join(os.path.dirname(__file__), "settings", "wangp-mcp-requests.sqlite3"),
+))
+
 # ============================================================================
 # Serve React build at /
 # ============================================================================
@@ -36855,6 +36923,7 @@ def run_server():
             flush=True,
         )
         sys.exit(1)
+
 
 
 # ``app/launch.py`` loads this module with ``runpy`` and sets its name to

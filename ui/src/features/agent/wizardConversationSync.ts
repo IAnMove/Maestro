@@ -1,3 +1,5 @@
+import { normalizeVisualEvidence, type VisualEvidence } from './visualEvidence'
+
 export const WIZARD_WELCOME_TEXT = 'Saludos, creador. Soy el mago de HocusPocus: puedo consultar la cola, explicarte el estudio, llevarte a la sección adecuada y preparar o lanzar un vídeo cuando me lo pidas. Dime qué quieres conjurar. 🪄'
 
 export interface WizardSyncMessage {
@@ -6,6 +8,7 @@ export interface WizardSyncMessage {
   text: string
   createdAt: number
   language?: string
+  mediaEvidence?: VisualEvidence[]
   cards?: unknown[]
   executionKey?: string
   jobLinks?: unknown[]
@@ -37,6 +40,7 @@ export function normalizeRemoteWizardMessages(
       id: message.id,
       role: message.role,
       text: message.text,
+      mediaEvidence: normalizeVisualEvidence(message.mediaEvidence),
       createdAt: typeof message.createdAt === 'number' ? message.createdAt : 0,
       ...(typeof message.language === 'string' && message.language ? { language: message.language } : {}),
       cards: Array.isArray(message.cards) && message.cards.length ? message.cards : undefined,

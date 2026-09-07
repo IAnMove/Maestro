@@ -1,8 +1,10 @@
+import type { VisualEvidence } from './visualEvidence'
 import type { CanonicalTask } from '../../api/client'
 import type { AgentAppSnapshot } from './agentActions'
 import { buildAgentCapabilityGuide } from './agentCapabilities'
 
 export interface AgentConversationEntry {
+  mediaEvidence?: VisualEvidence[]
   role: 'user' | 'assistant'
   text: string
   /** Language of this message, independent from the interface locale. */
@@ -162,6 +164,7 @@ export function buildAgentTurnPrompt(
   const conversation = messages.slice(-12).map(message => ({
     role: message.role,
     text: cleanText(message.text, 2_000),
+    mediaEvidence: message.mediaEvidence,
     ...(message.language ? { language: cleanText(message.language, 20) } : {}),
   }))
   const taskSnapshot = summarizeAgentTasks(tasks)

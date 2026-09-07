@@ -1,5 +1,6 @@
 import type { H3WindowPlan, GenerateParams } from '../types'
 import { BASE } from './http'
+import { normalizeVisualEvidence, type VisualEvidence } from '../features/agent/visualEvidence'
 
 export async function planH3Windows(params: {
   prompt: string
@@ -67,6 +68,9 @@ export async function writeSong(params: {
 // --- LLM Service ---
 
 export async function generateLlmText(params: {
+  onMediaEvidence?: (evidence: VisualEvidence[]) => void
+  media?: { source: string; kind: 'image' | 'video' }[]
+  workspace?: string
   prompt: string
   system_prompt?: string
   max_new_tokens?: number
@@ -88,6 +92,8 @@ export async function generateLlmText(params: {
       frequency_penalty: params.frequency_penalty ?? 0,
       presence_penalty: params.presence_penalty ?? 0,
       json_schema: params.json_schema,
+      media: params.media,
+      workspace: params.workspace,
     }),
   })
   if (!res.ok) {
@@ -95,6 +101,7 @@ export async function generateLlmText(params: {
     throw new Error(err.detail || err.error || 'LLM generate failed')
   }
   const body = await res.json()
+  params.onMediaEvidence?.(normalizeVisualEvidence(body.media_evidence))
   return String(body.text || '')
 }
 

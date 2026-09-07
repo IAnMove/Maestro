@@ -1,0 +1,39 @@
+{
+  "revisions": {
+    "DeepBeepMeep/Wan2.1": "850ed9ffca04b4d1ba6b95b5cd6167abedd3fc65",
+    "DeepBeepMeep/MiniMax-H3": "fa7ed035f21d341439d4dd763a020fc4a2482c43",
+    "DeepBeepMeep/SenseNova": "b0606e745c9c9cc630770b0097ac907a7d1d7dae"
+  },
+  "affine_maps": {
+    "ref2va_rank64.sft": {
+      "sha256": "4b661b03438d5d5fcc86be3dad2d9dbbd129720f089f8e94914b369eee198cee",
+      "size": 955640,
+      "url": "https://raw.githubusercontent.com/deepbeepmeep/Wan2GP/362c3467a70e1136ceb52eec95907205a8f88543/models/minimax_h3/lora_affine_maps/ref2va_rank64.sft"
+    },
+    "viggle_rank8.sft": {
+      "sha256": "89081fd235e9deff56274ab76b1b01fa4d9aeebcbd0746295b0fd086cf0e0fec",
+      "size": 129800,
+      "url": "https://raw.githubusercontent.com/deepbeepmeep/Wan2GP/362c3467a70e1136ceb52eec95907205a8f88543/models/minimax_h3/lora_affine_maps/viggle_rank8.sft"
+    },
+    "fl2va_rank8.sft": {
+      "sha256": "a42778e02ab2708dc70e23837ec4d3061b44f938c940decbc7a5b91f2c27c59e",
+      "size": 130072,
+      "url": "https://raw.githubusercontent.com/deepbeepmeep/Wan2GP/362c3467a70e1136ceb52eec95907205a8f88543/models/minimax_h3/lora_affine_maps/fl2va_rank8.sft"
+    },
+    "ref2va_rank8.sft": {
+      "sha256": "7179899e59fce9c36038cd6c0c57edaced0032c769c436cef234b07bf809381f",
+      "size": 130072,
+      "url": "https://raw.githubusercontent.com/deepbeepmeep/Wan2GP/362c3467a70e1136ceb52eec95907205a8f88543/models/minimax_h3/lora_affine_maps/ref2va_rank8.sft"
+    },
+    "viggle_rank64.sft": {
+      "sha256": "b260e4b6d485b548097fb18353682a0290519b1b40c2ead34030adcaf55e4a12",
+      "size": 961520,
+      "url": "https://raw.githubusercontent.com/deepbeepmeep/Wan2GP/362c3467a70e1136ceb52eec95907205a8f88543/models/minimax_h3/lora_affine_maps/viggle_rank64.sft"
+    },
+    "fl2va_rank64.sft": {
+      "sha256": "df40361cba88c9d6cf300a90d506ed349b349bd23babb6b94f15ab2df1b00f6e",
+      "size": 955640,
+      "url": "https://raw.githubusercontent.com/deepbeepmeep/Wan2GP/362c3467a70e1136ceb52eec95907205a8f88543/models/minimax_h3/lora_affine_maps/fl2va_rank64.sft"
+    }
+  }
+}
