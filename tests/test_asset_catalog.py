@@ -108,3 +108,64 @@ def test_inbox_filter_contains_only_noncanonical_assets(tmp_path: Path):
 
     assert result["total"] == 1
     assert result["assets"][0]["filename"] == "old.png"
+
+
+def test_catalog_sorts_by_created_time_and_name_with_stable_ids(tmp_path: Path):
+    root = _root(tmp_path / "outputs", "default")
+    for name, created, asset_id in (
+        ("beta.png", 100, "asset_b"),
+        ("alpha.png", 200, "asset_a"),
+        ("alpha.png", 0, "asset_missing"),
+    ):
+        output = Path(root["path"]) / f"{asset_id}-{name}"
+        output.write_bytes(b"image")
+        write_asset_manifest(
+            output,
+            build_asset_manifest(
+                output, asset_id=asset_id, tool="studio",
+                timing={"created_at": created, "completed_at": created},
+            ),
+        )
+
+    newest = scan_asset_catalog([root], sort="created_desc")
+    assert [item["id"] for item in newest["assets"]] == ["asset_a", "asset_b", "asset_missing"]
+    oldest = scan_asset_catalog([root], sort="created_asc")
+    assert [item["id"] for item in oldest["assets"]] == ["asset_b", "asset_a", "asset_missing"]
+    by_name = scan_asset_catalog([root], sort="name_asc")
+    assert [item["filename"] for item in by_name["assets"]] == [
+        "asset_a-alpha.png", "asset_b-beta.png", "asset_missing-alpha.png",
+    ]
+    by_name_desc = scan_asset_catalog([root], sort="name_desc")
+    assert [item["filename"] for item in by_name_desc["assets"]] == [
+        "asset_missing-alpha.png", "asset_b-beta.png", "asset_a-alpha.png",
+    ]
+    page = scan_asset_catalog([root], sort="created_desc", limit=1, offset=0)
+    assert page["total"] == 3
+    assert page["assets"][0]["id"] == "asset_a"
+    default = scan_asset_catalog([root])
+    completed = scan_asset_catalog([root], sort="completed_desc")
+    assert [item["id"] for item in default["assets"]] == [item["id"] for item in completed["assets"]]
+
+
+def test_name_desc_keeps_prefix_order_and_stable_ids(tmp_path: Path):
+    root = _root(tmp_path / "outputs", "default")
+    for name, asset_id in (("a.png", "asset_a"), ("ab.png", "asset_ab"), ("b.png", "asset_b")):
+        output = Path(root["path"]) / name
+        output.write_bytes(b"image")
+        write_asset_manifest(
+            output,
+            build_asset_manifest(output, asset_id=asset_id, tool="studio"),
+        )
+
+    result = scan_asset_catalog([root], sort="name_desc")
+    assert [item["filename"] for item in result["assets"]] == ["b.png", "ab.png", "a.png"]
+
+
+def test_catalog_accepts_multiple_kinds(tmp_path: Path):
+    root = _root(tmp_path / "outputs", "default")
+    (Path(root["path"]) / "still.png").write_bytes(b"image")
+    (Path(root["path"]) / "clip.mp4").write_bytes(b"video")
+    (Path(root["path"]) / "song.wav").write_bytes(b"audio")
+    result = scan_asset_catalog([root], kind="image,video")
+    assert {item["kind"] for item in result["assets"]} == {"image", "video"}
+    assert result["total"] == 2

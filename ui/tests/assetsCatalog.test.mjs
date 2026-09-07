@@ -13,7 +13,7 @@ test('asset API sends global filters and exposes the canonical client facade', a
   try {
     const client = await import('../src/api/client.ts')
     assert.equal(typeof client.fetchAssets, 'function')
-    await client.fetchAssets({ search: 'server choir', kind: 'video', workspace: 'film', limit: 25, offset: 5 })
+    await client.fetchAssets({ search: 'server choir', kind: 'video', workspace: 'film', sort: 'created_desc', limit: 25, offset: 5 })
     const url = new URL(calls[0].url, 'http://localhost')
     assert.equal(url.pathname, '/api/v1/assets')
     assert.equal(url.searchParams.get('search'), 'server choir')
@@ -21,6 +21,7 @@ test('asset API sends global filters and exposes the canonical client facade', a
     assert.equal(url.searchParams.get('workspace'), 'film')
     assert.equal(url.searchParams.get('limit'), '25')
     assert.equal(url.searchParams.get('offset'), '5')
+    assert.equal(url.searchParams.get('sort'), 'created_desc')
     await client.fetchAssets({ collection: 'inbox_legacy' })
     assert.equal(new URL(calls[1].url, 'http://localhost').searchParams.get('collection'), 'inbox_legacy')
   } finally {

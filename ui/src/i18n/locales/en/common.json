@@ -66,7 +66,15 @@
     "typeModel": "3D model",
     "typeAudio": "Audio",
     "typeScene": "Scene",
-    "typeComic": "Comic"
+    "typeComic": "Comic",
+    "typeDocument": "Document"
+  },
+  "picker": {
+    "unknownDate": "Unknown date",
+    "titleWithDate": "{{type}} · {{date}}",
+    "titleUnknownDate": "{{type}} · Unknown date",
+    "incompatibleKind": "This asset type is not allowed here.",
+    "tooMany": "This field cannot accept another asset."
   },
   "welcome": {
     "title": "What’s new in HocusPocus",
