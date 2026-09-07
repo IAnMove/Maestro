@@ -8618,7 +8618,7 @@ export const useStore = create<AppState>((set, get) => {
     }
     if (!selectedOutputMeta?.params) {
       console.warn('[LoadSettings] ABORT — no params available after fetch attempt; button is a no-op')
-      return
+      return false
     }
     const { models } = get()
     const p = selectedOutputMeta.params as Record<string, unknown>
@@ -8627,7 +8627,7 @@ export const useStore = create<AppState>((set, get) => {
     console.log('[LoadSettings] applying settings — model_type:', p.model_type, '| param keys:', Object.keys(p).length)
 
     let modelType = (p.model_type as string) || ''
-    if (!modelType) return
+    if (!modelType) return false
 
     // Migrate Recast sidecars made before the dedicated model existed. Those
     // jobs used the general I2V Fast accelerator with replacement conditioning;

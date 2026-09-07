@@ -233,3 +233,22 @@ test('Visual data cannot authorize generation, even when the model returns confi
   assert.deepEqual(turn.actions, [])
   assert.deepEqual(await executeAgentActions(turn.actions), [])
 })
+
+test('Reroll never reuses previous inputs when output metadata is missing or has no model', async () => {
+  const { useStore } = await import('../src/stores/useStore')
+  const initial = useStore.getState()
+  let submissions = 0
+  useStore.setState({
+    editVideoPath: 'previous.mp4', editRecastRefPath: 'previous.png',
+    filteredOutputs: () => [{ name: 'new-output.mp4' }] as never,
+    loadOutputMetadata: async () => {},
+    startGeneration: async () => { submissions += 1 },
+  })
+  try {
+    for (const selectedOutputMeta of [null, { params: {} }]) {
+      useStore.setState({ selectedOutputMeta: selectedOutputMeta as never })
+      await useStore.getState().rerollGeneration()
+    }
+    assert.equal(submissions, 0)
+  } finally { useStore.setState(initial) }
+})
