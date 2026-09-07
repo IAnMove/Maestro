@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { fetchAssets, type AssetKind } from '../api/assets'
-import type { ApiOutput } from '../api/outputs'
+import { getServerMediaReference, type ApiOutput } from '../api/outputs'
 import { catalogItemToOutput } from '../features/asset-picker'
 
 const KIND_FROM_OUTPUT: Partial<Record<ApiOutput['type'], AssetKind>> = {
@@ -17,11 +17,53 @@ function fallbackMime(item: ApiOutput): string {
   return 'application/octet-stream'
 }
 
-export async function fileFromOutput(item: ApiOutput): Promise<File> {
-  const response = await fetch(item.url)
-  if (!response.ok) throw new Error('Could not read the selected media')
-  const blob = await response.blob()
-  return new File([blob], item.name, { type: blob.type || fallbackMime(item) })
+export function studioMediaPath(item: ApiOutput): string {
+  if (item.path) return item.path
+  const ref = getServerMediaReference(item.url, item.name, item.workspace_id)
+  return ref?.audio_path || item.name
+}
+
+export function placeholderMediaFile(item: ApiOutput): File {
+  return new File([], item.name, { type: fallbackMime(item) })
+}
+
+export function applyChosenStudioMedia(
+  item: ApiOutput,
+  onReady: (next: { file: File; path: string; url: string; duration: number; width: number; height: number }) => void,
+  signal?: AbortSignal,
+): void {
+  const path = studioMediaPath(item)
+  const url = item.url
+  const file = placeholderMediaFile(item)
+  if (signal?.aborted) return
+  if (item.type === 'image') {
+    const image = new Image()
+    image.onload = () => {
+      if (!signal?.aborted) onReady({ file, path, url, duration: 0, width: image.naturalWidth, height: image.naturalHeight })
+    }
+    image.onerror = () => {
+      if (!signal?.aborted) onReady({ file, path, url, duration: 0, width: 0, height: 0 })
+    }
+    image.src = url
+    return
+  }
+  const video = document.createElement('video')
+  video.preload = 'metadata'
+  video.onloadedmetadata = () => {
+    if (signal?.aborted) return
+    onReady({
+      file,
+      path,
+      url,
+      duration: Number.isFinite(video.duration) ? video.duration : 0,
+      width: video.videoWidth,
+      height: video.videoHeight,
+    })
+  }
+  video.onerror = () => {
+    if (!signal?.aborted) onReady({ file, path, url, duration: 0, width: 0, height: 0 })
+  }
+  video.src = url
 }
 
 export function useWorkspaceOutputs(workspace: string, mediaType?: ApiOutput['type']): ApiOutput[] {
