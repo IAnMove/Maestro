@@ -89,12 +89,12 @@ async function renderDialog(props: { workspace?: string; onClose?: () => void; o
 }
 
 async function selectHeroAndPlate(view: Awaited<ReturnType<typeof renderDialog>>) {
-  const hero = await view.screen.findByRole('button', { name: /Seleccionar hero-/ })
+  const hero = await view.screen.findByRole('button', { name: /Select hero-/ })
   view.fireEvent.click(hero)
-  view.fireEvent.click(view.screen.getByRole('button', { name: 'Fondo (obligatorio)' }))
-  const plate = await view.screen.findByRole('button', { name: /Seleccionar plate-/ })
+  view.fireEvent.click(view.screen.getByRole('button', { name: 'Background (required)' }))
+  const plate = await view.screen.findByRole('button', { name: /Select plate-/ })
   view.fireEvent.click(plate)
-  view.fireEvent.click(view.screen.getByRole('checkbox', { name: /He guardado lo que necesito/ }))
+  view.fireEvent.click(view.screen.getByRole('checkbox', { name: /I have saved what I need/ }))
 }
 
 test('expone 24 referencias más 24 movimientos y habilita BPM/intensidad sólo en plantillas rítmicas', { concurrency: false }, async () => {
@@ -102,17 +102,17 @@ test('expone 24 referencias más 24 movimientos y habilita BPM/intensidad sólo 
   installAssetFetch()
   try {
     const view = await renderDialog()
-    const selector = view.screen.getByRole('combobox', { name: 'Acción / plantilla' }) as HTMLSelectElement
+    const selector = view.screen.getByRole('combobox', { name: 'Action / template' }) as HTMLSelectElement
     assert.equal(selector.options.length, ALL_SCENE_TEMPLATES.length)
     assert.equal(selector.options.length, 48)
     assert.equal(CANDIDATE_SCENE_TEMPLATES.length, 24)
-    assert.equal((view.screen.getByRole('spinbutton', { name: 'BPM visual' }) as HTMLInputElement).disabled, true)
-    assert.equal((view.screen.getByRole('spinbutton', { name: 'Intensidad del pulso' }) as HTMLInputElement).disabled, true)
+    assert.equal((view.screen.getByRole('spinbutton', { name: 'Visual BPM' }) as HTMLInputElement).disabled, true)
+    assert.equal((view.screen.getByRole('spinbutton', { name: 'Pulse intensity' }) as HTMLInputElement).disabled, true)
 
     view.fireEvent.change(selector, { target: { value: 'music-pulse' } })
-    const pulseBpm = await view.screen.findByRole('spinbutton', { name: 'BPM visual' }) as HTMLInputElement
+    const pulseBpm = await view.screen.findByRole('spinbutton', { name: 'Visual BPM' }) as HTMLInputElement
     assert.equal(pulseBpm.disabled, false)
-    assert.equal((view.screen.getByRole('spinbutton', { name: 'Intensidad del pulso' }) as HTMLInputElement).disabled, false)
+    assert.equal((view.screen.getByRole('spinbutton', { name: 'Pulse intensity' }) as HTMLInputElement).disabled, false)
     view.cleanup()
   } finally {
     globalThis.fetch = originalFetch
@@ -127,7 +127,7 @@ test('selecciona hero y fondo canónicos y aplica provided_only con lineage de c
   try {
     const view = await renderDialog({ onClose: () => { closed += 1 }, onApply: scene => { applied.push(scene); return true } })
     await selectHeroAndPlate(view)
-    view.fireEvent.click(view.screen.getByRole('button', { name: 'Crear y abrir en editor' }))
+    view.fireEvent.click(view.screen.getByRole('button', { name: 'Create and open in editor' }))
     await view.waitFor(() => assert.equal(applied.length, 1))
 
     const scene = applied[0]
@@ -153,10 +153,10 @@ test('mantiene assets heredados visibles pero no seleccionables ni aplicables', 
   let applied = 0
   try {
     const view = await renderDialog({ onApply: () => { applied += 1; return true } })
-    const hero = await view.screen.findByRole('button', { name: /Seleccionar hero-default\.png/ }) as HTMLButtonElement
+    const hero = await view.screen.findByRole('button', { name: /Select hero-default\.png/ }) as HTMLButtonElement
     assert.equal(hero.disabled, true)
     assert.match(hero.textContent || '', /metadatos canónicos/i)
-    assert.equal((view.screen.getByRole('button', { name: 'Crear y abrir en editor' }) as HTMLButtonElement).disabled, true)
+    assert.equal((view.screen.getByRole('button', { name: 'Create and open in editor' }) as HTMLButtonElement).disabled, true)
     assert.equal(applied, 0)
     view.cleanup()
   } finally {
@@ -171,24 +171,24 @@ test('cambia de plantilla y workspace reinicia bindings, y cerrar cancela sin ap
   let applied = 0
   try {
     const view = await renderDialog({ onClose: () => { closed += 1 }, onApply: () => { applied += 1; return true } })
-    const hero = await view.screen.findByRole('button', { name: /Seleccionar hero-default\.png/ })
+    const hero = await view.screen.findByRole('button', { name: /Select hero-default\.png/ })
     view.fireEvent.click(hero)
     assert.equal(hero.getAttribute('aria-pressed'), 'true')
 
-    const selector = view.screen.getByRole('combobox', { name: 'Acción / plantilla' })
+    const selector = view.screen.getByRole('combobox', { name: 'Action / template' })
     view.fireEvent.change(selector, { target: { value: 'music-pulse' } })
-    const resetHero = await view.screen.findByRole('button', { name: /Seleccionar hero-default\.png/ })
+    const resetHero = await view.screen.findByRole('button', { name: /Select hero-default\.png/ })
     assert.equal(resetHero.getAttribute('aria-pressed'), 'false')
 
     const other = assetsFor('other')
     installAssetFetch({ workspace: 'other' })
     view.rerender(<view.TemplateComposerDialog workspace="other" onClose={() => { closed += 1 }} onApply={() => { applied += 1; return true }} />)
-    const otherHero = await view.screen.findByRole('button', { name: /Seleccionar hero-other\.png/ })
+    const otherHero = await view.screen.findByRole('button', { name: /Select hero-other\.png/ })
     assert.equal(otherHero.getAttribute('aria-pressed'), 'false')
-    assert.equal(view.screen.queryByRole('button', { name: /Seleccionar hero-default\.png/ }), null)
+    assert.equal(view.screen.queryByRole('button', { name: /Select hero-default\.png/ }), null)
     assert.equal(other.hero.id, 'asset-hero-other')
 
-    view.fireEvent.click(view.screen.getByRole('button', { name: 'Cerrar' }))
+    view.fireEvent.click(view.screen.getByRole('button', { name: 'Close' }))
     assert.equal(closed, 1)
     assert.equal(applied, 0)
     view.cleanup()
@@ -205,7 +205,7 @@ test('404 y cambio de fuente al revalidar impiden aplicar y nunca generan assets
       let applied = 0
       const view = await renderDialog({ onApply: () => { applied += 1; return true } })
       await selectHeroAndPlate(view)
-      view.fireEvent.click(view.screen.getByRole('button', { name: 'Crear y abrir en editor' }))
+      view.fireEvent.click(view.screen.getByRole('button', { name: 'Create and open in editor' }))
       const alert = await view.screen.findByRole('alert')
       if (detailMode === '404') assert.match(alert.textContent || '', /Asset not found/i)
       else assert.match(alert.textContent || '', /ubicación del asset cambió/i)

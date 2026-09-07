@@ -1,3 +1,4 @@
+import { scene3dCopy } from './copy.ts'
 import { encodeWorld3DFrames, world3dExportSize } from './exportMp4.ts'
 import { publishWorld3DRecording } from './publish.ts'
 import type { Scene3DStageHandle } from './Scene3DStage.tsx'
@@ -14,7 +15,7 @@ export async function waitForWorld3DAssets(
 ) {
   const deadline = Date.now() + timeoutMs
   while (!handle.ready(document.slots)) {
-    if (Date.now() > deadline) throw new Error('The 3D assets did not finish loading.')
+    if (Date.now() > deadline) throw new Error(scene3dCopy('stage.assetsNotReady'))
     await sleep(200)
   }
 }
@@ -36,7 +37,7 @@ export async function exportWorld3DDocument(
       duration: document.duration,
       paint: seconds => {
         const canvas = handle.paint(seconds)
-        if (!canvas) throw new Error('The 3D stage is not ready to export.')
+        if (!canvas) throw new Error(scene3dCopy('stage.stageNotReady'))
         return canvas
       },
       onProgress,

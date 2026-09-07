@@ -1,5 +1,6 @@
 import { ArrayBufferTarget, Muxer } from 'mp4-muxer'
 import { scene3dFrameCount, scene3dFrameTime } from './clock.ts'
+import { scene3dCopy } from './copy.ts'
 
 export function evenDim(value: number): number {
   const n = Math.round(Number.isFinite(value) ? value : 0)
@@ -35,7 +36,7 @@ export async function encodeWorld3DFrames(options: {
   onProgress?: (index: number, count: number) => void
 }): Promise<Blob> {
   if (!('VideoEncoder' in window) || typeof VideoEncoder.isConfigSupported !== 'function') {
-    throw new Error('This browser cannot encode a deterministic H.264 MP4.')
+    throw new Error(scene3dCopy('stage.cannotEncode'))
   }
   const size = world3dExportSize(options.width, options.height)
   const plan = world3dExportPlan(options.duration, options.fps)
@@ -49,13 +50,13 @@ export async function encodeWorld3DFrames(options: {
     avc: { format: 'avc' },
   })
   if (!supported.supported || !supported.config) {
-    throw new Error('This browser cannot encode a deterministic H.264 MP4 at the selected resolution.')
+    throw new Error(scene3dCopy('stage.cannotEncodeResolution'))
   }
   const copy = document.createElement('canvas')
   copy.width = size.width
   copy.height = size.height
   const context = copy.getContext('2d')
-  if (!context) throw new Error('Could not create an export canvas.')
+  if (!context) throw new Error(scene3dCopy('stage.exportCanvasFailed'))
   const target = new ArrayBufferTarget()
   const muxer = new Muxer({
     target,
