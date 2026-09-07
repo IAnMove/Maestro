@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useStore } from '../../stores/useStore'
 import { useUiTranslation } from '../../i18n'
-import { FileUploadZone } from '../shared/FileUploadZone'
-import * as api from '../../api/client'
+import type { ApiOutput } from '../../api/outputs'
+import { AssetInput } from '../../features/asset-picker/AssetInput.tsx'
+import { applyChosenStudioMedia, studioMediaPath, useWorkspaceOutputs } from '../../lib/studioAssetPick.ts'
 
 /**
  * SFX mode controls for MMAudio — sound effects generation.
@@ -15,36 +16,24 @@ export function SfxControls() {
   const durationSeconds = useStore(s => s.durationSeconds)
   const setDurationSeconds = useStore(s => s.setDurationSeconds)
   const [videoFilename, setVideoFilename] = useState<string | null>(null)
-  const [uploading, setUploading] = useState(false)
+  const activeWorkspace = useStore(s => s.activeWorkspace)
+  const videoItems = useWorkspaceOutputs(activeWorkspace, 'video')
 
   const sfxPrompt = ((params as unknown as Record<string, unknown>).MMAudio_prompt as string) || ''
   const sfxNegPrompt = ((params as unknown as Record<string, unknown>).MMAudio_neg_prompt as string) || ''
   const textWeight = ((params as unknown as Record<string, unknown>).sfx_text_weight as number) ?? 1.0
 
-  const handleVideoUpload = async (file: File) => {
-    setUploading(true)
-    try {
-      const result = await api.uploadImage(file)
-      setParam('video_guide' as keyof typeof params, result.path)
-      setVideoFilename(file.name)
-
-      // Try to get video duration
-      const url = URL.createObjectURL(file)
-      const video = document.createElement('video')
-      video.preload = 'metadata'
-      video.onloadedmetadata = () => {
-        if (Number.isFinite(video.duration) && video.duration > 0) {
-          setDurationSeconds(Math.round(video.duration * 10) / 10)
-        }
-        URL.revokeObjectURL(url)
-      }
-      video.onerror = () => URL.revokeObjectURL(url)
-      video.src = url
-    } catch (e) {
-      console.error('Upload failed:', e)
-    } finally {
-      setUploading(false)
+  const chooseVideo = (item: ApiOutput | null) => {
+    if (!item) {
+      setParam('video_guide' as keyof typeof params, undefined)
+      setVideoFilename(null)
+      return
     }
+    setParam('video_guide' as keyof typeof params, studioMediaPath(item))
+    setVideoFilename(item.name)
+    applyChosenStudioMedia(item, next => {
+      if (next.duration > 0) setDurationSeconds(Math.round(next.duration * 10) / 10)
+    })
   }
 
   return (
@@ -54,15 +43,15 @@ export function SfxControls() {
         <label className="text-[11px] text-text-muted uppercase tracking-wider mb-1.5 block">
           {t('sfx.videoClip')} <span className="normal-case text-text-muted">({t('chrome.optional')})</span>
         </label>
-        <FileUploadZone
-          label={uploading ? t('chrome.uploading') : t('sfx.dropVideo')}
-          accept=".mp4,.webm,.avi,.mov,.mkv"
-          filename={videoFilename}
-          onFile={handleVideoUpload}
-          onClear={() => {
-            setParam('video_guide' as keyof typeof params, undefined)
-            setVideoFilename(null)
-          }}
+        <AssetInput
+          label={t('sfx.dropVideo')}
+          placeholder={t('sfx.dropVideo')}
+          items={videoItems}
+          accept=".mp4,.webm,.avi,.mov,.mkv,video/*"
+          workspaceId={activeWorkspace}
+          optional
+          constraints={{ kinds: ['video'], maxCount: 1, optional: true }}
+          onChoose={chooseVideo}
         />
         <p className="text-[9px] text-text-muted mt-1">
           {t('sfx.hint')}
