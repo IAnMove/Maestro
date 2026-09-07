@@ -6,11 +6,14 @@ import {
   catalogItemToPickerItem,
   checkCompatibility,
   createCatalogQuerySession,
+  filterPickerItems,
   isSameRef,
   outputToPickerItem,
   queryAssetCatalog,
   resolveAssetRef,
+  sortPickerItems,
   type AssetPickerIntent,
+  type PickerItem,
 } from '../src/features/asset-picker/index.ts'
 
 function catalogItem(overrides: Partial<AssetCatalogItem> & Pick<AssetCatalogItem, 'id' | 'filename'>): AssetCatalogItem {
@@ -87,6 +90,17 @@ test('constraints reject incompatible kinds and overflow', () => {
   assert.equal(checkCompatibility(item, { kinds: ['audio'], maxCount: 1, optional: true }, 0).allowed, false)
   assert.equal(checkCompatibility(item, { kinds: ['image'], maxCount: 1, optional: false }, 1).allowed, false)
   assert.equal(checkCompatibility(item, { kinds: ['image'], maxCount: 1, optional: false }, 0).allowed, true)
+})
+
+test('client sort keeps missing dates last and prefix names in reverse', () => {
+  const items: PickerItem[] = [
+    catalogItemToPickerItem(catalogItem({ id: 'a', filename: 'a.png', created_at: 10 }), 'default'),
+    catalogItemToPickerItem(catalogItem({ id: 'ab', filename: 'ab.png', created_at: 30 }), 'default'),
+    catalogItemToPickerItem(catalogItem({ id: 'b', filename: 'b.png', created_at: 0 }), 'default'),
+  ]
+  assert.deepEqual(sortPickerItems(items, 'created_desc').map(item => item.filename), ['ab.png', 'a.png', 'b.png'])
+  assert.deepEqual(sortPickerItems(items, 'name_desc').map(item => item.filename), ['b.png', 'ab.png', 'a.png'])
+  assert.deepEqual(filterPickerItems(items, 'ab').map(item => item.filename), ['ab.png'])
 })
 
 test('query session ignores an out-of-order response', async () => {

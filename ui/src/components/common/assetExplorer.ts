@@ -1,4 +1,5 @@
 import type { ApiOutput } from '../../api/outputs'
+import { formatCreatedDate, knownCreatedAt } from '../../features/asset-picker/titles.ts'
 
 export type AssetExplorerPurpose =
   | 'layer-model'
@@ -19,9 +20,7 @@ export type ExplorerChoiceHandlers = {
 }
 
 export function formatAssetDate(item: ApiOutput, locale?: string) {
-  const stamp = item.completed_at || item.created_at
-  if (!Number.isFinite(stamp) || stamp <= 0) return ''
-  return new Date(stamp * 1000).toLocaleString(locale)
+  return formatCreatedDate(knownCreatedAt(item.created_at), locale)
 }
 
 export function assetPreviewUrl(item: ApiOutput) {

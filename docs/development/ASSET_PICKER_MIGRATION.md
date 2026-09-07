@@ -346,8 +346,8 @@ Un agente es dueño del **núcleo** del picker (PR 1–4). Los demás solo adapt
 | PR | Alcance | Owner previsto | Hotspots / no tocar a la vez |
 |---|---|---|---|
 | 0 (este) | Inventario + contrato | Docs | — |
-| 1 | Tipos, catálogo, identidad | Núcleo picker | `features/asset-picker/*`, `api/assets.ts`, `routers/assets.py` / `asset_catalog.py` |
-| 2 | Modal, tarjetas, transacción | Núcleo picker | `AssetExplorerDialog`, `ModalShell` |
+| 1 | Tipos, catálogo, identidad | Núcleo picker | Mezclado en #207 |
+| 2 | Modal, tarjetas, transacción | Núcleo picker | `AssetExplorerDialog`, `ModalShell`. Conservar wrapper `ApiOutput` para consumidores de #198 |
 | 3 | Preview RAM-safe | Núcleo picker (archivos de preview) | No mezclar con PR 4 |
 | 4 | AssetInput dual origin + upload | Núcleo picker | `FileUploadZone` / campo común |
 | 5 | 2.5D + audio de escena + templates + Scene3D | Compositor 2.5D/3D | `SceneAnimatorPanel` (serializar vs i18n); `Scene3DWorkspace` ya no está reservado (#204 mezclado) |

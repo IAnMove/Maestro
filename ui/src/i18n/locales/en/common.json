@@ -67,7 +67,19 @@
     "typeAudio": "Audio",
     "typeScene": "Scene",
     "typeComic": "Comic",
-    "typeDocument": "Document"
+    "typeDocument": "Document",
+    "sortLabel": "Sort",
+    "sortCreatedDesc": "Newest first",
+    "sortCreatedAsc": "Oldest first",
+    "sortNameAsc": "Name A–Z",
+    "sortNameDesc": "Name Z–A",
+    "kindFilter": "Type",
+    "kindAll": "All compatible types",
+    "loading": "Loading assets…",
+    "loadFailed": "Could not load assets.",
+    "retry": "Retry",
+    "noResults": "No assets match this search.",
+    "filteredHidden": "The selected asset is hidden by the current filter."
   },
   "picker": {
     "unknownDate": "Unknown date",
