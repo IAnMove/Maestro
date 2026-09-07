@@ -26,7 +26,18 @@ export function isAudioOutput(item: ApiOutput | null): item is ApiOutput {
   return /\.(mp3|wav|flac|ogg|m4a|aac)$/i.test(item.name || item.path || '')
 }
 
+export function isUploadedAudioOutput(item: ApiOutput): boolean {
+  const url = typeof item.url === 'string' ? item.url : ''
+  const path = typeof item.path === 'string' ? item.path.replace(/\\/g, '/') : ''
+  return /\/api\/v1\/uploads\/audio\//i.test(url) || /(^|\/)uploads\/audio\//i.test(path)
+}
+
 export function isCustomMp3Output(item: ApiOutput): boolean {
+  // Device picks go through /upload-audio, which transcodes mp3/m4a/aac to wav
+  // and returns that artifact. Rejecting the wav would make "Import custom MP3"
+  // from disk fail after a successful upload. Catalog rows still need an mp3
+  // name or URL so a library wav/flac cannot be labeled custom MP3.
+  if (isUploadedAudioOutput(item)) return true
   const filename = audioBindingFilename(item)
   return /\.mp3$/i.test(filename) || /\.mp3(\?|$)/i.test(item.url || '')
 }

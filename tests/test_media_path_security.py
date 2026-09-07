@@ -6,6 +6,7 @@ import pytest
 from services.media_paths import (
     MediaPathNotAllowed,
     resolve_permitted_media_path,
+    resolve_story_cover_audio,
     resolve_voice_ref_paths,
 )
 
@@ -106,6 +107,38 @@ def test_permitted_media_path_resolves_audio_upload_subdir(tmp_path):
         )
 
 
+def test_story_cover_prefers_audio_upload_then_workspace_basename(tmp_path):
+    uploads = tmp_path / "uploads"
+    workspace = tmp_path / "workspace"
+    audio = uploads / "audio"
+    audio.mkdir(parents=True)
+    workspace.mkdir()
+    uploaded = audio / "ref.wav"
+    catalog = workspace / "theme.mp3"
+    uploaded.write_bytes(b"RIFF")
+    catalog.write_bytes(b"ID3")
+
+    assert resolve_story_cover_audio(
+        "ref.wav",
+        uploads_audio_root=str(audio),
+        uploads_root=str(uploads),
+        workspace_root=str(workspace),
+    ) == str(uploaded.resolve())
+    assert resolve_story_cover_audio(
+        "theme.mp3",
+        uploads_audio_root=str(audio),
+        uploads_root=str(uploads),
+        workspace_root=str(workspace),
+    ) == str(catalog.resolve())
+    with pytest.raises(FileNotFoundError):
+        resolve_story_cover_audio(
+            "missing.mp3",
+            uploads_audio_root=str(audio),
+            uploads_root=str(uploads),
+            workspace_root=str(workspace),
+        )
+
+
 def test_resolve_voice_ref_paths_keeps_audio_subdir_and_workspace_names(tmp_path):
     uploads = tmp_path / "uploads"
     workspace = tmp_path / "workspace"
@@ -158,6 +191,25 @@ def test_audio_trim_and_analysis_endpoints_use_the_shared_resolver():
             if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
         ]
         assert "_resolve_request_media_path" in calls, name
+
+
+def test_story_cover_jobs_use_the_shared_cover_resolver():
+    tree = ast.parse(LAUNCH.read_text(encoding="utf-8"), filename=str(LAUNCH))
+    functions = {
+        node.name: node
+        for node in tree.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+    for name in (
+        "start_story_music_candidates_job",
+        "generate_story_music_candidates",
+    ):
+        calls = [
+            node.func.id
+            for node in ast.walk(functions[name])
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+        ]
+        assert "_story_cover_reference_path" in calls, name
 
 
 def test_generation_resolves_voice_clone_refs_before_seedvc():
