@@ -14,6 +14,7 @@ import { OutputFolderSelector } from './OutputFolderSelector'
 interface MenuItem {
   value?: MediaFilter
   selected?: boolean
+  featured?: boolean
   section?: string
   label: string
   description: string
@@ -78,7 +79,8 @@ function NavigationBar({ category, title, items, activeValue, barRef }: { catego
             aria-label={item.label}
             aria-selected={item.selected ?? item.value === activeValue}
             onClick={item.action}
-            className="hp-navigation-child flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[10px] font-medium text-text-secondary transition hover:text-text-primary"
+            data-navigation-featured={item.featured ? 'true' : undefined}
+            className={`hp-navigation-child flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[10px] font-medium text-text-secondary transition hover:text-text-primary ${item.featured ? 'ring-1 ring-inset ring-accent-blue/40 bg-accent-blue/10' : ''}`}
           >
             <span>{item.icon}</span><span>{item.label}</span>
           </button>
@@ -201,6 +203,7 @@ export function TabFilter() {
     const state = useStore.getState()
     state.setSettingsOpen(false)
     state.setDashboardOpen(false)
+    if (filter === 'character-replacement') state.setSidebarOpen(false)
     state.setMediaFilter(filter)
     setActiveCategory(category)
     setExpandedCategory(category)
@@ -233,6 +236,7 @@ export function TabFilter() {
     { value: 'characters', label: t('tabs.characters'), description: t('descriptions.characters'), icon: <WandSparkles size={15} />, action: () => openFilter('characters') },
     { value: 'scene3d', label: t('tabs.scene3d'), description: t('descriptions.video3d'), icon: <MonitorPlay size={15} />, action: () => openFilter('scene3d') },
     { value: 'world3d', label: t('tabs.world3d'), description: t('descriptions.world3d'), icon: <Boxes size={15} />, action: () => openFilter('world3d') },
+    { value: 'character-replacement', featured: true, label: t('tabs.characterReplacement'), description: t('descriptions.characterReplacement'), icon: <WandSparkles size={15} />, action: () => openFilter('character-replacement') },
     { value: 'animate3d', label: t('tabs.animate3d'), description: t('descriptions.animate3d'), icon: <MonitorPlay size={15} />, action: () => openFilter('animate3d') },
   ]
   const productionItems: MenuItem[] = [

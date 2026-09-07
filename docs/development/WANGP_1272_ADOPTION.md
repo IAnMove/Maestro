@@ -10,7 +10,7 @@ la aplicación; las capacidades de generación residen en el WanGP interno.
 
 | Punto anunciado | Situación de esta base | Integración |
 | --- | --- | --- |
-| Viggle-Animate | Recast usa SCAIL-2 y su preparación de personas | Preset propio en Editar → Recast, con vídeo y un fotograma editado; conserva la cola Recast existente |
+| Viggle-Animate | Recast usa SCAIL-2 y su preparación de personas | Sección propia Estudios → Reemplazar personaje; prepara el fotograma y conserva la cola Recast existente para el vídeo |
 | H3 en dos fases | H3 local tiene una implementación distinta, con políticas y presets propios | Familia `h3_advanced` independiente: FL2VA, Ref2VA y variantes pruned; fases y refinamiento con tiles |
 | Inpainting y outpainting H3 | Los controles genéricos no usan todos los códigos nativos nuevos | Panel H3 dedicado con vídeo, máscara, márgenes y máscara por grupos; conserva anclas, inyección y audio |
 | Refinamiento de audio | Faltan los controles H3 nuevos | Opciones nativas de refinamiento en el modelo y sus ajustes personalizados |
@@ -26,19 +26,36 @@ RIFE mantiene sus rutas ×2/×4 y añade ×3 con tiempos de interpolación en te
 
 ## Viggle
 
-1. Abrir **Editar → Viggle** y elegir el vídeo fuente. Esta pestaña fija el modelo
-   Viggle-Animate; **Recast** conserva las recetas SCAIL.
-2. Extraer un fotograma hacia Imágenes, editar la apariencia manteniendo pose,
-   encuadre y proporciones, generar la imagen y aplicar el resultado de vuelta a Viggle. También se
-   puede elegir directamente un fotograma ya editado.
-3. Elegir resolución y audio y generar.
+1. Abrir **Estudios → Reemplazar personaje**, junto a Vídeo 2,5D y Vídeo 3D, y
+   elegir el vídeo. Desplazarse al instante deseado y pulsar **Usar este fotograma**.
+2. Añadir la imagen del personaje y pulsar **Generar fotograma sustituto**. El
+   panel prepara las dos referencias en orden y muestra una instrucción inicial
+   editable; no hace falta cambiar a Imágenes ni trasladar manualmente el resultado.
+3. Revisar el fotograma producido, elegir resolución/audio y pulsar **Generar
+   vídeo con Viggle**. El modelo de vídeo queda fijo; **Editar → Recast** conserva SCAIL.
 
-Ambos paneles explican el recorrido en español e inglés. La referencia 1 es el
-fotograma completo; una imagen adicional del personaje aporta su apariencia.
-Adjuntar referencias no genera la imagen sustituta. Durante esta edición, Auto
-conserva el lienzo del vídeo; la UI valida dimensiones antes de enviar la animación
-y el servidor mantiene su validación. La descarga de pesos faltantes sucede en
-la carga normal del modelo tras Generar, con el progreso y cancelación del trabajo.
+La sección utiliza el área central completa y un único desplazamiento exterior,
+con controles y textos en español e inglés. El selector de instante es independiente
+del recorte: por defecto se anima el vídeo completo. La
+[documentación oficial de Viggle](https://huggingface.co/Viggle/Viggle-Animate)
+confirma que la referencia puede proceder de cualquier momento del vídeo; no se
+envía su índice al modelo.
+
+La referencia 1 es el fotograma completo y la 2 aporta la apariencia del personaje.
+El editor usa sus propios defaults, conserva el prompt literal y fija el lienzo a
+las dimensiones del vídeo. El resultado se obtiene del ID exacto del trabajo, sin
+buscar imágenes por prompt ni tomar la primera salida de la galería. Los borradores
+se conservan por workspace durante la navegación de la sesión de navegador.
+La UI comprueba proporciones antes de enviar la animación y el servidor mantiene
+su validación, incluida la orientación visual de vídeos con metadatos de rotación.
+La descarga de pesos faltantes sucede en la carga normal del modelo tras Generar,
+con progreso y cancelación del trabajo. No se introduce otra cola ni se duplican
+las imágenes locales al pasarlas como referencias: el servidor resuelve sus URLs
+canónicas dentro de uploads o del workspace indicado.
+
+El retorno antiguo desde Imágenes se conserva para ajustes previos. Viggle no
+acepta una salida anterior a esa edición, aunque aparezca al cargar otra página
+de la galería; utiliza la hora del servidor y el snapshot de referencias existentes.
 
 El preset fija tres pasos, Euler, shift 3 y CFG 1 a 24 FPS. Emplea un prompt
 precalculado: el cambio visual se expresa mediante el fotograma. Su panel no
@@ -121,8 +138,9 @@ introduce un segundo scheduler ni un bucle autónomo con acceso al shell.
 
 Las pruebas manuales de Viggle han puesto de manifiesto la falta de espacio útil
 en la columna de herramientas. La [nota de revisión de paneles](STUDIO_PANEL_LAYOUT_REVIEW.md)
-recoge el problema y las alternativas para revisarlas después. No autoriza ni
-implementa un rediseño de navegación durante estas pruebas.
+recoge el problema y las alternativas para revisar la distribución general después.
+La petición posterior del usuario concreta únicamente una sección amplia para
+Reemplazar personaje; el rediseño global de paneles sigue aplazado.
 
 ## Procedencia y límites de validación
 

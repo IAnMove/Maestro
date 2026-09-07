@@ -2,6 +2,8 @@ import type { OutputFile } from '../types'
 
 export interface ViggleEditSession {
   workspace: string
+  /** Server Unix seconds, matching gallery created_at without client clock skew. */
+  startedAt: number
   previousOutputs: Array<Pick<OutputFile, 'name' | 'url'>>
 }
 
@@ -16,8 +18,10 @@ export function latestAnchorImage(
     return outputs.find(output => output.type === 'image')
   }
   const session = target.viggleEditSession
-  if (!session || session.workspace !== workspace || browsingUploads) return undefined
-  return outputs.find(output => output.type === 'image' && !session.previousOutputs.some(
+  if (!session || !Number.isFinite(session.startedAt) || session.startedAt <= 0
+    || session.workspace !== workspace || browsingUploads) return undefined
+  return outputs.find(output => output.type === 'image' && Number.isFinite(output.created_at)
+    && output.created_at > session.startedAt && !session.previousOutputs.some(
     previous => previous.name === output.name || previous.url === output.url,
   ))
 }

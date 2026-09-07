@@ -22,6 +22,15 @@ class JsonRequest:
 
 def prepare_generation_inputs(body, model_def, workspace, *, uploads_dir, workspace_dir):
     """Validate processor options and resolve new-family media before admission."""
+    canonical_refs = body.pop('canonical_image_refs', False)
+    if canonical_refs:
+        if canonical_refs is not True or not model_def.get('image_outputs') or body.get('image_mode') != 1:
+            raise ValueError('Canonical image references require an image generation request')
+        references = body.get('image_refs')
+        if not isinstance(references, list) or not references or any(not isinstance(value, str) for value in references):
+            raise ValueError('Canonical image references must be a non-empty ordered list')
+        body['image_refs'] = [resolve_wangp_media(value, workspace, uploads_dir=uploads_dir,
+                                                workspace_dir=workspace_dir) for value in references]
     if body.get('spatial_upsampling') or body.get('temporal_upsampling') or body.get('wangp_processor_settings'):
         from shared.wangp1272.processors import validate_selection, validated_settings
         error = validate_selection(body.get('spatial_upsampling', ''), body.get('temporal_upsampling', ''), body.get('image_mode') == 1)

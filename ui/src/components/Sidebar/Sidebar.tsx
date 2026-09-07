@@ -48,6 +48,7 @@ export function Sidebar() {
   const imageMode = useStore(s => s.params.image_mode)
   const modelOptions = useStore(s => s.modelOptions)
   const sidebarOpen = useStore(s => s.sidebarOpen)
+  const mediaFilter = useStore(s => s.mediaFilter)
   const appVersion = useStore(s => s.systemConfig?.app_version)
   const setSidebarOpen = useStore(s => s.setSidebarOpen)
   const setSidebarMode = useStore(s => s.setSidebarMode)
@@ -284,6 +285,9 @@ export function Sidebar() {
       )}
     </>
   )
+
+  // This workspace owns its controls in the central area, including on mobile.
+  if (mediaFilter === 'character-replacement') return null
 
   // Mobile: overlay drawer
   if (isMobile) {

@@ -191,12 +191,12 @@ test('A Viggle round trip cannot apply an old gallery image or an image from ano
     favorite: false, size: 1, created_at: 1,
   })
   const oldImage = image('unrelated.png')
-  const newImage = image('replacement.png')
+  const newImage = { ...image('replacement.png'), created_at: 2 }
   const savedRefs = [new dom.window.File([], 'previous-reference.png')]
   globalThis.fetch = async (input, init) => {
     if (String(input) === '/api/v1/extract-frames') {
       assert.equal(JSON.parse(String(init?.body)).workspace, 'viggle-test')
-      return Response.json({ start_path: 'source-frame.png', start_url: '/api/v1/uploads/source-frame.png' })
+      return Response.json({ start_path: 'source-frame.png', start_url: '/api/v1/uploads/source-frame.png', session_started_at: 1.5 })
     }
     assert.equal(String(input), '/api/v1/uploads/source-frame.png')
     return new Response('FRAME', { headers: { 'content-type': 'image/png' } })
@@ -250,6 +250,77 @@ test('A Viggle round trip cannot apply an old gallery image or an image from ano
     assert.equal(useStore.getState().editReturnTarget, null)
     assert.deepEqual(useStore.getState().imageRefs, savedRefs)
     assert.equal(useStore.getState().imageRefType, 'saved')
+  } finally {
+    cleanup()
+    useStore.setState(initial)
+    globalThis.fetch = originalFetch
+    context.mock.restoreAll()
+  }
+})
+
+test('Viggle rejects an older image loaded from gallery page two and accepts a later server timestamp', async context => {
+  const { render, act, cleanup } = await import('@testing-library/react')
+  const { useStore } = await import('../src/stores/useStore')
+  const { AnchorReturnBanner } = await import('../src/components/Sidebar/AnchorReturnBanner')
+  const initial = useStore.getState()
+  const originalFetch = globalThis.fetch
+  context.mock.method(console, 'error', () => {})
+  const startedAt = 1_750_000_000.123456
+  const oldImage: OutputFile = {
+    name: 'old-page-two.png', url: '/api/v1/file/old-page-two.png?workspace=viggle-test',
+    type: 'image', mode: 'image', favorite: false, size: 1, created_at: 1,
+  }
+  const firstPage: OutputFile[] = Array.from({ length: 100 }, (_, index) => ({
+    ...oldImage, name: `video-${index}.mp4`, url: `/api/v1/file/video-${index}.mp4?workspace=viggle-test`,
+    type: 'video', mode: 'video', created_at: 2,
+  }))
+  let pageRequests = 0
+  globalThis.fetch = async input => {
+    const url = new URL(String(input), 'http://localhost/')
+    if (url.pathname === '/api/v1/extract-frames') return Response.json({
+      start_path: 'frame.png', start_url: '/api/v1/uploads/frame.png', session_started_at: startedAt,
+    })
+    if (url.pathname === '/api/v1/uploads/frame.png') return new Response('FRAME', { headers: { 'content-type': 'image/png' } })
+    assert.equal(url.pathname, '/api/v1/outputs')
+    assert.equal(url.searchParams.get('workspace'), 'viggle-test')
+    assert.equal(url.searchParams.get('offset'), '100')
+    assert.equal(url.searchParams.get('limit'), '100')
+    pageRequests += 1
+    return Response.json({ outputs: [oldImage], total: 101 })
+  }
+  useStore.setState({
+    generationMode: 'avatar', editSubMode: 'recast', activeWorkspace: 'viggle-test', browsingUploads: false,
+    params: { ...initial.params, model_type: 'viggle_animate' },
+    editVideoPath: 'source.mp4', editVideoDuration: 3, editStartTime: 0, editEndTime: 3,
+    outputs: firstPage, outputsTotal: 101, mediaFilter: 'all', outputSearchQuery: '', editRecastRefPath: '',
+    setGenerationMode: mode => useStore.setState({ generationMode: mode }),
+    selectModel: async modelType => { useStore.setState(s => ({ params: { ...s.params, model_type: modelType } })) },
+  })
+  try {
+    await useStore.getState().sendFrameToImageMode('recast')
+    const target = useStore.getState().editReturnTarget!
+    assert.equal(target.viggleEditSession?.startedAt, startedAt)
+    assert.equal(target.viggleEditSession?.previousOutputs.length, 100)
+    const view = render(<AnchorReturnBanner />)
+    await act(async () => { await useStore.getState().loadMoreOutputs() })
+    assert.equal(pageRequests, 1)
+    assert.equal(useStore.getState().outputs.length, 101)
+    assert.equal(view.getByRole('button', { name: 'Apply & return' }).hasAttribute('disabled'), true)
+    await act(async () => { await useStore.getState().applyOutputAsAnchor() })
+    assert.equal(useStore.getState().editRecastRefPath, '')
+    assert.equal(useStore.getState().editReturnTarget, target)
+    for (const timestamp of [startedAt, Number.NaN, Number.POSITIVE_INFINITY]) {
+      assert.equal(latestAnchorImage([{ ...oldImage, created_at: timestamp }], target, 'viggle-test'), undefined)
+    }
+    const replacement = {
+      ...oldImage, name: 'replacement.png', url: '/api/v1/file/replacement.png?workspace=viggle-test',
+      created_at: startedAt + 0.0001,
+    }
+    await act(async () => { useStore.setState(s => ({ outputs: [replacement, ...s.outputs] })) })
+    assert.equal(view.getByRole('button', { name: 'Apply & return' }).hasAttribute('disabled'), false)
+    await act(async () => { await useStore.getState().applyOutputAsAnchor() })
+    assert.equal(useStore.getState().editRecastRefPath, replacement.url)
+    assert.equal(useStore.getState().editReturnTarget, null)
   } finally {
     cleanup()
     useStore.setState(initial)

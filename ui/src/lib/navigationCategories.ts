@@ -7,7 +7,7 @@ export const NAVIGATION_CATEGORIES = [
 export type NavigationCategory = typeof NAVIGATION_CATEGORIES[number]
 
 const STUDIOS = new Set<MediaFilter>([
-  'stories', 'series', 'comics', 'scene3d', 'world3d', 'animate3d', 'characters',
+  'stories', 'series', 'comics', 'scene3d', 'world3d', 'animate3d', 'characters', 'character-replacement',
 ])
 const PRODUCTION = new Set<MediaFilter>(['videoeditor'])
 const MEDIA = new Set<MediaFilter>([

@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import time
 from types import SimpleNamespace
 import uuid
 
@@ -41,6 +42,7 @@ def extract(tmp_path, monkeypatch):
         "os": os,
         "re": re,
         "uuid": uuid,
+        "time": time,
         "wgp": SimpleNamespace(server_config={"save_path": "outputs"}),
         "_get_active_workspace": lambda: "demo",
     }
@@ -92,6 +94,17 @@ def test_wangp_accepts_the_absolute_upload_path_from_legacy_roundtrip(extract):
     with Image.open(result["end_path"]) as frame:
         assert frame.size == (832, 480)
     assert "start_path" not in result
+
+
+def test_wangp_frame_session_uses_server_time_with_fractional_seconds(extract, monkeypatch):
+    submit, uploads, _ = extract
+    source = uploads / "source.mp4"
+    make_video(source, "832x480")
+    server_time = 1_750_000_000.123456
+    monkeypatch.setattr(time, "time", lambda: server_time)
+    result = submit(str(source), wangp_media=True, session_started_at=1)
+    assert result["session_started_at"] == server_time
+    assert "session_started_at" not in submit(str(source))
 
 
 @pytest.mark.parametrize(

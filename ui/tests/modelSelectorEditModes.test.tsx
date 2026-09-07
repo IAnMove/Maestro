@@ -83,17 +83,18 @@ test('Video dropdown retains H3 generators and excludes Viggle even after visiti
 })
 
 
-test('Viggle tab selects its exact model and displays a fixed model label; Recast restores SCAIL', async () => {
+test('Viggle is absent from Edit tabs; legacy Viggle settings retain their fixed model until Recast is chosen', async () => {
   const fixture = await setup('avatar', 'recast')
-  const { render, fireEvent } = await import('@testing-library/react')
+  const { render, fireEvent, act } = await import('@testing-library/react')
+  const { useStore } = await import('../src/stores/useStore')
   const { EditSubModeToggle } = await import('../src/components/Sidebar/EditSubModeToggle')
   try {
     const tabs = render(<EditSubModeToggle />)
-    fireEvent.click(tabs.getByRole('button', { name: 'Viggle', exact: true }))
+    assert.equal(tabs.queryByRole('button', { name: 'Viggle', exact: true }), null)
+    await act(async () => { useStore.getState().setEditSubMode('recast', 'viggle') })
     assert.deepEqual(fixture.selections, ['viggle_animate'])
     assert.equal(fixture.view.container.querySelectorAll('button').length, 0)
     assert.match(fixture.view.container.textContent || '', /Viggle-Animate Pruned 20B/)
-    assert.equal(tabs.getByRole('button', { name: 'Viggle', exact: true }).getAttribute('aria-pressed'), 'true')
     fireEvent.click(tabs.getByRole('button', { name: 'Recast', exact: true }))
     assert.deepEqual(fixture.selections, ['viggle_animate', 'scail2_14B_recast_fast'])
   } finally { fixture.close() }

@@ -11443,6 +11443,7 @@ async def extract_frames_endpoint(request: Request):
     Returns: {
         start_path, start_url,    # only if start_time provided
         end_path, end_url,        # only if end_time provided
+        session_started_at,      # server Unix seconds, only for wangp_media
     }
     """
     body = await request.json()
@@ -11497,6 +11498,9 @@ async def extract_frames_endpoint(request: Request):
         ep = _extract(float(end_time), "end")
         response["end_path"] = ep
         response["end_url"] = f"/api/v1/uploads/{os.path.basename(ep)}"
+    if body.get("wangp_media"):
+        # Compare against output file timestamps from this same server clock.
+        response["session_started_at"] = time.time()
     return response
 
 

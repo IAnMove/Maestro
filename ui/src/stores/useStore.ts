@@ -2346,6 +2346,7 @@ export const useStore = create<AppState>((set, get) => {
     try {
       let framePath = ''
       let frameUrl = ''
+      let sessionStartedAt = 0
       // Repaint can refine its existing edited frame. The first trip starts
       // from the source trim frame; later trips start from the applied result.
       if (which === 'repaint' && state.editRepaintFramePath) {
@@ -2366,6 +2367,12 @@ export const useStore = create<AppState>((set, get) => {
         const data = await res.json()
         framePath = (which === 'end' ? data.end_path : data.start_path) as string
         frameUrl = (which === 'end' ? data.end_url : data.start_url) as string
+        if (isViggle) {
+          sessionStartedAt = data.session_started_at
+          if (!Number.isFinite(sessionStartedAt) || sessionStartedAt <= 0) {
+            throw new Error('Frame extraction did not return a valid server timestamp')
+          }
+        }
       }
 
       // Use setGenerationMode rather than poking generationMode directly.
@@ -2411,6 +2418,7 @@ export const useStore = create<AppState>((set, get) => {
           sourceResolution: state.editVideoResolution,
           ...(isViggle ? { viggleEditSession: {
             workspace: state.activeWorkspace,
+            startedAt: sessionStartedAt,
             previousOutputs: s.outputs.map(({ name, url }) => ({ name, url })),
           } } : {}),
         },

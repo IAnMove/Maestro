@@ -1,9 +1,15 @@
 # Revisión pendiente de la distribución de paneles de Studio
 
 Fecha: 7 de septiembre de 2026. Origen: prueba manual del flujo Viggle.
-Estado: **documentado para revisar más adelante; sin rediseño aprobado ni
-implementación en curso**. El usuario pide continuar las pruebas de Viggle sin
-cambiar ahora la distribución de la interfaz.
+Estado: **distribución general aplazada; sin rediseño global aprobado**.
+El usuario pidió documentar el problema para revisar la distribución después de
+las pruebas de Viggle.
+
+Actualización de la misma sesión: al probar la guía, el usuario concretó un cambio
+acotado para Viggle: una sección destacada **Reemplazar personaje**, junto a Vídeo
+2,5D y Vídeo 3D, con preparación del fotograma y generación dentro de un espacio
+amplio. Ese flujo se implementa en la adopción WanGP; no resuelve ni sustituye la
+revisión general de paneles que recoge esta nota.
 
 ## Problema observado
 
@@ -29,8 +35,8 @@ trabajo. No se considera resuelto por añadir una guía o reducir su texto.
   contiene solo medios. El editor de vídeo, por ejemplo, tiene necesidades
   propias de espacio e interacción.
 - Evitar que una mejora provisional obligue a mover ahora el menú o desencadene
-  un rediseño de navegación. La solución concreta se decidirá después de probar
-  Viggle con tranquilidad.
+  un rediseño general de navegación. Las decisiones generales se revisarán después
+  de probar Viggle con tranquilidad.
 
 ## Opciones para comparar, todavía sin elegir
 
