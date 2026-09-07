@@ -90,7 +90,12 @@
     "titleWithDate": "{{type}} · {{date}}",
     "titleUnknownDate": "{{type}} · Fecha desconocida",
     "incompatibleKind": "Este tipo de recurso no está permitido aquí.",
-    "tooMany": "Este campo no admite otro recurso."
+    "tooMany": "Este campo no admite otro recurso.",
+    "fromDevice": "Desde mi equipo",
+    "fromLibrary": "Desde HocusPocus",
+    "remove": "Quitar",
+    "uploading": "Subiendo…",
+    "uploadFailed": "No se pudo subir el archivo."
   },
   "welcome": {
     "title": "Novedades de HocusPocus",

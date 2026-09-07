@@ -348,8 +348,8 @@ Un agente es dueño del **núcleo** del picker (PR 1–4). Los demás solo adapt
 | 0 (este) | Inventario + contrato | Docs | — |
 | 1 | Tipos, catálogo, identidad | Núcleo picker | Mezclado en #207 |
 | 2 | Modal, tarjetas, transacción | Núcleo picker | Mezclado en #208 |
-| 3 | Preview RAM-safe | Núcleo picker (archivos de preview) | `previewPlayer.tsx`, `AssetExplorerChrome.tsx`. No mezclar con PR 4 |
-| 4 | AssetInput dual origin + upload | Núcleo picker | `FileUploadZone` / campo común |
+| 3 | Preview RAM-safe | Núcleo picker (archivos de preview) | Mezclado en #210 |
+| 4 | AssetInput dual origin + upload | Núcleo picker | `AssetInput.tsx`, `upload.ts` |
 | 5 | 2.5D + audio de escena + templates + Scene3D | Compositor 2.5D/3D | `SceneAnimatorPanel` (serializar vs i18n); `Scene3DWorkspace` ya no está reservado (#204 mezclado) |
 | 6A | Tools, imagen, Hunyuan, edit | Tools/imagen | No núcleo modal |
 | 6B | Audio, vídeo, Video Editor, mixer | Audio/vídeo | Paralelo a 6A si no comparten archivo |

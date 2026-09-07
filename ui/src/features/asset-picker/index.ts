@@ -1,4 +1,6 @@
+export { AssetInput } from './AssetInput.tsx'
 export { catalogItemToPickerItem, checkCompatibility, outputToPickerItem, resolveCatalogMatch } from './adapters.ts'
+export { createUploadSession, inferUploadKind, uploadLocalAsset } from './upload.ts'
 export { filterPickerItems, paginatePickerItems, sortPickerItems } from './localQuery.ts'
 export { createCatalogQuerySession, queryAssetCatalog, resolveAssetRef } from './query.ts'
 export { displayAssetTitle, formatCreatedDate, formatUnknownDate, knownCreatedAt } from './titles.ts'
