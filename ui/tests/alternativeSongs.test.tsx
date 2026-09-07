@@ -81,7 +81,12 @@ test('alternative songs dialog lists attached songs and the remount action', asy
         }],
       }), { headers: { 'content-type': 'application/json' } })
     }
-    return new Response(JSON.stringify({ outputs: [{ name: 'en.mp3', type: 'audio' }] }), {
+    if (url.includes('/api/v1/assets')) {
+      return new Response(JSON.stringify({ total: 0, assets: [] }), {
+        headers: { 'content-type': 'application/json' },
+      })
+    }
+    return new Response(JSON.stringify({ outputs: [] }), {
       headers: { 'content-type': 'application/json' },
     })
   }
