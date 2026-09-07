@@ -6855,10 +6855,24 @@ def _apply_linked_model_folders(folders):
     return normalized
 
 
+def _validated_memory_profile_updates(body):
+    """Reject invalid profiles before any configuration changes are applied."""
+    profiles = {}
+    for key in ("video_profile", "image_profile", "audio_profile"):
+        if key not in body:
+            continue
+        value = body[key]
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or value not in (1, 2, 3, 3.5, 4, 4.5, 5):
+            raise HTTPException(status_code=400, detail=f"Invalid memory profile for {key}")
+        profiles[key] = value
+    return profiles
+
+
 @api.put("/api/v1/system-config")
 async def update_system_config(request: Request):
     """Update system-level settings. Accepts partial JSON body."""
     body = await request.json()
+    profile_updates = _validated_memory_profile_updates(body)
 
     ALLOWED_KEYS = {
         "attention_mode", "transformer_quantization", "vae_config",
@@ -6898,6 +6912,13 @@ async def update_system_config(request: Request):
         wgp.compile = updated["compile"]
     if "vram_safety_coefficient" in updated:
         wgp.args.vram_safety_coefficient = float(updated["vram_safety_coefficient"])
+    # WanGP selects these defaults when the next model is loaded. Updating
+    # server_config alone leaves its startup snapshots active indefinitely.
+    # The resident model's loaded_profile and offload object remain untouched.
+    for key, value in profile_updates.items():
+        setattr(wgp, f"default_profile_{key.removesuffix('_profile')}", value)
+    if "video_profile" in profile_updates:
+        wgp.default_profile = profile_updates["video_profile"]
 
     return {"status": "ok", "updated": updated}
 
