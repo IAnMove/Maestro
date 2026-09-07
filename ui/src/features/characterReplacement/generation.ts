@@ -128,7 +128,9 @@ export async function waitForReplacementVideo(
       throw new Error(status.error || status.message || 'Character replacement did not complete')
     }
     if (status.status === 'completed') {
-      const path = status.output_files.find(value => /\.(mp4|webm|mov|mkv)$/i.test(value))
+      // Each sliding window registers a cumulative video in API order.
+      // The last video contains the complete result; earlier ones are previews.
+      const path = status.output_files.slice().reverse().find(value => /\.(mp4|webm|mov|mkv)$/i.test(value))
       if (!path) throw new Error('Character replacement completed without a video')
       const name = path.split(/[\\/]/).pop()!
       return { name, source: api.getFileUrl(name, workspace), jobId,
