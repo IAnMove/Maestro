@@ -20,6 +20,21 @@ Object.assign(globalThis, {
 })
 Object.defineProperty(globalThis, 'navigator', { configurable: true, value: dom.window.navigator })
 
+async function chooseFromLibrary(
+  screen: Awaited<typeof import('@testing-library/react')>['screen'],
+  fireEvent: Awaited<typeof import('@testing-library/react')>['fireEvent'],
+  filename: string,
+  index = 0,
+) {
+  const buttons = screen.getAllByRole('button', { name: 'From HocusPocus' })
+    .filter((button: HTMLButtonElement) => !button.disabled)
+  fireEvent.click(buttons[index] || buttons[0])
+  const cards = await screen.findAllByTitle(filename)
+  const card = cards.find((node: HTMLElement) => node.tagName === 'BUTTON') || cards[0]
+  fireEvent.click(card)
+  fireEvent.click(screen.getByRole('button', { name: 'Choose' }))
+}
+
 const capabilities = {
   runtime: { installed: true, isolated_runtime: true, releases_vram_after_job: true, install_hint: null },
   models: [{
@@ -72,13 +87,15 @@ test('3D model switching retains but disables unsupported views and never sends 
   }) as typeof fetch
   try {
     render(<Hunyuan3DPanel />)
-    for (const view of ['Front', 'Left']) {
-      fireEvent.click(await screen.findByRole('button', { name: `Choose ${view} image from HocusPocus` }))
-      fireEvent.click(await screen.findByRole('option', { name: 'reference.png' }))
-    }
+    await screen.findAllByRole('button', { name: 'From HocusPocus' })
+    await chooseFromLibrary(screen, fireEvent, 'reference.png', 0)
+    await chooseFromLibrary(screen, fireEvent, 'reference.png', 1)
     act(() => useStore.setState(state => ({ params: { ...state.params, model_type: 'trellis2' } })))
     await screen.findByText(/Multi-view not supported/)
-    assert.equal(screen.queryByRole('button', { name: 'Choose Left image from HocusPocus' }), null)
+    assert.equal(
+      screen.getAllByRole('button', { name: 'From HocusPocus' }).filter(button => !(button as HTMLButtonElement).disabled).length,
+      1,
+    )
     assert.equal((screen.getByRole('textbox') as HTMLTextAreaElement).disabled, true)
     assert.equal((screen.getByRole('checkbox', { name: 'Low VRAM mode' }) as HTMLInputElement).disabled, true)
     fireEvent.click(screen.getByRole('button', { name: /Advanced/ }))
@@ -146,12 +163,10 @@ test('Hunyuan3D keeps disk upload and can use a HocusPocus image in the active w
 
   try {
     render(<Hunyuan3DPanel />)
-    await screen.findByRole('button', { name: 'Choose Front image from HocusPocus' })
-    assert.ok(screen.getByRole('button', { name: 'Upload Front image from disk' }))
+    await screen.findByRole('button', { name: 'From HocusPocus' })
+    assert.ok(screen.getByRole('button', { name: 'From my computer' }))
 
-    fireEvent.click(screen.getByRole('button', { name: 'Choose Front image from HocusPocus' }))
-    await screen.findByRole('listbox', { name: 'HocusPocus images for Front view' })
-    fireEvent.click(screen.getByRole('option', { name: 'bronze_robot_reference.png' }))
+    await chooseFromLibrary(screen, fireEvent, 'bronze_robot_reference.png')
     assert.ok(screen.getByText('bronze_robot_reference.png'))
 
     const generate = screen.getByRole('button', { name: 'Generate 3D asset' }) as HTMLButtonElement
@@ -210,8 +225,8 @@ test('a missing Hunyuan runtime keeps generate disabled after a reference image 
   try {
     render(<Hunyuan3DPanel />)
     await screen.findByRole('status')
-    fireEvent.click(await screen.findByRole('button', { name: 'Choose Front image from HocusPocus' }))
-    fireEvent.click(await screen.findByRole('option', { name: 'bronze_robot_reference.png' }))
+    await screen.findByRole('button', { name: 'From HocusPocus' })
+    await chooseFromLibrary(screen, fireEvent, 'bronze_robot_reference.png')
     assert.ok(screen.getByText('bronze_robot_reference.png'))
     const generate = screen.getByRole('button', { name: 'Generate 3D asset' }) as HTMLButtonElement
     assert.equal(generate.disabled, true)

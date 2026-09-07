@@ -350,8 +350,8 @@ Un agente es dueño del **núcleo** del picker (PR 1–4). Los demás solo adapt
 | 2 | Modal, tarjetas, transacción | Núcleo picker | Mezclado en #208 |
 | 3 | Preview RAM-safe | Núcleo picker (archivos de preview) | Mezclado en #210 |
 | 4 | AssetInput dual origin + upload | Núcleo picker | Mezclado en #211 |
-| 5 | 2.5D + audio de escena + templates + Scene3D | Compositor 2.5D/3D | `SceneAnimatorExplorer` / recetas. **Scene3DWorkspace reservado por #212** |
-| 6A | Tools, imagen, Hunyuan, edit | Tools/imagen | No núcleo modal |
+| 5 | 2.5D + audio de escena + templates + Scene3D | Compositor 2.5D/3D | Mezclado en #213 (sin Scene3DWorkspace; #212 abierto) |
+| 6A | Tools, imagen, Hunyuan, edit | Tools/imagen | `Hunyuan3DPanel` en curso. No núcleo picker (#214) |
 | 6B | Audio, vídeo, Video Editor, mixer | Audio/vídeo | Paralelo a 6A si no comparten archivo |
 | 7 | Story, Series, personajes, cómics, Director | Labs | Dividir 7A/7B si el diff crece |
 | 8 | Paridad Wizard + cierre inventario | Wizard + núcleo | `agentActions.ts` exclusivo |
