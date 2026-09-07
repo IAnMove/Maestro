@@ -62,7 +62,7 @@ test('narrative setup offers From my computer and From HocusPocus', { concurrenc
     )
     assert.ok(screen.getAllByRole('button', { name: /From my computer/ }).length >= 2)
     fireEvent.click(screen.getAllByRole('button', { name: /From HocusPocus/ })[0])
-    assert.ok(screen.getByTestId('asset-explorer'))
+    assert.ok(await screen.findByTestId('asset-explorer'))
   } finally {
     cleanup()
   }

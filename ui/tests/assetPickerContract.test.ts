@@ -15,6 +15,7 @@ import {
   livePickerItem,
   matchOutputByPicker,
   outputToPickerItem,
+  pickerItemToOutput,
   queryAssetCatalog,
   resolveAssetRef,
   sortPickerItems,
@@ -88,6 +89,10 @@ test('catalog items map to outputs and match back by id', () => {
   const picker = outputToPickerItem(output!, 'default')
   assert.equal(picker.ref.scheme, 'catalog')
   if (picker.ref.scheme === 'catalog') assert.equal(picker.ref.id, 'asset-hero')
+  const roundTrip = pickerItemToOutput(picker)
+  assert.equal(roundTrip?.asset_id, 'asset-hero')
+  assert.equal(roundTrip?.workspace_id, 'default')
+  assert.equal(roundTrip?.name, 'hero.png')
 })
 
 test('homonymous catalog files are not matched by filename alone', () => {

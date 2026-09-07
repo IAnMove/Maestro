@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   ChevronDown,
   ChevronRight,
@@ -7,7 +7,6 @@ import {
   Paintbrush,
   Pencil,
   Plus,
-  Upload,
   X,
 } from 'lucide-react'
 import { useStore } from '../../stores/useStore'
@@ -17,6 +16,10 @@ import { VideoTimelineSelector } from '../shared/VideoTimelineSelector'
 import { InfoTooltip } from './InfoTooltip'
 import { ScailResolutionSelector } from './ScailResolutionSelector'
 import * as api from '../../api/client'
+import type { ApiOutput } from '../../api/outputs'
+import { AssetInput } from '../../features/asset-picker/AssetInput.tsx'
+import { StudioSourceField } from '../../lib/StudioSourceField.tsx'
+import { applyChosenStudioMedia, useWorkspaceOutputs } from '../../lib/studioAssetPick.ts'
 
 const REGION_COLORS = ['#0000ff', '#ff0000', '#00c853', '#ff00ff', '#00cfd1']
 
@@ -52,8 +55,9 @@ export function RestyleControls() {
   const setMappings = useStore(s => s.setEditRepaintMappings)
   const resolutionProfile = useStore(s => s.editRepaintResolutionProfile)
   const sendFrameToImageMode = useStore(s => s.sendFrameToImageMode)
-
-  const videoInputRef = useRef<HTMLInputElement>(null)
+  const activeWorkspace = useStore(s => s.activeWorkspace)
+  const videoItems = useWorkspaceOutputs(activeWorkspace, 'video')
+  const imageItems = useWorkspaceOutputs(activeWorkspace, 'image')
   const [showRegions, setShowRegions] = useState(mappings.length > 0)
   const [previewState, setPreviewState] = useState<'idle' | 'loading' | 'found' | 'error'>('idle')
   const [preview, setPreview] = useState<PreviewResult | null>(null)
@@ -73,34 +77,19 @@ export function RestyleControls() {
     setPreviewError('')
   }, [])
 
-  const handleVideoUpload = useCallback(async (file: File) => {
-    try {
-      const result = await api.uploadImage(file)
-      const url = URL.createObjectURL(file)
-      const video = document.createElement('video')
-      video.src = url
-      video.onloadedmetadata = () => {
-        const duration = video.duration && isFinite(video.duration) ? video.duration : 0
-        const resolution = `${video.videoWidth}x${video.videoHeight}`
-        setEditVideo(file, result.path, url, duration, resolution)
-        // An edited frame is composition-specific. A new source must not
-        // silently reuse a target made for the previous video.
-        setTargetFrame(null, '', '')
-      }
+  const handleChooseVideo = useCallback((item: ApiOutput) => {
+    applyChosenStudioMedia(item, next => {
+      setEditVideo(next.file, next.path, next.url, next.duration, `${next.width}x${next.height}`)
+      setTargetFrame(null, '', '')
       resetPreview()
-    } catch (error) {
-      console.error('Repaint source upload failed:', error)
-    }
+    })
   }, [resetPreview, setEditVideo, setTargetFrame])
 
-  const handleTargetUpload = useCallback(async (file: File) => {
-    try {
-      const result = await api.uploadImage(file)
-      setTargetFrame(file, result.path, URL.createObjectURL(file))
+  const handleChooseFrame = useCallback((item: ApiOutput) => {
+    applyChosenStudioMedia(item, next => {
+      setTargetFrame(next.file, next.path, next.url)
       resetPreview()
-    } catch (error) {
-      console.error('Repaint target-frame upload failed:', error)
-    }
+    })
   }, [resetPreview, setTargetFrame])
 
   const updateMapping = useCallback((index: number, patch: Partial<RepaintRegionMapping>) => {
@@ -177,29 +166,14 @@ export function RestyleControls() {
       />
 
       {!editVideoFile ? (
-        <div
-          onDragOver={event => event.preventDefault()}
-          onDrop={event => {
-            event.preventDefault()
-            const file = event.dataTransfer.files[0]
-            if (file?.type.startsWith('video/')) void handleVideoUpload(file)
-          }}
-          onClick={() => videoInputRef.current?.click()}
-          className="border-2 border-dashed border-border rounded-lg p-6 text-center cursor-pointer hover:border-accent-blue/50 hover:bg-bg-hover/30 transition-all"
-        >
-          <Upload size={24} className="mx-auto mb-2 text-text-muted" />
-          <p className="text-xs text-text-secondary">{t('repaint.drop')}</p>
-          <input
-            ref={videoInputRef}
-            type="file"
-            accept="video/*"
-            className="hidden"
-            onChange={event => {
-              if (event.target.files?.[0]) void handleVideoUpload(event.target.files[0])
-              event.currentTarget.value = ''
-            }}
-          />
-        </div>
+        <StudioSourceField
+          label={t('repaint.drop')}
+          items={videoItems}
+          accept="video/*"
+          kinds={['video']}
+          workspaceId={activeWorkspace}
+          onChoose={handleChooseVideo}
+        />
       ) : (
         <div className="relative">
           <button
@@ -268,19 +242,15 @@ export function RestyleControls() {
           {targetFramePath ? t('repaint.editAgain') : t('repaint.editFrame')}
         </button>
 
-        <label className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded border border-dashed border-border text-[10px] text-text-secondary hover:text-text-primary hover:border-accent-blue/50 cursor-pointer">
-          <Upload size={11} />
-          {targetFramePath ? t('repaint.replaceFrame') : t('repaint.uploadFrame')}
-          <input
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={event => {
-              if (event.target.files?.[0]) void handleTargetUpload(event.target.files[0])
-              event.currentTarget.value = ''
-            }}
-          />
-        </label>
+        <AssetInput
+          label={targetFramePath ? t('repaint.replaceFrame') : t('repaint.uploadFrame')}
+          placeholder={t('repaint.uploadFrame')}
+          items={imageItems}
+          accept="image/*"
+          workspaceId={activeWorkspace}
+          constraints={{ kinds: ['image'], maxCount: 1, optional: false }}
+          onChoose={item => { if (item) handleChooseFrame(item) }}
+        />
       </div>
 
       <div className="rounded-lg border border-border overflow-hidden">

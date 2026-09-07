@@ -120,6 +120,32 @@ export function outputToPickerItem(item: ApiOutput, workspaceId: string): Picker
   }
 }
 
+const PICKER_OUTPUT_TYPE: Partial<Record<AssetKind, ApiOutput['type']>> = {
+  image: 'image',
+  video: 'video',
+  audio: 'audio',
+  model3d: 'model3d',
+  scene: 'scene',
+  document: 'comic',
+}
+
+export function pickerItemToOutput(item: PickerItem): ApiOutput | null {
+  const type = PICKER_OUTPUT_TYPE[item.kind]
+  if (!type) return null
+  return {
+    name: item.filename,
+    type,
+    mode: null,
+    size: item.sizeBytes,
+    created_at: item.createdAt ?? 0,
+    url: item.url,
+    thumbnail_url: item.thumbnailUrl,
+    asset_id: item.ref.scheme === 'catalog' ? item.ref.id : undefined,
+    workspace_id: item.ref.workspaceId,
+    path: item.filename,
+  }
+}
+
 export function checkCompatibility(item: PickerItem, constraints: AssetConstraints, alreadyChosen: number): Compatibility {
   if (!constraints.kinds.includes(item.kind)) return { allowed: false, reasonKey: 'picker.incompatibleKind' }
   if (alreadyChosen >= constraints.maxCount) return { allowed: false, reasonKey: 'picker.tooMany' }

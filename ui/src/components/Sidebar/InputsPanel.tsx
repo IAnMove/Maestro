@@ -1252,6 +1252,7 @@ function InputsAssetSlot({
   disabled?: boolean
   onChoose: (item: ApiOutput) => void
 }) {
+  const workspaceId = useStore(s => s.activeWorkspace)
   return (
     <div className="w-[10.5rem] shrink-0 rounded-xl border border-dashed border-border p-1.5">
       <AssetInput
@@ -1260,6 +1261,7 @@ function InputsAssetSlot({
         items={items}
         accept={accept}
         disabled={disabled}
+        workspaceId={workspaceId}
         constraints={{ kinds, maxCount: 1, optional: false }}
         onChoose={item => { if (item) onChoose(item) }}
       />
