@@ -59,15 +59,20 @@ export async function bindScreenMedia(root: Object3D, screen: MediaScreen, stand
     }
     if (abort.signal.aborted) throw new Error('screen-media-disposed')
     target.material = material; paint(); runtime.ready = true
-    let pending: Promise<void> | null = null, desired = 0
+    let pending: Promise<void> | null = null, desired = 0, settled = 0
     runtime.seek = async (seconds, current) => {
       if (runtime.error) throw runtime.error
       if (!video || abort.signal.aborted) return
       desired = mediaScreenTime(seconds, video.duration, current)
-      while (!abort.signal.aborted && (pending || Math.abs(video.currentTime - desired) > .0005)) {
+      // Browsers snap to a frame; retrying the same clock time never lands exactly and hangs export.
+      while (!abort.signal.aborted && (pending || settled !== desired)) {
         if (!pending) pending = (async () => {
-          while (!abort.signal.aborted && Math.abs(video.currentTime - desired) > .0005) {
-            const sought = waitMedia(video, 'seeked', abort.signal); video.currentTime = desired; await sought; paint()
+          while (!abort.signal.aborted && settled !== desired) {
+            const target = desired
+            if (Math.abs(video.currentTime - target) > .0005) {
+              const sought = waitMedia(video, 'seeked', abort.signal); video.currentTime = target; await sought; paint()
+            }
+            settled = target
           }
         })().catch(error => { runtime.error = error instanceof Error ? error : new Error(String(error)); throw runtime.error }).finally(() => { pending = null })
         await pending
