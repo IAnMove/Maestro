@@ -16,6 +16,13 @@ settings, camera fields, light and unique object identities before mounting.
 Saved upload/file URLs remain the source authority; JSON files do not embed GLBs
 or make their source files portable. Filesystem/blob URLs retain the existing
 transient-source handling. Imported dimensions determine preview and export.
+Export preserves sizes up to 1920×1080 (1080×1920 for portrait shots), fits larger
+documents inside that bound, and rounds dimensions to even pixels. Smaller shots
+are not upscaled. The encoder, export canvas and publication metadata share this
+size calculation. Full HD at 60 fps requests H.264 level 4.2; the existing browser
+support check still reports unsupported configurations instead of reducing them
+silently. MP4 bytes remain in browser memory, so longer exports still require
+enough local memory; this change does not add streaming or export recovery.
 
 `clipNumber` is optional, positive and integral. It is shown in preview and baked
 into the encoded frame at the upper right. It is also included in the published

@@ -8,12 +8,22 @@ export function evenDim(value: number): number {
 }
 
 export function world3dExportSize(width: number, height: number) {
-  const maxW = 1280
-  const maxH = 720
+  const maxW = width >= height ? 1920 : 1080
+  const maxH = width >= height ? 1080 : 1920
   const scale = Math.min(1, maxW / Math.max(1, width), maxH / Math.max(1, height))
   return {
     width: evenDim(width * scale),
     height: evenDim(height * scale),
+  }
+}
+
+export function world3dEncoderConfig(width: number, height: number, fps: number): VideoEncoderConfig {
+  const blocksPerSecond = Math.ceil(width / 16) * Math.ceil(height / 16) * fps
+  return {
+    codec: blocksPerSecond > 245760 ? 'avc1.64002a' : 'avc1.640028',
+    width, height, framerate: fps,
+    bitrate: Math.round(Math.max(4_000_000, Math.min(24_000_000, width * height * fps * 0.18))),
+    avc: { format: 'avc' },
   }
 }
 
@@ -42,15 +52,7 @@ export async function encodeWorld3DFrames(options: {
   }
   const size = world3dExportSize(options.width, options.height)
   const plan = world3dExportPlan(options.duration, options.fps)
-  const bitrate = Math.round(Math.max(4_000_000, Math.min(24_000_000, size.width * size.height * plan.fps * 0.18)))
-  const supported = await VideoEncoder.isConfigSupported({
-    codec: 'avc1.640028',
-    width: size.width,
-    height: size.height,
-    bitrate,
-    framerate: plan.fps,
-    avc: { format: 'avc' },
-  })
+  const supported = await VideoEncoder.isConfigSupported(world3dEncoderConfig(size.width, size.height, plan.fps))
   if (!supported.supported || !supported.config) {
     throw new Error(scene3dCopy('stage.cannotEncodeResolution'))
   }
