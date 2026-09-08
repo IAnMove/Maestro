@@ -38,6 +38,13 @@ test('3D templates, playback speed and object transforms work in the editor', as
   // Drag the real X handle in the WebGL viewport, then verify the document field.
   const scene = applyScene3DTemplate('two-shot')
   const canvas = workspace.locator('canvas').first()
+  const viewport = workspace.getByRole('region', { name: '3D scene', exact: true })
+  await viewport.focus()
+  await page.keyboard.press('r')
+  await expect(workspace.getByRole('button', { name: 'Rotate Y', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await expect(workspace.getByTestId('scene3d-transform-help')).toContainText('R to rotate')
+  await page.keyboard.press('g')
+  await expect(workspace.getByRole('button', { name: 'Move', exact: true })).toHaveAttribute('aria-pressed', 'true')
   await canvas.scrollIntoViewIfNeeded()
   const box = await canvas.boundingBox()
   expect(box).not.toBeNull()
@@ -51,13 +58,34 @@ test('3D templates, playback speed and object transforms work in the editor', as
   const y = box!.y + point.y * box!.height
   await page.mouse.move(x, y)
   await page.mouse.down()
+  await expect(workspace.getByTestId('scene3d-transform-help')).toBeVisible()
   await page.mouse.move(x + 65, y, { steps: 10 })
   await page.mouse.up()
+  await expect(workspace.getByTestId('scene3d-transform-help')).toHaveCount(0)
   await expect(workspace.getByLabel('Position (m) X', { exact: true })).not.toHaveValue('-0.95')
   await workspace.getByRole('button', { name: 'Reset transform' }).click()
 
+  // R changes the real ring gizmo; dragging it must persist a new yaw.
+  const initialYaw = await workspace.getByLabel('Rotation Y (°)', { exact: true }).inputValue()
+  await viewport.focus()
+  await page.keyboard.press('r')
+  await canvas.scrollIntoViewIfNeeded()
+  const rotateBox = (await canvas.boundingBox())!
+  const ring = projectPoint([origin[0] + handleScale * 0.5, origin[1], origin[2]], eye, look, scene.camera.fov, rotateBox.width / rotateBox.height)!
+  const ringX = rotateBox.x + ring.x * rotateBox.width
+  const ringY = rotateBox.y + ring.y * rotateBox.height
+  await page.mouse.move(ringX, ringY)
+  await page.mouse.down()
+  await page.screenshot({ path: testInfo.outputPath('video3d-rotation-help.png'), fullPage: true })
+  await page.mouse.move(ringX + 45, ringY - 25, { steps: 10 })
+  await page.mouse.up()
+  await expect(workspace.getByLabel('Rotation Y (°)', { exact: true })).not.toHaveValue(initialYaw)
+  await workspace.getByRole('button', { name: 'Reset transform' }).click()
+
   await workspace.getByLabel('Rotation Y (°)', { exact: true }).fill('0')
-  await workspace.getByRole('button', { name: 'Scale', exact: true }).click()
+  await viewport.focus()
+  await page.keyboard.press('s')
+  await expect(workspace.getByRole('button', { name: 'Scale', exact: true })).toHaveAttribute('aria-pressed', 'true')
   await canvas.scrollIntoViewIfNeeded()
   const scaleBox = (await canvas.boundingBox())!
   const scaleX = scaleBox.x + point.x * scaleBox.width
@@ -68,6 +96,10 @@ test('3D templates, playback speed and object transforms work in the editor', as
   await page.mouse.up()
   await expect(workspace.getByLabel('Size', { exact: true })).not.toHaveValue('1')
   await workspace.getByRole('button', { name: 'Reset transform' }).click()
+  // Typing outside the viewport does not change its mode.
+  await workspace.getByLabel('Size', { exact: true }).focus()
+  await page.keyboard.press('r')
+  await expect(workspace.getByRole('button', { name: 'Scale', exact: true })).toHaveAttribute('aria-pressed', 'true')
 
   await workspace.locator('summary').filter({ hasText: 'Shot library' }).click()
   await workspace.getByRole('searchbox', { name: 'Search templates' }).fill('close')

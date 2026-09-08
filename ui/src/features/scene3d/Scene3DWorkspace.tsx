@@ -12,6 +12,7 @@ import { Scene3DAnimationControls } from './Scene3DAnimationControls'
 import { Scene3DDocumentControls } from './Scene3DDocumentControls'
 import { Scene3DTransport } from './Scene3DTransport'
 import { Scene3DTransformPanel } from './Scene3DTransformPanel'
+import { Scene3DInteraction } from './Scene3DInteraction'
 import type { TransformMode } from './transformGizmo'
 import { clipBindingError, resolveScene3DClip, retainSlotClipCatalogs } from './clips.ts'
 import { scene3dFrameCount, scene3dFrameTime, scene3dPlaybackSpeed } from './clock.ts'
@@ -259,10 +260,8 @@ export function Scene3DWorkspace({ width, height }: Props) {
         onToggle={() => { if (canMutateWorld3DScene(exportingRef.current)) setPlaying(current => !current) }}
         onSeek={time => { if (exportingRef.current) return; setPlaying(false); setFrame(Math.min(count - 1, Math.max(0, Math.round(time * fps)))) }}
         onSpeed={playbackSpeed => applyScene(current => ({ ...current, playbackSpeed }))} />
-      <div
-        className="relative w-full overflow-hidden rounded-lg border border-border bg-[#10141c]"
-        style={{ aspectRatio: `${sceneDoc.width} / ${sceneDoc.height}` }}
-      >
+      <Scene3DInteraction enabled={!playing && !exporting && Boolean(selected) && selected.media !== 'image'}
+        width={sceneDoc.width} height={sceneDoc.height} onMode={setTransformMode}>
         <Scene3DStage
           ref={stageRef}
           document={sceneDoc}
@@ -279,7 +278,7 @@ export function Scene3DWorkspace({ width, height }: Props) {
         <div className="pointer-events-none absolute left-3 top-3 rounded-lg bg-black/75 px-3 py-2 text-xs text-cyan-200">
           {t('stage.badge')} · {editorT(`template.${sceneDoc.templateId}.title`)}
         </div>
-      </div>
+      </Scene3DInteraction>
       {sceneDoc.dressing === 'workshop' && <label className="flex items-center gap-2 text-xs">{editorT('travel.screen')}<select disabled={exporting} value={sceneDoc.workshopScreen ?? 'code'} onChange={event => applyScene(current => ({ ...current, workshopScreen: event.target.value as 'code' | 'error' | 'success' }))} className="min-h-10 rounded border border-border bg-bg-tertiary px-2">{(['code', 'error', 'success'] as const).map(state => <option key={state} value={state}>{editorT(`travel.${state}`)}</option>)}</select></label>}
       <Scene3DFramingControls framing={sceneDoc.camera.framing} slots={sceneDoc.slots} disabled={exporting || playing} onChange={framing => applyScene(current => ({ ...current, camera: { ...current.camera, framing } }))} />
       <div className="flex flex-wrap items-center gap-3">
