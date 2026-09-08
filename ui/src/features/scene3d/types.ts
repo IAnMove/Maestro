@@ -1,3 +1,5 @@
+import { CINEMATIC_TEMPLATE_IDS } from './cinematicTemplateIds'
+
 export type Vec3 = readonly [number, number, number]
 
 export type Scene3DCameraFamily =
@@ -54,6 +56,12 @@ export const SCENE3D_TEMPLATE_IDS = [
   'drive-coast-reveal',
   'drive-city-wide',
   'drive-tunnel-wing',
+  'siege-ring',
+  'spell-duel',
+  'victory-circle',
+  'coder-room',
+  'clone-chase',
+  ...CINEMATIC_TEMPLATE_IDS,
 ] as const
 
 export type Scene3DTemplateId = (typeof SCENE3D_TEMPLATE_IDS)[number]
@@ -63,6 +71,20 @@ export type Scene3DClipRef = {
   name: string
 }
 
+export type Scene3DClipPlayback = {
+  speed?: number
+  start?: number
+  loop?: boolean
+}
+
+export type Scene3DMotion = {
+  to: Vec3
+  via?: Vec3
+  faceTravel?: boolean
+  turnTo?: number
+  easing?: 'linear' | 'smooth'
+}
+
 export type Scene3DSlotMedia = 'model3d' | 'image'
 
 export type Scene3DLoop = {
@@ -70,7 +92,7 @@ export type Scene3DLoop = {
   speed: number
 }
 
-export type Scene3DDressing = 'none' | 'street' | 'space' | 'treadmill' | 'cafe' | 'drive-city' | 'drive-coast' | 'drive-tunnel'
+export type Scene3DDressing = 'none' | 'street' | 'space' | 'treadmill' | 'cafe' | 'drive-city' | 'drive-coast' | 'drive-tunnel' | 'citadel' | 'workshop' | 'chase-street'
 
 export type Scene3DSourceRef = {
   workspaceId: string
@@ -88,7 +110,13 @@ export type Scene3DSlot = {
   sourceUrl: string
   sourceRef?: Scene3DSourceRef
   media: Scene3DSlotMedia
+  surface?: 'wall' | 'floor'
+  textureRepeat?: number
+  performance?: 'typing'
+  grounded?: boolean
   clip: Scene3DClipRef | null
+  clipPlayback?: Scene3DClipPlayback
+  motion?: Scene3DMotion
   loop?: Scene3DLoop
 }
 
@@ -100,6 +128,22 @@ export type Scene3DCamera = {
   orbitRadius?: number
   orbitHeight?: number
   orbitTurns?: number
+  targetOffset?: Vec3
+  eyeOffset?: Vec3
+  framing?: Scene3DFraming
+}
+
+export type Scene3DFraming = {
+  targetSlot: string
+  anchor: 'head' | 'center' | 'feet'
+  from: Vec3
+  to: Vec3
+  lookFrom?: Vec3
+  lookTo?: Vec3
+  orbitTurns?: number
+  rollFrom?: number
+  rollTo?: number
+  relativeToFacing?: boolean
 }
 
 export type Scene3DLight = {
@@ -117,12 +161,16 @@ export type Scene3DDocument = {
   height: number
   fps: 24 | 30 | 60
   duration: number
+  /** Stable review number, baked into exported frames when present. */
+  clipNumber?: number
+  texts?: import('../../lib/kineticText').KineticText[]
   /** Timeline rate; exported duration is duration / playbackSpeed. */
   playbackSpeed?: number
   templateId: Scene3DTemplateId
   camera: Scene3DCamera
   light: Scene3DLight
   dressing?: Scene3DDressing
+  workshopScreen?: 'code' | 'error' | 'success'
   slots: Scene3DSlot[]
 }
 

@@ -1,3 +1,4 @@
+import { kineticTextFields, KINETIC_TEXT_SCHEMA, type KineticText } from './kineticText'
 import type { Scene, SceneAtmosphereKind, SceneBlendMode, SceneCurve, SceneKeyframe, SceneLayer, SceneLayerType, SceneMask } from '../types'
 import { applyCutoutDialogue, findCutoutMouthLayers, normalizeFaceBinding, planCutoutDialogue } from './cutoutDialogue'
 import { resolveSceneGrade } from './sceneGrade'
@@ -207,6 +208,7 @@ export interface SceneRecipe {
   dialogueBeats?: SceneRecipeDialogueBeat[]
   shots?: SceneRecipeShot[]
   scene: {
+    texts?: KineticText[]
     width?: number
     height?: number
     fps?: 30 | 60
@@ -616,6 +618,7 @@ export const SCENE_RECIPE_JSON_SCHEMA: Record<string, unknown> = {
     scene: {
       type: 'object',
       properties: {
+        texts: KINETIC_TEXT_SCHEMA,
         width: { type: 'integer', minimum: 256, maximum: 3840 },
         height: { type: 'integer', minimum: 256, maximum: 3840 },
         fps: { enum: [30, 60] },
@@ -1269,6 +1272,7 @@ export function parseSceneRecipe(value: unknown): SceneRecipe {
     dialogueBeats,
     shots,
     scene: {
+      ...kineticTextFields(sceneRaw.texts),
       width: Math.round(boundedNumber(sceneRaw.width, 1280, 256, 3840)),
       height: Math.round(boundedNumber(sceneRaw.height, 720, 256, 3840)),
       fps: sceneRaw.fps === 60 ? 60 : 30,
@@ -1367,6 +1371,7 @@ export function compileRecipeShot(
     const dialogue = compileRecipeDialogue(scene.layers, scopedRecipe.dialogueBeats, scene.fps ?? 30, scene.duration)
     return {
       ...scene,
+      ...kineticTextFields(recipe.scene.texts),
       ...sceneGenerationPolicyFields(recipe.generationPolicy),
       layers: dialogue.layers,
       ...(audioTracks.length ? { audioTracks } : {}),
@@ -1609,6 +1614,7 @@ export function compileSceneRecipe(
   return {
     version: 1,
     name: recipe.name,
+    ...kineticTextFields(recipe.scene.texts),
     ...sceneGenerationPolicyFields(recipe.generationPolicy),
     width: recipe.scene.width || 1280,
     height: recipe.scene.height || 720,

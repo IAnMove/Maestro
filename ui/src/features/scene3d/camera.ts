@@ -70,7 +70,7 @@ export function cameraLookAtTime(
     return camera.family === 'hood' ? [0, 0.82, -14] : [0, 0.7, -0.55]
   }
   if (camera.family === 'follow' || camera.family === 'pursuit' || camera.family === 'side' || camera.family === 'front') {
-    return slotLook(slots, 'subject_1', camera.look)
+    return vecAdd(slotLook(slots, 'subject_1', camera.look), camera.targetOffset ?? [0, 0, 0])
   }
   if (camera.family === 'encounter') {
     const a = slotLook(slots, 'subject_1', camera.look)
@@ -93,6 +93,7 @@ export function cameraEyeAtTime(
 ): Vec3 {
   const s = unitProgress(sceneSeconds, duration)
   const look = cameraLookAtTime(camera, sceneSeconds, duration, slots)
+  if (camera.eyeOffset && ['follow', 'pursuit', 'side', 'front'].includes(camera.family)) return vecAdd(look, camera.eyeOffset)
   const radius = camera.orbitRadius ?? 4.2
   const height = camera.orbitHeight ?? 1.6
   const turns = Number.isFinite(camera.orbitTurns) ? camera.orbitTurns! : 1

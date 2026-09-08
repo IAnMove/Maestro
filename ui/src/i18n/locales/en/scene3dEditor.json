@@ -21,7 +21,9 @@
   "smaller": "Smaller",
   "larger": "Larger",
   "reset": "Reset transform",
-  "gizmoHelp": "Drag an axis to move. Use the centre handle to scale uniformly.",
+  "gizmoHelp": "Inside the scene, press G to move, R to rotate around Y, or S to scale. Drag the gizmo; use its centre to scale proportionally.",
+  "viewport": "3D scene",
+  "transformShortcuts": "Inside the scene: R to rotate around Y · S to scale · G to move. Drag the gizmo to adjust the object.",
   "selectObject": "Select an object",
   "position": "Position (m)",
   "yaw": "Rotation Y (°)",
@@ -178,6 +180,106 @@
     "drive-tunnel-wing": {
       "title": "Tunnel profile",
       "description": "A low side camera shows the car within the tunnel."
+    },
+    "siege-ring": {
+      "title": "Citadel siege",
+      "description": "A central hero and two flanking enemies in a server citadel."
+    },
+    "spell-duel": {
+      "title": "Spell duel",
+      "description": "A sideways encounter with room for two characters to retreat."
+    },
+    "victory-circle": {
+      "title": "Victory circle",
+      "description": "A celebration orbit around three characters on a server stage."
+    },
+    "coder-room": {
+      "title": "Coder workshop",
+      "description": "A desk, keyboard and animated code screen in an open room."
+    },
+    "clone-chase": {
+      "title": "Street pursuit",
+      "description": "Travelling actors and a fixed street with visible ground markers."
+    },
+    "face-closeup": {
+      "title": "Intimate close-up",
+      "description": "A gentle push toward the animated head."
+    },
+    "face-extreme": {
+      "title": "Extreme gaze",
+      "description": "Tight framing on the eyes and expression."
+    },
+    "face-profile": {
+      "title": "Character profile",
+      "description": "A restrained slide alongside the face."
+    },
+    "face-reaction-arc": {
+      "title": "Reaction arc",
+      "description": "A short arc around the face for a reaction shot."
+    },
+    "face-low-angle": {
+      "title": "Low-angle hero",
+      "description": "A low angle approaching the face from chest level."
+    },
+    "face-high-angle": {
+      "title": "High-angle doubt",
+      "description": "An intimate high angle for doubt or exhaustion."
+    },
+    "face-revelation": {
+      "title": "Revelation push",
+      "description": "A fast push from medium framing to the face."
+    },
+    "face-to-face": {
+      "title": "Face to face",
+      "description": "Two faces sharing a close framing."
+    },
+    "boots-to-face": {
+      "title": "Boots to gaze",
+      "description": "The camera rises from the feet to the face."
+    },
+    "dutch-charge": {
+      "title": "Dutch charge",
+      "description": "Forward motion with a rolling camera angle."
+    },
+    "overhead-formation": {
+      "title": "Overhead formation",
+      "description": "A rotating top view of three characters."
+    },
+    "camera-pass": {
+      "title": "Camera pass",
+      "description": "The character passes a stationary camera that pans to follow."
+    },
+    "vehicle-showcase": {
+      "title": "Vehicle showcase",
+      "description": "A three-quarter orbit around your vehicle GLB."
+    },
+    "vehicle-front-low": {
+      "title": "Low front grille",
+      "description": "A low approach toward the vehicle front."
+    },
+    "vehicle-rear-chase": {
+      "title": "Rear chase",
+      "description": "Rear tracking of a moving vehicle."
+    },
+    "vehicle-side-track": {
+      "title": "Side tracking",
+      "description": "The camera keeps pace alongside the vehicle."
+    },
+    "vehicle-wheel-detail": {
+      "title": "Wheel detail",
+      "description": "A low side detail shot, adjustable to the model."
+    },
+    "vehicle-roof-orbit": {
+      "title": "Roof orbit",
+      "description": "A high orbit revealing the roof and silhouette."
+    },
+    "vehicle-convoy": {
+      "title": "Triple convoy",
+      "description": "Three vehicles advance in a staggered formation."
+    },
+    "vehicle-drift-arc": {
+      "title": "Drift arc",
+      "description": "A curved route with the vehicle facing its direction of travel."
     }
   },
   "gallerySearch": "Search the catalog",
@@ -185,5 +287,55 @@
   "galleryCount": "{{count}} templates",
   "focusEditor": "Expand editor",
   "exitFocus": "Exit fullscreen",
-  "fullscreenUnavailable": "This browser cannot enter fullscreen."
+  "fullscreenUnavailable": "This browser cannot enter fullscreen.",
+  "animation": "GLB animation",
+  "animationsLoading": "Loading GLB animations…",
+  "animationsEmpty": "This GLB has no animations.",
+  "animationSpeed": "Animation speed",
+  "animationStart": "Animation start (s)",
+  "animationLoop": "Loop animation",
+  "clipNumber": "Clip number",
+  "duration": "Duration (s)",
+  "saveDocument": "Save shot JSON",
+  "loadDocument": "Open shot JSON",
+  "invalidDocument": "Could not open: this is not a valid 3D shot file.",
+  "travel": {
+    "title": "Travel through the scene",
+    "help": "The transform panel sets the starting position. Define the destination here; the path lasts for the shot.",
+    "to": "Destination",
+    "via": "Curve control",
+    "face": "Face the direction of travel",
+    "curve": "Curved path",
+    "ease": "Ease in and out",
+    "distance": "Straight distance: {{distance}} m · {{speed}} m/s",
+    "floor": "Use image as a floor texture",
+    "surface": "Image use",
+    "backdrop": "Backdrop",
+    "wall": "Wall texture",
+    "ground": "Rest model on the ground",
+    "typing": "Keyboard gesture",
+    "typingHelp": "Keyboard gesture for compatible characters. Use it with the programmer room template and keep the character close to the desk.",
+    "screen": "Monitor",
+    "code": "Coding",
+    "error": "Build failed",
+    "success": "Build passed",
+    "repeat": "Texture repetitions"
+  },
+  "framing": {
+    "title": "Subject framing",
+    "help": "Follow a point on the subject. Adjust framing to your GLB; models without a head bone use their height.",
+    "target": "Character or object",
+    "anchor": "Point of interest",
+    "head": "Head",
+    "center": "Center",
+    "feet": "Feet / base",
+    "from": "Camera at start",
+    "to": "Camera at end",
+    "lookFrom": "Look at start",
+    "lookTo": "Look at end",
+    "orbit": "Orbit turns",
+    "rollFrom": "Initial tilt (°)",
+    "rollTo": "Final tilt (°)",
+    "facing": "Follow the subject orientation"
+  }
 }

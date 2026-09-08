@@ -930,7 +930,7 @@
     "exportCanvasFailed": "Could not create an export canvas.",
     "clipMissing": "No clip at index {{index}}",
     "clipNameMismatch": "Clip {{index}} is {{found}}, not {{wanted}}.",
-    "help": "Metres, Y-up. Clip identity is index plus the exact glTF name. Local GLB files stay in the browser; they are not uploaded.",
+    "help": "Choose an animation from each GLB, adjust its timing, and save the shot to reopen it. The clip number is included in the exported MP4.",
     "runHelp": "Side-on, chest height. The character stays on the spot; pick the Running clip by its exact glTF name. No floor — only the subject and the cylinder scrolling the other way.",
     "infinite": "Infinite backdrop",
     "loopSpeed": "Scroll",

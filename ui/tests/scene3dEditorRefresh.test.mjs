@@ -14,9 +14,9 @@ import { ALL_SCENE_TEMPLATES } from '../src/features/sceneTemplates/catalog.ts'
 import { candidateDemoScene } from '../src/features/sceneTemplates/demoScenes.ts'
 import { serializeSceneFile, parseSceneFile } from '../src/lib/sceneFile.ts'
 
-test('all 36 3D shots roundtrip and produce finite, nondegenerate cameras', () => {
-  assert.equal(SCENE3D_TEMPLATES.length, 36)
-  assert.equal(new Set(SCENE3D_TEMPLATE_IDS).size, 36)
+test('all 3D shots roundtrip and produce finite, nondegenerate cameras', () => {
+  assert.equal(SCENE3D_TEMPLATES.length, SCENE3D_TEMPLATE_IDS.length)
+  assert.equal(new Set(SCENE3D_TEMPLATE_IDS).size, SCENE3D_TEMPLATE_IDS.length)
   for (const template of SCENE3D_TEMPLATES) {
     const scene = applyScene3DTemplate(template.id)
     assert.ok(TEMPLATE_CATEGORIES[template.id])
@@ -37,7 +37,7 @@ test('new layouts are distinct and existing shots get different camera compositi
     const scene = applyScene3DTemplate(template.id)
     return JSON.stringify([scene.camera, scene.slots, scene.dressing])
   })
-  assert.equal(new Set(fingerprints).size, 36)
+  assert.equal(new Set(fingerprints).size, SCENE3D_TEMPLATE_IDS.length)
 })
 
 test('shot changes preserve asset identity and clip choices without mutating the previous scene', () => {

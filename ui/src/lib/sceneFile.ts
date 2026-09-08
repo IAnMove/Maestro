@@ -1,3 +1,4 @@
+import { kineticTextFields } from './kineticText'
 import type { Scene, SceneLayer } from '../types'
 import { parseSceneGenerationPolicy, sceneGenerationPolicyFields } from './sceneGenerationPolicy'
 
@@ -53,6 +54,7 @@ export const parseSceneFile = (text: string): Scene => {
   if (width <= 0 || height <= 0) throw new Error('Scene width and height must be positive.')
   return {
     ...(candidate as Scene),
+    ...kineticTextFields(candidate.texts),
     version: 1,
     width,
     ...(generationPolicy ? { generationPolicy } : {}),

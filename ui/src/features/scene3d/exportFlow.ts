@@ -1,5 +1,7 @@
+import { paintKineticTexts } from '../../lib/kineticText.ts'
 import { scene3dOutputDuration, scene3dPlaybackSpeed } from './clock.ts'
 import { scene3dCopy } from './copy.ts'
+import { paintClipNumber } from './performance.ts'
 import { finishWorld3DExport, paintWorld3DExportFrame, startWorld3DExport } from './exportLock.ts'
 import { encodeWorld3DFrames, world3dExportSize } from './exportMp4.ts'
 import { publishWorld3DRecording } from './publish.ts'
@@ -38,6 +40,10 @@ export async function exportWorld3DDocument(
       fps: snapshot.fps,
       duration: scene3dOutputDuration(snapshot),
       paint: seconds => paintWorld3DExportFrame(handle, snapshot, seconds * scene3dPlaybackSpeed(snapshot.playbackSpeed)),
+      overlay: (context, width, height, seconds) => {
+        paintKineticTexts(context, width, height, seconds * scene3dPlaybackSpeed(snapshot.playbackSpeed), snapshot.texts)
+        paintClipNumber(context, width, height, snapshot.clipNumber)
+      },
       onProgress,
     })
     try {

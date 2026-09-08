@@ -1,3 +1,5 @@
+import { framingPose } from './framing'
+import { framingAnchor } from './framingAnchor'
 import {
   AnimationMixer,
   BackSide,
@@ -11,6 +13,7 @@ import {
   DirectionalLight,
   DoubleSide,
   HemisphereLight,
+  LoopOnce,
   Mesh,
   MeshBasicMaterial,
   MeshStandardMaterial,
@@ -27,10 +30,13 @@ import {
 } from 'three'
 import type { GLTF } from 'three/addons/loaders/GLTFLoader.js'
 import { cameraEyeAtTime, cameraLookAtTime } from './camera.ts'
-import { scene3dClipLocalTime } from './clock.ts'
+import { performanceClipTime, slotPoseAtTime } from './performance.ts'
 import { cylinderUvOffset, isCylinderBackdrop, slotMountKey } from './backdrop.ts'
 import { scene3dSlotColor } from './document.ts'
 import { paintDrive } from './driveMotion.ts'
+import { applyTypingPose, resetTypingPose } from './typingPose.ts'
+import { paintWorkshop } from './workshopSet.ts'
+import { paintCitadel } from './citadelSet.ts'
 import type { Scene3DClipCatalogEntry, Scene3DDocument, Scene3DLight, Scene3DSlot } from './types.ts'
 
 export const CYLINDER_RADIUS = 12
@@ -53,6 +59,7 @@ export type SlotGpu = {
   loopSpeed: number
   looping: boolean
   loaded: boolean
+  contactShadow?: Mesh
 }
 
 export type GpuWorld = {
@@ -144,10 +151,17 @@ export function makeStripeTexture(): Texture {
 }
 
 export function imageBackdropMesh(slot: Scene3DSlot, texture: Texture | null): Mesh {
-  const material = new MeshBasicMaterial({
+  if (texture && slot.surface) {
+    texture.wrapT = RepeatWrapping
+    const repeat = slot.textureRepeat ?? (slot.surface === 'floor' ? 4 : 2)
+    texture.repeat.set(repeat, repeat)
+    texture.needsUpdate = true
+  }
+  const MaterialType = slot.surface ? MeshStandardMaterial : MeshBasicMaterial
+  const material = new MaterialType({
     map: texture,
     color: texture ? 0xffffff : 0x243044,
-    depthWrite: false,
+    depthWrite: Boolean(slot.surface),
     side: isCylinderBackdrop(slot) ? BackSide : DoubleSide,
   })
   const scale = Math.max(0.05, slot.scale)
@@ -160,7 +174,9 @@ export function imageBackdropMesh(slot: Scene3DSlot, texture: Texture | null): M
     return mesh
   }
   const mesh = new Mesh(new PlaneGeometry(2, 1.125), material)
-  mesh.position.set(slot.position[0], slot.position[1] + 2.2, slot.position[2])
+  mesh.rotation.order = 'YXZ'
+  mesh.position.set(slot.position[0], slot.position[1] + (slot.surface === 'floor' ? 0 : 2.2), slot.position[2])
+  mesh.rotation.x = slot.surface === 'floor' ? -Math.PI / 2 : 0
   mesh.rotation.y = slot.rotationY
   mesh.scale.setScalar(scale)
   mesh.renderOrder = -1
@@ -209,8 +225,19 @@ export function bindMixer(root: Object3D, animations: GLTF['animations'], slot: 
   const clip = animations[slot.clip.index]
   if (!clip || clip.name !== slot.clip.name) return null
   const mixer = new AnimationMixer(root)
-  mixer.clipAction(clip).play()
+  const action = mixer.clipAction(clip)
+  action.setLoop(LoopOnce, 1)
+  action.clampWhenFinished = true
+  action.play()
   return mixer
+}
+
+/** Re-enable clamped actions so seeking backwards is independent of prior paints. */
+export function seekBoundMixer(mixer: AnimationMixer, clip: GLTF['animations'][number], time: number) {
+  const action = mixer.clipAction(clip)
+  action.paused = false
+  action.enabled = true
+  mixer.setTime(time)
 }
 
 export function dropSlot(world: GpuWorld, slotId: string) {
@@ -218,6 +245,10 @@ export function dropSlot(world: GpuWorld, slotId: string) {
   if (!current) return
   current.mixer?.stopAllAction()
   world.scene.remove(current.root)
+  if (current.contactShadow) {
+    world.scene.remove(current.contactShadow)
+    disposeObject(current.contactShadow)
+  }
   disposeObject(current.root)
   world.slots.delete(slotId)
 }
@@ -232,7 +263,13 @@ export function placeSlot(
 ) {
   dropSlot(world, slot.id)
   world.scene.add(root)
+  const contactShadow = slot.media === 'model3d' ? new Mesh(new CircleGeometry(.4, 24), new MeshBasicMaterial({ color: 0x03070d, transparent: true, opacity: .25, depthWrite: false })) : undefined
+  if (contactShadow) {
+    contactShadow.rotation.x = -Math.PI / 2
+    world.scene.add(contactShadow)
+  }
   world.slots.set(slot.id, {
+    contactShadow,
     sourceUrl: slot.sourceUrl,
     mountKey: slotMountKey(slot),
     clipKey: clipKeyOf(slot.clip),
@@ -262,22 +299,48 @@ export function clipMatches(gpu: Pick<SlotGpu, 'clipKey' | 'animations'>, index:
   return Boolean(clip && gpu.clipKey === `${index}\0${clip.name}`)
 }
 
+function groundLoadedSlot(gpu: SlotGpu, slot: Scene3DSlot) {
+  if (slot.grounded && gpu.kind === 'model') {
+    gpu.root.updateMatrixWorld(true)
+    const bounds = new Box3().setFromObject(gpu.root, true)
+    if (Number.isFinite(bounds.min.y)) gpu.root.position.y += slot.position[1] - bounds.min.y
+    if (gpu.contactShadow && !gpu.animations.length && !bounds.isEmpty()) {
+      const size = bounds.getSize(new Vector3()), center = bounds.getCenter(new Vector3())
+      gpu.contactShadow.position.set(center.x, slot.position[1] + .025, center.z)
+      gpu.contactShadow.scale.set(Math.max(.1, size.x), Math.max(.1, size.z), 1)
+    }
+  }
+}
+
 export function paintWorld(world: GpuWorld, document: Scene3DDocument, sceneSeconds: number) {
-  const eye = cameraEyeAtTime(document.camera, sceneSeconds, document.duration, document.slots)
-  const look = cameraLookAtTime(document.camera, sceneSeconds, document.duration, document.slots)
-  world.camera.fov = document.camera.fov
-  world.camera.position.set(eye[0], eye[1], eye[2])
-  world.camera.lookAt(look[0], look[1], look[2])
-  world.camera.updateProjectionMatrix()
+  const posedSlots = document.slots.map(slot => ({ ...slot, ...slotPoseAtTime(slot, sceneSeconds, document.duration) }))
   applyLoopOffset(world, sceneSeconds)
+  paintCitadel(world.dressing, sceneSeconds)
+  paintWorkshop(world.dressing, sceneSeconds, document.workshopScreen)
   const bg = document.slots.find(isCylinderBackdrop)
   paintDrive(world, sceneSeconds, bg?.loop?.speed ?? world.driveSpeed)
-  for (const gpu of world.slots.values()) {
-    if (!gpu.mixer) continue
+  for (const slot of posedSlots) {
+    const gpu = world.slots.get(slot.id)
+    if (!gpu) continue
+    poseLoadedSlot(gpu, slot)
+    resetTypingPose(gpu.root)
     const clip = gpu.animations.find((_clip: { duration?: number }, index: number) => clipMatches(gpu, index))
-    const local = scene3dClipLocalTime(sceneSeconds, clip?.duration ?? null, { loop: true })
-    if (local != null) gpu.mixer.setTime(local)
+    const local = performanceClipTime(sceneSeconds, clip?.duration ?? null, slot.clipPlayback)
+    if (local != null && clip && gpu.mixer) seekBoundMixer(gpu.mixer, clip, local)
+    groundLoadedSlot(gpu, slot)
+    if (slot.performance === 'typing') applyTypingPose(gpu.root, slot, sceneSeconds)
   }
+  const framing = document.camera.framing
+  const target = posedSlots.find(slot => slot.id === framing?.targetSlot)
+  const root = target && world.slots.get(target.id)?.root
+  const shot = framing && target && root ? framingPose(framing, framingAnchor(root, framing.anchor), target, sceneSeconds, document.duration) : null
+  const eye = shot?.eye ?? cameraEyeAtTime(document.camera, sceneSeconds, document.duration, posedSlots)
+  const look = shot?.look ?? cameraLookAtTime(document.camera, sceneSeconds, document.duration, posedSlots)
+  world.camera.fov = document.camera.fov
+  world.camera.position.set(...eye)
+  world.camera.lookAt(...look)
+  if (shot) world.camera.rotateZ(shot.roll)
+  world.camera.updateProjectionMatrix()
   world.renderer.render(world.scene, world.camera)
 }
 
@@ -300,6 +363,7 @@ export function syncSlotClip(world: GpuWorld, slot: Scene3DSlot) {
   if (!current) return
   const nextKey = clipKeyOf(slot.clip)
   if (current.clipKey === nextKey) return
+  resetTypingPose(current.root)
   current.mixer?.stopAllAction()
   current.mixer = bindMixer(current.root, current.animations, slot)
   current.clipKey = nextKey
@@ -365,6 +429,10 @@ export function resizeWorld(world: GpuWorld, host: HTMLDivElement) {
 }
 
 export function poseLoadedSlot(current: SlotGpu, slot: Scene3DSlot) {
+  if (current.contactShadow) {
+    current.contactShadow.position.set(slot.position[0], slot.position[1] + .025, slot.position[2])
+    current.contactShadow.scale.set(slot.scale, slot.scale * .65, 1)
+  }
   current.loopSpeed = slot.loop?.speed ?? 0
   current.looping = isCylinderBackdrop(slot)
   const scale = Math.max(0.05, slot.scale)
@@ -375,7 +443,9 @@ export function poseLoadedSlot(current: SlotGpu, slot: Scene3DSlot) {
     return
   }
   if (current.kind === 'image') {
-    current.root.position.set(slot.position[0], slot.position[1] + 2.2, slot.position[2])
+    current.root.rotation.order = 'YXZ'
+    current.root.position.set(slot.position[0], slot.position[1] + (slot.surface === 'floor' ? 0 : 2.2), slot.position[2])
+    current.root.rotation.x = slot.surface === 'floor' ? -Math.PI / 2 : 0
     current.root.rotation.y = slot.rotationY
     current.root.scale.setScalar(scale)
     return

@@ -930,7 +930,7 @@
     "exportCanvasFailed": "No se pudo crear un lienzo de exportación.",
     "clipMissing": "No hay clip en el índice {{index}}",
     "clipNameMismatch": "El clip {{index}} es {{found}}, no {{wanted}}.",
-    "help": "Metros, Y-up. La identidad del clip es índice más el nombre glTF exacto. Los GLB locales se quedan en el navegador; no se suben.",
+    "help": "Elige una animación de cada GLB, ajusta sus tiempos y guarda el plano para volver a abrirlo. El número de clip aparece en el MP4 exportado.",
     "runHelp": "De lado, a la altura del pecho. El personaje se queda en sitio; elige el clip Running por su nombre glTF exacto. Sin suelo: solo el sujeto y el cilindro desplazándose al contrario.",
     "infinite": "Fondo infinito",
     "loopSpeed": "Desplazamiento",
