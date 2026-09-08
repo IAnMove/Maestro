@@ -31,9 +31,7 @@ async function openApp(page: Page) {
   const panel = wizardPanel(page)
   const opened = await panel.waitFor({ state: 'visible', timeout: 20_000 }).then(() => true).catch(() => false)
   if (!opened) {
-    const expand = page.getByRole('button', { name: 'Expand Ask to the Wizard' })
-    if (await expand.isVisible()) await expand.click()
-    else await page.getByTitle('Ask to the Wizard about the app or current task queue').click()
+    await page.getByRole('button', { name: 'Expand Ask to the Wizard' }).click()
   }
   await expect(panel).toBeVisible()
   await expect(panel.getByText('Saludos, creador. Soy el mago de HocusPocus', { exact: false })).toBeVisible()
@@ -478,7 +476,7 @@ test('wizard: injected executor failure remains observable and retryable', async
   if (await activityButton.getAttribute('aria-expanded') !== 'true') await activityButton.click()
   await expect(page.getByTitle('Injected simulated audio executor failure', { exact: true })).toBeVisible()
   if (await activityButton.getAttribute('aria-expanded') === 'true') await activityButton.click()
-  await page.getByTitle('Ask to the Wizard about the app or current task queue').click()
+  if (!await wizardPanel(page).isVisible()) await page.getByRole('button', { name: 'Expand Ask to the Wizard' }).click()
   await expect(wizardPanel(page)).toBeVisible()
   const beforeRetry = await rootTaskIds(request, workspace)
   const retryTranscript = await ask(
