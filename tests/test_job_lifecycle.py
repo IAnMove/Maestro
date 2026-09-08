@@ -490,6 +490,35 @@ class TestJobLifecycle(unittest.TestCase):
         self.assertEqual(result, [False])
         generation_lock.release()
 
+    def test_cancelled_orphan_waiter_cannot_block_the_next_job(self):
+        generation_lock = threading.Lock()
+        orphan = {"id": "worker-failed-before-acquire", "status": "queued"}
+        successor = {"id": "next-job", "status": "queued"}
+        register_generation_job(generation_lock, orphan)
+        register_generation_job(generation_lock, successor)
+        request_cancel(orphan)
+        result = []
+
+        def next_worker():
+            acquired = acquire_generation_slot(generation_lock, successor, poll_interval=0.01)
+            result.append(acquired)
+            if acquired:
+                generation_lock.release()
+
+        worker = threading.Thread(target=next_worker)
+        worker.start()
+        try:
+            worker.join(timeout=1)
+            self.assertFalse(worker.is_alive(), "a cancelled waiter with no worker must not retain its FIFO position")
+            self.assertEqual(result, [True])
+            self.assertIsNone(generation_queue_position(generation_lock, orphan))
+            self.assertFalse(generation_lock.locked())
+        finally:
+            request_cancel(successor)
+            worker.join(timeout=1)
+            # Also drain an orphan when demonstrating this regression on old code.
+            acquire_generation_slot(generation_lock, orphan, poll_interval=0.01)
+
     def test_generation_slot_is_fifo_by_registration_not_thread_schedule(self):
         generation_lock = threading.Lock()
         generation_lock.acquire()
