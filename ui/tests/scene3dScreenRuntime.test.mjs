@@ -49,6 +49,27 @@ test('no-op and same-target requests await decoded content and repaint on backwa
   } finally { runtime.dispose(); h.restore() }
 })
 
+test('a snapped decoded frame settles once so export does not reseek the same clock time', async () => {
+  const h = mediaHarness(), screen = { ...defaultMediaScreen(), media: 'video', sourceUrl: '/test.mp4' }
+  let time = 0, assignments = 0
+  Object.defineProperty(h.video, 'currentTime', {
+    configurable: true,
+    get() { return time },
+    set(value) { assignments += 1; time = Math.round(Number(value) * 24) / 24 },
+  })
+  const runtime = await bindScreenMedia(h.root, screen, true, new AbortController().signal)
+  try {
+    const pending = runtime.seek(1 / 30, screen)
+    assert.equal(assignments, 1)
+    assert.ok(Math.abs(h.video.currentTime - 1 / 30) > .0005)
+    h.finishSeek()
+    await Promise.race([pending, new Promise((_, reject) => setTimeout(() => reject(new Error('seek-did-not-settle')), 50))])
+    assert.equal(assignments, 1)
+    await runtime.seek(1 / 30, screen)
+    assert.equal(assignments, 1)
+  } finally { runtime.dispose(); h.restore() }
+})
+
 test('disposing a pending video seek rejects it and restores the GLB material', async () => {
   const h = mediaHarness(), screen = { ...defaultMediaScreen(), media: 'video', sourceUrl: '/test.mp4' }
   const runtime = await bindScreenMedia(h.root, screen, false, new AbortController().signal)
