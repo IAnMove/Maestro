@@ -1700,7 +1700,7 @@ test('repairs an explicit image request into prepare_image plus start_generation
 })
 
 test('repairs an explicit Studio audio request when the model only prepares it', async () => {
-  const { reconcileAgentTurnWithRequest } = await import('../src/features/agent/agentActions.ts')
+  const { isExplicitAudioGenerationRequest, isHowToGenerateQuestion, reconcileAgentTurnWithRequest } = await import('../src/features/agent/agentActions.ts')
   const prepare = {
     type: 'prepare_audio', subMode: 'music', prompt: 'Piano minimalista instrumental',
     modelType: 'ace_step_v1_5_xl_sft_lm_4b', durationSeconds: 15,
@@ -1718,6 +1718,40 @@ test('repairs an explicit Studio audio request when the model only prepares it',
     { reply: 'Mantengo la ficha.', actions: [{ type: 'open_tab', tab: 'audio' }, prepare] },
   )
   assert.deepEqual(retry.actions.map(action => action.type), ['open_tab', 'prepare_audio', 'start_generation'])
+
+  const englishPrompt = 'Generate a fresh instrumental music track now through Ask to the Wizard. Open Studio → Audio → Music and fill a fresh form, then start the new task.'
+  assert.equal(isExplicitAudioGenerationRequest(englishPrompt), true)
+  const englishReconciled = await reconcileAgentTurnWithRequest(
+    englishPrompt,
+    { reply: 'I will prepare it.', actions: [{ type: 'open_tab', tab: 'audio' }, prepare] },
+  )
+  assert.deepEqual(englishReconciled.actions.map(action => action.type), ['open_tab', 'prepare_audio', 'start_generation'])
+
+  for (const question of [
+    'Explain how to generate music in Studio Audio.',
+    'Can you show me how to make a music track in Studio Audio?',
+    'How can I generate music in Studio Audio?',
+    'How to generate music in Studio Audio?',
+    'What model should I choose to generate music in Studio Audio?',
+  ]) {
+    assert.equal(isHowToGenerateQuestion(question), true)
+    const educational = await reconcileAgentTurnWithRequest(question, {
+      reply: 'I will generate it now.',
+      actions: [
+        { type: 'open_tab', tab: 'audio' },
+        prepare,
+        { type: 'start_generation', confirm: true },
+      ],
+    })
+    assert.deepEqual(educational.actions.map(action => action.type), ['open_tab'])
+  }
+
+  const voice = await reconcileAgentTurnWithRequest('Generate a voice in Studio Audio.', {
+    reply: 'I will prepare it.',
+    actions: [],
+  })
+  assert.deepEqual(voice.actions.map(action => action.type), ['prepare_audio', 'start_generation'])
+  assert.equal(voice.actions[0].subMode, 'speech')
 })
 
 test('keeps Story Lab song generation out of the Studio Audio shortcut', async () => {

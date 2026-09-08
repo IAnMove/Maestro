@@ -629,6 +629,11 @@ def acquire_generation_slot(
                 _remove_generation_waiter(lock_key, token, job)
                 return False
             queue = _generation_queues.get(lock_key)
+            # A worker can fail before entering this function. Cancellation
+            # must let its successors advance even if that worker never polls.
+            while queue and is_cancel_requested(queue[0][2]):
+                _, cancelled_token, cancelled_job = queue[0]
+                _remove_generation_waiter(lock_key, cancelled_token, cancelled_job)
             is_head = bool(queue and queue[0][1] is token)
             if not is_head:
                 _generation_queue_condition.wait(timeout=poll_interval)

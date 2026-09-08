@@ -114,6 +114,13 @@ export async function selectAudioModel(
     state.selectModel(requested)
   }
   const selected = useStore.getState().params.model_type || requested || fallback
+  // selectModel starts loading model options in the background. Await the
+  // same model here before applying an explicit Wizard duration; otherwise
+  // the late options response can overwrite it with the model's default
+  // (ACE-Step's 120 s default turned a requested 20 s track into 120 s).
+  if (selected && subMode !== 'sfx') {
+    await useStore.getState().loadModelOptions(selected)
+  }
   const selectedModel = useStore.getState().models.find(model => model.model_type === selected)
   return selectedModel?.name || selected
 }

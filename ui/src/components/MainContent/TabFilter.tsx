@@ -307,8 +307,8 @@ export function TabFilter() {
 
   return (
     <nav aria-label={t('aria.sections')} className="flex min-w-0 flex-1 flex-col rounded-xl border border-border bg-bg-tertiary/70 p-1">
-      <div className="flex min-w-0 items-center gap-1">
-        <div ref={topRowRef} className="flex min-w-0 flex-1 flex-nowrap items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="flex min-w-0 flex-col gap-1 md:flex-row md:items-center">
+        <div ref={topRowRef} className="flex min-w-0 w-full flex-nowrap items-center gap-1 overflow-x-auto md:w-auto md:flex-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <PrimaryButton active={activeCategory === 'direct-generation'} expanded={expandedCategory === 'direct-generation'} category="direct-generation" buttonRef={element => { categoryRefs.current['direct-generation'] = element }} icon={<Sparkles size={14} />} label={t('primary.directGeneration')} onClick={() => selectCategory('direct-generation')} />
           <PrimaryButton active={activeCategory === 'studios'} expanded={expandedCategory === 'studios'} category="studios" buttonRef={element => { categoryRefs.current.studios = element }} icon={<BookOpen size={14} />} label={t('primary.studios')} onClick={() => selectCategory('studios')} />
           <PrimaryButton active={activeCategory === 'production'} expanded={expandedCategory === 'production'} category="production" buttonRef={element => { categoryRefs.current.production = element }} icon={<Clapperboard size={14} />} label={t('primary.production')} onClick={() => selectCategory('production')} />
@@ -317,7 +317,7 @@ export function TabFilter() {
           <PrimaryButton active={mediaFilter === PRIMARY_DESTINATIONS.activity.value} icon={<Activity size={14} />} label={t('primary.activity')} ariaLabel={`${t('tabs.runs')} · ${t('primary.activity')}`} onClick={() => openFilter(PRIMARY_DESTINATIONS.activity.value)} />
         </div>
 
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-1 md:shrink-0 md:flex-nowrap">
           <OutputFolderSelector />
           {searchOpen ? (
             <div className="flex items-center gap-1 rounded-lg border border-border bg-bg-secondary px-2 py-0.5">
