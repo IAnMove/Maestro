@@ -299,6 +299,19 @@ export function clipMatches(gpu: Pick<SlotGpu, 'clipKey' | 'animations'>, index:
   return Boolean(clip && gpu.clipKey === `${index}\0${clip.name}`)
 }
 
+function groundLoadedSlot(gpu: SlotGpu, slot: Scene3DSlot) {
+  if (slot.grounded && gpu.kind === 'model') {
+    gpu.root.updateMatrixWorld(true)
+    const bounds = new Box3().setFromObject(gpu.root, true)
+    if (Number.isFinite(bounds.min.y)) gpu.root.position.y += slot.position[1] - bounds.min.y
+    if (gpu.contactShadow && !gpu.animations.length && !bounds.isEmpty()) {
+      const size = bounds.getSize(new Vector3()), center = bounds.getCenter(new Vector3())
+      gpu.contactShadow.position.set(center.x, slot.position[1] + .025, center.z)
+      gpu.contactShadow.scale.set(Math.max(.1, size.x), Math.max(.1, size.z), 1)
+    }
+  }
+}
+
 export function paintWorld(world: GpuWorld, document: Scene3DDocument, sceneSeconds: number) {
   const posedSlots = document.slots.map(slot => ({ ...slot, ...slotPoseAtTime(slot, sceneSeconds, document.duration) }))
   applyLoopOffset(world, sceneSeconds)
@@ -314,16 +327,7 @@ export function paintWorld(world: GpuWorld, document: Scene3DDocument, sceneSeco
     const clip = gpu.animations.find((_clip: { duration?: number }, index: number) => clipMatches(gpu, index))
     const local = performanceClipTime(sceneSeconds, clip?.duration ?? null, slot.clipPlayback)
     if (local != null && clip && gpu.mixer) seekBoundMixer(gpu.mixer, clip, local)
-    if (slot.grounded && gpu.kind === 'model') {
-      gpu.root.updateMatrixWorld(true)
-      const bounds = new Box3().setFromObject(gpu.root, true)
-      if (Number.isFinite(bounds.min.y)) gpu.root.position.y += slot.position[1] - bounds.min.y
-      if (gpu.contactShadow && !gpu.animations.length && !bounds.isEmpty()) {
-        const size = bounds.getSize(new Vector3()), center = bounds.getCenter(new Vector3())
-        gpu.contactShadow.position.set(center.x, slot.position[1] + .025, center.z)
-        gpu.contactShadow.scale.set(Math.max(.1, size.x), Math.max(.1, size.z), 1)
-      }
-    }
+    groundLoadedSlot(gpu, slot)
     if (slot.performance === 'typing') applyTypingPose(gpu.root, slot, sceneSeconds)
   }
   const framing = document.camera.framing
