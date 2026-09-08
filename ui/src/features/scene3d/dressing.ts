@@ -1,4 +1,5 @@
 import { workshopGroup } from './workshopSet.ts'
+import { mediaSet } from './mediaSet.ts'
 import { chaseGroup } from './chaseSet.ts'
 import {
   BoxGeometry,
@@ -74,6 +75,7 @@ export function syncDressing(
   clearDrive(world)
   world.floor.visible = kind !== 'space' && kind !== 'treadmill' && kind !== 'cafe' && !isDriveDressing(kind)
   if (kind === 'street') world.dressing = streetGroup()
+  if (kind === 'retro-lab' || kind === 'observatory' || kind === 'broadcast-plaza') world.dressing = mediaSet(kind)
   if (kind === 'workshop') world.dressing = workshopGroup()
   if (kind === 'chase-street') world.dressing = chaseGroup()
   if (kind === 'citadel') world.dressing = citadelGroup()

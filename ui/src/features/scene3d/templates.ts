@@ -1,4 +1,5 @@
 import { cinematicDocument, CINEMATIC_TEMPLATES, CINEMATIC_CATEGORIES } from './cinematicTemplates'
+import { mediaTemplateDocument, MEDIA_TEMPLATES, MEDIA_CATEGORIES } from './mediaTemplates'
 import { createDefaultScene3DDocument } from './document.ts'
 import { SCENE3D_TEMPLATE_IDS, type Scene3DCamera, type Scene3DCameraFamily, type Scene3DDocument, type Scene3DSlot, type Scene3DSlotId, type Scene3DTemplateId } from './types.ts'
 
@@ -14,6 +15,7 @@ export type Scene3DTemplate = {
 export type Scene3DTemplateCategory = 'cinema' | 'product' | 'music' | 'space' | 'drive'
 export const TEMPLATE_CATEGORIES: Record<Scene3DTemplateId, Scene3DTemplateCategory> = {
   ...CINEMATIC_CATEGORIES,
+  ...MEDIA_CATEGORIES,
   'coder-room': 'cinema',
   'clone-chase': 'cinema',
   'siege-ring': 'cinema',
@@ -144,6 +146,7 @@ export const SCENE3D_TEMPLATES: readonly Scene3DTemplate[] = [
   { id: 'coder-room', camera: 'establishment', duration: 7, slots: ['subject_1', 'background'] },
   { id: 'clone-chase', camera: 'follow', duration: 7, slots: ['subject_1', 'subject_2', 'prop', 'background'] },
   ...CINEMATIC_TEMPLATES,
+  ...MEDIA_TEMPLATES,
 ]
 
 const LAYOUTS: Partial<Record<Scene3DTemplateId, Partial<Record<Scene3DSlotId, Pick<Scene3DSlot, 'position' | 'rotationY' | 'scale'>>>>> = {
@@ -336,6 +339,8 @@ function emptySlot(id: Scene3DSlotId): Scene3DSlot {
 }
 
 export function applyScene3DTemplate(id: Scene3DTemplateId): Scene3DDocument {
+  const media = mediaTemplateDocument(id)
+  if (media) return media
   const cinematic = cinematicDocument(id)
   if (cinematic) return cinematic
   const template = SCENE3D_TEMPLATES.find(item => item.id === id) ?? SCENE3D_TEMPLATES[0]
@@ -440,7 +445,7 @@ const DRESSING_BY_TEMPLATE: Partial<Record<Scene3DTemplateId, Scene3DDocument['d
 export function patchScene3DSlot(
   document: Scene3DDocument,
   slotId: string,
-  patch: Partial<Pick<Scene3DSlot, 'position' | 'rotationY' | 'scale' | 'sourceUrl' | 'sourceRef' | 'media' | 'clip' | 'clipPlayback' | 'motion' | 'loop' | 'surface' | 'performance' | 'grounded' | 'textureRepeat'>>,
+  patch: Partial<Pick<Scene3DSlot, 'position' | 'rotationY' | 'scale' | 'sourceUrl' | 'sourceRef' | 'media' | 'clip' | 'clipPlayback' | 'motion' | 'loop' | 'surface' | 'performance' | 'grounded' | 'textureRepeat' | 'screen'>>,
 ): Scene3DDocument {
   return {
     ...document,
@@ -459,6 +464,10 @@ export function remountScene3DTemplate(id: Scene3DTemplateId, previous: Scene3DD
   next.fps = previous.fps
   if (!keepAssets) return next
   next.slots = next.slots.map(slot => {
+    if (slot.screen) {
+      const oldScreen = previous.slots.find(item => item.id === slot.id && item.screen?.sourceUrl) ?? previous.slots.find(item => item.screen?.sourceUrl)
+      if (oldScreen?.screen) slot.screen = { ...slot.screen, sourceUrl: oldScreen.screen.sourceUrl, sourceRef: oldScreen.screen.sourceRef, media: oldScreen.screen.media }
+    }
     const old = previous.slots.find(item => item.slot === slot.slot && item.media === slot.media && item.sourceUrl)
     return old ? { ...slot, sourceUrl: old.sourceUrl, sourceRef: old.sourceRef, clip: old.clip, clipPlayback: old.clipPlayback } : slot
   })

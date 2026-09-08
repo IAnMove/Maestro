@@ -1,4 +1,8 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import { Mesh } from 'three'
+import { useUiTranslation } from '../../i18n'
+import { bindScreenMedia } from './screenMediaRuntime'
+import { slotMountKey } from './backdrop'
 import { createTransformGizmo, type TransformMode, type TransformPatch } from './transformGizmo.ts'
 import { TextureLoader } from 'three'
 import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js'
@@ -37,6 +41,7 @@ type Props = {
   onTransform?: (slotId: string, patch: TransformPatch) => void
   onSelect?: (slotId: string) => void
   onSlotClips?: (slotId: string, clips: Scene3DClipCatalogEntry[]) => void
+  onSlotMeshes?: (slotId: string, meshes: string[]) => void
 }
 
 export type Scene3DStageHandle = {
@@ -46,6 +51,23 @@ export type Scene3DStageHandle = {
   restoreSize: () => void
   beginExport: (document: Scene3DDocument) => void
   endExport: () => void
+  prepareFrame?: (seconds: number, document: Scene3DDocument) => Promise<void>
+}
+
+function loadScreen(world: GpuWorld, slot: Scene3DSlot, onError: (message: string) => void, onReady: () => void) {
+  const gpu = world.slots.get(slot.id), screen = slot.screen
+  if (!gpu || !screen?.sourceUrl) return
+  const abort = new AbortController(); gpu.screenAbort = abort
+  void bindScreenMedia(gpu.root, screen, slot.media === 'screen', abort.signal, () => {
+    if (!abort.signal.aborted && world.slots.get(slot.id) === gpu) world.renderer.render(world.scene, world.camera)
+  }).then(media => {
+    if (world.slots.get(slot.id) !== gpu || abort.signal.aborted) { media.dispose(); return }
+    gpu.screen = media
+    onReady()
+  }).catch(error => {
+    if (abort.signal.aborted || world.slots.get(slot.id) !== gpu) return
+    gpu.screenError = error instanceof Error ? error : new Error(String(error)); onError(gpu.screenError.message)
+  })
 }
 
 function loadSlotGltf(
@@ -55,6 +77,7 @@ function loadSlotGltf(
   cancelled: () => boolean,
   liveSlot: () => Scene3DSlot | undefined,
   onClips: ((slotId: string, clips: Scene3DClipCatalogEntry[]) => void) | undefined,
+  onLoaded: (slot: Scene3DSlot, gltf: GLTF) => void,
 ) {
   const url = slot.sourceUrl
   if (!url) return
@@ -66,12 +89,13 @@ function loadSlotGltf(
         return
       }
       const live = liveSlot()
-      if (!live || live.sourceUrl !== url || live.media === 'image') {
+      if (!live || slotMountKey(live) !== slotMountKey(slot) || live.media !== 'model3d') {
         disposeObject(gltf.scene)
         return
       }
       const baseScale = fitGltf(gltf.scene, live)
       placeSlot(world, live, gltf.scene, gltf.animations, baseScale, true)
+      onLoaded(live, gltf)
       onClips?.(live.id, catalogFromClips(gltf.animations))
     },
     undefined,
@@ -108,16 +132,22 @@ function loadSlotImage(
 }
 
 export const Scene3DStage = forwardRef<Scene3DStageHandle, Props>(function Scene3DStage(
-  { document, sceneSeconds, onSlotClips, selectedId, transformMode = 'translate', editing = false, onTransform, onSelect },
+  { document, sceneSeconds, onSlotClips, onSlotMeshes, selectedId, transformMode = 'translate', editing = false, onTransform, onSelect },
   ref,
 ) {
+  const { t } = useUiTranslation('scene3dEditor')
+  const [screenErrors, setScreenErrors] = useState<Record<string, string>>({})
+  const screenError = document.slots.some(slot => screenErrors[slot.id] === slotMountKey(slot))
   const hostRef = useRef<HTMLDivElement>(null)
   const worldRef = useRef<GpuWorld | null>(null)
   const gizmoRef = useRef<ReturnType<typeof createTransformGizmo> | null>(null)
   const interactionRef = useRef({ onTransform, onSelect })
   useEffect(() => { interactionRef.current = { onTransform, onSelect } }, [onTransform, onSelect])
   const documentRef = useRef(document)
+  const secondsRef = useRef(sceneSeconds)
+  useEffect(() => { secondsRef.current = sceneSeconds }, [sceneSeconds])
   const onSlotClipsRef = useRef(onSlotClips)
+  const onSlotMeshesRef = useRef(onSlotMeshes)
   const exportLockRef = useRef<Scene3DDocument | null>(null)
 
   useEffect(() => {
@@ -127,9 +157,15 @@ export const Scene3DStage = forwardRef<Scene3DStageHandle, Props>(function Scene
 
   useEffect(() => {
     onSlotClipsRef.current = onSlotClips
-  }, [onSlotClips])
+    onSlotMeshesRef.current = onSlotMeshes
+  }, [onSlotClips, onSlotMeshes])
 
   useImperativeHandle(ref, () => ({
+    async prepareFrame(seconds, frozen) {
+      const world = worldRef.current
+      if (!world) return
+      await Promise.all(frozen.slots.map(slot => slot.screen ? world.slots.get(slot.id)?.screen?.seek(seconds, slot.screen) : undefined))
+    },
     paint(seconds, frozen) {
       const world = worldRef.current
       if (!world) return null
@@ -221,6 +257,16 @@ export const Scene3DStage = forwardRef<Scene3DStageHandle, Props>(function Scene
     const world = worldRef.current
     if (!world || exportLockRef.current) return
     const loader = new GLTFLoader()
+    const repaint = () => paintWorld(world, documentRef.current, secondsRef.current)
+    const bindScreen = (slot: Scene3DSlot) => loadScreen(world, slot,
+      () => setScreenErrors(current => ({ ...current, [slot.id]: slotMountKey(slot) })),
+      () => {
+        setScreenErrors(current => {
+          if (!(slot.id in current)) return current
+          const next = { ...current }; delete next[slot.id]; return next
+        })
+        repaint()
+      })
     pruneSlots(world, document.slots)
     for (const slot of document.slots) {
       const current = world.slots.get(slot.id)
@@ -230,13 +276,20 @@ export const Scene3DStage = forwardRef<Scene3DStageHandle, Props>(function Scene
         continue
       }
       placeSlot(world, slot, placeholderMesh(slot), [], 1, !slot.sourceUrl)
+      if (slot.media === 'screen') { bindScreen(slot); continue }
       const live = () => documentRef.current.slots.find(item => item.id === slot.id)
       const gone = () => worldRef.current !== world
       if (slot.media === 'image') {
         loadSlotImage(world, slot, gone, live)
         continue
       }
-      loadSlotGltf(world, slot, loader, gone, live, (slotId, clips) => onSlotClipsRef.current?.(slotId, clips))
+      loadSlotGltf(world, slot, loader, gone, live, (slotId, clips) => onSlotClipsRef.current?.(slotId, clips), (loaded, gltf) => {
+        const names: string[] = []
+        gltf.scene.traverse(child => { if (child instanceof Mesh) names.push(child.name) })
+        onSlotMeshesRef.current?.(loaded.id, names)
+        bindScreen(loaded)
+        repaint()
+      })
     }
   }, [document.slots])
 
@@ -247,5 +300,6 @@ export const Scene3DStage = forwardRef<Scene3DStageHandle, Props>(function Scene
     paintWorld(world, document, sceneSeconds)
   }, [document, sceneSeconds, selectedId, transformMode, editing])
 
-  return <div ref={hostRef} className="absolute inset-0" data-testid="scene3d-stage" />
+  return <><div ref={hostRef} className="absolute inset-0" data-testid="scene3d-stage" />
+    {screenError && <p role="alert" className="absolute bottom-2 left-2 z-10 rounded bg-black/90 p-2 text-xs text-red-200">{t('screens.failed')}</p>}</>
 })

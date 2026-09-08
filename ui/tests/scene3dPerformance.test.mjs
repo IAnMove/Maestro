@@ -1,10 +1,57 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { spawnSync } from 'node:child_process'
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { AnimationClip, NumberKeyframeTrack, Object3D, InterpolateDiscrete } from 'three'
-import { performanceClipTime, slotPoseAtTime, paintClipNumber } from '../src/features/scene3d/performance.ts'
+import { fitClipPlayback, performanceClipTime, slotPoseAtTime, paintClipNumber } from '../src/features/scene3d/performance.ts'
 import { createDefaultScene3DDocument, parseScene3DDocument } from '../src/features/scene3d/document.ts'
 import { bindMixer, seekBoundMixer } from '../src/features/scene3d/gpu.ts'
 import { remountScene3DTemplate } from '../src/features/scene3d/templates.ts'
+import { numberedShots } from '../../pinokio_agent/skills/api/Maestro-next.git/clients/shot_plan.mjs'
+
+test('fitting root motion prevents a four-second animation jumping inside a longer shot', () => {
+ const root=new Object3D();const clip=new AnimationClip('Advance',4,[new NumberKeyframeTrack('.position[z]',[0,4],[0,2.4])]);
+ const doc=createDefaultScene3DDocument();doc.duration=4.6;doc.slots[0].clip={index:0,name:'Advance'};
+ const mixer=bindMixer(root,[clip],doc.slots[0]);
+ const position=(seconds,playback)=>{seekBoundMixer(mixer,clip,performanceClipTime(seconds,4,playback));return root.position.z;};
+ assert.ok(position(3.99,{loop:true})-position(4,{loop:true})>2.3);
+ const fitted=fitClipPlayback(4,4.6,{start:0,loop:true});
+ let previous=-1;
+ for(let frame=0;frame<=138;frame++){const value=position(frame/30,fitted);assert.ok(value>=previous);if(previous>=0)assert.ok(value-previous<.018);previous=value;}
+ assert.ok(Math.abs(previous-2.4)<1e-6);
+ doc.slots[0].clipPlayback=fitted;
+ assert.deepEqual(parseScene3DDocument(JSON.parse(JSON.stringify(doc))).slots[0].clipPlayback,fitted);
+ assert.deepEqual(fitClipPlayback(6,10,{start:2,speed:3,loop:true}),{start:2,speed:.4,loop:false});
+ assert.deepEqual(fitClipPlayback(.3,1,{start:.2}),{start:.2,speed:.1,loop:false});
+ assert.deepEqual(fitClipPlayback(.8,.15,{start:.2}),{start:.2,speed:4,loop:false});
+ for(const [duration,shot,start] of [[null,4,0],[NaN,4,0],[4,0,0],[4,Infinity,0],[4,4,4],[4,50,0],[10,1,0]])assert.equal(fitClipPlayback(duration,shot,{start}),undefined);
+})
+
+test('clean export plans retain editorial identity without adding burned-in numbers', () => {
+ const plan={shots:[{document:{}},{number:6,document:{}},{document:{clipNumber:16}}]};
+ const before=structuredClone(plan);assert.deepEqual(numberedShots(plan).map(item=>item.number),[1,6,16]);assert.deepEqual(plan,before);
+ assert.throws(()=>numberedShots({shots:[{number:1,document:{}},{number:1,document:{}}]}),/duplicate/);
+ assert.throws(()=>numberedShots({shots:[{number:0,document:{}}]}),/Invalid/);
+ assert.throws(()=>numberedShots({shots:[]}),/contain shots/);
+})
+
+test('the assembler resolves the same clean identities and rejects duplicates before publication', () => {
+ const directory=mkdtempSync(join(tmpdir(),'world3d-clean-plan-'));
+ const script=fileURLToPath(new URL('../../pinokio_agent/skills/api/Maestro-next.git/clients/world3d_assemble.py',import.meta.url));
+ const run=shots=>{
+  writeFileSync(join(directory,'plan.json'),JSON.stringify({shots}));
+  return spawnSync('python3',[script,'--base-url','http://127.0.0.1:1','--plan',join(directory,'plan.json'),'--render-dir',directory,'--workspace','test','--output',join(directory,'out.mp4')],{encoding:'utf8'});
+ };
+ try {
+  for(const [shot,expected] of [[{document:{}},'clip-01'],[{number:6,document:{clipNumber:16}},'clip-06'],[{document:{clipNumber:16}},'clip-16']]){
+   const result=run([shot]);assert.equal(result.status,1);assert.match(result.stderr,new RegExp(`${expected}\\.publication\\.json`));
+  }
+  const invalid=run([{number:6,document:{}},{number:6,document:{}}]);assert.equal(invalid.status,1);assert.match(invalid.stderr,/Invalid or duplicate shot number: 6/);assert.doesNotMatch(invalid.stderr,/FileNotFoundError/);
+ }finally{rmSync(directory,{recursive:true,force:true});}
+})
 
 test('single playback holds the final pose instead of wrapping back to zero', () => {
  const root=new Object3D();const clip=new AnimationClip('exact | Ä', 2, [new NumberKeyframeTrack('.position[x]',[0,2],[0,10])]);

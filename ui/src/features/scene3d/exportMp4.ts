@@ -33,7 +33,7 @@ export async function encodeWorld3DFrames(options: {
   height: number
   fps: number
   duration: number
-  paint: (seconds: number) => HTMLCanvasElement
+  paint: (seconds: number) => HTMLCanvasElement | Promise<HTMLCanvasElement>
   onProgress?: (index: number, count: number) => void
   overlay?: (context: CanvasRenderingContext2D, width: number, height: number, seconds: number) => void
 }): Promise<Blob> {
@@ -76,7 +76,7 @@ export async function encodeWorld3DFrames(options: {
   try {
     for (let index = 0; index < plan.count; index += 1) {
       if (encoderError) throw encoderError
-      const source = options.paint(plan.times[index] ?? 0)
+      const source = await options.paint(plan.times[index] ?? 0)
       context.drawImage(source, 0, 0, size.width, size.height)
       options.overlay?.(context, size.width, size.height, plan.times[index] ?? 0)
       await nextPaint()

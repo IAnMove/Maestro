@@ -10,6 +10,16 @@ export function parseClipPlayback(raw: unknown): Scene3DClipPlayback | undefined
   }
 }
 
+/** Fit the remaining source animation once into the current shot, without wrapping. */
+export function fitClipPlayback(duration: number | null | undefined, shotDuration: number, raw?: Scene3DClipPlayback): Scene3DClipPlayback | undefined {
+  if (duration == null || !Number.isFinite(duration) || duration <= 0 || !Number.isFinite(shotDuration) || shotDuration <= 0) return undefined
+  const start = parseClipPlayback(raw)?.start ?? 0
+  const speed = (duration - start) / shotDuration
+  const tolerance = 16 * Number.EPSILON
+  if (speed < 0.1 - tolerance || speed > 4 + tolerance) return undefined
+  return { start, speed: Math.max(0.1, Math.min(4, speed)), loop: false }
+}
+
 export function parseMotion(raw: unknown): Scene3DMotion | undefined {
   if (!raw || typeof raw !== 'object') return undefined
   const value = raw as Scene3DMotion

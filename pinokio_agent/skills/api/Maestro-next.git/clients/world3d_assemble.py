@@ -1,4 +1,4 @@
-"""Assemble numbered browser-rendered shots and music through the Video Editor API."""
+"""Assemble browser-rendered shots and music through the Video Editor API."""
 import argparse
 import json
 from pathlib import Path
@@ -12,6 +12,23 @@ for name in ('base-url', 'plan', 'render-dir', 'workspace', 'output'):
 parser.add_argument('--name')
 args = parser.parse_args()
 plan = json.loads(Path(args.plan).read_text())
+shots = []
+used = set()
+if not isinstance(plan.get('shots'), list) or not plan['shots']:
+    raise SystemExit('A plan must contain shots')
+for index, shot in enumerate(plan['shots'], 1):
+    if not isinstance(shot, dict) or not isinstance(shot.get('document'), dict):
+        raise SystemExit(f'Missing document for shot {index}')
+    number = shot.get('number')
+    if number is None:
+        number = shot['document'].get('clipNumber')
+    if number is None:
+        number = index
+    if type(number) not in (int, float) or not 1 <= number <= 9007199254740991 or int(number) != number or number in used:
+        raise SystemExit(f'Invalid or duplicate shot number: {number}')
+    number = int(number)
+    used.add(number)
+    shots.append((shot, number))
 render_dir = Path(args.render_dir)
 output = Path(args.output)
 if output.exists():
@@ -25,8 +42,7 @@ def request(endpoint, body=None):
         return json.load(response)
 
 clips = []
-for shot in plan['shots']:
-    number = shot['document']['clipNumber']
+for shot, number in shots:
     publication = json.loads((render_dir / f'clip-{number:02}.publication.json').read_text())
     saved = publication['saved']
     clips.append({'name': f'CLIP {number:02} — {shot["title"]}',

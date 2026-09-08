@@ -280,6 +280,38 @@
     "vehicle-drift-arc": {
       "title": "Curva de derrape",
       "description": "Recorrido curvo con orientación del vehículo según su avance."
+    },
+    "monitor-reveal": {
+      "title": "Revelar monitor",
+      "description": "Una cámara ascendente descubre un monitor junto a tu mascota."
+    },
+    "desk-presenter": {
+      "title": "Presentador de escritorio",
+      "description": "Tu mascota presenta un PC GLB con una malla para imagen o vídeo."
+    },
+    "monitor-detail": {
+      "title": "Detalle de pantalla",
+      "description": "Acercamiento frontal para leer el contenido del monitor."
+    },
+    "screen-gallery": {
+      "title": "Galería de pantallas",
+      "description": "Tres paneles alrededor del protagonista en un observatorio."
+    },
+    "billboard-plaza": {
+      "title": "Plaza de pantallas gigantes",
+      "description": "Arquitectura monumental, cartel elevado y protagonista a escala."
+    },
+    "screen-corridor": {
+      "title": "Pasillo de pantallas",
+      "description": "El protagonista recorre un pasillo de paneles enfrentados."
+    },
+    "control-room": {
+      "title": "Sala de control",
+      "description": "Seis pantallas y una mascota que supervisa el conjunto."
+    },
+    "product-finale": {
+      "title": "Final de producto",
+      "description": "Presentación amplia con protagonista y tres pantallas."
     }
   },
   "gallerySearch": "Buscar en el catálogo",
@@ -294,6 +326,8 @@
   "animationSpeed": "Velocidad de animación",
   "animationStart": "Inicio en animación (s)",
   "animationLoop": "Repetir animación",
+  "animationFit": "Ajustar animación al plano",
+  "animationFitHint": "Reproduce una vez la animación restante durante la duración actual del plano (velocidad 0,1–4×). Aplícalo de nuevo si cambias la duración o el inicio.",
   "clipNumber": "Número de clip",
   "duration": "Duración (s)",
   "saveDocument": "Guardar plano JSON",
@@ -337,5 +371,30 @@
     "rollFrom": "Inclinación inicial (°)",
     "rollTo": "Inclinación final (°)",
     "facing": "Seguir la orientación del personaje"
+  },
+  "screens": {
+    "add": "Añadir pantalla",
+    "title": "Pantalla multimedia",
+    "attach": "Usar una malla como pantalla",
+    "mesh": "Malla de la pantalla",
+    "chooseMesh": "Elige una malla",
+    "content": "Imagen o vídeo en la pantalla",
+    "chooseContent": "Elige una imagen o vídeo",
+    "fit": "Ajuste del contenido",
+    "contain": "Completo, sin recortar",
+    "cover": "Llenar y recortar",
+    "style": "Tipo de pantalla",
+    "monitor": "Monitor de escritorio",
+    "billboard": "Cartel / pantalla gigante",
+    "frameless": "Panel sin marco",
+    "width": "Ancho / proporción",
+    "height": "Alto / proporción",
+    "flipY": "Invertir verticalmente",
+    "start": "Inicio del vídeo (s)",
+    "speed": "Velocidad del vídeo",
+    "loop": "Repetir vídeo",
+    "clockHelp": "El vídeo sigue el tiempo de la escena. Su audio está silenciado.",
+    "remove": "Quitar pantalla",
+    "failed": "No se pudo cargar la pantalla. Comprueba la malla y el archivo."
   }
 }
