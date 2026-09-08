@@ -80,6 +80,23 @@ def test_mode_mismatch_does_not_launch(monkeypatch, runner, tmp_path):
     assert not (tmp_path / 'run.json').exists()
 
 
+@pytest.mark.parametrize('last_run', ['{truncated', 'null', '[]', '{}',
+    '{"status":"failed","failedTests":[]}', '{"status":"passed","failedTests":["old-id"]}',
+    '{"status":"failed","failedTests":[""]}', '{"status":"failed","failedTests":[3]}'])
+def test_resume_rejects_missing_or_corrupt_failure_filter_without_running_all_tests(monkeypatch, runner, tmp_path, last_run):
+    previous = tmp_path / 'attempt-original'
+    (previous / 'raw').mkdir(parents=True)
+    state = previous / 'raw' / '.last-run.json'
+    state.write_text(last_run)
+    manifest = {'profile': 'real', 'attempts': [{'path': str(previous), 'scenario': 'app-generate', 'status': 'failed'}]}
+    (tmp_path / 'run.json').write_text(json.dumps(manifest))
+    monkeypatch.setattr(runner.subprocess, 'run', lambda *_a, **_k: pytest.fail('Corrupt --last-failed would run every test'))
+    assert invoke(monkeypatch, runner, tmp_path, '--resume') == 2
+    assert list(tmp_path.glob('attempt-*')) == [previous]
+    assert state.read_text() == last_run
+    assert json.loads((tmp_path / 'run.json').read_text()) == manifest
+
+
 def test_portable_report_escapes_content_and_shows_incomplete_evidence(monkeypatch, runner, tmp_path):
     attempt = tmp_path / 'attempt-one'
     attempt.mkdir()

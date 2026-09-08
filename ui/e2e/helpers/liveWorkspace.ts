@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { expect, type APIRequestContext, type Page, type TestInfo } from '@playwright/test'
-import { isOwnedWorkspace, liveWriteViolation } from './liveWorkspacePolicy'
+import { isOwnedWorkspace, liveQueryViolation, liveTaskTarget, liveWriteViolation } from './liveWorkspacePolicy'
 import { liveJson } from './liveRead'
 
 export interface LiveSystemConfig {
@@ -60,7 +60,6 @@ export async function isolateLiveWorkspace(page: Page, request: APIRequestContex
     }
     let payload: unknown
     try { payload = req.postDataJSON() } catch { /* upload/form requests retain their original body */ }
-    if (url.searchParams.has('workspace')) payload = { ...payload as object, workspace: url.searchParams.get('workspace') }
     if (preferencePaths.has(url.pathname)) {
       if (method === 'PUT') {
         const baseline = browserPreferences.get(url.pathname) ?? await (await request.get(url.pathname)).json()
@@ -88,13 +87,12 @@ export async function isolateLiveWorkspace(page: Page, request: APIRequestContex
         }
       }
     }
-    let reason = liveWriteViolation(method, url.pathname, payload, workspace)
-    const taskTarget = /^\/api\/v1\/(?:cancel\/([^/]+)|tasks\/([^/]+)(?:\/(?:cancel|retry|resume))?)$/.exec(url.pathname)
-    if (!reason && taskTarget && !['GET', 'HEAD', 'OPTIONS'].includes(method)) {
+    let reason = liveWriteViolation(method, url.pathname, payload, workspace) || liveQueryViolation(method, url.searchParams, workspace)
+    const id = liveTaskTarget(method, url.pathname)
+    if (!reason && id) {
       const response = await request.get(`/api/v1/tasks?workspace=${encodeURIComponent(selected)}&status=all`)
-      const data = await response.json() as { tasks: Array<{ id: string; backend_job_id?: string; workspace?: string }> }
-      const id = decodeURIComponent(taskTarget[1] || taskTarget[2])
-      if (!response.ok() || !data.tasks?.some(task => isOwnedWorkspace(task.workspace, workspace) && (task.id === id || task.backend_job_id === id))) reason = 'task mutation outside the selected test workspace'
+      const data = await response.json() as { tasks: Array<{ id: string; backend_job_id?: string; pipeline_id?: string; workspace?: string }> }
+      if (!response.ok() || !data.tasks?.some(task => isOwnedWorkspace(task.workspace, workspace) && [task.id, task.backend_job_id, task.pipeline_id].includes(id))) reason = 'task mutation outside the selected test workspace'
     }
     if (reason) {
       intercepted.push({ method, path: url.pathname, reason })

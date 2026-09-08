@@ -94,6 +94,20 @@ def main() -> int:
         if not previous.exists():
             print('Previous attempt has no Playwright .last-run.json; cannot resume.', file=sys.stderr)
             return 2
+        try:
+            last_run = json.loads(previous.read_text())
+            failed_ids = last_run.get('failedTests') if isinstance(last_run, dict) else None
+            if (
+                not isinstance(last_run, dict)
+                or last_run.get('status') not in ('failed', 'interrupted', 'timedout')
+                or not isinstance(failed_ids, list)
+                or not failed_ids
+                or not all(isinstance(item, str) and item.strip() for item in failed_ids)
+            ):
+                raise ValueError('expected a failed/interrupted run with non-empty failed test IDs')
+        except (OSError, ValueError) as exc:
+            print(f'Cannot resume invalid or empty Playwright failure state; no tests launched: {exc}', file=sys.stderr)
+            return 2
     attempt = output / f'attempt-{stamp}'
     attempt.mkdir(parents=True, exist_ok=False)
     if previous:

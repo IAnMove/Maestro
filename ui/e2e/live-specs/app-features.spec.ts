@@ -51,6 +51,8 @@ test('app: feature tour captures every main destination and tool panel', async (
       await expect(page.getByText('Storage Manager', { exact: true })).toBeVisible()
     })
     await page.getByRole('button', { name: 'Close settings', exact: true }).click()
+    const settingsDrawer = page.locator('div.fixed.top-0.right-0').filter({ has: page.getByRole('button', { name: 'Close settings', exact: true }) })
+    await expect(settingsDrawer).not.toBeInViewport()
     const activity = page.getByRole('button', { name: 'Activity', exact: true })
     if (await activity.getAttribute('aria-expanded') === 'true') await activity.click()
     await page.setViewportSize({ width: 390, height: 844 })

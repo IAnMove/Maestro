@@ -110,6 +110,9 @@ Use `--headed` to watch the Wizard navigate and fill the application. Use
 `--resume --output-dir <previous-root>` to ask Playwright to rerun failures
 from that root's previous completed attempt. It creates a new evidence folder;
 it does not resume a backend generation or overwrite the earlier report.
+Resume rejects a corrupt, empty or successful `.last-run.json` before launching
+Playwright: without a valid list of failed IDs, `--last-failed` could otherwise
+select the complete scenario again.
 
 Real GPU acceptance is intentionally hard to trigger:
 
@@ -175,6 +178,9 @@ global active folder even when a browser has another selected folder. The
 harness blocks those writes. The comic case validates all 12 panel images
 and browser JSON/PDF downloads; it does **not** certify server save/history.
 Story and Series library writes remain live within the selected test folder.
+Task controls, including legacy cancel/stop routes, must resolve to canonical
+tasks in that folder. JSON and query destinations are checked independently;
+native submissions require an explicit JSON workspace. Deletion is excluded.
 Do not remove the isolation guard to get a failing case to pass.
 
 See [APP_USER_GUIDE.md](APP_USER_GUIDE.md) for usage and the Wizard capability

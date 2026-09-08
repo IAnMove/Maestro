@@ -59,7 +59,7 @@ export async function captureFeature(page: Page, info: TestInfo, records: Featur
   const screenshot = `${id}.png`
   let error: string | undefined
   try { await action() } catch (cause) { error = cause instanceof Error ? cause.message : String(cause) }
-  await page.screenshot({ path: info.outputPath(screenshot), fullPage: true })
+  await page.screenshot({ path: info.outputPath(screenshot), fullPage: true, animations: 'disabled' })
   const record: FeatureEvidence = { id, title: route.at(-1)!, route, screenshot, status: error ? 'failed' : 'passed', error, wizard: wizardEvidence(route) }
   records.push(record)
   await fs.writeFile(info.outputPath('features.json'), JSON.stringify(records, null, 2))
