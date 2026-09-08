@@ -318,6 +318,11 @@ export function paintWorld(world: GpuWorld, document: Scene3DDocument, sceneSeco
       gpu.root.updateMatrixWorld(true)
       const bounds = new Box3().setFromObject(gpu.root, true)
       if (Number.isFinite(bounds.min.y)) gpu.root.position.y += slot.position[1] - bounds.min.y
+      if (gpu.contactShadow && !gpu.animations.length && !bounds.isEmpty()) {
+        const size = bounds.getSize(new Vector3()), center = bounds.getCenter(new Vector3())
+        gpu.contactShadow.position.set(center.x, slot.position[1] + .025, center.z)
+        gpu.contactShadow.scale.set(Math.max(.1, size.x), Math.max(.1, size.z), 1)
+      }
     }
     if (slot.performance === 'typing') applyTypingPose(gpu.root, slot, sceneSeconds)
   }
