@@ -1,6 +1,8 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
 import { createTransformGizmo, type TransformMode, type TransformPatch } from './transformGizmo.ts'
 import { TextureLoader } from 'three'
+import { estimateFace, FACE_PROFILES, type FaceProfile } from './speech/calibration'
+import type { FacePlacement } from './speech/types'
 import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js'
 import { adoptCafeMaps, loadCafeMaps } from './cafeSet.ts'
 import { syncDressing } from './dressing.ts'
@@ -46,6 +48,7 @@ export type Scene3DStageHandle = {
   restoreSize: () => void
   beginExport: (document: Scene3DDocument) => void
   endExport: () => void
+  facePlacement?: (slotId: string, profile: FaceProfile) => FacePlacement | undefined
 }
 
 function loadSlotGltf(
@@ -70,6 +73,7 @@ function loadSlotGltf(
         disposeObject(gltf.scene)
         return
       }
+      gltf.scene.userData.speechPlacements = Object.fromEntries(FACE_PROFILES.map(profile => [profile, estimateFace(gltf.scene, profile)]))
       const baseScale = fitGltf(gltf.scene, live)
       placeSlot(world, live, gltf.scene, gltf.animations, baseScale, true)
       onClips?.(live.id, catalogFromClips(gltf.animations))
@@ -117,6 +121,8 @@ export const Scene3DStage = forwardRef<Scene3DStageHandle, Props>(function Scene
   const interactionRef = useRef({ onTransform, onSelect })
   useEffect(() => { interactionRef.current = { onTransform, onSelect } }, [onTransform, onSelect])
   const documentRef = useRef(document)
+  const secondsRef = useRef(sceneSeconds)
+  useEffect(() => { secondsRef.current = sceneSeconds }, [sceneSeconds])
   const onSlotClipsRef = useRef(onSlotClips)
   const exportLockRef = useRef<Scene3DDocument | null>(null)
 
@@ -148,6 +154,10 @@ export const Scene3DStage = forwardRef<Scene3DStageHandle, Props>(function Scene
       const world = worldRef.current
       const host = hostRef.current
       if (world && host) resizeWorld(world, host)
+    },
+    facePlacement(slotId, profile) {
+      const placement = worldRef.current?.slots.get(slotId)?.root.userData.speechPlacements?.[profile] as FacePlacement | undefined
+      return placement ? structuredClone(placement) : undefined
     },
     beginExport(next) {
       gizmoRef.current?.hide()
@@ -236,7 +246,10 @@ export const Scene3DStage = forwardRef<Scene3DStageHandle, Props>(function Scene
         loadSlotImage(world, slot, gone, live)
         continue
       }
-      loadSlotGltf(world, slot, loader, gone, live, (slotId, clips) => onSlotClipsRef.current?.(slotId, clips))
+      loadSlotGltf(world, slot, loader, gone, live, (slotId, clips) => {
+        onSlotClipsRef.current?.(slotId, clips)
+        paintWorld(world, documentRef.current, secondsRef.current)
+      })
     }
   }, [document.slots])
 

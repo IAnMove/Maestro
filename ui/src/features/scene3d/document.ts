@@ -76,7 +76,8 @@ export function parseScene3DDocument(raw: unknown): Scene3DDocument | null {
   if (value.version !== 1 || value.units !== 'meters' || value.up !== 'y') return null
   if (!Array.isArray(value.slots) || !value.camera || !value.light) return null
   if (!validScene3DShape(value)) return null
-  const slots = value.slots.map(normalizeScene3DSlot)
+  let slots: Scene3DSlot[]
+  try { slots = value.slots.map(normalizeScene3DSlot) } catch { return null }
   const templateId: Scene3DTemplateId = typeof value.templateId === 'string'
     && (SCENE3D_TEMPLATE_IDS as readonly string[]).includes(value.templateId)
     ? value.templateId as Scene3DTemplateId

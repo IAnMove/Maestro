@@ -1,4 +1,6 @@
 import { CINEMATIC_TEMPLATE_IDS } from './cinematicTemplateIds'
+import { SPEECH_TEMPLATE_IDS } from './speech/templateIds'
+import type { Scene3DSpeech } from './speech/types'
 
 export type Vec3 = readonly [number, number, number]
 
@@ -20,6 +22,7 @@ export type Scene3DCameraFamily =
 export type Scene3DSlotId = 'subject_1' | 'subject_2' | 'background' | 'prop'
 
 export const SCENE3D_TEMPLATE_IDS = [
+  ...SPEECH_TEMPLATE_IDS,
   'two-shot',
   'product-orbit',
   'hero-push',
@@ -109,6 +112,7 @@ export type Scene3DSlot = {
   scale: number
   sourceUrl: string
   sourceRef?: Scene3DSourceRef
+  speech?: Scene3DSpeech
   media: Scene3DSlotMedia
   surface?: 'wall' | 'floor'
   textureRepeat?: number

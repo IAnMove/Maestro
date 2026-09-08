@@ -1,4 +1,5 @@
 import { ArrayBufferTarget, Muxer } from 'mp4-muxer'
+import { encodeSpeechAudio } from './speech/encodeAudio'
 import { scene3dFrameCount, scene3dFrameTime } from './clock.ts'
 import { scene3dCopy } from './copy.ts'
 
@@ -34,6 +35,7 @@ export async function encodeWorld3DFrames(options: {
   fps: number
   duration: number
   paint: (seconds: number) => HTMLCanvasElement
+  audio?: AudioBuffer
   onProgress?: (index: number, count: number) => void
   overlay?: (context: CanvasRenderingContext2D, width: number, height: number, seconds: number) => void
 }): Promise<Blob> {
@@ -64,6 +66,7 @@ export async function encodeWorld3DFrames(options: {
     target,
     video: { codec: 'avc', width: size.width, height: size.height, frameRate: plan.fps },
     fastStart: 'in-memory',
+    audio: options.audio ? { codec: 'aac', numberOfChannels: 1, sampleRate: options.audio.sampleRate } : undefined,
     firstTimestampBehavior: 'strict',
   })
   let encoderError: Error | null = null
@@ -74,6 +77,7 @@ export async function encodeWorld3DFrames(options: {
   encoder.configure(supported.config)
   const frameDurationUs = Math.round(1_000_000 / plan.fps)
   try {
+    if (options.audio) await encodeSpeechAudio(muxer, options.audio)
     for (let index = 0; index < plan.count; index += 1) {
       if (encoderError) throw encoderError
       const source = options.paint(plan.times[index] ?? 0)
@@ -91,6 +95,6 @@ export async function encodeWorld3DFrames(options: {
     muxer.finalize()
     return new Blob([target.buffer], { type: 'video/mp4' })
   } finally {
-    encoder.close()
+    if (encoder.state !== 'closed') encoder.close()
   }
 }
