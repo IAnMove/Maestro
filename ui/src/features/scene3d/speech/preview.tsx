@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { Scene3DDocument } from '../types'
 import { scene3dPlaybackSpeed } from '../clock'
 import { useUiTranslation } from '../../../i18n'
+import { sceneVoiceTracks } from './timeline'
 
 export function SceneSpeechAudio({ document, seconds, playing }: { document: Scene3DDocument; seconds: number; playing: boolean }) {
   const { t } = useUiTranslation('scene3dEditor')
@@ -10,18 +11,17 @@ export function SceneSpeechAudio({ document, seconds, playing }: { document: Sce
   useEffect(() => () => { for (const audio of players.current.values()) { audio.pause(); audio.removeAttribute('src'); audio.load() } players.current.clear() }, [])
   useEffect(() => {
     const wanted = new Set<string>()
-    for (const slot of document.slots) {
-      const voice = slot.speech
-      if (!voice?.enabled || !voice.audio) continue
-      wanted.add(slot.id)
-      let audio = players.current.get(slot.id)
+    for (const voice of sceneVoiceTracks(document)) {
+      if (!voice.audio) continue
+      wanted.add(voice.key)
+      let audio = players.current.get(voice.key)
       if (!audio || audio.dataset.source !== voice.audio.url) {
         audio?.pause(); audio = new Audio(voice.audio.url); audio.dataset.source = voice.audio.url; audio.preload = 'auto'
         // Match offline export: changing scene speed changes voice pitch, too.
         audio.preservesPitch = false
-        players.current.set(slot.id, audio)
+        players.current.set(voice.key, audio)
       }
-      const local = seconds - voice.start + voice.offset, active = playing && seconds >= voice.start && (!Number.isFinite(audio.duration) || local < audio.duration)
+      const local = seconds - voice.start + voice.offset, active = playing && seconds >= voice.start && seconds < Math.min(document.duration, voice.end ?? document.duration) && (!Number.isFinite(audio.duration) || local < audio.duration)
       audio.volume = Math.min(1, voice.gain); audio.playbackRate = scene3dPlaybackSpeed(document.playbackSpeed)
       if (!active) audio.pause()
       if (audio.readyState > 0 && Math.abs(audio.currentTime - Math.max(0, local)) > .12) audio.currentTime = Math.max(0, local)

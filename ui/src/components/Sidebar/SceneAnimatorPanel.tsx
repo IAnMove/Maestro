@@ -2756,7 +2756,19 @@ export function SceneAnimatorPanel() {
       setRhythmBusy(false)
     }
   }), [outputs, selectedId, updateScene, t])
+  const animateModelDialogue = async () => {
+    if (playing || recording || publishing || cutoutDialogueBusy) return
+    if (selected?.type !== 'model3d' || !selectedDialogueTrack) { setMessage(t('animator.attachSpeechFirst')); return }
+    const snapshot = structuredClone(scene)
+    setCutoutDialogueBusy(true)
+    try {
+      const { speakLegacyModel } = await import('../../features/scene3d/speech/prepareProduction')
+      await speakLegacyModel(snapshot, selected.id, selectedDialogueTrack.id, workspace, cutoutDialogueStart, cutoutDialogueEnd, cutoutDialogueText)
+    } catch (error) { setMessage(error instanceof Error ? error.message : String(error)) }
+    finally { setCutoutDialogueBusy(false) }
+  }
   const animateCutoutDialogue = () => {
+    if (selected?.type === 'model3d') { void animateModelDialogue(); return }
     const text = cutoutDialogueText.trim()
     if (!text) { setMessage(t('animator.writeDialogueFirst')); return }
     const poseLayerId = selected?.faceBinding?.poseLayerId
@@ -2781,6 +2793,7 @@ export function SceneAnimatorPanel() {
     setMessage(t('animator.animatedMouths', { beats: plan.visemes.length, states: Object.keys(frames).length }))
   }
   const animateCutoutDialogueFromAudio = async () => {
+    if (selected?.type === 'model3d') { await animateModelDialogue(); return }
     const poseLayerId = selected?.faceBinding?.poseLayerId
       ?? (selected?.relationship?.type === 'parent' && isCutoutFaceLayer(selected) ? selected.relationship.targetLayerId : undefined)
       ?? (selected && selected.type !== 'camera' && selected.type !== 'effect' && !isCutoutFaceLayer(selected) ? selected.id : undefined)

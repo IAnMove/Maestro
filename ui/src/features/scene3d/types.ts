@@ -1,6 +1,6 @@
 import { CINEMATIC_TEMPLATE_IDS } from './cinematicTemplateIds'
 import { SPEECH_TEMPLATE_IDS } from './speech/templateIds'
-import type { Scene3DSpeech } from './speech/types'
+import type { Scene3DSpeech, Scene3DSoundtrack } from './speech/types'
 
 export type Vec3 = readonly [number, number, number]
 
@@ -105,6 +105,7 @@ export type Scene3DSourceRef = {
 }
 
 export type Scene3DSlot = {
+  character?: { id: string; name: string }
   id: string
   slot: Scene3DSlotId
   position: Vec3
@@ -158,6 +159,8 @@ export type Scene3DLight = {
 }
 
 export type Scene3DDocument = {
+  soundtrack?: Scene3DSoundtrack[]
+  production?: { kind: 'song' | 'dialogue' | 'episode' | 'trailer'; title: string; sourceId?: string; workspace: string }
   version: 1
   units: 'meters'
   up: 'y'

@@ -458,6 +458,9 @@ export function remountScene3DTemplate(id: Scene3DTemplateId, previous: Scene3DD
   const next = applyScene3DTemplate(id)
   next.playbackSpeed = previous.playbackSpeed
   next.clipNumber = previous.clipNumber
+  next.production = previous.production ? structuredClone(previous.production) : undefined
+  next.soundtrack = previous.soundtrack ? structuredClone(previous.soundtrack) : undefined
+  if (previous.production) next.duration = previous.duration
   next.texts = previous.texts ? structuredClone(previous.texts) : undefined
   next.width = previous.width
   next.height = previous.height
@@ -465,7 +468,7 @@ export function remountScene3DTemplate(id: Scene3DTemplateId, previous: Scene3DD
   if (!keepAssets) return next
   next.slots = next.slots.map(slot => {
     const old = previous.slots.find(item => item.slot === slot.slot && item.media === slot.media && item.sourceUrl)
-    return old ? { ...slot, sourceUrl: old.sourceUrl, sourceRef: old.sourceRef, clip: old.clip, clipPlayback: old.clipPlayback, speech: old.speech ? structuredClone(old.speech) : undefined } : slot
+    return old ? { ...slot, character: old.character, sourceUrl: old.sourceUrl, sourceRef: old.sourceRef, clip: old.clip, clipPlayback: old.clipPlayback, speech: old.speech ? structuredClone(old.speech) : undefined } : slot
   })
   return next
 }

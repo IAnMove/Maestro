@@ -13,13 +13,15 @@ import { decodeVoice, voiceWav } from './audio'
 import { importSpeechKit } from './kit'
 import { FaceControls, SpeechNumber, speechInput } from './FaceControls'
 
-export function Scene3DSpeechControls({ slot, workspace, disabled, calibrate, onChange, onImport, onFit }: {
+export type SpeechControlsProps = {
   slot: Scene3DSlot; workspace: string; disabled: boolean
   calibrate: (profile: FaceProfile) => FacePlacement | undefined
   onChange: (speech: Scene3DSpeech) => void
   onImport: (patch: Partial<Scene3DSlot>) => void
   onFit: (duration: number) => void
-}) {
+  onBusyChange?: (busy: boolean) => void
+}
+export function Scene3DSpeechControls({ slot, workspace, disabled, calibrate, onChange, onImport, onFit, onBusyChange }: SpeechControlsProps) {
   const { t } = useUiTranslation('scene3dEditor')
   const { t: sceneT } = useUiTranslation('scene3d')
   const speech = slot.speech ?? defaultSpeech()
@@ -28,6 +30,7 @@ export function Scene3DSpeechControls({ slot, workspace, disabled, calibrate, on
   const [profile, setProfile] = useState<FaceProfile>('generic')
   const [jobs] = useState(() => ({ serial: 0, controller: null as AbortController | null }))
   const jsonInput = useRef<HTMLInputElement>(null), kitInput = useRef<HTMLInputElement>(null)
+  useEffect(() => { onBusyChange?.(busy); return () => onBusyChange?.(false) }, [busy, onBusyChange])
   useEffect(() => {
     let alive = true
     void fetchOutputs(200, 0, { mediaType: 'audio', workspace }).then(result => { if (alive) setItems(result.outputs.filter(item => item.type === 'audio')) }).catch(() => {})
@@ -56,7 +59,7 @@ export function Scene3DSpeechControls({ slot, workspace, disabled, calibrate, on
   const audioValue: ApiOutput | undefined = speech.audio ? { name: speech.audio.filename, url: speech.audio.url, type: 'audio', mode: null, size: 0,
     created_at: 0, thumbnail_url: '', workspace_id: speech.audio.workspaceId, asset_id: speech.audio.assetId } : undefined
   return <section data-testid="scene3d-speech" className="space-y-3 rounded-xl border border-border bg-bg-secondary p-3 text-text-secondary">
-    <h3 className="text-sm font-semibold text-text-primary">{t('speech.option')} · {sceneT(`stage.slot.${slot.slot}`)}</h3>
+    <h3 className="text-sm font-semibold text-text-primary">{t('speech.option')} · {slot.character?.name || sceneT(`stage.slot.${slot.slot}`)}</h3>
     <p className="text-xs leading-5">{t('speech.intro')}</p>
     {!slot.sourceUrl && <p className="text-xs text-text-muted">{t('speech.chooseModel')}</p>}
     <fieldset disabled={disabled || busy} className="space-y-3 disabled:opacity-60">
@@ -74,7 +77,9 @@ export function Scene3DSpeechControls({ slot, workspace, disabled, calibrate, on
       <div className="flex flex-wrap gap-3">
         <button type="button" className={speechInput} disabled={!speech.audio} onClick={() => void run(async signal => {
           const buffer = await decodeVoice(speech.audio!.url)
-          const cues = await analyzeSceneSpeech(await voiceWav(buffer), signal)
+          const duration = Math.min(buffer.duration - speech.offset, (speech.end ?? speech.start + buffer.duration - speech.offset) - speech.start)
+          const localCues = await analyzeSceneSpeech(await voiceWav(buffer, speech.offset, duration), signal)
+          const cues = localCues.map(cue => ({ ...cue, start: cue.start + speech.offset, end: cue.end + speech.offset }))
           return () => onChange({ ...speech, cues, driver: 'rhubarb' })
         })}>{t('speech.analyze')}</button>
         <button type="button" className={speechInput} disabled={!speech.cues.length} onClick={() => onFit(Math.max(.1, speech.start + (speech.cues.at(-1)?.end ?? 0) - speech.offset))}>{t('speech.fit')}</button>
@@ -83,7 +88,7 @@ export function Scene3DSpeechControls({ slot, workspace, disabled, calibrate, on
       {speech.driver === 'amplitude' && <p className="text-xs text-amber-200">{t('speech.amplitudeHint')}</p>}
       <div className="flex flex-wrap gap-3">
         <SpeechNumber label={t('speech.start')} value={speech.start} min={0} max={600} step={.1} onChange={start => onChange({ ...speech, start })} />
-        <SpeechNumber label={t('speech.offset')} value={speech.offset} min={0} max={90} step={.1} onChange={offset => onChange({ ...speech, offset })} />
+        <SpeechNumber label={t('speech.offset')} value={speech.offset} min={0} max={600} step={.1} onChange={offset => onChange({ ...speech, offset })} />
         <SpeechNumber label={t('speech.gain')} value={speech.gain} min={0} max={1} step={.05} onChange={gain => onChange({ ...speech, gain })} />
       </div>
       <FaceControls speech={speech} onChange={onChange} />

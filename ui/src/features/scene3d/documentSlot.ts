@@ -12,6 +12,8 @@ function textureRepeat(value: unknown) {
 }
 
 export function normalizeScene3DSlot(slot: Scene3DSlot): Scene3DSlot {
+  if (slot.character !== undefined && (!slot.character || typeof slot.character.id !== 'string' || !slot.character.id || slot.character.id.length > 160
+    || typeof slot.character.name !== 'string' || slot.character.name.length > 300)) throw new Error('Invalid character identity.')
   const sourceUrl = durableScene3DSourceUrl(typeof slot.sourceUrl === 'string' ? slot.sourceUrl : '')
   const sourceRef = parseScene3DSourceRef(slot.sourceRef)
   return {
