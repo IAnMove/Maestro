@@ -32,7 +32,7 @@ for shot in plan['shots']:
     clips.append({'name': f'CLIP {number:02} — {shot["title"]}',
                   'source': saved['url'] + '?' + urllib.parse.urlencode({'workspace': args.workspace}),
                   'trim_start': shot.get('trim_start', 0),
-                  'trim_end': shot.get('trim_end', shot['document']['duration']),
+                  'trim_end': shot.get('trim_end', 0),
                   'muted': True, 'volume': 0, 'fit': 'contain', 'transition': 'none'})
 body = {'name': args.name or plan['title'], 'workspace': args.workspace,
         'width': 1280, 'height': 720, 'fps': 30, 'clips': clips,
