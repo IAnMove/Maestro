@@ -32,6 +32,8 @@ import { performanceClipTime, slotPoseAtTime } from './performance.ts'
 import { cylinderUvOffset, isCylinderBackdrop, slotMountKey } from './backdrop.ts'
 import { scene3dSlotColor } from './document.ts'
 import { paintDrive } from './driveMotion.ts'
+import { applyTypingPose, resetTypingPose } from './typingPose.ts'
+import { paintWorkshop } from './workshopSet.ts'
 import { paintCitadel } from './citadelSet.ts'
 import type { Scene3DClipCatalogEntry, Scene3DDocument, Scene3DLight, Scene3DSlot } from './types.ts'
 
@@ -55,6 +57,7 @@ export type SlotGpu = {
   loopSpeed: number
   looping: boolean
   loaded: boolean
+  contactShadow?: Mesh
 }
 
 export type GpuWorld = {
@@ -146,10 +149,17 @@ export function makeStripeTexture(): Texture {
 }
 
 export function imageBackdropMesh(slot: Scene3DSlot, texture: Texture | null): Mesh {
-  const material = new MeshBasicMaterial({
+  if (texture && slot.surface) {
+    texture.wrapT = RepeatWrapping
+    const repeat = slot.textureRepeat ?? (slot.surface === 'floor' ? 4 : 2)
+    texture.repeat.set(repeat, repeat)
+    texture.needsUpdate = true
+  }
+  const MaterialType = slot.surface ? MeshStandardMaterial : MeshBasicMaterial
+  const material = new MaterialType({
     map: texture,
     color: texture ? 0xffffff : 0x243044,
-    depthWrite: false,
+    depthWrite: Boolean(slot.surface),
     side: isCylinderBackdrop(slot) ? BackSide : DoubleSide,
   })
   const scale = Math.max(0.05, slot.scale)
@@ -162,7 +172,9 @@ export function imageBackdropMesh(slot: Scene3DSlot, texture: Texture | null): M
     return mesh
   }
   const mesh = new Mesh(new PlaneGeometry(2, 1.125), material)
-  mesh.position.set(slot.position[0], slot.position[1] + 2.2, slot.position[2])
+  mesh.rotation.order = 'YXZ'
+  mesh.position.set(slot.position[0], slot.position[1] + (slot.surface === 'floor' ? 0 : 2.2), slot.position[2])
+  mesh.rotation.x = slot.surface === 'floor' ? -Math.PI / 2 : 0
   mesh.rotation.y = slot.rotationY
   mesh.scale.setScalar(scale)
   mesh.renderOrder = -1
@@ -231,6 +243,10 @@ export function dropSlot(world: GpuWorld, slotId: string) {
   if (!current) return
   current.mixer?.stopAllAction()
   world.scene.remove(current.root)
+  if (current.contactShadow) {
+    world.scene.remove(current.contactShadow)
+    disposeObject(current.contactShadow)
+  }
   disposeObject(current.root)
   world.slots.delete(slotId)
 }
@@ -245,7 +261,13 @@ export function placeSlot(
 ) {
   dropSlot(world, slot.id)
   world.scene.add(root)
+  const contactShadow = slot.media === 'model3d' ? new Mesh(new CircleGeometry(.4, 24), new MeshBasicMaterial({ color: 0x03070d, transparent: true, opacity: .25, depthWrite: false })) : undefined
+  if (contactShadow) {
+    contactShadow.rotation.x = -Math.PI / 2
+    world.scene.add(contactShadow)
+  }
   world.slots.set(slot.id, {
+    contactShadow,
     sourceUrl: slot.sourceUrl,
     mountKey: slotMountKey(slot),
     clipKey: clipKeyOf(slot.clip),
@@ -285,16 +307,23 @@ export function paintWorld(world: GpuWorld, document: Scene3DDocument, sceneSeco
   world.camera.updateProjectionMatrix()
   applyLoopOffset(world, sceneSeconds)
   paintCitadel(world.dressing, sceneSeconds)
+  paintWorkshop(world.dressing, sceneSeconds, document.workshopScreen)
   const bg = document.slots.find(isCylinderBackdrop)
   paintDrive(world, sceneSeconds, bg?.loop?.speed ?? world.driveSpeed)
   for (const slot of posedSlots) {
     const gpu = world.slots.get(slot.id)
     if (!gpu) continue
     poseLoadedSlot(gpu, slot)
-    if (!gpu.mixer) continue
+    resetTypingPose(gpu.root)
     const clip = gpu.animations.find((_clip: { duration?: number }, index: number) => clipMatches(gpu, index))
     const local = performanceClipTime(sceneSeconds, clip?.duration ?? null, slot.clipPlayback)
-    if (local != null && clip) seekBoundMixer(gpu.mixer, clip, local)
+    if (local != null && clip && gpu.mixer) seekBoundMixer(gpu.mixer, clip, local)
+    if (slot.grounded && gpu.kind === 'model') {
+      gpu.root.updateMatrixWorld(true)
+      const bounds = new Box3().setFromObject(gpu.root, true)
+      if (Number.isFinite(bounds.min.y)) gpu.root.position.y += slot.position[1] - bounds.min.y
+    }
+    if (slot.performance === 'typing') applyTypingPose(gpu.root, slot, sceneSeconds)
   }
   world.renderer.render(world.scene, world.camera)
 }
@@ -383,6 +412,10 @@ export function resizeWorld(world: GpuWorld, host: HTMLDivElement) {
 }
 
 export function poseLoadedSlot(current: SlotGpu, slot: Scene3DSlot) {
+  if (current.contactShadow) {
+    current.contactShadow.position.set(slot.position[0], slot.position[1] + .025, slot.position[2])
+    current.contactShadow.scale.set(slot.scale, slot.scale * .65, 1)
+  }
   current.loopSpeed = slot.loop?.speed ?? 0
   current.looping = isCylinderBackdrop(slot)
   const scale = Math.max(0.05, slot.scale)
@@ -393,7 +426,9 @@ export function poseLoadedSlot(current: SlotGpu, slot: Scene3DSlot) {
     return
   }
   if (current.kind === 'image') {
-    current.root.position.set(slot.position[0], slot.position[1] + 2.2, slot.position[2])
+    current.root.rotation.order = 'YXZ'
+    current.root.position.set(slot.position[0], slot.position[1] + (slot.surface === 'floor' ? 0 : 2.2), slot.position[2])
+    current.root.rotation.x = slot.surface === 'floor' ? -Math.PI / 2 : 0
     current.root.rotation.y = slot.rotationY
     current.root.scale.setScalar(scale)
     return

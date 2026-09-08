@@ -190,6 +190,14 @@
     "victory-circle": {
       "title": "Victory circle",
       "description": "A celebration orbit around three characters on a server stage."
+    },
+    "coder-room": {
+      "title": "Coder workshop",
+      "description": "A desk, keyboard and animated code screen in an open room."
+    },
+    "clone-chase": {
+      "title": "Street pursuit",
+      "description": "Travelling actors and a fixed street with visible ground markers."
     }
   },
   "gallerySearch": "Search the catalog",
@@ -208,5 +216,27 @@
   "duration": "Duration (s)",
   "saveDocument": "Save shot JSON",
   "loadDocument": "Open shot JSON",
-  "invalidDocument": "Could not open: this is not a valid 3D shot file."
+  "invalidDocument": "Could not open: this is not a valid 3D shot file.",
+  "travel": {
+    "title": "Travel through the scene",
+    "help": "The transform panel sets the starting position. Define the destination here; the path lasts for the shot.",
+    "to": "Destination",
+    "via": "Curve control",
+    "face": "Face the direction of travel",
+    "curve": "Curved path",
+    "ease": "Ease in and out",
+    "distance": "Straight distance: {{distance}} m · {{speed}} m/s",
+    "floor": "Use image as a floor texture",
+    "surface": "Image use",
+    "backdrop": "Backdrop",
+    "wall": "Wall texture",
+    "ground": "Rest model on the ground",
+    "typing": "Keyboard gesture",
+    "typingHelp": "Keyboard gesture for compatible characters. Use it with the programmer room template and keep the character close to the desk.",
+    "screen": "Monitor",
+    "code": "Coding",
+    "error": "Build failed",
+    "success": "Build passed",
+    "repeat": "Texture repetitions"
+  }
 }

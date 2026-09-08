@@ -582,6 +582,7 @@ export interface SceneLayer {
 }
 
 export interface Scene {
+  texts?: import('../lib/kineticText').KineticText[]
   version: 1
   name: string
   /** Recipe asset-job restriction, retained through save/reload. Not a global

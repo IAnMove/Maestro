@@ -9,6 +9,7 @@ const vector = (value: unknown) => Array.isArray(value) && value.length === 3 &&
 function validCamera(camera: Scene3DCamera) {
   if (!vector(camera.eye) || !vector(camera.look) || !positive(camera.fov) || camera.fov >= 180) return false
   if (!CAMERA_FAMILIES.has(camera.family)) return false
+  if ([camera.targetOffset, camera.eyeOffset].some(value => value != null && !vector(value))) return false
   const optionalNumbers = [camera.orbitRadius, camera.orbitHeight, camera.orbitTurns]
   if (!optionalNumbers.every(value => value == null || finite(value))) return false
   return camera.orbitRadius == null || camera.orbitRadius > 0

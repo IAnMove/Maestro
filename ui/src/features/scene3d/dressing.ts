@@ -1,3 +1,5 @@
+import { workshopGroup } from './workshopSet.ts'
+import { chaseGroup } from './chaseSet.ts'
 import {
   BoxGeometry,
   Color,
@@ -72,6 +74,8 @@ export function syncDressing(
   clearDrive(world)
   world.floor.visible = kind !== 'space' && kind !== 'treadmill' && kind !== 'cafe' && !isDriveDressing(kind)
   if (kind === 'street') world.dressing = streetGroup()
+  if (kind === 'workshop') world.dressing = workshopGroup()
+  if (kind === 'chase-street') world.dressing = chaseGroup()
   if (kind === 'citadel') world.dressing = citadelGroup()
   if (kind === 'space') world.dressing = spaceGroup()
   if (kind === 'cafe') world.dressing = cafeGroup(maps?.cafe ?? { facade: null, floor: null, back: null })

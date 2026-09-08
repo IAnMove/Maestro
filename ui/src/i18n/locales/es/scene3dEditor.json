@@ -190,6 +190,14 @@
     "victory-circle": {
       "title": "Círculo de victoria",
       "description": "Órbita de celebración con tres personajes en un escenario de servidores."
+    },
+    "coder-room": {
+      "title": "Cuarto del programador",
+      "description": "Mesa, teclado y pantalla de código animada en un cuarto abierto."
+    },
+    "clone-chase": {
+      "title": "Persecución por el barrio",
+      "description": "Personajes en movimiento y calle fija con referencias visibles en el suelo."
     }
   },
   "gallerySearch": "Buscar en el catálogo",
@@ -208,5 +216,27 @@
   "duration": "Duración (s)",
   "saveDocument": "Guardar plano JSON",
   "loadDocument": "Abrir plano JSON",
-  "invalidDocument": "No se pudo abrir: el archivo no es un plano 3D válido."
+  "invalidDocument": "No se pudo abrir: el archivo no es un plano 3D válido.",
+  "travel": {
+    "title": "Desplazarse por el escenario",
+    "help": "El panel de transformación fija la posición inicial. Aquí defines el destino; el recorrido dura todo el plano.",
+    "to": "Destino",
+    "via": "Control de curva",
+    "face": "Orientarse según el recorrido",
+    "curve": "Trayectoria curva",
+    "ease": "Entrada y salida suaves",
+    "distance": "Distancia recta: {{distance}} m · {{speed}} m/s",
+    "floor": "Usar imagen como textura de suelo",
+    "surface": "Uso de la imagen",
+    "backdrop": "Fondo",
+    "wall": "Textura de pared",
+    "ground": "Apoyar el modelo en el suelo",
+    "typing": "Gesto de teclear",
+    "typingHelp": "Gesto para personajes compatibles. Úsalo con la plantilla del cuarto del programador y coloca al personaje cerca de la mesa.",
+    "screen": "Monitor",
+    "code": "Programando",
+    "error": "Build fallido",
+    "success": "Build correcto",
+    "repeat": "Repeticiones de textura"
+  }
 }

@@ -69,10 +69,10 @@ test('3D templates, playback speed and object transforms work in the editor', as
   await expect(workspace.getByLabel('Size', { exact: true })).not.toHaveValue('1')
   await workspace.getByRole('button', { name: 'Reset transform' }).click()
 
-  await workspace.locator('summary').click()
+  await workspace.locator('summary').filter({ hasText: 'Shot library' }).click()
   await workspace.getByRole('searchbox', { name: 'Search templates' }).fill('portrait')
   await workspace.getByTestId('world3d-template-portrait-arc').click()
-  await workspace.locator('summary').click()
+  await workspace.locator('summary').filter({ hasText: 'Shot library' }).click()
   await expect(workspace.getByRole('slider', { name: 'Scene position' })).toHaveValue('0')
   await expect(workspace.getByRole('combobox', { name: 'Speed', exact: true })).toHaveValue('2')
   await workspace.getByRole('button', { name: 'Scale', exact: true }).click()

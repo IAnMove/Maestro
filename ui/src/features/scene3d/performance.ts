@@ -16,6 +16,8 @@ export function parseMotion(raw: unknown): Scene3DMotion | undefined {
   if (!Array.isArray(value.to) || value.to.length !== 3 || !value.to.every(Number.isFinite)) return undefined
   return {
     to: [...value.to] as unknown as Vec3,
+    via: Array.isArray(value.via) && value.via.length === 3 && value.via.every(Number.isFinite) ? [...value.via] as unknown as Vec3 : undefined,
+    faceTravel: value.faceTravel === true,
     turnTo: typeof value.turnTo === 'number' && Number.isFinite(value.turnTo) ? value.turnTo : undefined,
     easing: value.easing === 'smooth' ? 'smooth' : 'linear',
   }
@@ -25,9 +27,18 @@ export function slotPoseAtTime(slot: Scene3DSlot, seconds: number, duration: num
   if (!slot.motion) return { position: slot.position, rotationY: slot.rotationY }
   const progress = Math.max(0, Math.min(1, seconds / Math.max(0.001, duration)))
   const t = slot.motion.easing === 'smooth' ? progress * progress * (3 - 2 * progress) : progress
+  const via = slot.motion.via
+  const position = slot.position.map((v, i) => via
+    ? (1 - t) ** 2 * v + 2 * (1 - t) * t * via[i] + t * t * slot.motion!.to[i]
+    : v + (slot.motion!.to[i] - v) * t) as unknown as Vec3
+  const tangent = slot.position.map((v, i) => via
+    ? 2 * (1 - t) * (via[i] - v) + 2 * t * (slot.motion!.to[i] - via[i])
+    : slot.motion!.to[i] - v)
+  const facing = slot.motion.faceTravel && Math.hypot(tangent[0], tangent[2]) > .0001
+    ? Math.atan2(tangent[0], tangent[2]) : slot.rotationY + ((slot.motion.turnTo ?? slot.rotationY) - slot.rotationY) * t
   return {
-    position: slot.position.map((v, i) => v + (slot.motion!.to[i] - v) * t) as unknown as Vec3,
-    rotationY: slot.rotationY + ((slot.motion.turnTo ?? slot.rotationY) - slot.rotationY) * t,
+    position,
+    rotationY: facing,
   }
 }
 

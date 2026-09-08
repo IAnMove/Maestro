@@ -12,6 +12,8 @@ export type Scene3DTemplate = {
 
 export type Scene3DTemplateCategory = 'cinema' | 'product' | 'music' | 'space' | 'drive'
 export const TEMPLATE_CATEGORIES: Record<Scene3DTemplateId, Scene3DTemplateCategory> = {
+  'coder-room': 'cinema',
+  'clone-chase': 'cinema',
   'siege-ring': 'cinema',
   'spell-duel': 'cinema',
   'victory-circle': 'music',
@@ -54,6 +56,8 @@ export const TEMPLATE_CATEGORIES: Record<Scene3DTemplateId, Scene3DTemplateCateg
 }
 
 const CAMERA_PROFILES: Record<Scene3DTemplateId, Partial<Scene3DCamera>> = {
+  'coder-room': { eye: [3, 2.2, 3.9], look: [0, 1, -.4], fov: 42 },
+  'clone-chase': { orbitRadius: 8, fov: 52 },
   'siege-ring': { eye: [0.8, 3.5, 8], look: [0, 0.8, 0], fov: 46 },
   'spell-duel': { eye: [0, 1.6, 5.8], fov: 42 },
   'victory-circle': { orbitRadius: 6.7, orbitHeight: 1.4, orbitTurns: 0.22, fov: 46 },
@@ -135,9 +139,21 @@ export const SCENE3D_TEMPLATES: readonly Scene3DTemplate[] = [
   { id: 'siege-ring', camera: 'reveal', duration: 8, slots: ['subject_1', 'subject_2', 'prop'] },
   { id: 'spell-duel', camera: 'encounter', duration: 6, slots: ['subject_1', 'subject_2'] },
   { id: 'victory-circle', camera: 'orbit', duration: 8, slots: ['subject_1', 'subject_2', 'prop'] },
+  { id: 'coder-room', camera: 'establishment', duration: 7, slots: ['subject_1', 'background'] },
+  { id: 'clone-chase', camera: 'follow', duration: 7, slots: ['subject_1', 'subject_2', 'prop', 'background'] },
 ]
 
 const LAYOUTS: Record<Scene3DTemplateId, Partial<Record<Scene3DSlotId, Pick<Scene3DSlot, 'position' | 'rotationY' | 'scale'>>>> = {
+  'coder-room': {
+    subject_1: { position: [0, 0, .55], rotationY: Math.PI, scale: 1.05 },
+    background: { position: [0, .7, -4.8], rotationY: 0, scale: 6 },
+  },
+  'clone-chase': {
+    subject_1: { position: [-3, 0, 1], rotationY: Math.PI / 2, scale: 1.05 },
+    subject_2: { position: [-6, 0, -.3], rotationY: Math.PI / 2, scale: 1 },
+    prop: { position: [-7.5, 0, -1.5], rotationY: Math.PI / 2, scale: 1 },
+    background: { position: [0, 1, -6], rotationY: 0, scale: 13 },
+  },
   'siege-ring': {
     subject_1: { position: [0, 0, 0.7], rotationY: 0, scale: 1.1 },
     subject_2: { position: [-2.2, 0, -1], rotationY: 0.8, scale: 1 },
@@ -356,6 +372,9 @@ export function applyScene3DTemplate(id: Scene3DTemplateId): Scene3DDocument {
   const cool = category === 'space' || category === 'music'
   document.light = { kind: 'directional', direction: [-0.65, -1, -0.4], intensity: cool ? 1.4 : 1.3, color: cool ? '#dceaff' : '#fff0d9' }
   document.dressing = DRESSING_BY_TEMPLATE[template.id]
+  if (template.id === 'clone-chase') document.slots.forEach(slot => {
+    if (slot.media !== 'image') slot.motion = { to: [slot.position[0] + 14, slot.position[1], slot.position[2]], faceTravel: true }
+  })
   return document
 }
 
@@ -384,6 +403,8 @@ const CYLINDER_BY_TEMPLATE: Partial<Record<Scene3DTemplateId, { speed: number; p
 }
 
 const DRESSING_BY_TEMPLATE: Partial<Record<Scene3DTemplateId, Scene3DDocument['dressing']>> = {
+  'coder-room': 'workshop',
+  'clone-chase': 'chase-street',
   'siege-ring': 'citadel',
   'spell-duel': 'citadel',
   'victory-circle': 'citadel',
@@ -414,7 +435,7 @@ const DRESSING_BY_TEMPLATE: Partial<Record<Scene3DTemplateId, Scene3DDocument['d
 export function patchScene3DSlot(
   document: Scene3DDocument,
   slotId: string,
-  patch: Partial<Pick<Scene3DSlot, 'position' | 'rotationY' | 'scale' | 'sourceUrl' | 'sourceRef' | 'media' | 'clip' | 'clipPlayback' | 'motion' | 'loop'>>,
+  patch: Partial<Pick<Scene3DSlot, 'position' | 'rotationY' | 'scale' | 'sourceUrl' | 'sourceRef' | 'media' | 'clip' | 'clipPlayback' | 'motion' | 'loop' | 'surface' | 'performance' | 'grounded' | 'textureRepeat'>>,
 ): Scene3DDocument {
   return {
     ...document,
@@ -427,6 +448,7 @@ export function remountScene3DTemplate(id: Scene3DTemplateId, previous: Scene3DD
   const next = applyScene3DTemplate(id)
   next.playbackSpeed = previous.playbackSpeed
   next.clipNumber = previous.clipNumber
+  next.texts = previous.texts ? structuredClone(previous.texts) : undefined
   next.width = previous.width
   next.height = previous.height
   next.fps = previous.fps

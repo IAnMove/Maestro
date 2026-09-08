@@ -25,11 +25,11 @@ export function isImageBackdrop(slot: Pick<Scene3DSlot, 'media'>): boolean {
   return slot.media === 'image'
 }
 
-export function isCylinderBackdrop(slot: Pick<Scene3DSlot, 'media' | 'loop'>): boolean {
-  return slot.media === 'image' && slot.loop?.cylinder === true
+export function isCylinderBackdrop(slot: Pick<Scene3DSlot, 'media' | 'loop' | 'surface'>): boolean {
+  return slot.media === 'image' && slot.surface !== 'floor' && slot.loop?.cylinder === true
 }
 
-export function slotMountKey(slot: Pick<Scene3DSlot, 'sourceUrl' | 'media' | 'loop'>): string {
+export function slotMountKey(slot: Pick<Scene3DSlot, 'sourceUrl' | 'media' | 'loop' | 'surface' | 'textureRepeat'>): string {
   if (slot.media !== 'image') return `${slot.sourceUrl}\0glb`
-  return `${slot.sourceUrl}\0${slot.loop?.cylinder ? 'cyl' : 'plane'}`
+  return `${slot.sourceUrl}\0${isCylinderBackdrop(slot) ? 'cyl' : 'plane'}\0${slot.surface ?? ''}\0${slot.textureRepeat ?? ''}`
 }
