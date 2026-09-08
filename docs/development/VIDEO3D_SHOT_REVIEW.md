@@ -86,6 +86,12 @@ They survive scene/shot JSON, 2D recipe round trips and template changes, and
 are baked into MP4s. Preview uses a bounded canvas; final output uses the export
 resolution. Text draws over the image, below the optional clip number.
 
+The optional `font` field selects `sans` or `mono`. Monospace lettering provides
+terminal-style typography for either editor; the same font is used for measuring
+and painting. The default retains existing sans-serif output. Typeface choice
+survives shot files, 2D recipes and template changes; imports accept only the two
+known values rather than arbitrary CSS font strings.
+
 At most 12 cues and 240 characters per cue are accepted. Blank or invalid lists
 do not add new fields to legacy 2D scene files. Cue timing is local to a shot;
 3D global playback speed affects text and scene together. A recipe's scene text
