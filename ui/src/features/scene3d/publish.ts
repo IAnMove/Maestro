@@ -7,7 +7,7 @@ export function world3dRecordingStub(document: Scene3DDocument) {
   const size = world3dExportSize(document.width, document.height)
   return {
     version: 1 as const,
-    name: `world3d-${document.templateId || 'scene'}`,
+    name: `${document.clipNumber ? `clip-${String(document.clipNumber).padStart(2, '0')}-` : ''}world3d-${document.templateId || 'scene'}`,
     width: size.width,
     height: size.height,
     fps: document.fps === 60 ? 60 : 30,

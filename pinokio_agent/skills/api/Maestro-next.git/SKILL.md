@@ -17,6 +17,20 @@ The SHA-256 is an observation of the downloaded bytes, not proof that the server
 froze the file between catalog lookup and download. Preserve the manifest and
 observed hash together; do not claim a server-provided content-addressed identity.
 
+Use `clients/world3d_shots.mjs` during worktree UI development to open saved shot
+JSON through the editor and render through its existing export/publication flow.
+Pass `--cdp`, `--app-url`, `--plan`, `--output-dir`, and `--workspace`; the frontend
+must expose Vite source modules and use English UI controls. Set
+`PLAYWRIGHT_MODULE` only if Playwright is installed outside the client's module
+resolution path. `--preview-only` produces contact frames without MP4s. Existing
+local MP4s are skipped, so use a fresh output directory when changing a plan.
+
+Use `clients/world3d_assemble.py` to assemble those published shots and their
+soundtrack through Video Editor. Pass `--base-url`, `--plan`, `--render-dir`,
+`--workspace` and `--output`. Plans contain ordered shot documents, titles,
+source audio upload metadata, and optional source trim times. Validate the final
+frame count: Video Editor normalization can shorten silent source clips.
+
 ## Operations
 
 - `prepare-from-job`: copy durable outline/script stages from a recoverable planning job into the current episode and set its target duration through the episode API.
@@ -41,6 +55,12 @@ observed hash together; do not claim a server-provided content-addressed identit
 Every operation prints one JSON response to stdout. Planning and render starts return durable job IDs that can be polled after process or app restarts.
 
 ## Notes
+
+Scene Recordings expects audio in `scene.audioTracks`, with filenames located in
+the output workspace. Embedded input audio is discarded when that list is empty.
+Recordings and Video Editor responses may return an unscoped file URL; append the
+explicit request workspace when downloading it. Verify decoded frames, duration
+and audio rather than relying on a successful HTTP response alone.
 
 The server keeps canon snapshots immutable when an episode is saved. Applying a planning job performs its own stale-episode guard, so do not edit the episode between `start-plan` and `apply-plan`.
 

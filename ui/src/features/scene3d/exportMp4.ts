@@ -35,6 +35,7 @@ export async function encodeWorld3DFrames(options: {
   duration: number
   paint: (seconds: number) => HTMLCanvasElement
   onProgress?: (index: number, count: number) => void
+  overlay?: (context: CanvasRenderingContext2D, width: number, height: number) => void
 }): Promise<Blob> {
   if (!('VideoEncoder' in window) || typeof VideoEncoder.isConfigSupported !== 'function') {
     throw new Error(scene3dCopy('stage.cannotEncode'))
@@ -77,6 +78,7 @@ export async function encodeWorld3DFrames(options: {
       if (encoderError) throw encoderError
       const source = options.paint(plan.times[index] ?? 0)
       context.drawImage(source, 0, 0, size.width, size.height)
+      options.overlay?.(context, size.width, size.height)
       await nextPaint()
       const frame = new VideoFrame(copy, { timestamp: index * frameDurationUs, duration: frameDurationUs })
       encoder.encode(frame, { keyFrame: index % Math.max(1, plan.fps * 2) === 0 })

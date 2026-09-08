@@ -12,6 +12,9 @@ export type Scene3DTemplate = {
 
 export type Scene3DTemplateCategory = 'cinema' | 'product' | 'music' | 'space' | 'drive'
 export const TEMPLATE_CATEGORIES: Record<Scene3DTemplateId, Scene3DTemplateCategory> = {
+  'siege-ring': 'cinema',
+  'spell-duel': 'cinema',
+  'victory-circle': 'music',
   'two-shot': 'cinema',
   'product-orbit': 'product',
   'hero-push': 'cinema',
@@ -51,6 +54,9 @@ export const TEMPLATE_CATEGORIES: Record<Scene3DTemplateId, Scene3DTemplateCateg
 }
 
 const CAMERA_PROFILES: Record<Scene3DTemplateId, Partial<Scene3DCamera>> = {
+  'siege-ring': { eye: [0.8, 3.5, 8], look: [0, 0.8, 0], fov: 46 },
+  'spell-duel': { eye: [0, 1.6, 5.8], fov: 42 },
+  'victory-circle': { orbitRadius: 6.7, orbitHeight: 1.4, orbitTurns: 0.22, fov: 46 },
   'two-shot': { eye: [0, 1.65, 5.6], fov: 44 },
   'product-orbit': { orbitRadius: 3.6, orbitHeight: 0.35, orbitTurns: 0.65, fov: 40 },
   'hero-push': { eye: [0.25, 1.15, 4.5], fov: 40 },
@@ -126,9 +132,26 @@ export const SCENE3D_TEMPLATES: readonly Scene3DTemplate[] = [
   { id: 'drive-coast-reveal', camera: 'reveal', duration: 9, slots: ['background'] },
   { id: 'drive-city-wide', camera: 'musical', duration: 10, slots: ['background'] },
   { id: 'drive-tunnel-wing', camera: 'wing', duration: 8, slots: ['background'] },
+  { id: 'siege-ring', camera: 'reveal', duration: 8, slots: ['subject_1', 'subject_2', 'prop'] },
+  { id: 'spell-duel', camera: 'encounter', duration: 6, slots: ['subject_1', 'subject_2'] },
+  { id: 'victory-circle', camera: 'orbit', duration: 8, slots: ['subject_1', 'subject_2', 'prop'] },
 ]
 
 const LAYOUTS: Record<Scene3DTemplateId, Partial<Record<Scene3DSlotId, Pick<Scene3DSlot, 'position' | 'rotationY' | 'scale'>>>> = {
+  'siege-ring': {
+    subject_1: { position: [0, 0, 0.7], rotationY: 0, scale: 1.1 },
+    subject_2: { position: [-2.2, 0, -1], rotationY: 0.8, scale: 1 },
+    prop: { position: [2.2, 0, -1], rotationY: -0.8, scale: 1 },
+  },
+  'spell-duel': {
+    subject_1: { position: [-1, 0, 0.4], rotationY: 1.1, scale: 1.1 },
+    subject_2: { position: [1.1, 0, -0.2], rotationY: -1.1, scale: 1 },
+  },
+  'victory-circle': {
+    subject_1: { position: [0, 0, 0.7], rotationY: 0, scale: 1.1 },
+    subject_2: { position: [-1.8, 0, -0.5], rotationY: 0.25, scale: 1 },
+    prop: { position: [1.8, 0, -0.5], rotationY: -0.25, scale: 1 },
+  },
   'portrait-arc': {
     subject_1: { position: [0, 0, 0], rotationY: 0.2, scale: 1 },
     background: { position: [0, 0, -6], rotationY: 0, scale: 8 },
@@ -361,6 +384,9 @@ const CYLINDER_BY_TEMPLATE: Partial<Record<Scene3DTemplateId, { speed: number; p
 }
 
 const DRESSING_BY_TEMPLATE: Partial<Record<Scene3DTemplateId, Scene3DDocument['dressing']>> = {
+  'siege-ring': 'citadel',
+  'spell-duel': 'citadel',
+  'victory-circle': 'citadel',
   'wide-tableau': 'street',
   'duet-stage': 'street',
   'cafe-duet': 'cafe',
@@ -388,7 +414,7 @@ const DRESSING_BY_TEMPLATE: Partial<Record<Scene3DTemplateId, Scene3DDocument['d
 export function patchScene3DSlot(
   document: Scene3DDocument,
   slotId: string,
-  patch: Partial<Pick<Scene3DSlot, 'position' | 'rotationY' | 'scale' | 'sourceUrl' | 'sourceRef' | 'media' | 'clip' | 'loop'>>,
+  patch: Partial<Pick<Scene3DSlot, 'position' | 'rotationY' | 'scale' | 'sourceUrl' | 'sourceRef' | 'media' | 'clip' | 'clipPlayback' | 'motion' | 'loop'>>,
 ): Scene3DDocument {
   return {
     ...document,
@@ -400,13 +426,14 @@ export function patchScene3DSlot(
 export function remountScene3DTemplate(id: Scene3DTemplateId, previous: Scene3DDocument, keepAssets = true): Scene3DDocument {
   const next = applyScene3DTemplate(id)
   next.playbackSpeed = previous.playbackSpeed
+  next.clipNumber = previous.clipNumber
   next.width = previous.width
   next.height = previous.height
   next.fps = previous.fps
   if (!keepAssets) return next
   next.slots = next.slots.map(slot => {
     const old = previous.slots.find(item => item.slot === slot.slot && item.media === slot.media && item.sourceUrl)
-    return old ? { ...slot, sourceUrl: old.sourceUrl, sourceRef: old.sourceRef, clip: old.clip } : slot
+    return old ? { ...slot, sourceUrl: old.sourceUrl, sourceRef: old.sourceRef, clip: old.clip, clipPlayback: old.clipPlayback } : slot
   })
   return next
 }

@@ -54,6 +54,9 @@ export const SCENE3D_TEMPLATE_IDS = [
   'drive-coast-reveal',
   'drive-city-wide',
   'drive-tunnel-wing',
+  'siege-ring',
+  'spell-duel',
+  'victory-circle',
 ] as const
 
 export type Scene3DTemplateId = (typeof SCENE3D_TEMPLATE_IDS)[number]
@@ -63,6 +66,18 @@ export type Scene3DClipRef = {
   name: string
 }
 
+export type Scene3DClipPlayback = {
+  speed?: number
+  start?: number
+  loop?: boolean
+}
+
+export type Scene3DMotion = {
+  to: Vec3
+  turnTo?: number
+  easing?: 'linear' | 'smooth'
+}
+
 export type Scene3DSlotMedia = 'model3d' | 'image'
 
 export type Scene3DLoop = {
@@ -70,7 +85,7 @@ export type Scene3DLoop = {
   speed: number
 }
 
-export type Scene3DDressing = 'none' | 'street' | 'space' | 'treadmill' | 'cafe' | 'drive-city' | 'drive-coast' | 'drive-tunnel'
+export type Scene3DDressing = 'none' | 'street' | 'space' | 'treadmill' | 'cafe' | 'drive-city' | 'drive-coast' | 'drive-tunnel' | 'citadel'
 
 export type Scene3DSourceRef = {
   workspaceId: string
@@ -89,6 +104,8 @@ export type Scene3DSlot = {
   sourceRef?: Scene3DSourceRef
   media: Scene3DSlotMedia
   clip: Scene3DClipRef | null
+  clipPlayback?: Scene3DClipPlayback
+  motion?: Scene3DMotion
   loop?: Scene3DLoop
 }
 
@@ -117,6 +134,8 @@ export type Scene3DDocument = {
   height: number
   fps: 24 | 30 | 60
   duration: number
+  /** Stable review number, baked into exported frames when present. */
+  clipNumber?: number
   /** Timeline rate; exported duration is duration / playbackSpeed. */
   playbackSpeed?: number
   templateId: Scene3DTemplateId

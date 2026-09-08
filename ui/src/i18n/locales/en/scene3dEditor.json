@@ -178,6 +178,18 @@
     "drive-tunnel-wing": {
       "title": "Tunnel profile",
       "description": "A low side camera shows the car within the tunnel."
+    },
+    "siege-ring": {
+      "title": "Citadel siege",
+      "description": "A central hero and two flanking enemies in a server citadel."
+    },
+    "spell-duel": {
+      "title": "Spell duel",
+      "description": "A sideways encounter with room for two characters to retreat."
+    },
+    "victory-circle": {
+      "title": "Victory circle",
+      "description": "A celebration orbit around three characters on a server stage."
     }
   },
   "gallerySearch": "Search the catalog",
@@ -185,5 +197,16 @@
   "galleryCount": "{{count}} templates",
   "focusEditor": "Expand editor",
   "exitFocus": "Exit fullscreen",
-  "fullscreenUnavailable": "This browser cannot enter fullscreen."
+  "fullscreenUnavailable": "This browser cannot enter fullscreen.",
+  "animation": "GLB animation",
+  "animationsLoading": "Loading GLB animations…",
+  "animationsEmpty": "This GLB has no animations.",
+  "animationSpeed": "Animation speed",
+  "animationStart": "Animation start (s)",
+  "animationLoop": "Loop animation",
+  "clipNumber": "Clip number",
+  "duration": "Duration (s)",
+  "saveDocument": "Save shot JSON",
+  "loadDocument": "Open shot JSON",
+  "invalidDocument": "Could not open: this is not a valid 3D shot file."
 }

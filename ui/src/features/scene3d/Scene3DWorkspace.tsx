@@ -4,6 +4,8 @@ import { AssetInput } from '../../features/asset-picker/AssetInput.tsx'
 import { useUiTranslation } from '../../i18n'
 import { useStore } from '../../stores/useStore'
 import { Scene3DTemplateBrowser } from './Scene3DTemplateBrowser'
+import { Scene3DAnimationControls } from './Scene3DAnimationControls'
+import { Scene3DDocumentControls } from './Scene3DDocumentControls'
 import { Scene3DTransport } from './Scene3DTransport'
 import { Scene3DTransformPanel } from './Scene3DTransformPanel'
 import type { TransformMode } from './transformGizmo'
@@ -53,7 +55,7 @@ export function Scene3DWorkspace({ width, height }: Props) {
   const { t: editorT } = useUiTranslation('scene3dEditor')
   const [transformMode, setTransformMode] = useState<TransformMode>('translate')
   const [keepAssets, setKeepAssets] = useState(true)
-  const [sceneDoc, setSceneDoc] = useState<Scene3DDocument>(() => applyScene3DTemplate('two-shot'))
+  const [sceneDoc, setSceneDoc] = useState<Scene3DDocument>(() => ({ ...applyScene3DTemplate('two-shot'), width, height }))
   const [playing, setPlaying] = useState(false)
   const [frame, setFrame] = useState(0)
   const [selectedId, setSelectedId] = useState('subject_1')
@@ -237,13 +239,24 @@ export function Scene3DWorkspace({ width, height }: Props) {
       <Scene3DTemplateBrowser selected={sceneDoc.templateId} disabled={exporting} onSelect={mountTemplate} />
       <label className="flex min-h-10 items-center gap-2 px-1 text-xs text-text-secondary"><input type="checkbox" checked={keepAssets} disabled={exporting} onChange={event => setKeepAssets(event.target.checked)} />{editorT('keepAssets')}</label>
       </details>
+      <Scene3DDocumentControls document={sceneDoc} disabled={exporting || playing}
+        onChange={next => { applyScene(next); setFrame(0) }}
+        onLoad={next => {
+          if (!canMutateWorld3DScene(exportingRef.current)) return
+          generationRef.current += 1
+          const keptUrls = new Set(next.slots.map(slot => slot.sourceUrl))
+          for (const slot of sceneDoc.slots) if (!keptUrls.has(slot.sourceUrl)) revokeIfBlob(slot.sourceUrl)
+          setCatalogs(current => retainSlotClipCatalogs(sceneDoc.slots, next.slots, current))
+          setPlaying(false); setFrame(0); applyScene(next)
+          setSelectedId(next.slots[0]?.id ?? 'subject_1')
+        }} />
       <Scene3DTransport playing={playing} disabled={exporting} seconds={seconds} duration={sceneDoc.duration} speed={speed}
         onToggle={() => { if (canMutateWorld3DScene(exportingRef.current)) setPlaying(current => !current) }}
         onSeek={time => { if (exportingRef.current) return; setPlaying(false); setFrame(Math.min(count - 1, Math.max(0, Math.round(time * fps)))) }}
         onSpeed={playbackSpeed => applyScene(current => ({ ...current, playbackSpeed }))} />
       <div
         className="relative w-full overflow-hidden rounded-lg border border-border bg-[#10141c]"
-        style={{ aspectRatio: `${width} / ${height}` }}
+        style={{ aspectRatio: `${sceneDoc.width} / ${sceneDoc.height}` }}
       >
         <Scene3DStage
           ref={stageRef}
@@ -256,6 +269,7 @@ export function Scene3DWorkspace({ width, height }: Props) {
           onTransform={(id, patch) => applyScene(current => patchScene3DSlot(current, id, patch))}
           onSlotClips={(slotId, clips) => setCatalogs(current => ({ ...current, [slotId]: clips }))}
         />
+        {sceneDoc.clipNumber && <div className="pointer-events-none absolute right-3 top-3 rounded bg-black/80 px-3 py-2 font-mono text-sm text-cyan-50">CLIP {String(sceneDoc.clipNumber).padStart(2, '0')}</div>}
         <div className="pointer-events-none absolute left-3 top-3 rounded-lg bg-black/75 px-3 py-2 text-xs text-cyan-200">
           {t('stage.badge')} · {editorT(`template.${sceneDoc.templateId}.title`)}
         </div>
@@ -270,7 +284,7 @@ export function Scene3DWorkspace({ width, height }: Props) {
         <button
           type="button"
           data-testid="world3d-export"
-          disabled={exporting || playing}
+          disabled={exporting || playing || Boolean(clipIssue)}
           onClick={() => void exportScene()}
           className="ml-auto min-h-11 rounded-lg border border-cyan-400/50 bg-cyan-400/10 px-4 text-xs font-semibold text-cyan-100 disabled:opacity-40"
         >
@@ -285,7 +299,6 @@ export function Scene3DWorkspace({ width, height }: Props) {
         }} />}
       <div className="grid gap-1.5 md:grid-cols-2">
         {sceneDoc.slots.map(slot => {
-          const clips = catalogs[slot.id] ?? []
           const capture: SlotSourceCapture = {
             generation: generationRef.current,
             slotId: slot.id,
@@ -312,27 +325,8 @@ export function Scene3DWorkspace({ width, height }: Props) {
                   onChoose={item => assignChoice(slot, capture, item)}
                 />
               </div>
-              {clips.length > 0 && (
-                <select
-                  className="mt-1 w-full rounded border border-border bg-bg-tertiary px-1 py-0.5 disabled:opacity-40"
-                  disabled={exporting}
-                  value={slot.clip ? `${slot.clip.index}\u001f${slot.clip.name}` : ''}
-                  onChange={event => {
-                    const value = event.target.value
-                    const split = value.indexOf('\u001f')
-                    applyScene(current => patchScene3DSlot(current, slot.id, {
-                      clip: value ? { index: Number(value.slice(0, split)) || 0, name: value.slice(split + 1) } : null,
-                    }))
-                  }}
-                >
-                  <option value="">{t('stage.noClip')}</option>
-                  {clips.map(clip => (
-                    <option key={`${clip.index}:${clip.name}`} value={`${clip.index}\u001f${clip.name}`}>
-                      {clip.index}: {clip.name}
-                    </option>
-                  ))}
-                </select>
-              )}
+              <Scene3DAnimationControls slot={slot} clips={catalogs[slot.id]} disabled={exporting || playing}
+                onChange={patch => applyScene(current => patchScene3DSlot(current, slot.id, patch))} />
               {slot.slot === 'background' && (
                 <InfiniteBackdropControls
                   loop={slot.loop}

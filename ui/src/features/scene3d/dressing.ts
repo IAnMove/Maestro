@@ -8,6 +8,7 @@ import {
   type Object3D,
 } from 'three'
 import { cafeGroup, type CafeMaps } from './cafeSet.ts'
+import { citadelGroup } from './citadelSet.ts'
 import { driveGroup, isDriveDressing, type DriveMaps } from './driveSet.ts'
 import { clearDrive } from './driveMotion.ts'
 import type { GpuWorld } from './gpu.ts'
@@ -71,6 +72,7 @@ export function syncDressing(
   clearDrive(world)
   world.floor.visible = kind !== 'space' && kind !== 'treadmill' && kind !== 'cafe' && !isDriveDressing(kind)
   if (kind === 'street') world.dressing = streetGroup()
+  if (kind === 'citadel') world.dressing = citadelGroup()
   if (kind === 'space') world.dressing = spaceGroup()
   if (kind === 'cafe') world.dressing = cafeGroup(maps?.cafe ?? { facade: null, floor: null, back: null })
   if (isDriveDressing(kind)) {

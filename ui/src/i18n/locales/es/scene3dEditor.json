@@ -178,6 +178,18 @@
     "drive-tunnel-wing": {
       "title": "Perfil en el túnel",
       "description": "Una cámara lateral baja muestra el coche dentro del túnel."
+    },
+    "siege-ring": {
+      "title": "Asedio a la ciudadela",
+      "description": "Protagonista en el centro y dos enemigos flanqueando una ciudadela de servidores."
+    },
+    "spell-duel": {
+      "title": "Duelo de hechizos",
+      "description": "Encuentro lateral entre dos personajes con espacio para retroceder."
+    },
+    "victory-circle": {
+      "title": "Círculo de victoria",
+      "description": "Órbita de celebración con tres personajes en un escenario de servidores."
     }
   },
   "gallerySearch": "Buscar en el catálogo",
@@ -185,5 +197,16 @@
   "galleryCount": "{{count}} plantillas",
   "focusEditor": "Ampliar editor",
   "exitFocus": "Salir de pantalla completa",
-  "fullscreenUnavailable": "Este navegador no permite la pantalla completa."
+  "fullscreenUnavailable": "Este navegador no permite la pantalla completa.",
+  "animation": "Animación del GLB",
+  "animationsLoading": "Cargando animaciones del GLB…",
+  "animationsEmpty": "Este GLB no contiene animaciones.",
+  "animationSpeed": "Velocidad de animación",
+  "animationStart": "Inicio en animación (s)",
+  "animationLoop": "Repetir animación",
+  "clipNumber": "Número de clip",
+  "duration": "Duración (s)",
+  "saveDocument": "Guardar plano JSON",
+  "loadDocument": "Abrir plano JSON",
+  "invalidDocument": "No se pudo abrir: el archivo no es un plano 3D válido."
 }

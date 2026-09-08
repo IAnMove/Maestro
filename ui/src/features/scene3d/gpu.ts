@@ -11,6 +11,7 @@ import {
   DirectionalLight,
   DoubleSide,
   HemisphereLight,
+  LoopOnce,
   Mesh,
   MeshBasicMaterial,
   MeshStandardMaterial,
@@ -27,10 +28,11 @@ import {
 } from 'three'
 import type { GLTF } from 'three/addons/loaders/GLTFLoader.js'
 import { cameraEyeAtTime, cameraLookAtTime } from './camera.ts'
-import { scene3dClipLocalTime } from './clock.ts'
+import { performanceClipTime, slotPoseAtTime } from './performance.ts'
 import { cylinderUvOffset, isCylinderBackdrop, slotMountKey } from './backdrop.ts'
 import { scene3dSlotColor } from './document.ts'
 import { paintDrive } from './driveMotion.ts'
+import { paintCitadel } from './citadelSet.ts'
 import type { Scene3DClipCatalogEntry, Scene3DDocument, Scene3DLight, Scene3DSlot } from './types.ts'
 
 export const CYLINDER_RADIUS = 12
@@ -209,8 +211,19 @@ export function bindMixer(root: Object3D, animations: GLTF['animations'], slot: 
   const clip = animations[slot.clip.index]
   if (!clip || clip.name !== slot.clip.name) return null
   const mixer = new AnimationMixer(root)
-  mixer.clipAction(clip).play()
+  const action = mixer.clipAction(clip)
+  action.setLoop(LoopOnce, 1)
+  action.clampWhenFinished = true
+  action.play()
   return mixer
+}
+
+/** Re-enable clamped actions so seeking backwards is independent of prior paints. */
+export function seekBoundMixer(mixer: AnimationMixer, clip: GLTF['animations'][number], time: number) {
+  const action = mixer.clipAction(clip)
+  action.paused = false
+  action.enabled = true
+  mixer.setTime(time)
 }
 
 export function dropSlot(world: GpuWorld, slotId: string) {
@@ -263,20 +276,25 @@ export function clipMatches(gpu: Pick<SlotGpu, 'clipKey' | 'animations'>, index:
 }
 
 export function paintWorld(world: GpuWorld, document: Scene3DDocument, sceneSeconds: number) {
-  const eye = cameraEyeAtTime(document.camera, sceneSeconds, document.duration, document.slots)
-  const look = cameraLookAtTime(document.camera, sceneSeconds, document.duration, document.slots)
+  const posedSlots = document.slots.map(slot => ({ ...slot, ...slotPoseAtTime(slot, sceneSeconds, document.duration) }))
+  const eye = cameraEyeAtTime(document.camera, sceneSeconds, document.duration, posedSlots)
+  const look = cameraLookAtTime(document.camera, sceneSeconds, document.duration, posedSlots)
   world.camera.fov = document.camera.fov
   world.camera.position.set(eye[0], eye[1], eye[2])
   world.camera.lookAt(look[0], look[1], look[2])
   world.camera.updateProjectionMatrix()
   applyLoopOffset(world, sceneSeconds)
+  paintCitadel(world.dressing, sceneSeconds)
   const bg = document.slots.find(isCylinderBackdrop)
   paintDrive(world, sceneSeconds, bg?.loop?.speed ?? world.driveSpeed)
-  for (const gpu of world.slots.values()) {
+  for (const slot of posedSlots) {
+    const gpu = world.slots.get(slot.id)
+    if (!gpu) continue
+    poseLoadedSlot(gpu, slot)
     if (!gpu.mixer) continue
     const clip = gpu.animations.find((_clip: { duration?: number }, index: number) => clipMatches(gpu, index))
-    const local = scene3dClipLocalTime(sceneSeconds, clip?.duration ?? null, { loop: true })
-    if (local != null) gpu.mixer.setTime(local)
+    const local = performanceClipTime(sceneSeconds, clip?.duration ?? null, slot.clipPlayback)
+    if (local != null && clip) seekBoundMixer(gpu.mixer, clip, local)
   }
   world.renderer.render(world.scene, world.camera)
 }

@@ -1,4 +1,6 @@
+import { validScene3DShape } from './documentValidation.ts'
 import { scene3dPlaybackSpeed } from './clock.ts'
+import { parseClipPlayback, parseMotion, reviewClipNumber } from './performance.ts'
 import { parseScene3DLoop } from './backdrop.ts'
 import { durableScene3DSourceUrl, parseScene3DSourceRef } from './slotSource.ts'
 import { SCENE3D_TEMPLATE_IDS, type Scene3DDocument, type Scene3DSlot, type Scene3DTemplateId } from './types.ts'
@@ -73,6 +75,7 @@ export function parseScene3DDocument(raw: unknown): Scene3DDocument | null {
   const value = raw as Partial<Scene3DDocument>
   if (value.version !== 1 || value.units !== 'meters' || value.up !== 'y') return null
   if (!Array.isArray(value.slots) || !value.camera || !value.light) return null
+  if (!validScene3DShape(value)) return null
   const slots = value.slots.map(slot => {
     const sourceUrl = durableScene3DSourceUrl(typeof slot.sourceUrl === 'string' ? slot.sourceUrl : '')
     const sourceRef = parseScene3DSourceRef(slot.sourceRef)
@@ -82,6 +85,8 @@ export function parseScene3DDocument(raw: unknown): Scene3DDocument | null {
       sourceRef: sourceUrl && sourceRef ? sourceRef : undefined,
       media: slot.media === 'image' ? 'image' as const : 'model3d' as const,
       loop: parseScene3DLoop(slot.loop),
+      clipPlayback: parseClipPlayback(slot.clipPlayback),
+      motion: parseMotion(slot.motion),
     }
   })
   const templateId: Scene3DTemplateId = typeof value.templateId === 'string'
@@ -89,8 +94,8 @@ export function parseScene3DDocument(raw: unknown): Scene3DDocument | null {
     ? value.templateId as Scene3DTemplateId
     : 'two-shot'
   const dressing = value.dressing === 'street' || value.dressing === 'space' || value.dressing === 'treadmill' || value.dressing === 'cafe'
-    || value.dressing === 'drive-city' || value.dressing === 'drive-coast' || value.dressing === 'drive-tunnel'
+    || value.dressing === 'drive-city' || value.dressing === 'drive-coast' || value.dressing === 'drive-tunnel' || value.dressing === 'citadel'
     ? value.dressing
     : undefined
-  return { ...value, slots, templateId, dressing, playbackSpeed: scene3dPlaybackSpeed(value.playbackSpeed) } as Scene3DDocument
+  return { ...value, slots, templateId, dressing, clipNumber: reviewClipNumber(value.clipNumber), playbackSpeed: scene3dPlaybackSpeed(value.playbackSpeed) } as Scene3DDocument
 }
