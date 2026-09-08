@@ -51,7 +51,10 @@ export async function openAuditApp(page: Page, workspace?: string) {
   if (workspace) await expect(page.getByRole('button', { name: `Switch output folder: ${workspace}`, exact: true })).toBeVisible()
   const close = page.getByRole('button', { name: 'Close Ask to the Wizard', exact: true })
   await close.waitFor({ state: 'visible', timeout: 15_000 }).catch(() => undefined)
-  if (await close.isVisible()) await close.click()
+  // The panel's entrance animation can keep the visible icon moving for a
+  // moment after the main navigation is ready. This is test setup, so force
+  // the already-resolved button click instead of misreporting a tour failure.
+  if (await close.isVisible()) await close.click({ force: true })
 }
 
 export async function captureFeature(page: Page, info: TestInfo, records: FeatureEvidence[], route: string[], action: () => Promise<void>) {

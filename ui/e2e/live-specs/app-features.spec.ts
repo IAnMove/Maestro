@@ -7,6 +7,10 @@ test('app: feature tour captures every main destination and tool panel', async (
   const isolation = await isolateLiveWorkspace(page, request, info)
   const records: FeatureEvidence[] = []
   const errors: string[] = []
+  const closeDirectorIfOpen = async () => {
+    const close = page.getByRole('button', { name: 'Close Director video workflows', exact: true })
+    if (await close.isVisible()) await close.click({ force: true })
+  }
   page.on('pageerror', error => errors.push(error.message))
   try {
     await openAuditApp(page, isolation.workspace)
@@ -24,11 +28,13 @@ test('app: feature tour captures every main destination and tool panel', async (
           await expect(tab).toHaveAttribute('aria-selected', 'true')
           await page.evaluate(() => document.fonts.ready)
         })
+        await closeDirectorIfOpen()
         if (category === 'direct-generation' && name === 'Tools') {
           for (const tool of ['Upscale', 'Revoice', 'Remove background']) {
             await captureFeature(page, info, records, [label, name, tool], async () => {
               await page.getByRole('button', { name: tool, exact: true }).click()
             })
+            await closeDirectorIfOpen()
           }
         }
         const subModes = name === 'Audio' ? ['Speech', 'Music', 'SFX', 'Mixer']
@@ -38,6 +44,7 @@ test('app: feature tour captures every main destination and tool panel', async (
           await captureFeature(page, info, records, [label, name, subMode], async () => {
             await page.getByRole('button', { name: subMode, exact: true }).click()
           })
+          await closeDirectorIfOpen()
         }
       }
     }
@@ -45,11 +52,13 @@ test('app: feature tour captures every main destination and tool panel', async (
       await captureFeature(page, info, records, [name], async () => {
         await page.getByRole(name === 'Activity' ? 'button' : 'tab', { name, exact: true }).click()
       })
+      await closeDirectorIfOpen()
     }
     await captureFeature(page, info, records, ['Settings'], async () => {
       await page.getByRole('button', { name: 'Settings', exact: true }).click()
       await expect(page.getByText('Storage Manager', { exact: true })).toBeVisible()
     })
+    await closeDirectorIfOpen()
     await page.getByRole('button', { name: 'Close settings', exact: true }).click()
     const settingsDrawer = page.locator('div.fixed.top-0.right-0').filter({ has: page.getByRole('button', { name: 'Close settings', exact: true }) })
     await expect(settingsDrawer).not.toBeInViewport()
@@ -57,6 +66,11 @@ test('app: feature tour captures every main destination and tool panel', async (
     if (await activity.getAttribute('aria-expanded') === 'true') await activity.click()
     await page.setViewportSize({ width: 390, height: 844 })
     await captureFeature(page, info, records, ['Mobile navigation'], async () => {
+      // The responsive Wizard is an overlay. It can reopen when the viewport
+      // crosses the mobile breakpoint, so close it before exercising the
+      // underlying navigation; otherwise the overlay intercepts the click.
+      const mobileClose = page.getByRole('button', { name: 'Close Ask to the Wizard', exact: true })
+      if (await mobileClose.isVisible()) await mobileClose.click({ force: true })
       await page.getByRole('button', { name: 'Studios', exact: true }).click()
       expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(2)
     })

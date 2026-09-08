@@ -29,7 +29,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument('--base-url', default=os.environ.get('HOCUSPOCUS_BASE_URL'))
     parser.add_argument('--profile', choices=('plan', 'simulate', 'real'), default='simulate')
-    parser.add_argument('--scenario', choices=('smoke', 'full', 'studio', 'language', 'music-video', 'music-video-new', 'comic', 'series', 'failure', 'cancel', 'workspace', 'app-tour', 'app-generate', 'app'), default='smoke')
+    parser.add_argument('--scenario', choices=('smoke', 'full', 'studio', 'language', 'music-video', 'music-video-new', 'comic', 'series', 'failure', 'cancel', 'workspace', 'wizard-media', 'app-tour', 'app-generate', 'app'), default='smoke')
     parser.add_argument('--headed', action='store_true')
     parser.add_argument('--resume', action='store_true', help='Run only tests that failed in the previous Playwright invocation')
     parser.add_argument('--confirm-real', action='store_true')

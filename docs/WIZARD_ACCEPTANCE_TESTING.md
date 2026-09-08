@@ -89,7 +89,7 @@ port, so `--base-url` is required unless
 
 Available scenarios are `smoke`, `full`, `studio`, `language`, `music-video`,
 `music-video-new`, `comic`, `series`, `failure`, `cancel`, `workspace`,
-`app-tour`, `app-generate` and `app`. `language`
+`wizard-media`, `app-tour`, `app-generate` and `app`. `language`
 verifies a live mixed-language turn (conversation, content, speech, exact quote and
 technical provider prompt). `music-video-new` is the one-turn regression for a newly
 authored song and videoclip: it proves that the Wizard creates a fresh Story project,
@@ -105,7 +105,13 @@ image case needs an enabled Flux 2 Klein 9B, and the music case needs the
 configured ACE-Step model installed. Music waits for model defaults before
 setting 30 seconds and checks the decoded duration. Upscale uses Lanczos ×2
 and checks the decoded dimensions. These are family-level cases, not certification
-of every model and parameter combination.
+of every model and parameter combination. `wizard-media` is the current live
+Wizard acceptance pass for two independent native generations: a Flux 2 Klein 9B
+image followed by a 20-second ACE-Step instrumental track. Both submissions start
+in the visible Ask to the Wizard panel, resolve through the canonical queue, and
+retain the literal prompts, Wizard command trace, task IDs, output bytes and browser
+decode evidence. It requires the corresponding local models to be installed and
+enabled and must be run with `--profile real --confirm-real`.
 Use `--headed` to watch the Wizard navigate and fill the application. Use
 `--resume --output-dir <previous-root>` to ask Playwright to rerun failures
 from that root's previous completed attempt. It creates a new evidence folder;

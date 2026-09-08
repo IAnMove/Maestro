@@ -127,9 +127,13 @@ async function waitForTerminalRoot(
   previous: Set<string>,
   expectedStatus: 'terminal' | 'completed' = 'terminal',
 ) {
+  // Cold-loading ACE-Step can briefly block the API worker while the model is
+  // moved into reserved RAM. Keep observing the same task rather than
+  // turning that transient lack of an HTTP response into a duplicate run.
+  const taskJson = (path: string) => json(request, path, { timeout: 180_000 })
   let taskId = ''
   await expect.poll(async () => {
-    const payload = await json(request, `/api/v1/tasks?status=all&workspace=${encodeURIComponent(workspace)}`) as {
+    const payload = await taskJson(`/api/v1/tasks?status=all&workspace=${encodeURIComponent(workspace)}`) as {
       tasks: Array<{ id: string; parent_id?: string | null }>
     }
     taskId = payload.tasks.find(item => !item.parent_id && !previous.has(item.id))?.id || ''
@@ -137,7 +141,7 @@ async function waitForTerminalRoot(
   }, { timeout: 60_000, intervals: [250, 500, 1_000, 2_000] }).not.toBe('')
   let terminalStatus = ''
   await expect.poll(async () => {
-    const payload = await json(request, `/api/v1/tasks?status=all&workspace=${encodeURIComponent(workspace)}`) as {
+    const payload = await taskJson(`/api/v1/tasks?status=all&workspace=${encodeURIComponent(workspace)}`) as {
       tasks: Array<{ id: string; parent_id?: string | null; status: string }>
     }
     terminalStatus = payload.tasks.find(item => item.id === taskId)?.status || ''
@@ -145,6 +149,98 @@ async function waitForTerminalRoot(
   }, { timeout: 20 * 60_000, intervals: [500, 1_000, 2_000, 5_000] }).toMatch(/completed|failed|cancelled/)
   if (expectedStatus === 'completed') expect(terminalStatus).toBe('completed')
   return taskId
+}
+
+type WizardMediaTask = {
+  id: string
+  status: string
+  kind: string
+  model?: string
+  result_refs?: string[]
+  metadata?: Record<string, unknown>
+  created_at?: number
+  started_at?: number | null
+  completed_at?: number | null
+}
+
+type WizardMediaOutput = {
+  name: string
+  type: string
+  url: string
+  size: number
+}
+
+/**
+ * Resolve a real Wizard-submitted task through the canonical output registry.
+ * This deliberately observes the task and downloads its published bytes; it
+ * never submits a second request or calls a capability executor directly.
+ */
+async function waitForWizardMedia(
+  page: Page,
+  request: APIRequestContext,
+  info: TestInfo,
+  workspace: string,
+  previous: Set<string>,
+  label: string,
+  kind: 'image' | 'audio',
+) {
+  const taskId = await waitForTerminalRoot(request, workspace, previous, 'completed')
+  const taskPayload = await json(request, `/api/v1/tasks?status=all&workspace=${encodeURIComponent(workspace)}`) as {
+    tasks: WizardMediaTask[]
+  }
+  const task = taskPayload.tasks.find(item => item.id === taskId)
+  expect(task, `Canonical ${label} task must remain observable`).toBeTruthy()
+  expect(task?.metadata?.actor).toBe('wizard')
+  expect(task?.metadata?.capability).toBe('start_generation')
+  expect(task?.result_refs?.length).toBeGreaterThan(0)
+
+  const outputsPayload = await json(request, `/api/v1/outputs?workspace=${encodeURIComponent(workspace)}`) as {
+    outputs: WizardMediaOutput[]
+  }
+  const output = outputsPayload.outputs.find(item => (
+    item.type === kind && task?.result_refs?.includes(item.name)
+  ))
+  expect(output, `Canonical ${label} output must be published`).toBeTruthy()
+  const mediaResponse = await request.get(output!.url)
+  expect(mediaResponse.ok(), `${label} output must be downloadable`).toBeTruthy()
+  const bytes = await mediaResponse.body()
+  expect(bytes.length).toBeGreaterThan(256)
+  const metadataResponse = await request.get(
+    `/api/v1/outputs/${encodeURIComponent(output!.name)}/metadata?workspace=${encodeURIComponent(workspace)}`,
+  )
+  expect(metadataResponse.ok(), `${label} metadata must be readable`).toBeTruthy()
+  const metadata = await metadataResponse.json() as Record<string, unknown>
+  expect((metadata.origin as Record<string, unknown> | undefined)?.actor).toBe('wizard')
+  expect((metadata.execution as Record<string, unknown> | undefined)?.status).toBe('completed')
+  expect((metadata.execution as Record<string, unknown> | undefined)?.mode).toBe('real')
+
+  const decoded = await page.evaluate(({ url, mediaKind }) => new Promise<Record<string, number>>((resolve, reject) => {
+    if (mediaKind === 'image') {
+      const image = new Image()
+      image.onload = () => resolve({ width: image.naturalWidth, height: image.naturalHeight })
+      image.onerror = () => reject(new Error('Browser could not decode Wizard image output'))
+      image.src = url
+      return
+    }
+    const audio = new Audio()
+    audio.onloadedmetadata = () => resolve({ duration: audio.duration })
+    audio.onerror = () => reject(new Error('Browser could not decode Wizard audio output'))
+    audio.src = url
+  }), { url: output!.url, mediaKind: kind })
+  expect(Object.values(decoded).every(value => Number.isFinite(value) && value > 0)).toBeTruthy()
+
+  const started = Number(task?.started_at || task?.created_at || 0)
+  const completed = Number(task?.completed_at || 0)
+  const timing = {
+    started_at: task?.started_at ?? null,
+    completed_at: task?.completed_at ?? null,
+    elapsed_seconds: started > 0 && completed > started ? completed - started : null,
+  }
+  await info.attach(`${label}-task.json`, { body: JSON.stringify(task, null, 2), contentType: 'application/json' })
+  await info.attach(`${label}-metadata.json`, { body: JSON.stringify(metadata, null, 2), contentType: 'application/json' })
+  await info.attach(`${label}-timing.json`, { body: JSON.stringify({ timing, decoded, bytes: bytes.length }, null, 2), contentType: 'application/json' })
+  await info.attach(`${label}-output${kind === 'image' ? '.png' : '.wav'}`, { body: bytes, contentType: kind === 'image' ? 'image/png' : 'audio/wav' })
+  return { task, output, metadata, bytes, decoded, timing }
 }
 
 async function attachEvidence(page: Page, request: APIRequestContext, testInfo: TestInfo, transcript: string) {
@@ -231,6 +327,60 @@ test('wizard: Studio UI → canonical queue → generated video', async ({ page,
   await expect(page.getByRole('button', { name: 'Direct generation', exact: true })).toBeVisible()
   await expect(page.getByPlaceholder('Describe your video...')).not.toHaveValue('')
   await attachEvidence(page, request, testInfo, transcript)
+})
+
+test('wizard: Ask to the Wizard real image and music outputs', async ({ page, request }, testInfo) => {
+  test.skip(scenario !== 'wizard-media', `scenario=${scenario}`)
+  const config = await liveConfig(request, test.info())
+  const workspace = String(config.execution_workspace)
+  const imagePrompt = [
+    'Generate a fresh image now through Ask to the Wizard.',
+    'Open Studio → Image and fill a fresh image generation form for one wide product-style illustration of Tentri, the LogSentinel observatory mascot, supervising amber log streams in a dark terminal room.',
+    'Use the installed local Flux 2 Klein 9B model exactly when it is available, one 16:9 image.',
+    'Do not reuse an existing gallery output and do not ask me for decisions.',
+  ].join(' ')
+  const beforeImage = await rootTaskIds(request, workspace)
+  const imageTranscript = await ask(page, imagePrompt)
+  const image = await waitForWizardMedia(page, request, testInfo, workspace, beforeImage, 'wizard-image', 'image')
+  expect(image.task.model).toMatch(/Flux 2 Klein 9B/i)
+
+  const musicPrompt = [
+    'Generate a fresh instrumental music track now through Ask to the Wizard.',
+    'Open Studio → Audio → Music and fill a fresh form for a 20-second playful chiptune observatory ident: warm synth bass, bright arpeggios, crisp terminal beeps and a confident rising finish, with no vocals.',
+    'Use the installed local ACE-Step 1.5 XL SFT LM_4B model exactly when it is available, and set the duration to 20 seconds.',
+    'Create a new audio task; do not reuse the image or any earlier audio output and do not ask me for decisions.',
+  ].join(' ')
+  const beforeMusic = await rootTaskIds(request, workspace)
+  const musicTranscript = await ask(page, musicPrompt)
+  const music = await waitForWizardMedia(page, request, testInfo, workspace, beforeMusic, 'wizard-music', 'audio')
+  expect(music.task.model).toMatch(/ACE-Step/i)
+  expect((music.task.metadata?.generation_details as Record<string, unknown> | undefined)?.duration_seconds).toBe(20)
+  expect(music.decoded.duration).toBeGreaterThan(15)
+  expect(music.decoded.duration).toBeLessThan(25)
+
+  const trace = await page.evaluate(() => (
+    window as Window & { __HOCUSPOCUS_WIZARD_TRACE__?: Array<Record<string, unknown>> }
+  ).__HOCUSPOCUS_WIZARD_TRACE__ || []) as Array<{
+    question?: string
+    turn?: { actions?: Array<{ type?: string }> }
+    results?: Array<{ action?: { type?: string }; command?: { commandId?: string }; report?: { taskId?: string } }>
+  }>
+  const imageTurn = trace.find(entry => entry.question === imagePrompt)
+  const musicTurn = trace.find(entry => entry.question === musicPrompt)
+  expect(imageTurn?.turn?.actions?.map(action => action.type)).toEqual(expect.arrayContaining(['prepare_image', 'start_generation']))
+  expect(musicTurn?.turn?.actions?.map(action => action.type)).toEqual(expect.arrayContaining(['prepare_audio', 'start_generation']))
+  for (const [entry, resultId] of [[imageTurn, image.task.id], [musicTurn, music.task.id]] as const) {
+    const generation = entry?.results?.find(result => result.action?.type === 'start_generation')
+    expect(generation?.command?.commandId).toBeTruthy()
+    expect(generation?.report?.taskId).toBe(resultId)
+  }
+  await testInfo.attach('wizard-image-prompt.txt', { body: imagePrompt, contentType: 'text/plain' })
+  await testInfo.attach('wizard-music-prompt.txt', { body: musicPrompt, contentType: 'text/plain' })
+  await testInfo.attach('wizard-media-run.json', {
+    body: JSON.stringify({ workspace, image, music }, null, 2),
+    contentType: 'application/json',
+  })
+  await attachEvidence(page, request, testInfo, `${imageTranscript}\n\n--- MUSIC ---\n\n${musicTranscript}`)
 })
 
 test('wizard: UI locale, conversation, content, speech and provider prompt stay independent', async ({ page, request }, testInfo) => {

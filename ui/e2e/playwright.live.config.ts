@@ -11,6 +11,7 @@ const filters: Record<string, RegExp> = {
   'music-video': /wizard: vocal/, 'music-video-new': /wizard: one-turn/,
   comic: /wizard: multi-page/, series: /wizard: Series Lab/, failure: /wizard: injected/,
   cancel: /wizard: a queued/, workspace: /wizard: workspace switching/,
+  'wizard-media': /wizard: Ask to the Wizard real image and music outputs/,
   full: /wizard: (Studio|UI locale|vocal|multi-page|Series Lab)/,
   'app-tour': /app: feature tour/, 'app-generate': /app: real/, app: /app:/,
 }

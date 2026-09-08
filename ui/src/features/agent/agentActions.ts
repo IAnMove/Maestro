@@ -1885,7 +1885,9 @@ export function isExplicitImageGenerationRequest(request: string): boolean {
 
 const EXPLICIT_AUDIO_GENERATION_REQUESTS = [
   /\b(?:gen[eé]ra(?:la|lo|r|d|me)?|crea(?:la|lo|r|d|me)?|lanza(?:la|lo|r|d)?|encola(?:la|lo|r|d)?)\b[^.!?\n]{0,120}\b(?:audio|canci[oó]n|m[uú]sica|voz|speech)\b/i,
+  /\b(?:make|create|generate|render|queue|start|launch)\b[^.!?\n]{0,120}\b(?:audio|song|music|voice|speech|track)\b/i,
   /\b(?:audio|canci[oó]n|m[uú]sica|voz|speech)\b[^.!?\n]{0,160}\b(?:gen[eé]ra(?:la|lo|r|d|me)?|l[aá]nza(?:la|lo|r|d)?|enc[oó]la(?:la|lo|r|d)?)\b/i,
+  /\b(?:audio|song|music|voice|speech|track)\b[^.!?\n]{0,160}\b(?:make|create|generate|render|queue|start|launch)\b/i,
 ]
 const STUDIO_AUDIO_CONTEXT = [
   /\bstudio\s*(?:(?:→|->|›|\/|-)\s*)?audio\b/i,
@@ -1982,13 +1984,17 @@ function comicPanelTarget(
   }
 }
 
-const HOW_TO_GENERATE = /\b(?:c[oó]mo(?:\s+(?:lo|la|las|los|puedo|se))?\s+(?:genero|generar|lanzo|lanzar|creo|crear|hago|hacer)|how\s+do\s+i\s+(?:generate|create|launch|start|make))\b/i
+const HOW_TO_GENERATE = [
+  /\b(?:c[oó]mo(?:\s+(?:lo|la|las|los|puedo|se))?\s+(?:genero|generar|lanzo|lanzar|creo|crear|hago|hacer)|how\s+(?:can|do)\s+(?:i|we|you)\s+(?:generate|create|launch|start|make)|how\s+do\s+i\s+(?:generate|create|launch|start|make))\b/i,
+  /\bhow\s+to\s+(?:generate|create|launch|start|make)\b/i,
+  /\b(?:explain|describe|tell\s+me|show(?:\s+me)?|can\s+you\s+show\s+me)\b[^.!?\n]{0,96}\bhow\s+(?:to|do(?:\s+i)?)\b/i,
+  /\b(?:what|which)\s+(?:model|provider)\b[^.!?\n]{0,160}\b(?:generate|create|launch|start|make)\b/i,
+]
 
 export function isHowToGenerateQuestion(request: string): boolean {
   const text = request.trim()
   if (!text || text.length > 240) return false
-  if (!HOW_TO_GENERATE.test(text)) return false
-  return /[?]/.test(text) || /^(?:c[oó]mo|how)\b/i.test(text)
+  return HOW_TO_GENERATE.some(pattern => pattern.test(text))
 }
 
 const LABS_INVENTORY = /(?:¿\s*)?(?:qu[eé]\s+puedes\s+hacer|what\s+can\s+you\s+do)(?:\s+(?:en|in|con|with))?\s+(?:el\s+)?(?:series\s+lab|story\s+lab)/i
@@ -2440,7 +2446,7 @@ export async function reconcileAgentTurnWithRequest(
       (action): action is AgentPrepareAudioAction => action.type === 'prepare_audio',
     ) || {
         type: 'prepare_audio',
-        subMode: /\b(?:voz|speech|tts)\b/i.test(request) ? 'speech' : 'music',
+        subMode: /\b(?:voz|voice|speech|tts)\b/i.test(request) ? 'speech' : 'music',
         prompt: request.trim().slice(0, 8_000),
         durationSeconds: 15,
       } satisfies AgentPrepareAudioAction
