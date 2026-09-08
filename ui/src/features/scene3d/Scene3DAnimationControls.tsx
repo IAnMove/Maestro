@@ -1,10 +1,11 @@
 import { useUiTranslation } from '../../i18n'
-import { parseClipPlayback } from './performance.ts'
+import { fitClipPlayback, parseClipPlayback } from './performance.ts'
 import type { Scene3DClipCatalogEntry, Scene3DSlot } from './types.ts'
 
-export function Scene3DAnimationControls({ slot, clips, disabled, onChange }: {
+export function Scene3DAnimationControls({ slot, clips, duration, disabled, onChange }: {
   slot: Scene3DSlot
   clips: Scene3DClipCatalogEntry[] | undefined
+  duration: number
   disabled: boolean
   onChange: (patch: Partial<Scene3DSlot>) => void
 }) {
@@ -14,6 +15,8 @@ export function Scene3DAnimationControls({ slot, clips, disabled, onChange }: {
   if (clips == null) return <p role="status" className="mt-2 text-xs text-text-muted">{t('animationsLoading')}</p>
   if (!clips.length) return <p className="mt-2 text-xs text-text-muted">{t('animationsEmpty')}</p>
   const playback = parseClipPlayback(slot.clipPlayback) ?? { speed: 1, start: 0, loop: true }
+  const selected = clips.find(clip => clip.index === slot.clip?.index && clip.name === slot.clip.name)
+  const fitted = fitClipPlayback(selected?.durationSeconds, duration, playback)
   return <div className="mt-3 space-y-2">
     <label className="block text-xs font-medium">{t('animation')}
       <select aria-label={`${t('animation')} ${slot.id}`} disabled={disabled}
@@ -42,6 +45,9 @@ export function Scene3DAnimationControls({ slot, clips, disabled, onChange }: {
       </label>
       <label className="flex min-h-10 items-center gap-2 text-xs"><input type="checkbox" disabled={disabled} checked={playback.loop}
         onChange={event => onChange({ clipPlayback: { ...playback, loop: event.target.checked } })} />{t('animationLoop')}</label>
+      <button type="button" disabled={disabled || !fitted} title={t('animationFitHint')}
+        className="min-h-10 rounded border border-border px-3 text-xs disabled:opacity-40"
+        onClick={() => { if (fitted) onChange({ clipPlayback: fitted }) }}>{t('animationFit')}</button>
     </div>}
   </div>
 }

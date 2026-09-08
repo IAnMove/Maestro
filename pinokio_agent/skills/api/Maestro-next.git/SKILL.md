@@ -24,6 +24,12 @@ must expose Vite source modules and use English UI controls. Set
 `PLAYWRIGHT_MODULE` only if Playwright is installed outside the client's module
 resolution path. `--preview-only` produces contact frames without MP4s. Existing
 local MP4s are skipped, so use a fresh output directory when changing a plan.
+Omit `document.clipNumber` for a clean video. Filenames and review records use
+`shot.number`, falling back to `document.clipNumber` or the one-based shot index;
+these editorial numbers must be unique positive integers and are not added to
+the rendered document. For animations with forward root motion, choose one-shot
+playback and fit the remaining animation to the shot duration; repeating a
+non-cyclic source animation can jump back at its loop boundary.
 
 Use `clients/world3d_assemble.py` to assemble those published shots and their
 soundtrack through Video Editor. Pass `--base-url`, `--plan`, `--render-dir`,

@@ -326,6 +326,8 @@
   "animationSpeed": "Animation speed",
   "animationStart": "Animation start (s)",
   "animationLoop": "Loop animation",
+  "animationFit": "Fit animation to shot",
+  "animationFitHint": "Play the remaining animation once over the current shot duration (0.1–4× speed). Apply again if you change the duration or start time.",
   "clipNumber": "Clip number",
   "duration": "Duration (s)",
   "saveDocument": "Save shot JSON",

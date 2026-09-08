@@ -326,6 +326,8 @@
   "animationSpeed": "Velocidad de animación",
   "animationStart": "Inicio en animación (s)",
   "animationLoop": "Repetir animación",
+  "animationFit": "Ajustar animación al plano",
+  "animationFitHint": "Reproduce una vez la animación restante durante la duración actual del plano (velocidad 0,1–4×). Aplícalo de nuevo si cambias la duración o el inicio.",
   "clipNumber": "Número de clip",
   "duration": "Duración (s)",
   "saveDocument": "Guardar plano JSON",

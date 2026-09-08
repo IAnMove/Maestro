@@ -5,6 +5,11 @@ animations, displays their durations, and offers speed, source start time and
 loop/hold controls per object. Unknown-duration clips cannot be selected.
 Controls affect preview and MP4 capture identically. A single play reaches the
 exact last pose, including STEP tracks; seeking back reactivates a clamped action.
+“Fit animation to shot” plays the remaining source animation once over the current
+shot duration by setting speed and disabling looping. It preserves the source
+start time and supports 0.1–4×, including decimal values at either boundary.
+Apply it again after changing shot duration or source start. This is particularly
+useful for forward root motion: a non-cyclic animation can jump back when looped.
 
 Shot JSON can be saved and reopened from the editor. Import validates render
 settings, camera fields, light and unique object identities before mounting.
@@ -16,6 +21,12 @@ transient-source handling. Imported dimensions determine preview and export.
 into the encoded frame at the upper right. It is also included in the published
 filename and recipe. It survives template changes with the rest of the shot.
 This number is an editorial reference; it does not replace asset or attempt IDs.
+For clean exports, omit `document.clipNumber`. The shot render/assembly clients
+still identify files using `shot.number`, then `document.clipNumber`, then the
+one-based position in the plan. They reject duplicate or invalid identities
+before publication. Rendering confirms the imported editor document through a
+saved JSON roundtrip before checking assets, so consecutive unnumbered shots
+with the same sources still apply their own animations, cameras and lights.
 
 `clipPlayback` stores `speed`, `start` (source animation seconds), and `loop`.
 `motion` stores a world-space destination, optional quadratic control point
