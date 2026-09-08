@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { Bone, Group, Quaternion, Vector3, Mesh, BoxGeometry, MeshBasicMaterial, PerspectiveCamera, Scene } from 'three'
+import { AnimationClip, QuaternionKeyframeTrack, Bone, Group, Quaternion, Vector3, Mesh, BoxGeometry, MeshBasicMaterial, PerspectiveCamera, Scene } from 'three'
 import { createDefaultScene3DDocument, parseScene3DDocument } from '../src/features/scene3d/document.ts'
 import { applyScene3DTemplate } from '../src/features/scene3d/templates.ts'
 import { slotPoseAtTime } from '../src/features/scene3d/performance.ts'
 import { slotMountKey } from '../src/features/scene3d/backdrop.ts'
-import { imageBackdropMesh, paintWorld } from '../src/features/scene3d/gpu.ts'
+import { bindMixer, imageBackdropMesh, paintWorld, syncSlotClip } from '../src/features/scene3d/gpu.ts'
 import { applyTypingPose, resetTypingPose } from '../src/features/scene3d/typingPose.ts'
 
 test('curved travel changes world position and follows its tangent deterministically', () => {
@@ -51,6 +51,19 @@ test('typing restores the immediately preceding animation pose once, including p
   assert.ok(upper.quaternion.angleTo(next)<1e-6)
   applyTypingPose(root,slot,.2);resetTypingPose(root)
   assert.ok(upper.quaternion.angleTo(next)<1e-6)
+})
+
+test('clearing a GLB animation consumes typing restoration before the mixer restores bind pose', () => {
+  const {root,upper}=rig()
+  const rotated=new Quaternion().setFromAxisAngle(new Vector3(0,0,1),.5)
+  const clip=new AnimationClip('arms',2,[new QuaternionKeyframeTrack('LeftArm.quaternion',[0,2],[...rotated.toArray(),...rotated.toArray()])])
+  const slot={...createDefaultScene3DDocument().slots[0],position:[0,0,0],rotationY:0,clip:{index:0,name:'arms'}}
+  const mixer=bindMixer(root,[clip],slot);mixer.setTime(.5)
+  applyTypingPose(root,slot,.5)
+  const gpu={root,mixer,animations:[clip],clipKey:'0\0arms'}
+  syncSlotClip({slots:new Map([[slot.id,gpu]])},{...slot,clip:null})
+  resetTypingPose(root)
+  assert.ok(upper.quaternion.angleTo(new Quaternion())<1e-6)
 })
 
 test('grounding happens before keyboard targeting and backward seeks do not accumulate offsets', () => {

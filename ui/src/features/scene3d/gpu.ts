@@ -347,6 +347,7 @@ export function syncSlotClip(world: GpuWorld, slot: Scene3DSlot) {
   if (!current) return
   const nextKey = clipKeyOf(slot.clip)
   if (current.clipKey === nextKey) return
+  resetTypingPose(current.root)
   current.mixer?.stopAllAction()
   current.mixer = bindMixer(current.root, current.animations, slot)
   current.clipKey = nextKey
