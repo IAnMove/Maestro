@@ -859,6 +859,31 @@ export class WizardWorkflowRuntime {
     }
   }
 
+  /**
+   * A CAS retry builds a merged snapshot, but `advanceUnlocked` keeps mutating
+   * the live workflow object captured in `owner.collection`. Adopt remote-only
+   * siblings into that same collection instead of pointing persist at the clone
+   * — otherwise the next persist in this advance overwrites those siblings.
+   */
+  private adoptPersistMerge(
+    owner: {
+      workspace: string
+      collection: WizardWorkflowCollection
+      openSequence: number
+    },
+    merged: WizardWorkflowCollection,
+  ): void {
+    const liveById = new Map(owner.collection.workflows.map(workflow => [workflow.workflowId, workflow]))
+    owner.collection.workflows = merged.workflows.map(workflow => {
+      const live = liveById.get(workflow.workflowId)
+      return live && live.updatedAt >= workflow.updatedAt ? live : workflow
+    })
+    owner.collection.revision = merged.revision
+    if (this.ownsOpen(owner.openSequence, owner.workspace)) {
+      this.collection = owner.collection
+    }
+  }
+
   private async persistAndEmit(
     workflow: WizardWorkflowRecord,
     owner = this.capturePersistOwner(),
@@ -894,10 +919,8 @@ export class WizardWorkflowRuntime {
         lastError = error
         const remote = await this.persistence.load(targetWorkspace)
         candidate = mergeCollections(candidate, remote)
-        owner.collection.revision = candidate.revision
-        if (this.ownsOpen(openSequence, targetWorkspace)) {
-          this.collection = candidate
-        }
+        this.adoptPersistMerge(owner, candidate)
+        candidate = clone(owner.collection)
       }
     }
     throw lastError instanceof Error ? lastError : new Error('Could not persist Wizard workflow.')
