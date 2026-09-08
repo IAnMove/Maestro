@@ -43,6 +43,40 @@ previous animation pose before resampling, including repeated/paused frames.
 the gesture. This is a coarse contact aid, not foot IK, retargeting, seating,
 terrain collision or physics. Contact shadows are simple moving soft blobs.
 
+## Subject framing and the twenty additional presets
+
+The library includes eight face shots (`face-closeup`, `face-extreme`,
+`face-profile`, `face-reaction-arc`, `face-low-angle`, `face-high-angle`,
+`face-revelation`, `face-to-face`), four action shots (`boots-to-face`,
+`dutch-charge`, `overhead-formation`, `camera-pass`) and eight vehicle shots
+(`vehicle-showcase`, `vehicle-front-low`, `vehicle-rear-chase`,
+`vehicle-side-track`, `vehicle-wheel-detail`, `vehicle-roof-orbit`,
+`vehicle-convoy`, `vehicle-drift-arc`). The vehicle presets bind the user's GLB;
+there is no bundled car, private model, texture or animation binding.
+
+Open Studios → Video 3D → Shot library, select a preset and assign the GLBs.
+Subject framing edits the tracked object, head/center/base anchor, start/end
+camera and look offsets, orbit turns and camera tilt. Offsets are in meters
+multiplied by the object's scene scale. They rotate with the subject heading
+unless that option is disabled. Camera tilt is in degrees. A bone whose name
+ends in `Head` is tracked after animation and grounding; unrigged models use
+86% of the current mesh height. Center/base use animated mesh bounds. GLB rigs,
+front axes and proportions vary: check the first and last frame and adjust
+these controls for each asset. A car has no standard wheel-bone contract, so
+the wheel-detail preset is an editable offset, not automatic wheel detection.
+
+`camera.framing` is optional and preserved in shot JSON. Old camera families
+retain their behavior when it is absent. Selecting another camera family
+clears the subject framing so the selected family takes effect. Editor and
+Wizard mount requests share the template registry; an explicit Wizard
+`cameraFamily` override also clears framing. This does not add a separate
+Wizard action for editing arbitrary framing fields.
+
+Travel presets translate the model through the fixed street. The supplied
+Quattro test asset contains a single mesh/material, no clips and no separate
+wheel objects. Its travel moves the whole car; tire spin, steering, body-panel
+recoloring and suspension are not claimed as rigged animations.
+
 ## Animated lettering in 2D and 3D
 
 Both editors expose the same `texts` cues and canvas painter: impact, upward

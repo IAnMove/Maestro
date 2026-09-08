@@ -1,3 +1,4 @@
+import { validFraming } from './framing'
 import type { Scene3DCamera, Scene3DDocument, Scene3DLight, Scene3DSlot } from './types.ts'
 
 const CAMERA_FAMILIES = new Set(['establishment', 'follow', 'orbit', 'reveal', 'encounter', 'pursuit', 'product', 'musical', 'side', 'front', 'chase', 'hood', 'wing'])
@@ -9,6 +10,7 @@ const vector = (value: unknown) => Array.isArray(value) && value.length === 3 &&
 function validCamera(camera: Scene3DCamera) {
   if (!vector(camera.eye) || !vector(camera.look) || !positive(camera.fov) || camera.fov >= 180) return false
   if (!CAMERA_FAMILIES.has(camera.family)) return false
+  if (camera.framing != null && !validFraming(camera.framing)) return false
   if ([camera.targetOffset, camera.eyeOffset].some(value => value != null && !vector(value))) return false
   const optionalNumbers = [camera.orbitRadius, camera.orbitHeight, camera.orbitTurns]
   if (!optionalNumbers.every(value => value == null || finite(value))) return false
@@ -36,6 +38,7 @@ export function validScene3DShape(value: Partial<Scene3DDocument>) {
   if (![24, 30, 60].includes(value.fps!)) return false
   if (!value.camera || !value.light || !Array.isArray(value.slots)) return false
   if (!validCamera(value.camera) || !validLight(value.light)) return false
+  if (value.camera.framing && !value.slots.some(slot => slot?.id === value.camera!.framing!.targetSlot)) return false
   if (value.slots.length > 64 || !value.slots.every(validSlot)) return false
   return new Set(value.slots.map(slot => slot.id)).size === value.slots.length
 }

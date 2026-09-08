@@ -52,7 +52,7 @@ export function listenForWorld3DWorkflow(
 
 export function documentFromWorld3DRequest(request: World3DWizardRequest): Scene3DDocument {
   const document = applyScene3DTemplate(request.templateId)
-  if (request.cameraFamily) document.camera = { ...document.camera, family: request.cameraFamily }
+  if (request.cameraFamily) document.camera = { ...document.camera, family: request.cameraFamily, framing: undefined }
   const bindings = request.bindings ?? {}
   document.slots = document.slots.map(slot => {
     const bound = bindings[slot.slot]

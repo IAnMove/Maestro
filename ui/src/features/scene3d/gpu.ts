@@ -1,3 +1,5 @@
+import { framingPose } from './framing'
+import { framingAnchor } from './framingAnchor'
 import {
   AnimationMixer,
   BackSide,
@@ -299,12 +301,6 @@ export function clipMatches(gpu: Pick<SlotGpu, 'clipKey' | 'animations'>, index:
 
 export function paintWorld(world: GpuWorld, document: Scene3DDocument, sceneSeconds: number) {
   const posedSlots = document.slots.map(slot => ({ ...slot, ...slotPoseAtTime(slot, sceneSeconds, document.duration) }))
-  const eye = cameraEyeAtTime(document.camera, sceneSeconds, document.duration, posedSlots)
-  const look = cameraLookAtTime(document.camera, sceneSeconds, document.duration, posedSlots)
-  world.camera.fov = document.camera.fov
-  world.camera.position.set(eye[0], eye[1], eye[2])
-  world.camera.lookAt(look[0], look[1], look[2])
-  world.camera.updateProjectionMatrix()
   applyLoopOffset(world, sceneSeconds)
   paintCitadel(world.dressing, sceneSeconds)
   paintWorkshop(world.dressing, sceneSeconds, document.workshopScreen)
@@ -325,6 +321,17 @@ export function paintWorld(world: GpuWorld, document: Scene3DDocument, sceneSeco
     }
     if (slot.performance === 'typing') applyTypingPose(gpu.root, slot, sceneSeconds)
   }
+  const framing = document.camera.framing
+  const target = posedSlots.find(slot => slot.id === framing?.targetSlot)
+  const root = target && world.slots.get(target.id)?.root
+  const shot = framing && target && root ? framingPose(framing, framingAnchor(root, framing.anchor), target, sceneSeconds, document.duration) : null
+  const eye = shot?.eye ?? cameraEyeAtTime(document.camera, sceneSeconds, document.duration, posedSlots)
+  const look = shot?.look ?? cameraLookAtTime(document.camera, sceneSeconds, document.duration, posedSlots)
+  world.camera.fov = document.camera.fov
+  world.camera.position.set(...eye)
+  world.camera.lookAt(...look)
+  if (shot) world.camera.rotateZ(shot.roll)
+  world.camera.updateProjectionMatrix()
   world.renderer.render(world.scene, world.camera)
 }
 

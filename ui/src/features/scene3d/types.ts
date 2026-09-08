@@ -1,3 +1,5 @@
+import { CINEMATIC_TEMPLATE_IDS } from './cinematicTemplateIds'
+
 export type Vec3 = readonly [number, number, number]
 
 export type Scene3DCameraFamily =
@@ -59,6 +61,7 @@ export const SCENE3D_TEMPLATE_IDS = [
   'victory-circle',
   'coder-room',
   'clone-chase',
+  ...CINEMATIC_TEMPLATE_IDS,
 ] as const
 
 export type Scene3DTemplateId = (typeof SCENE3D_TEMPLATE_IDS)[number]
@@ -127,6 +130,20 @@ export type Scene3DCamera = {
   orbitTurns?: number
   targetOffset?: Vec3
   eyeOffset?: Vec3
+  framing?: Scene3DFraming
+}
+
+export type Scene3DFraming = {
+  targetSlot: string
+  anchor: 'head' | 'center' | 'feet'
+  from: Vec3
+  to: Vec3
+  lookFrom?: Vec3
+  lookTo?: Vec3
+  orbitTurns?: number
+  rollFrom?: number
+  rollTo?: number
+  relativeToFacing?: boolean
 }
 
 export type Scene3DLight = {

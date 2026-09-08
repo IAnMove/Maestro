@@ -1,3 +1,4 @@
+import { cinematicDocument, CINEMATIC_TEMPLATES, CINEMATIC_CATEGORIES } from './cinematicTemplates'
 import { createDefaultScene3DDocument } from './document.ts'
 import { SCENE3D_TEMPLATE_IDS, type Scene3DCamera, type Scene3DCameraFamily, type Scene3DDocument, type Scene3DSlot, type Scene3DSlotId, type Scene3DTemplateId } from './types.ts'
 
@@ -12,6 +13,7 @@ export type Scene3DTemplate = {
 
 export type Scene3DTemplateCategory = 'cinema' | 'product' | 'music' | 'space' | 'drive'
 export const TEMPLATE_CATEGORIES: Record<Scene3DTemplateId, Scene3DTemplateCategory> = {
+  ...CINEMATIC_CATEGORIES,
   'coder-room': 'cinema',
   'clone-chase': 'cinema',
   'siege-ring': 'cinema',
@@ -55,7 +57,7 @@ export const TEMPLATE_CATEGORIES: Record<Scene3DTemplateId, Scene3DTemplateCateg
   'drive-tunnel-wing': 'drive',
 }
 
-const CAMERA_PROFILES: Record<Scene3DTemplateId, Partial<Scene3DCamera>> = {
+const CAMERA_PROFILES: Partial<Record<Scene3DTemplateId, Partial<Scene3DCamera>>> = {
   'coder-room': { eye: [3, 2.2, 3.9], look: [0, 1, -.4], fov: 42 },
   'clone-chase': { orbitRadius: 8, fov: 52 },
   'siege-ring': { eye: [0.8, 3.5, 8], look: [0, 0.8, 0], fov: 46 },
@@ -141,9 +143,10 @@ export const SCENE3D_TEMPLATES: readonly Scene3DTemplate[] = [
   { id: 'victory-circle', camera: 'orbit', duration: 8, slots: ['subject_1', 'subject_2', 'prop'] },
   { id: 'coder-room', camera: 'establishment', duration: 7, slots: ['subject_1', 'background'] },
   { id: 'clone-chase', camera: 'follow', duration: 7, slots: ['subject_1', 'subject_2', 'prop', 'background'] },
+  ...CINEMATIC_TEMPLATES,
 ]
 
-const LAYOUTS: Record<Scene3DTemplateId, Partial<Record<Scene3DSlotId, Pick<Scene3DSlot, 'position' | 'rotationY' | 'scale'>>>> = {
+const LAYOUTS: Partial<Record<Scene3DTemplateId, Partial<Record<Scene3DSlotId, Pick<Scene3DSlot, 'position' | 'rotationY' | 'scale'>>>>> = {
   'coder-room': {
     subject_1: { position: [0, 0, .55], rotationY: Math.PI, scale: 1.05 },
     background: { position: [0, .7, -4.8], rotationY: 0, scale: 6 },
@@ -333,8 +336,10 @@ function emptySlot(id: Scene3DSlotId): Scene3DSlot {
 }
 
 export function applyScene3DTemplate(id: Scene3DTemplateId): Scene3DDocument {
+  const cinematic = cinematicDocument(id)
+  if (cinematic) return cinematic
   const template = SCENE3D_TEMPLATES.find(item => item.id === id) ?? SCENE3D_TEMPLATES[0]
-  const layout = LAYOUTS[template.id]
+  const layout = LAYOUTS[template.id] ?? {}
   const document = createDefaultScene3DDocument()
   document.templateId = template.id
   document.duration = template.duration

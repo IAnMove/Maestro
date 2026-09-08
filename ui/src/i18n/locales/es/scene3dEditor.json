@@ -198,6 +198,86 @@
     "clone-chase": {
       "title": "Persecución por el barrio",
       "description": "Personajes en movimiento y calle fija con referencias visibles en el suelo."
+    },
+    "face-closeup": {
+      "title": "Cara íntima",
+      "description": "Acercamiento suave que sigue la cabeza animada."
+    },
+    "face-extreme": {
+      "title": "Mirada extrema",
+      "description": "Encuadre muy cerrado de ojos y expresión."
+    },
+    "face-profile": {
+      "title": "Perfil en penumbra",
+      "description": "Deslizamiento lateral junto al perfil del personaje."
+    },
+    "face-reaction-arc": {
+      "title": "Arco de reacción",
+      "description": "Arco corto alrededor del rostro para una reacción."
+    },
+    "face-low-angle": {
+      "title": "Héroe desde abajo",
+      "description": "Contrapicado que acerca al rostro desde el pecho."
+    },
+    "face-high-angle": {
+      "title": "Duda desde arriba",
+      "description": "Picado íntimo para momentos de duda o cansancio."
+    },
+    "face-revelation": {
+      "title": "Golpe de revelación",
+      "description": "Acercamiento rápido desde plano medio a rostro."
+    },
+    "face-to-face": {
+      "title": "Cara a cara",
+      "description": "Dos rostros en un encuadre cercano compartido."
+    },
+    "boots-to-face": {
+      "title": "De botas a mirada",
+      "description": "La cámara asciende desde los pies hasta el rostro."
+    },
+    "dutch-charge": {
+      "title": "Carga inclinada",
+      "description": "Avance con cámara inclinada que cambia de lado."
+    },
+    "overhead-formation": {
+      "title": "Formación cenital",
+      "description": "Vista superior giratoria de tres personajes."
+    },
+    "camera-pass": {
+      "title": "Cruce junto a cámara",
+      "description": "El personaje cruza ante una cámara fija que lo sigue con la mirada."
+    },
+    "vehicle-showcase": {
+      "title": "Presentación del coche",
+      "description": "Órbita de tres cuartos alrededor de tu GLB de vehículo."
+    },
+    "vehicle-front-low": {
+      "title": "Frontal a ras de suelo",
+      "description": "Acercamiento bajo al frontal del vehículo."
+    },
+    "vehicle-rear-chase": {
+      "title": "Fuga desde atrás",
+      "description": "Seguimiento trasero de un vehículo en movimiento."
+    },
+    "vehicle-side-track": {
+      "title": "Paralelo lateral",
+      "description": "La cámara acompaña al vehículo desde un lateral."
+    },
+    "vehicle-wheel-detail": {
+      "title": "Detalle de rueda",
+      "description": "Plano de detalle lateral bajo; ajustable al modelo."
+    },
+    "vehicle-roof-orbit": {
+      "title": "Órbita sobre techo",
+      "description": "Órbita alta para revelar el techo y la silueta."
+    },
+    "vehicle-convoy": {
+      "title": "Convoy triple",
+      "description": "Tres vehículos avanzan en formación escalonada."
+    },
+    "vehicle-drift-arc": {
+      "title": "Curva de derrape",
+      "description": "Recorrido curvo con orientación del vehículo según su avance."
     }
   },
   "gallerySearch": "Buscar en el catálogo",
@@ -238,5 +318,22 @@
     "error": "Build fallido",
     "success": "Build correcto",
     "repeat": "Repeticiones de textura"
+  },
+  "framing": {
+    "title": "Encuadre del protagonista",
+    "help": "Sigue un punto del personaje. Ajusta el encuadre al GLB; los modelos sin hueso de cabeza usan su altura.",
+    "target": "Personaje u objeto",
+    "anchor": "Punto de interés",
+    "head": "Cabeza",
+    "center": "Centro",
+    "feet": "Pies / base",
+    "from": "Cámara al inicio",
+    "to": "Cámara al final",
+    "lookFrom": "Mirada al inicio",
+    "lookTo": "Mirada al final",
+    "orbit": "Vueltas de órbita",
+    "rollFrom": "Inclinación inicial (°)",
+    "rollTo": "Inclinación final (°)",
+    "facing": "Seguir la orientación del personaje"
   }
 }
