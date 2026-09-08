@@ -58,12 +58,12 @@ export function sourceRefFromOutput(item: ApiOutput, workspaceId: string): Scene
   }
 }
 
-export function pickerOutputFromSlot(sourceUrl: string, media: Scene3DSlotMedia, sourceRef?: Scene3DSourceRef): ApiOutput | undefined {
+export function pickerOutputFromSlot(sourceUrl: string, media: Scene3DSlotMedia | 'video', sourceRef?: Scene3DSourceRef): ApiOutput | undefined {
   const url = durableScene3DSourceUrl(sourceUrl)
   if (!url) return undefined
   return {
     name: sourceRef?.filename || url.split('/').pop() || url,
-    type: media === 'image' ? 'image' : 'model3d',
+    type: media === 'image' ? 'image' : media === 'video' ? 'video' : 'model3d',
     mode: null,
     size: 0,
     created_at: 0,

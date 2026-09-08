@@ -92,6 +92,45 @@ do not add new fields to legacy 2D scene files. Cue timing is local to a shot;
 defaults apply to each compiled shot. This does not provide lyric alignment,
 karaoke word timings, occlusion by 3D objects or extruded 3D type.
 
+## Monitors, billboards and image/video surfaces
+
+In Video 3D, **Add screen** creates a physical monitor, billboard or frameless
+panel. Choose an image or video from the device or library, adjust its dimensions
+and use the regular object transforms and travel controls. **Fit entire image**
+letterboxes the original; **Fill and crop** fills the face without stretching.
+Screen faces are unlit so the app's content remains readable under scene lights.
+
+For an existing GLB, enable **Use a mesh as a screen** and select its mesh name.
+`SCREEN_CONTENT` is the initial name for prepared monitor models. The name must
+identify exactly one mesh; missing/duplicate names fail visibly and prevent an
+incomplete export. The mesh needs usable UVs. Its existing geometry and UVs
+determine placement; width/height set the content aspect, not the GLB's dimensions.
+Use **Flip vertically** for assets whose UV orientation needs it. Other materials
+remain on the object. This is one media surface per slot, not a general material
+or submesh editor.
+
+Videos are muted and follow scene time, including start offset, playback speed,
+loop/hold and backwards seeks. Export awaits the decoded frame before encoding
+it. Async loads and callbacks are scoped to their current slot/configuration;
+replacement and unmount dispose the old material, texture and decoder. Source
+URL and source identity survive shot JSON. Keep the uploaded files with the
+project: JSON references them and does not embed their bytes.
+
+Eight reusable product templates contain no private media: `monitor-reveal`,
+`desk-presenter`, `monitor-detail`, `screen-gallery`, `billboard-plaza`,
+`screen-corridor`, `control-room`, and `product-finale`. Their sets are `retro-lab`,
+`observatory`, and `broadcast-plaza`. The desk preset expects a user GLB with a
+display mesh. Switching templates retains screen content while adopting the new
+layout. The registry is shared with Wizard mounting; arbitrary screen-source
+bindings still use the editor or shot JSON. This feature requires the WebGL path.
+
+Local LogSentinel production preserves four supplied screenshots, the PC GLB,
+Tentri's nine named animations and the complete supplied song. The screens include
+a real rendered mascot video. Real-browser checks exercise forward/backward
+video seeks and paused repaint; contract checks cover stale loads, disposal,
+export locking and async frame capture. Screenshots remain user evidence: their
+paused-analysis/error counters are not replaced with invented healthy telemetry.
+
 ## Validation and production observations
 
 Unit tests cover exact STEP endings and backwards seeks, deterministic travel,

@@ -1,4 +1,5 @@
 import { CINEMATIC_TEMPLATE_IDS } from './cinematicTemplateIds'
+import { MEDIA_TEMPLATE_IDS } from './mediaTemplateIds'
 
 export type Vec3 = readonly [number, number, number]
 
@@ -62,6 +63,7 @@ export const SCENE3D_TEMPLATE_IDS = [
   'coder-room',
   'clone-chase',
   ...CINEMATIC_TEMPLATE_IDS,
+  ...MEDIA_TEMPLATE_IDS,
 ] as const
 
 export type Scene3DTemplateId = (typeof SCENE3D_TEMPLATE_IDS)[number]
@@ -85,14 +87,14 @@ export type Scene3DMotion = {
   easing?: 'linear' | 'smooth'
 }
 
-export type Scene3DSlotMedia = 'model3d' | 'image'
+export type Scene3DSlotMedia = 'model3d' | 'image' | 'screen'
 
 export type Scene3DLoop = {
   cylinder: boolean
   speed: number
 }
 
-export type Scene3DDressing = 'none' | 'street' | 'space' | 'treadmill' | 'cafe' | 'drive-city' | 'drive-coast' | 'drive-tunnel' | 'citadel' | 'workshop' | 'chase-street'
+export type Scene3DDressing = 'none' | 'street' | 'space' | 'treadmill' | 'cafe' | 'drive-city' | 'drive-coast' | 'drive-tunnel' | 'citadel' | 'workshop' | 'chase-street' | 'retro-lab' | 'observatory' | 'broadcast-plaza'
 
 export type Scene3DSourceRef = {
   workspaceId: string
@@ -110,6 +112,7 @@ export type Scene3DSlot = {
   sourceUrl: string
   sourceRef?: Scene3DSourceRef
   media: Scene3DSlotMedia
+  screen?: import('./mediaScreen').MediaScreen
   surface?: 'wall' | 'floor'
   textureRepeat?: number
   performance?: 'typing'

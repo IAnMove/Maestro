@@ -1,0 +1,43 @@
+import { readFile } from 'node:fs/promises'
+import { expect, test } from '@playwright/test'
+import { gotoApp, closeApp } from '../helpers/gotoApp'
+
+test('a screen upload, dimensions and fit survive saving and reopening the shot', async ({ page }, testInfo) => {
+  const session = await gotoApp(page)
+  const url = '/api/v1/uploads/media-screen-test.png'
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=', 'base64')
+  await page.route('**/api/v1/upload', route => route.fulfill({ json: { filename: 'media-screen-test.png', path: url, url, kind: 'image' } }))
+  await page.route(`**${url}`, route => route.fulfill({ contentType: 'image/png', body: png }))
+  await page.getByRole('tab', { name: 'Video 3D', exact: true }).click()
+  await page.getByRole('button', { name: 'Close Ask to the Wizard' }).click()
+  await page.getByRole('button', { name: 'Expand editor', exact: true }).click()
+  const workspace = page.getByTestId('scene3d-workspace')
+  await workspace.getByRole('button', { name: 'Add screen', exact: true }).click()
+  const controls = workspace.getByTestId('scene3d-screen-controls').filter({ has: page.getByRole('button', { name: 'Remove screen', exact: true }) })
+  await controls.getByTestId('asset-input-file').setInputFiles({ name: 'media-screen-test.png', mimeType: 'image/png', buffer: png })
+  await expect(controls.getByText('media-screen-test.png', { exact: true })).toBeVisible()
+  await controls.getByLabel('Content fit', { exact: true }).selectOption('cover')
+  await controls.getByLabel('Screen style', { exact: true }).selectOption('billboard')
+  await controls.getByLabel('Width / aspect', { exact: true }).fill('8')
+  await controls.getByLabel('Height / aspect', { exact: true }).fill('4.5')
+  const downloaded = page.waitForEvent('download')
+  await workspace.getByRole('button', { name: 'Save shot JSON', exact: true }).click()
+  const saved = await downloaded
+  const path = testInfo.outputPath('screen.world3d.json')
+  await saved.saveAs(path)
+  const document = JSON.parse(await readFile(path, 'utf8'))
+  const slot = document.slots.find((item: { media: string }) => item.media === 'screen')
+  expect(slot.screen).toMatchObject({ sourceUrl: url, media: 'image', fit: 'cover', style: 'billboard', width: 8, height: 4.5 })
+  expect(slot.screen.sourceRef).toMatchObject({ filename: 'media-screen-test.png', url })
+  await controls.getByRole('button', { name: 'Remove screen', exact: true }).click()
+  await expect(workspace.getByRole('button', { name: 'Remove screen', exact: true })).toHaveCount(0)
+  await workspace.locator('input[type=file][accept=".json,application/json"]').setInputFiles({ name: 'screen.world3d.json', mimeType: 'application/json', buffer: await readFile(path) })
+  await expect(controls.getByLabel('Content fit', { exact: true })).toHaveValue('cover')
+  await expect(controls.getByLabel('Screen style', { exact: true })).toHaveValue('billboard')
+  await expect(controls.getByLabel('Width / aspect', { exact: true })).toHaveValue('8')
+  await expect(controls.getByText('media-screen-test.png', { exact: true })).toBeVisible()
+  await workspace.getByRole('button', { name: 'Play', exact: true }).click()
+  await expect(controls.getByLabel('Content fit', { exact: true })).toBeDisabled()
+  await expect(workspace.getByRole('button', { name: 'Add screen', exact: true })).toBeDisabled()
+  await closeApp(page, session)
+})

@@ -39,7 +39,7 @@ for(const shot of plan.shots) {
  const still=await page.evaluate(async d=>{
   const h=window.__world3dStage;h.beginExport(d);h.setExportSize(d.width,d.height);
   try {
-   const time=Math.min(d.duration/2,2), source=h.paint(time,d);
+   const time=Math.min(d.duration/2,2); await h.prepareFrame?.(time,d); const source=h.paint(time,d);
    const canvas=document.createElement('canvas');canvas.width=d.width;canvas.height=d.height;const ctx=canvas.getContext('2d');ctx.drawImage(source,0,0);
    const {paintKineticTexts}=await import('/src/lib/kineticText.ts');const {paintClipNumber}=await import('/src/features/scene3d/performance.ts');
    paintKineticTexts(ctx,d.width,d.height,time,d.texts);paintClipNumber(ctx,d.width,d.height,d.clipNumber);return canvas.toDataURL('image/png');

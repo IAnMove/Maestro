@@ -1,4 +1,6 @@
 import { framingPose } from './framing'
+import { screenGeometry } from './screenGeometry'
+import type { ScreenMediaRuntime } from './screenMediaRuntime'
 import { framingAnchor } from './framingAnchor'
 import {
   AnimationMixer,
@@ -60,6 +62,9 @@ export type SlotGpu = {
   looping: boolean
   loaded: boolean
   contactShadow?: Mesh
+  screen?: ScreenMediaRuntime
+  screenAbort?: AbortController
+  screenError?: Error
 }
 
 export type GpuWorld = {
@@ -194,6 +199,7 @@ function firstMap(root: Object3D): Texture | null {
 }
 
 export function placeholderMesh(slot: Scene3DSlot) {
+  if (slot.media === 'screen') return screenGeometry(slot)
   if (slot.media === 'image') {
     const texture = isCylinderBackdrop(slot) ? makeStripeTexture() : null
     return imageBackdropMesh(slot, texture)
@@ -244,6 +250,8 @@ export function dropSlot(world: GpuWorld, slotId: string) {
   const current = world.slots.get(slotId)
   if (!current) return
   current.mixer?.stopAllAction()
+  current.screenAbort?.abort()
+  current.screen?.dispose()
   world.scene.remove(current.root)
   if (current.contactShadow) {
     world.scene.remove(current.contactShadow)
@@ -288,9 +296,13 @@ export function placeSlot(
 export function worldAssetsReady(world: GpuWorld, slots: readonly Scene3DSlot[]): boolean {
   if (!world.dressingReady) return false
   return slots.every(slot => {
-    if (!slot.sourceUrl) return true
     const gpu = world.slots.get(slot.id)
-    return Boolean(gpu && gpu.sourceUrl === slot.sourceUrl && gpu.loaded)
+    if (slot.screen && gpu?.mountKey !== slotMountKey(slot)) return false
+    if (gpu?.screenError) throw gpu.screenError
+    if (gpu?.screen?.error) throw gpu.screen.error
+    if (slot.screen?.sourceUrl && !gpu?.screen?.ready) return false
+    if (!slot.sourceUrl) return true
+    return Boolean(gpu && gpu.mountKey === slotMountKey(slot) && gpu.loaded)
   })
 }
 
@@ -322,6 +334,7 @@ export function paintWorld(world: GpuWorld, document: Scene3DDocument, sceneSeco
   for (const slot of posedSlots) {
     const gpu = world.slots.get(slot.id)
     if (!gpu) continue
+    if (gpu.screen && slot.screen) void gpu.screen.seek(sceneSeconds, slot.screen).catch(() => {})
     poseLoadedSlot(gpu, slot)
     resetTypingPose(gpu.root)
     const clip = gpu.animations.find((_clip: { duration?: number }, index: number) => clipMatches(gpu, index))

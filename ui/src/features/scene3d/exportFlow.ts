@@ -39,7 +39,11 @@ export async function exportWorld3DDocument(
       height: size.height,
       fps: snapshot.fps,
       duration: scene3dOutputDuration(snapshot),
-      paint: seconds => paintWorld3DExportFrame(handle, snapshot, seconds * scene3dPlaybackSpeed(snapshot.playbackSpeed)),
+      paint: async seconds => {
+        const time = seconds * scene3dPlaybackSpeed(snapshot.playbackSpeed)
+        await handle.prepareFrame?.(time, snapshot)
+        return paintWorld3DExportFrame(handle, snapshot, time)
+      },
       overlay: (context, width, height, seconds) => {
         paintKineticTexts(context, width, height, seconds * scene3dPlaybackSpeed(snapshot.playbackSpeed), snapshot.texts)
         paintClipNumber(context, width, height, snapshot.clipNumber)
