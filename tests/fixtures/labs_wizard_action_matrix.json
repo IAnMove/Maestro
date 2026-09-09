@@ -2312,8 +2312,8 @@
       "preconditions": "Exact image/video source, installed upscale method and active workspace",
       "persistence": "Durable command receipt and task",
       "presentation": "tools.upscale",
-      "test": "ui/tests/toolsGenerationCommands.test.ts; ui/tests/toolsUpscaleAdapter.test.ts; ui/tests/toolsPanel.test.tsx",
-      "notes": "The video shortcut enters Tools before the durable ACK presentation; it shares the same command gateway as the Tools button.",
+      "test": "ui/tests/toolsUpscaleAdapter.test.ts",
+      "notes": "The video shortcut enters Tools before the durable ACK presentation; it shares the same command gateway as the Tools button. Further coverage: ui/tests/toolsGenerationCommands.test.ts and ui/tests/toolsPanel.test.tsx. Outside the Story/Series Lab context.",
       "prompt_fixture": "",
       "blocking_defect": ""
     },
