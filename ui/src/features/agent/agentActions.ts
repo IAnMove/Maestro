@@ -2719,7 +2719,6 @@ export const HOCUSPOCUS_AGENT_RESPONSE_SCHEMA: Record<string, unknown> = mergeRe
           },
           audio_sub_mode: { type: 'string', enum: ['', 'speech', 'music', 'sfx'] },
           sfx_text_weight: { type: 'number', minimum: 0, maximum: 5 },
-          video_guide: { anyOf: [{ type: 'string', minLength: 1, maxLength: 8_192 }, { type: 'null' }] },
           preset: { type: 'string', maxLength: 40 },
           sfx_clips: {
             type: 'array', maxItems: 12,

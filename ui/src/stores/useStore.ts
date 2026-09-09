@@ -2799,11 +2799,11 @@ export const useStore = create<AppState>((set, get) => {
       loraWeights: sameModel ? restoredLora.loraWeights : {},
       availableLoras: sameModel ? restoredLora.availableLoras : [],
     }))
+    if (newModelType && mode !== 'model3d') get().loadModelOptions(newModelType)
     if (newModelType && !sfxModelTypes.has(newModelType) && mode !== 'model3d') {
       if (!sameModel) {
         get().loadLoras(newModelType)
       }
-      get().loadModelOptions(newModelType)
       // Mode switch counts as a model selection too — apply the new
       // model's defaults so numeric primaries (steps, CFG, flow_shift,
       // sample_solver) match what that model expects rather than what
@@ -3871,9 +3871,9 @@ export const useStore = create<AppState>((set, get) => {
             availableLoras: savedLora.availableLoras || [],
           }))
         }
+        if (mode !== 'model3d') get().loadModelOptions(mt)
         if (!sfxModelTypes.has(mt) && mode !== 'model3d') {
           get().loadLoras(mt)
-          get().loadModelOptions(mt)
           _applyModelDefaults(get, set, mt)
         }
       }
@@ -6167,6 +6167,12 @@ export const useStore = create<AppState>((set, get) => {
 
   loadModelOptions: async (modelType) => {
     const seq = ++_modelOptionsSeq
+    // Virtual SFX has no options endpoint. Still invalidate pending responses
+    // and clear the previous model's constraints and Advanced controls.
+    if (sfxModelTypes.has(modelType)) {
+      set({ modelOptions: null, modelOptionsLoading: false })
+      return
+    }
     set({ modelOptionsLoading: true })
     try {
       const options = await api.fetchModelOptions(modelType)
@@ -8604,10 +8610,10 @@ export const useStore = create<AppState>((set, get) => {
       loraWeights: {},
       availableLoras: [],
     }))
-    // Virtual SFX models don't have backend model options or LoRAs
+    if (currentMode !== 'model3d') get().loadModelOptions(modelType)
+    // Virtual SFX models don't have backend LoRAs or model defaults.
     if (!sfxModelTypes.has(modelType) && currentMode !== 'model3d') {
       get().loadLoras(modelType)
-      get().loadModelOptions(modelType)
       _applyModelDefaults(get, set, modelType)
     }
     // Persist to localStorage
@@ -8743,12 +8749,9 @@ export const useStore = create<AppState>((set, get) => {
     // modelOptions matches the restored model before rerollGeneration
     // submits (stale capabilities used to strip stg_scale/perturbation_*
     // from the request, which then poisoned the next sidecar with zeros).
-    // (Virtual SFX models have no LoRAs/options endpoints — same guard
-    // as boot.)
-    if (!sfxModelTypes.has(modelType)) {
-      get().loadLoras(modelType)
-      await get().loadModelOptions(modelType)
-    }
+    // Virtual SFX clears stale options locally without fetching an endpoint.
+    if (!sfxModelTypes.has(modelType)) get().loadLoras(modelType)
+    await get().loadModelOptions(modelType)
 
     // Detect I2V: if image_start was used or image_prompt_type contains "S"
     const hadStartImage = !!(p.image_start || (p.image_prompt_type as string || '').includes('S'))

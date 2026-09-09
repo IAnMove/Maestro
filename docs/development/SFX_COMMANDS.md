@@ -143,3 +143,17 @@ removes it. A nonempty canonical reference selects that source; empty action
 strings and host/remote paths are rejected. The request duration is retained
 until server preparation probes the guide. No-guidance requests are limited
 to 20 seconds; the legacy SFX pack helper retains its separate clip behavior.
+
+### Switching into the SFX form
+
+Loading options for a virtual MMAudio model clears the previous model's options
+locally and invalidates pending option requests. Boot, mode/model selection,
+Wizard preparation and loading a sidecar use the same path. SFX must not inherit
+video minimum durations or H3 Advanced controls, even when a late request succeeds
+or fails. No MMAudio options or LoRA endpoint is fetched.
+
+The Wizard schema and instructions distinguish omitting `video_guide` (keep the
+selected guide), an explicit `null` (clear), and a canonical reference (replace).
+Replacing guide audio does not mean clearing the guide. This instructs the LLM;
+it is not a deterministic guarantee of natural-language interpretation. Parser
+and form tests verify each actual action's semantics separately from real runs.

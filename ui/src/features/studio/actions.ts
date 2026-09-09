@@ -120,7 +120,7 @@ export async function selectAudioModel(
   // same model here before applying an explicit Wizard duration; otherwise
   // the late options response can overwrite it with the model's default
   // (ACE-Step's 120 s default turned a requested 20 s track into 120 s).
-  if (selected && subMode !== 'sfx') {
+  if (selected) {
     await useStore.getState().loadModelOptions(selected)
   }
   const selectedModel = useStore.getState().models.find(model => model.model_type === selected)

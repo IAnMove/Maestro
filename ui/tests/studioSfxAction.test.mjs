@@ -29,7 +29,7 @@ async function withStudio(callback) {
       durationSeconds: 120,
       setGenerationMode: mode => useStore.setState({ generationMode: mode }),
       setAudioSubMode: subMode => useStore.setState({ audioSubMode: subMode }),
-      loadModelOptions: async () => { throw new Error('SFX has no carrier model options') },
+      loadModelOptions: before.loadModelOptions,
     })
     await callback()
   } finally { useStore.setState(before) }
@@ -96,3 +96,52 @@ test('SFX preparation validates the effective guide before any form mutation', a
     assert.equal(useStore.getState(), before)
   })
 })
+
+for (const settleWithFailure of [false, true]) {
+  test(`entering SFX clears H3 constraints and ignores a late options ${settleWithFailure ? 'failure' : 'response'}`, async () => {
+    const before = useStore.getState()
+    const fetchBefore = globalThis.fetch
+    let finish
+    const options = { fps: 30, frames_minimum: 155, frames_maximum: 601,
+      guidance_max_phases: 1, default_guidance_scale: 7 }
+    const requests = []
+    globalThis.fetch = async url => {
+      if (String(url).endsWith('/model-selections')) return new Response('{}', { headers: { 'content-type': 'application/json' } })
+      requests.push(String(url))
+      assert.match(String(url), /model-options.*minimax_h3/)
+      return new Promise((resolve, reject) => {
+        finish = () => settleWithFailure ? reject(new Error('late request failed'))
+          : resolve(new Response(JSON.stringify(options), { headers: { 'content-type': 'application/json' } }))
+      })
+    }
+    try {
+      useStore.setState({ generationMode: 'video', audioSubMode: 'speech', modelsLoaded: true,
+        models: [{ model_type: 'mmaudio_v2', name: 'MMAudio v2', family: 'tts', is_downloaded: true }],
+        selectedModelPerAudioSubMode: {}, selectedModelPerMode: { audio: 'mmaudio_v2' }, activeWorkspace: 'sfx-output',
+        params: { ...before.params, model_type: 'minimax_h3', video_guide: guide },
+        modelOptions: options, durationSeconds: 5.166666666666667 })
+      const pending = useStore.getState().loadModelOptions('minimax_h3')
+      assert.equal(useStore.getState().modelOptionsLoading, true)
+      await prepareAudio(parse(rawAction))
+      assert.equal(useStore.getState().modelOptions, null)
+      assert.equal(useStore.getState().modelOptionsLoading, false)
+      assert.equal(useStore.getState().durationSeconds, 3)
+      assert.equal(useStore.getState().params.video_guide, guide)
+      const prepared = useStore.getState()
+      finish()
+      await pending
+      assert.equal(useStore.getState(), prepared, 'obsolete completion must not mutate the SFX form')
+      assert.equal(requests.length, 1, 'MMAudio must not fetch backend options or LoRAs')
+      // Returning to Audio with its persisted virtual selection must also clear
+      // options without relying on setAudioSubMode changing the sub-tab.
+      useStore.setState({ generationMode: 'video', modelOptions: options,
+        selectedModelPerMode: { audio: 'mmaudio_v2' } })
+      useStore.getState().setGenerationMode('audio')
+      assert.equal(useStore.getState().modelOptions, null)
+      assert.equal(requests.length, 1)
+    } finally {
+      globalThis.fetch = fetchBefore
+      useStore.setState(before)
+    }
+  })
+}
