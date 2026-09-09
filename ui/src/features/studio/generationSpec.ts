@@ -573,6 +573,10 @@ function takeWorkspaceCollectionId(value: unknown): string | undefined {
  *
  * Workspace is moved to input.workspace.  Declared UI metadata is omitted,
  * while every catalogued native parameter is copied at its value level.
+ * Shared-form leftovers from Load Settings, reroll sidecars or native
+ * primary settings (H3 policy, perturbation, duration_seconds, …) are
+ * dropped instead of failing the whole image submission. Envelope
+ * injection and invalid catalogued values still fail closed.
  * Legacy filesystem references are intentionally rejected here; callers must
  * resolve them through the read-only references endpoint first.
  */
@@ -585,13 +589,11 @@ export function createStudioImageGenerationCommand(
   const workspaceCollectionId = takeWorkspaceCollectionId(fullParams.provenance)
   const params: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(fullParams)) {
-    if (key === 'workspace' || DECLARED_METADATA_FIELDS.has(key)) continue
+    if (key === 'workspace' || DECLARED_METADATA_FIELDS.has(key) || value === undefined) continue
     if (ENVELOPE_INJECTION_FIELDS.has(key)) {
       throw new Error('workspace parameters cannot contain envelope field ' + key)
     }
-    if (!STUDIO_IMAGE_PARAM_CATALOG.has(key)) {
-      throw new Error('input.params.' + key + ' is not supported by generation.image')
-    }
+    if (!STUDIO_IMAGE_PARAM_CATALOG.has(key)) continue
     params[key] = value
   }
   const command: StudioImageGenerationCommand = {

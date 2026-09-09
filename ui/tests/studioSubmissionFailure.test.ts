@@ -64,6 +64,24 @@ test('legacy image control and mask fields are translated in the detached V2 sna
   assert.equal(resolutions, 1)
 })
 
+test('Load Settings leftovers do not block image command preparation', async () => {
+  const params = {
+    workspace: 'command-qa', prompt: 'Reroll this image literally', model_type: 'pi_flux2',
+    resolution: '512x512', num_inference_steps: 4, seed: 42, guidance_scale: 1,
+    image_mode: 1, video_length: 1, generation_mode: 'image',
+    minimax_h3_planning_style: 'faithful', minimax_h3_audio_policy: 'native',
+    duration_seconds: 0, perturbation_layers: [9], stg_scale: 1,
+    speakers_locations: '0:45 55:100', voice_clone_enabled: true,
+  }
+  const before = state('image', params)
+  const submission = await prepareImage(params, before, () => before)
+  assert.equal(submission.params.prompt, params.prompt)
+  assert.equal(submission.params.workspace, params.workspace)
+  assert.equal(submission.params.minimax_h3_planning_style, undefined)
+  assert.equal(submission.params.duration_seconds, undefined)
+  assert.equal(submission.params.voice_clone_enabled, undefined)
+})
+
 test('two different legacy and image guides fail instead of silently discarding one', () => {
   const params = { video_guide: '/api/v1/uploads/one.png', image_guide: '/api/v1/uploads/two.png' }
   assert.throws(() => translateLegacyImageGuides(params))

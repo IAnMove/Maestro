@@ -156,6 +156,39 @@ test('the captured native Studio request fixture remains a valid v2 snapshot', {
   assert.equal('provenance' in command.input.params, false)
 })
 
+test('v2 builder omits Load Settings and primary-settings leftovers instead of blocking Generate', { concurrency: false }, () => {
+  const source = baseParams('reroll-leftovers')
+  source.minimax_h3_planning_style = 'faithful'
+  source.minimax_h3_audio_policy = 'native'
+  source.minimax_h3_reference_sequence = false
+  source.minimax_h3_turbo_preset = 'standard'
+  source.duration_seconds = 0
+  source.pause_seconds = 0
+  source.perturbation_switch = 0
+  source.perturbation_layers = [9]
+  source.stg_scale = 1
+  source.keyframe_conditioning_mode = 'replace'
+  source.keyframe_inject_mode = 'additive'
+  source.speakers_locations = '0:45 55:100'
+  source.viggle_audio_mode = ''
+  source.attention_sparsity = 0
+  source.video_guide2 = ''
+  source.voice_clone_enabled = true
+  source.voice_clone_mode = 'in_place'
+  source.voice_clone_refs = ['/tmp/voice.wav']
+  const command = createStudioImageGenerationCommand(source, 'reroll-leftovers')
+
+  assert.equal(command.input.params.prompt, source.prompt)
+  assert.equal(command.input.params.model_type, source.model_type)
+  assert.equal(command.input.workspace, source.workspace)
+  assert.equal('minimax_h3_planning_style' in command.input.params, false)
+  assert.equal('duration_seconds' in command.input.params, false)
+  assert.equal('perturbation_layers' in command.input.params, false)
+  assert.equal('voice_clone_enabled' in command.input.params, false)
+  assert.equal('speakers_locations' in command.input.params, false)
+  assert.equal('viggle_audio_mode' in command.input.params, false)
+})
+
 test('v2 builder requires canonical references and rejects envelope injection', { concurrency: false }, () => {
   const legacyPath = baseParams('legacy')
   legacyPath.image_refs = ['/tmp/legacy.png']
