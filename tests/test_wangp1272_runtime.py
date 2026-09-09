@@ -116,12 +116,13 @@ def test_processor_settings_cannot_override_runtime_and_ranges_are_enforced(monk
             processors.validated_settings('h3facerefine', {'spatial_upsampler_face_count': value})
 
 
-@pytest.mark.parametrize('audio_only,shape,expected_count', [
-    (True, (160,), 12),
-    (True, (2, 160), 12),
-    (False, (3, 7, 2, 2), 19),
+@pytest.mark.parametrize('audio_only,is_image,shape,expected_count', [
+    (True, False, (160,), 12),
+    (True, False, (2, 160), 12),
+    (False, True, (3, 1, 2, 2), 12),
+    (False, False, (3, 7, 2, 2), 19),
 ])
-def test_postprocessing_clock_counts_video_frames_without_indexing_audio(audio_only, shape, expected_count):
+def test_postprocessing_clock_counts_video_frames_without_indexing_audio(audio_only, is_image, shape, expected_count):
     """Execute the engine's clock update without bootstrapping model services."""
     from types import SimpleNamespace
 
@@ -143,7 +144,7 @@ def test_postprocessing_clock_counts_video_frames_without_indexing_audio(audio_o
     else:
         raise AssertionError('Native postprocessing clock not found')
     sample = SimpleNamespace(shape=shape)
-    namespace = {'sample': sample, 'audio_only': audio_only, 'native_frames_processed_count': 12}
+    namespace = {'sample': sample, 'audio_only': audio_only, 'is_image': is_image, 'native_frames_processed_count': 12}
     code = compile(ast.Module(body=statements, type_ignores=[]), 'native-postprocessing-clock', 'exec')
     exec(code, namespace)
     assert namespace['postprocess_audio_offset'] == 12

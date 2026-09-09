@@ -9240,7 +9240,7 @@ def generate_video(
                     send_cmd("progress", [0, get_latest_status(state,"Upsampling")])
                 
                 postprocess_audio_offset = native_frames_processed_count
-                if not audio_only:
+                if not (audio_only or is_image):
                     native_frames_processed_count += sample.shape[1]
                 output_fps  = fps
                 if len(temporal_upsampling) > 0:
