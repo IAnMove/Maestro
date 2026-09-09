@@ -10,6 +10,7 @@ export type KineticText = {
   size: number
   color: string
   rotation: number
+  font?: 'sans' | 'mono'
 }
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value))
@@ -33,6 +34,7 @@ export function parseKineticTexts(raw: unknown): KineticText[] {
       size: clamp(numeric(value.size, 9), 2, 25),
       color: /^#[0-9a-f]{6}$/i.test(value.color ?? '') ? value.color! : '#ffe3a0',
       rotation: clamp(numeric(value.rotation, 0), -45, 45),
+      ...(value.font === 'mono' || value.font === 'sans' ? { font: value.font } : {}),
     }]
   })
 }
@@ -50,6 +52,7 @@ export const KINETIC_TEXT_SCHEMA = {
       preset: { enum: KINETIC_PRESETS }, x: { type: 'number', minimum: 0, maximum: 100 },
       y: { type: 'number', minimum: 0, maximum: 100 }, size: { type: 'number', minimum: 2, maximum: 25 },
       color: { type: 'string', pattern: '^#[0-9a-fA-F]{6}$' }, rotation: { type: 'number', minimum: -45, maximum: 45 },
+      font: { enum: ['sans', 'mono'] },
     }, required: ['id', 'text', 'start', 'end', 'preset'], additionalProperties: false,
   },
 }
@@ -90,11 +93,12 @@ export function paintKineticTexts(ctx: CanvasRenderingContext2D, width: number, 
     if (!state) continue
     ctx.save()
     let size = height * cue.size / 100
-    ctx.font = `900 ${size}px system-ui, sans-serif`
+    const font = (pixels: number) => cue.font === 'mono' ? `700 ${pixels}px ui-monospace, monospace` : `900 ${pixels}px system-ui, sans-serif`
+    ctx.font = font(size)
     const lines = cue.text.split('\n')
     const textWidth = Math.max(1, ...lines.map(line => ctx.measureText(line).width))
     size *= Math.min(1, width * .86 / textWidth)
-    ctx.font = `900 ${size}px system-ui, sans-serif`
+    ctx.font = font(size)
     ctx.translate(width * cue.x / 100, height * (cue.y / 100 + state.dy))
     ctx.rotate(cue.rotation * Math.PI / 180)
     ctx.scale(state.scale, state.scale)

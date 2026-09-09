@@ -114,3 +114,71 @@ def test_processor_settings_cannot_override_runtime_and_ranges_are_enforced(monk
     for value in (True, 1.5, -1, 6, float('nan')):
         with pytest.raises(ValueError):
             processors.validated_settings('h3facerefine', {'spatial_upsampler_face_count': value})
+
+
+@pytest.mark.parametrize('audio_only,is_image,shape,expected_count', [
+    (True, False, (160,), 12),
+    (True, False, (2, 160), 12),
+    (False, True, (3, 1, 2, 2), 12),
+    (False, False, (3, 7, 2, 2), 19),
+])
+def test_postprocessing_clock_counts_video_frames_without_indexing_audio(audio_only, is_image, shape, expected_count):
+    """Execute the engine's clock update without bootstrapping model services."""
+    from types import SimpleNamespace
+
+    tree = ast.parse((ROOT / 'app/wgp.py').read_text())
+    statement_lists = (value for node in ast.walk(tree) for _, value in ast.iter_fields(node)
+                       if isinstance(value, list) and value and isinstance(value[0], ast.stmt))
+    for body in statement_lists:
+        start = next((index for index, node in enumerate(body)
+                      if isinstance(node, ast.Assign) and any(
+                          isinstance(target, ast.Name) and target.id == 'postprocess_audio_offset'
+                          for target in node.targets)), None)
+        if start is not None:
+            end = next(index for index in range(start + 1, len(body))
+                       if isinstance(body[index], ast.Assign) and any(
+                           isinstance(target, ast.Name) and target.id == 'output_fps'
+                           for target in body[index].targets))
+            statements = body[start:end]
+            break
+    else:
+        raise AssertionError('Native postprocessing clock not found')
+    sample = SimpleNamespace(shape=shape)
+    namespace = {'sample': sample, 'audio_only': audio_only, 'is_image': is_image, 'native_frames_processed_count': 12}
+    code = compile(ast.Module(body=statements, type_ignores=[]), 'native-postprocessing-clock', 'exec')
+    exec(code, namespace)
+    assert namespace['postprocess_audio_offset'] == 12
+    assert namespace['native_frames_processed_count'] == expected_count
+    assert namespace['sample'] is sample
+    exec(code, namespace)
+    assert namespace['postprocess_audio_offset'] == expected_count
+    assert namespace['native_frames_processed_count'] == 12 + 2 * (expected_count - 12)
+
+
+@pytest.mark.parametrize('method,still_image,height,expected_size', [
+    ('lanczos2', True, 180, (640, 360)),
+    ('lanczos2', True, 176, (640, 352)),
+    ('lanczos1.5', True, 180, (480, 270)),
+    ('lanczos2', False, 180, (640, 352)),
+    ('vae1', True, 180, (160, 96)),
+])
+def test_lanczos_stills_keep_exact_dimensions_and_video_keeps_alignment(method, still_image, height, expected_size):
+    from types import SimpleNamespace
+    import numpy as np
+    from PIL import Image
+
+    torch = pytest.importorskip('torch')
+    upscale = engine_function('app/wgp.py', 'perform_spatial_upsampling', {
+        'torch': torch, 'np': np, 'Image': Image,
+        'wangp_processors': SimpleNamespace(is_spatial=lambda _: False),
+        'find_edit_spatial_upsampler': lambda _: None,
+        'process_images_multithread': lambda fn, frames, *_args, **_kwargs: [fn(frame) for frame in frames],
+        'get_default_workers': lambda: 1,
+    })
+    frame_count = 1 if still_image else 3
+    sample = torch.full((3, frame_count, height, 320), 127, dtype=torch.uint8)
+    result = upscale(sample, method, still_image=still_image)
+    width, output_height = expected_size
+    assert result.shape == (3, frame_count, output_height, width)
+    assert result.dtype == torch.uint8
+    assert torch.all(result == 127)

@@ -5089,7 +5089,12 @@ export const useStore = create<AppState>((set, get) => {
           // back to `max` then 600.
           const ds = state.modelOptions.duration_slider
           const sliderDefault = ds?.default ?? ds?.max ?? 600
-          params.duration_seconds = state.durationSeconds < 30 ? sliderDefault : state.durationSeconds
+          // A zero duration is the model's declared "auto" sentinel (for
+          // example DramaBox). Any positive slider value is an explicit user
+          // choice and must reach the backend unchanged; replacing short
+          // choices with the model default made a requested 20 s ACE-Step
+          // track run for 120 s.
+          params.duration_seconds = state.durationSeconds === 0 ? sliderDefault : state.durationSeconds
         }
         // Let the TTS model use its own defaults for steps/guidance if ours are video defaults
         if ((params.num_inference_steps as number) > 0 && state.modelOptions?.default_num_inference_steps == null) {

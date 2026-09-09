@@ -1,10 +1,11 @@
 import { parseClipPlayback, parseMotion } from './performance.ts'
 import { parseSpeech } from './speech/track'
+import { parseMediaScreen } from './mediaScreen.ts'
 import { parseScene3DLoop } from './backdrop.ts'
 import { durableScene3DSourceUrl, parseScene3DSourceRef } from './slotSource.ts'
 import type { Scene3DDressing, Scene3DSlot } from './types.ts'
 
-const DRESSINGS = new Set<Scene3DDressing>(['street', 'space', 'treadmill', 'cafe', 'drive-city', 'drive-coast', 'drive-tunnel', 'citadel', 'workshop', 'chase-street'])
+const DRESSINGS = new Set<Scene3DDressing>(['street', 'space', 'treadmill', 'cafe', 'drive-city', 'drive-coast', 'drive-tunnel', 'citadel', 'workshop', 'chase-street', 'retro-lab', 'observatory', 'broadcast-plaza'])
 export const parseDressing = (value?: Scene3DDressing) => DRESSINGS.has(value!) ? value : undefined
 
 function textureRepeat(value: unknown) {
@@ -18,8 +19,8 @@ export function normalizeScene3DSlot(slot: Scene3DSlot): Scene3DSlot {
   const sourceRef = parseScene3DSourceRef(slot.sourceRef)
   return {
     ...slot, sourceUrl, sourceRef: sourceUrl && sourceRef ? sourceRef : undefined,
-    speech: slot.media === 'image' ? undefined : parseSpeech(slot.speech),
-    media: slot.media === 'image' ? 'image' : 'model3d',
+    speech: slot.media === 'image' || slot.media === 'screen' ? undefined : parseSpeech(slot.speech),
+    media: slot.media === 'image' ? 'image' : slot.media === 'screen' ? 'screen' : 'model3d', screen: parseMediaScreen(slot.screen),
     loop: parseScene3DLoop(slot.loop), clipPlayback: parseClipPlayback(slot.clipPlayback), motion: parseMotion(slot.motion),
     surface: slot.surface === 'floor' || slot.surface === 'wall' ? slot.surface : undefined,
     grounded: slot.grounded === true, textureRepeat: textureRepeat(slot.textureRepeat),

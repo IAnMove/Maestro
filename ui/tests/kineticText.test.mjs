@@ -7,7 +7,7 @@ import { parseSceneRecipe, compileSceneRecipe } from '../src/lib/sceneRecipe.ts'
 import { createDefaultScene3DDocument, parseScene3DDocument } from '../src/features/scene3d/document.ts'
 import { remountScene3DTemplate } from '../src/features/scene3d/templates.ts'
 
-const cue = parseKineticTexts([{id:'title', text:'¡Código 🧙!\nLínea 2', start:1, end:4, preset:'typewriter'}])[0]
+const cue = parseKineticTexts([{id:'title', text:'¡Código 🧙!\nLínea 2', start:1, end:4, preset:'typewriter',font:'mono'}])[0]
 
 test('text time sampling supports seeking and exclusive end times', () => {
   assert.equal(kineticTextState(cue, .9), null)
@@ -25,6 +25,7 @@ test('untrusted text imports are bounded and literal text is preserved', () => {
   assert.equal(texts[0].x, 50)
   assert.equal(texts[0].size, 25)
   assert.equal(parseKineticTexts(Array.from({length:20}, (_,i)=>({...cue,id:String(i)}))).length,12)
+  assert.equal(parseKineticTexts([{...cue,font:'untrusted-font'}])[0].font,undefined)
 })
 
 test('the same text survives 2D file, recipe, compiled scene and 3D template round trips', () => {
@@ -45,4 +46,7 @@ test('all text presets paint visible glyphs and restore the canvas state', () =>
   for(const preset of ['impact','rise','typewriter','wave']) paintKineticTexts(ctx,1280,720,3,[{...cue,preset}])
   assert.equal(saves,4);assert.equal(restores,4)
   assert.ok(glyphs.includes('¡Código 🧙!'));assert.ok(glyphs.includes('🧙'))
+  assert.match(ctx.font,/ui-monospace, monospace$/)
+  paintKineticTexts(ctx,1280,720,3,[{...cue,font:undefined}])
+  assert.match(ctx.font,/system-ui, sans-serif$/)
 })

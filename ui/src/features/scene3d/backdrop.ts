@@ -1,4 +1,5 @@
 import type { Scene3DLoop, Scene3DSlot } from './types.ts'
+import { mediaScreenMountKey } from './mediaScreen.ts'
 
 export function wrapUnit(value: number): number {
   if (!Number.isFinite(value)) return 0
@@ -29,7 +30,7 @@ export function isCylinderBackdrop(slot: Pick<Scene3DSlot, 'media' | 'loop' | 's
   return slot.media === 'image' && slot.surface !== 'floor' && slot.loop?.cylinder === true
 }
 
-export function slotMountKey(slot: Pick<Scene3DSlot, 'sourceUrl' | 'media' | 'loop' | 'surface' | 'textureRepeat'>): string {
-  if (slot.media !== 'image') return `${slot.sourceUrl}\0glb`
+export function slotMountKey(slot: Pick<Scene3DSlot, 'sourceUrl' | 'media' | 'loop' | 'surface' | 'textureRepeat' | 'screen'>): string {
+  if (slot.media !== 'image') return `${slot.sourceUrl}\0${slot.media}\0${mediaScreenMountKey(slot.screen)}`
   return `${slot.sourceUrl}\0${isCylinderBackdrop(slot) ? 'cyl' : 'plane'}\0${slot.surface ?? ''}\0${slot.textureRepeat ?? ''}`
 }

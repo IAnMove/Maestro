@@ -369,6 +369,38 @@
     "vehicle-drift-arc": {
       "title": "Drift arc",
       "description": "A curved route with the vehicle facing its direction of travel."
+    },
+    "monitor-reveal": {
+      "title": "Monitor reveal",
+      "description": "A rising camera reveals a monitor beside your mascot."
+    },
+    "desk-presenter": {
+      "title": "Desktop presenter",
+      "description": "Your mascot presents a GLB computer with an image or video surface."
+    },
+    "monitor-detail": {
+      "title": "Screen detail",
+      "description": "A frontal push-in makes the monitor content readable."
+    },
+    "screen-gallery": {
+      "title": "Screen gallery",
+      "description": "Three panels surround the lead in an observatory."
+    },
+    "billboard-plaza": {
+      "title": "Giant-screen plaza",
+      "description": "Monumental architecture, a raised billboard and a lead for scale."
+    },
+    "screen-corridor": {
+      "title": "Screen corridor",
+      "description": "The lead travels through a corridor of facing panels."
+    },
+    "control-room": {
+      "title": "Control room",
+      "description": "Six screens and a mascot overseeing the room."
+    },
+    "product-finale": {
+      "title": "Product finale",
+      "description": "A wide product presentation with the lead and three screens."
     }
   },
   "gallerySearch": "Search the catalog",
@@ -383,6 +415,8 @@
   "animationSpeed": "Animation speed",
   "animationStart": "Animation start (s)",
   "animationLoop": "Loop animation",
+  "animationFit": "Fit animation to shot",
+  "animationFitHint": "Play the remaining animation once over the current shot duration (0.1–4× speed). Apply again if you change the duration or start time.",
   "clipNumber": "Clip number",
   "duration": "Duration (s)",
   "saveDocument": "Save shot JSON",
@@ -426,5 +460,30 @@
     "rollFrom": "Initial tilt (°)",
     "rollTo": "Final tilt (°)",
     "facing": "Follow the subject orientation"
+  },
+  "screens": {
+    "add": "Add screen",
+    "title": "Media screen",
+    "attach": "Use a mesh as a screen",
+    "mesh": "Screen mesh",
+    "chooseMesh": "Choose a mesh",
+    "content": "Screen image or video",
+    "chooseContent": "Choose an image or video",
+    "fit": "Content fit",
+    "contain": "Fit entire image",
+    "cover": "Fill and crop",
+    "style": "Screen style",
+    "monitor": "Desktop monitor",
+    "billboard": "Billboard / giant screen",
+    "frameless": "Frameless panel",
+    "width": "Width / aspect",
+    "height": "Height / aspect",
+    "flipY": "Flip vertically",
+    "start": "Video start (s)",
+    "speed": "Video speed",
+    "loop": "Loop video",
+    "clockHelp": "Video follows the scene clock. Its audio is muted.",
+    "remove": "Remove screen",
+    "failed": "The screen could not load. Check the mesh and media file."
   }
 }

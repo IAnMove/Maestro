@@ -121,7 +121,7 @@ import wgp
 from services.generation import bind_wgp, get_model_def
 bind_wgp(wgp)
 from services import model3d_service, minimax_h3_service, minimax_image_service
-from services import tools_upscale
+from services import tools_upscale as tools_upscale_service
 from services import debug_trace
 from routers.lan_auth import create_lan_auth_router
 from services.durable_generation_queue import DurableGenerationQueue
@@ -22861,8 +22861,8 @@ def _apply_spatial_upsampling_to_file(video_path: str, method: str, job: dict = 
 
 # Compatibility aliases keep the existing HTTP validation contract stable while
 # the implementation lives in the standalone Tools service.
-_TOOL_UPSCALE_METHODS = tools_upscale.TOOL_UPSCALE_METHODS
-_TOOL_SOURCE_EXTENSIONS = tools_upscale.TOOL_SOURCE_EXTENSIONS
+_TOOL_UPSCALE_METHODS = tools_upscale_service.TOOL_UPSCALE_METHODS
+_TOOL_SOURCE_EXTENSIONS = tools_upscale_service.TOOL_SOURCE_EXTENSIONS
 
 
 def _tool_asset_roots() -> list[dict[str, str]]:
@@ -23062,7 +23062,7 @@ def _upscale_tool_image(
     progress_callback=None,
 ) -> tuple[int, int]:
     """Compatibility facade for callers that used the old launch symbol."""
-    return tools_upscale.upscale_image(
+    return tools_upscale_service.upscale_image(
         source_path,
         output_path,
         method,
@@ -23147,7 +23147,7 @@ def _write_tool_sidecar(
 
 def _run_tool_upscale(job_id: str):
     """Compatibility facade for the standalone Tools upscale service."""
-    return tools_upscale.run_tool_upscale(
+    return tools_upscale_service.run_tool_upscale(
         job_id,
         runtime={
             "jobs": _jobs,

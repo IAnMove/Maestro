@@ -8,7 +8,7 @@ import { cloneScene3DDocument, createDefaultScene3DDocument, parseScene3DDocumen
 import { applyScene3DTemplate, patchScene3DSlot } from '../src/features/scene3d/templates.ts'
 import { documentFromWorld3DRequest } from '../src/features/scene3d/world3dAgent.ts'
 import { canMutateWorld3DScene, finishWorld3DExport, paintWorld3DExportFrame, startWorld3DExport } from '../src/features/scene3d/exportLock.ts'
-import { evenDim, world3dExportPlan, world3dExportSize } from '../src/features/scene3d/exportMp4.ts'
+import { evenDim, world3dEncoderConfig, world3dExportPlan, world3dExportSize } from '../src/features/scene3d/exportMp4.ts'
 import { world3dRecordingStub } from '../src/features/scene3d/publish.ts'
 import { hashSoftwareFrame, renderScene3DSoftware } from '../src/features/scene3d/softwareRender.ts'
 
@@ -193,7 +193,7 @@ test('drive templates keep the car still and scroll the world', () => {
 
 test('world3d export plan is independent of compositor layers', () => {
   assert.equal(evenDim(1281), 1280)
-  assert.deepEqual(world3dExportSize(1920, 1080), { width: 1280, height: 720 })
+  assert.deepEqual(world3dExportSize(1920, 1080), { width: 1920, height: 1080 })
   const plan = world3dExportPlan(2, 30)
   assert.equal(plan.count, 60)
   assert.equal(plan.times[0], 0)
@@ -204,6 +204,36 @@ test('world3d export plan is independent of compositor layers', () => {
   assert.equal(stub.name, 'world3d-run-loop')
   assert.deepEqual(stub.layers, [])
   assert.equal(stub.fps, 30)
+})
+
+test('full HD export and publication retain orientation without upscaling smaller shots', () => {
+  for (const [width, height, expected] of [
+    [1920, 1080, { width: 1920, height: 1080 }],
+    [1080, 1920, { width: 1080, height: 1920 }],
+    [1280, 720, { width: 1280, height: 720 }],
+    [720, 1280, { width: 720, height: 1280 }],
+    [3840, 2160, { width: 1920, height: 1080 }],
+    [2160, 3840, { width: 1080, height: 1920 }],
+    [2160, 2160, { width: 1080, height: 1080 }],
+    [641, 481, { width: 640, height: 480 }],
+  ]) {
+    assert.deepEqual(world3dExportSize(width, height), expected)
+    const stub = world3dRecordingStub({ ...applyScene3DTemplate('run-loop'), width, height })
+    assert.deepEqual({ width: stub.width, height: stub.height }, expected)
+  }
+})
+
+test('encoder level admits full HD at 60 fps while preserving the 720p configuration', () => {
+  assert.equal(world3dEncoderConfig(1280, 720, 60).codec, 'avc1.640028')
+  assert.equal(world3dEncoderConfig(1920, 1080, 30).codec, 'avc1.640028')
+  for (const [width, height] of [[1920, 1080], [1080, 1920], [1080, 1080]]) {
+    const config = world3dEncoderConfig(width, height, 60)
+    assert.equal(config.codec, 'avc1.64002a')
+    assert.equal(config.width, width)
+    assert.equal(config.height, height)
+    assert.equal(config.framerate, 60)
+    assert.ok(config.bitrate <= 24_000_000)
+  }
 })
 
 test('wizard can mount the run-loop cylinder template', () => {

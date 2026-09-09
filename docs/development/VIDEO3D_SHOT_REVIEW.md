@@ -5,17 +5,35 @@ animations, displays their durations, and offers speed, source start time and
 loop/hold controls per object. Unknown-duration clips cannot be selected.
 Controls affect preview and MP4 capture identically. A single play reaches the
 exact last pose, including STEP tracks; seeking back reactivates a clamped action.
+“Fit animation to shot” plays the remaining source animation once over the current
+shot duration by setting speed and disabling looping. It preserves the source
+start time and supports 0.1–4×, including decimal values at either boundary.
+Apply it again after changing shot duration or source start. This is particularly
+useful for forward root motion: a non-cyclic animation can jump back when looped.
 
 Shot JSON can be saved and reopened from the editor. Import validates render
 settings, camera fields, light and unique object identities before mounting.
 Saved upload/file URLs remain the source authority; JSON files do not embed GLBs
 or make their source files portable. Filesystem/blob URLs retain the existing
 transient-source handling. Imported dimensions determine preview and export.
+Export preserves sizes up to 1920×1080 (1080×1920 for portrait shots), fits larger
+documents inside that bound, and rounds dimensions to even pixels. Smaller shots
+are not upscaled. The encoder, export canvas and publication metadata share this
+size calculation. Full HD at 60 fps requests H.264 level 4.2; the existing browser
+support check still reports unsupported configurations instead of reducing them
+silently. MP4 bytes remain in browser memory, so longer exports still require
+enough local memory; this change does not add streaming or export recovery.
 
 `clipNumber` is optional, positive and integral. It is shown in preview and baked
 into the encoded frame at the upper right. It is also included in the published
 filename and recipe. It survives template changes with the rest of the shot.
 This number is an editorial reference; it does not replace asset or attempt IDs.
+For clean exports, omit `document.clipNumber`. The shot render/assembly clients
+still identify files using `shot.number`, then `document.clipNumber`, then the
+one-based position in the plan. They reject duplicate or invalid identities
+before publication. Rendering confirms the imported editor document through a
+saved JSON roundtrip before checking assets, so consecutive unnumbered shots
+with the same sources still apply their own animations, cameras and lights.
 
 `clipPlayback` stores `speed`, `start` (source animation seconds), and `loop`.
 `motion` stores a world-space destination, optional quadratic control point
@@ -86,11 +104,56 @@ They survive scene/shot JSON, 2D recipe round trips and template changes, and
 are baked into MP4s. Preview uses a bounded canvas; final output uses the export
 resolution. Text draws over the image, below the optional clip number.
 
+The optional `font` field selects `sans` or `mono`. Monospace lettering provides
+terminal-style typography for either editor; the same font is used for measuring
+and painting. The default retains existing sans-serif output. Typeface choice
+survives shot files, 2D recipes and template changes; imports accept only the two
+known values rather than arbitrary CSS font strings.
+
 At most 12 cues and 240 characters per cue are accepted. Blank or invalid lists
 do not add new fields to legacy 2D scene files. Cue timing is local to a shot;
 3D global playback speed affects text and scene together. A recipe's scene text
 defaults apply to each compiled shot. This does not provide lyric alignment,
 karaoke word timings, occlusion by 3D objects or extruded 3D type.
+
+## Monitors, billboards and image/video surfaces
+
+In Video 3D, **Add screen** creates a physical monitor, billboard or frameless
+panel. Choose an image or video from the device or library, adjust its dimensions
+and use the regular object transforms and travel controls. **Fit entire image**
+letterboxes the original; **Fill and crop** fills the face without stretching.
+Screen faces are unlit so the app's content remains readable under scene lights.
+
+For an existing GLB, enable **Use a mesh as a screen** and select its mesh name.
+`SCREEN_CONTENT` is the initial name for prepared monitor models. The name must
+identify exactly one mesh; missing/duplicate names fail visibly and prevent an
+incomplete export. The mesh needs usable UVs. Its existing geometry and UVs
+determine placement; width/height set the content aspect, not the GLB's dimensions.
+Use **Flip vertically** for assets whose UV orientation needs it. Other materials
+remain on the object. This is one media surface per slot, not a general material
+or submesh editor.
+
+Videos are muted and follow scene time, including start offset, playback speed,
+loop/hold and backwards seeks. Export awaits the decoded frame before encoding
+it. Async loads and callbacks are scoped to their current slot/configuration;
+replacement and unmount dispose the old material, texture and decoder. Source
+URL and source identity survive shot JSON. Keep the uploaded files with the
+project: JSON references them and does not embed their bytes.
+
+Eight reusable product templates contain no private media: `monitor-reveal`,
+`desk-presenter`, `monitor-detail`, `screen-gallery`, `billboard-plaza`,
+`screen-corridor`, `control-room`, and `product-finale`. Their sets are `retro-lab`,
+`observatory`, and `broadcast-plaza`. The desk preset expects a user GLB with a
+display mesh. Switching templates retains screen content while adopting the new
+layout. The registry is shared with Wizard mounting; arbitrary screen-source
+bindings still use the editor or shot JSON. This feature requires the WebGL path.
+
+Local LogSentinel production preserves four supplied screenshots, the PC GLB,
+Tentri's nine named animations and the complete supplied song. The screens include
+a real rendered mascot video. Real-browser checks exercise forward/backward
+video seeks and paused repaint; contract checks cover stale loads, disposal,
+export locking and async frame capture. Screenshots remain user evidence: their
+paused-analysis/error counters are not replaced with invented healthy telemetry.
 
 ## Validation and production observations
 
