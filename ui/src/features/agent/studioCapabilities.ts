@@ -46,6 +46,19 @@ function number(
   return integer ? Math.round(bounded) : bounded
 }
 
+/** Validate a Music control without silently changing the requested value. */
+function strictNumber(
+  value: unknown,
+  minimum: number,
+  maximum: number,
+  integer = false,
+): number | undefined {
+  if (value === undefined) return undefined
+  if (typeof value !== 'number' || !Number.isFinite(value)) return undefined
+  if (value < minimum || value > maximum || (integer && !Number.isInteger(value))) return undefined
+  return value
+}
+
 function stringArray(value: unknown, maxItems: number, maxLength: number): string[] {
   return Array.isArray(value)
     ? value.slice(0, maxItems).flatMap(item => {
@@ -128,7 +141,7 @@ function audioAction(raw: Record<string, unknown>): AgentPrepareAudioAction | nu
   // separately below and must never be folded into the lyrics.
   const prompt = speech || music ? literalText(raw.prompt, 200_000) : text(raw.prompt, 8_000)
   if (!prompt?.trim()) return null
-  const negativePrompt = speech
+  const negativePrompt = speech || music
     ? (raw.negative_prompt === undefined ? undefined : literalText(raw.negative_prompt, 200_000))
     : text(raw.negative_prompt, 2_000) || undefined
   if (raw.negative_prompt !== undefined && negativePrompt === undefined) return null
@@ -141,22 +154,34 @@ function audioAction(raw: Record<string, unknown>): AgentPrepareAudioAction | nu
   if (raw.alt_prompt !== undefined && altPrompt === undefined) return null
   if (raw.music_description !== undefined && musicDescription === undefined) return null
   if (raw.music_instrumental !== undefined && typeof raw.music_instrumental !== 'boolean') return null
+  const durationSeconds = music
+    ? strictNumber(raw.duration_seconds, 5, 360)
+    : number(raw.duration_seconds, speech ? 0 : 1, speech ? 1_800 : 20)
+  const seed = music ? strictNumber(raw.seed, -1, 2_147_483_647, true) : undefined
+  const inferenceSteps = music ? strictNumber(raw.inference_steps, 1, 1_000, true) : undefined
+  const guidanceScale = music ? strictNumber(raw.guidance_scale, 0, 1_000) : undefined
+  const outputCount = music ? strictNumber(raw.output_count, 1, 1, true) : undefined
+  if (music && (
+    (raw.duration_seconds !== undefined && durationSeconds === undefined)
+    || (raw.seed !== undefined && seed === undefined)
+    || (raw.inference_steps !== undefined && inferenceSteps === undefined)
+    || (raw.guidance_scale !== undefined && guidanceScale === undefined)
+    || (raw.output_count !== undefined && outputCount === undefined)
+  )) return null
   return {
     type: 'prepare_audio',
     subMode: AUDIO_SUB_MODES.has(subMode) ? subMode : 'sfx',
     prompt,
     modelType: text(raw.model_type, 160) || undefined,
-    durationSeconds: number(raw.duration_seconds, speech ? 0 : 1, speech ? 1_800 : music ? 360 : 20),
+    durationSeconds,
     negativePrompt,
     altPrompt,
     musicDescription,
     musicInstrumental: music ? raw.music_instrumental as boolean | undefined : undefined,
-    seed: music ? number(raw.seed, -1, 2_147_483_647, true) : undefined,
-    inferenceSteps: music ? number(raw.inference_steps, 1, 1_000, true) : undefined,
-    guidanceScale: music && typeof raw.guidance_scale === 'number' && raw.guidance_scale >= 0
-      ? number(raw.guidance_scale, 0, 1_000)
-      : undefined,
-    outputCount: music ? number(raw.output_count, 1, 1, true) : undefined,
+    seed,
+    inferenceSteps,
+    guidanceScale,
+    outputCount,
   }
 }
 

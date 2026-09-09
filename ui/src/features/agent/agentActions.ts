@@ -945,6 +945,19 @@ const optionalNumber = (
   return integer ? Math.round(bounded) : bounded
 }
 
+/** Validate a Music control without silently changing the requested value. */
+const strictNumber = (
+  value: unknown,
+  minimum: number,
+  maximum: number,
+  integer = false,
+): number | undefined => {
+  if (value === undefined) return undefined
+  if (typeof value !== 'number' || !Number.isFinite(value)) return undefined
+  if (value < minimum || value > maximum || (integer && !Number.isInteger(value))) return undefined
+  return value
+}
+
 const optionalPositiveNumber = (
   value: unknown,
   minimum: number,
@@ -1244,12 +1257,23 @@ function parseAction(value: unknown): AgentAction | null {
     const durationSeconds = subMode === 'speech'
       ? optionalNumber(raw.duration_seconds, 0, 1_800)
       : music
-        ? optionalNumber(raw.duration_seconds, 0, 360)
+        ? strictNumber(raw.duration_seconds, 5, 360)
         : optionalPositiveNumber(raw.duration_seconds, 1, 20)
     const negativePrompt = speechOrMusic
       ? (raw.negative_prompt === undefined ? undefined : literalString(raw.negative_prompt, 200_000))
       : cleanString(raw.negative_prompt, 2_000) || undefined
     if (raw.negative_prompt !== undefined && negativePrompt === undefined) return null
+    const seed = music ? strictNumber(raw.seed, -1, 2_147_483_647, true) : undefined
+    const inferenceSteps = music ? strictNumber(raw.inference_steps, 1, 1_000, true) : undefined
+    const guidanceScale = music ? strictNumber(raw.guidance_scale, 0, 1_000) : undefined
+    const outputCount = music ? strictNumber(raw.output_count, 1, 1, true) : undefined
+    if (music && (
+      (raw.duration_seconds !== undefined && durationSeconds === undefined)
+      || (raw.seed !== undefined && seed === undefined)
+      || (raw.inference_steps !== undefined && inferenceSteps === undefined)
+      || (raw.guidance_scale !== undefined && guidanceScale === undefined)
+      || (raw.output_count !== undefined && outputCount === undefined)
+    )) return null
     return {
       type: 'prepare_audio',
       subMode: AUDIO_SUB_MODES.has(subMode) ? subMode : 'sfx',
@@ -1260,12 +1284,10 @@ function parseAction(value: unknown): AgentAction | null {
       altPrompt,
       musicDescription,
       musicInstrumental: music ? raw.music_instrumental as boolean | undefined : undefined,
-      seed: music ? optionalNumber(raw.seed, -1, 2_147_483_647, true) : undefined,
-      inferenceSteps: music ? optionalPositiveNumber(raw.inference_steps, 1, 1_000, true) : undefined,
-      guidanceScale: music && typeof raw.guidance_scale === 'number' && raw.guidance_scale >= 0
-        ? optionalNumber(raw.guidance_scale, 0, 1_000)
-        : undefined,
-      outputCount: music ? optionalPositiveNumber(raw.output_count, 1, 1, true) : undefined,
+      seed,
+      inferenceSteps,
+      guidanceScale,
+      outputCount,
     }
   }
   if (type === 'prepare_3d') {

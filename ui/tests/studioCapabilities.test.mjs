@@ -234,3 +234,30 @@ test('music preparation keeps literal lyrics/caption/description and native cont
   assert.equal(definition.resolve({ type: 'prepare_audio', audio_sub_mode: 'music', prompt: lyrics,
     music_description: 'x'.repeat(200_001) }), null)
 })
+
+test('music controls reject invalid values instead of clamping them', async () => {
+  const definition = (await registeredStudioCapabilities()).get('prepare_audio')
+  const base = {
+    type: 'prepare_audio', audio_sub_mode: 'music',
+    prompt: '  [Verse]\nkeep literal  ', alt_prompt: '  acoustic pop  ',
+  }
+  assert.equal(definition.resolve({ ...base, duration_seconds: 4 }), null)
+  assert.equal(definition.resolve({ ...base, duration_seconds: 0 }), null)
+  assert.equal(definition.resolve({ ...base, duration_seconds: 400 }), null)
+  assert.equal(definition.resolve({ ...base, duration_seconds: Number.NaN }), null)
+  assert.equal(definition.resolve({ ...base, output_count: 3 }), null)
+  assert.equal(definition.resolve({ ...base, inference_steps: 2_000 }), null)
+  assert.equal(definition.resolve({ ...base, seed: 1.25 }), null)
+  assert.equal(definition.resolve({ ...base, guidance_scale: Number.POSITIVE_INFINITY }), null)
+
+  const accepted = definition.resolve({
+    ...base, duration_seconds: 75, output_count: 1, inference_steps: 1_000,
+    seed: -1, guidance_scale: 0, negative_prompt: '  preserve\nthis  ',
+  })
+  assert.equal(accepted.durationSeconds, 75)
+  assert.equal(accepted.outputCount, 1)
+  assert.equal(accepted.inferenceSteps, 1_000)
+  assert.equal(accepted.seed, -1)
+  assert.equal(accepted.guidanceScale, 0)
+  assert.equal(accepted.negativePrompt, '  preserve\nthis  ')
+})
