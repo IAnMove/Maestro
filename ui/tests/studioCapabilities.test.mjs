@@ -71,7 +71,9 @@ test('resolves Studio forms with bounded, canonical camelCase actions', async ()
   })
   assert.deepEqual(audio, {
     type: 'prepare_audio', subMode: 'music', prompt: 'heavy metal vocal en español', modelType: undefined,
-    durationSeconds: 20, negativePrompt: undefined,
+    durationSeconds: 75, negativePrompt: undefined,
+    altPrompt: undefined, musicDescription: undefined, musicInstrumental: undefined,
+    seed: undefined, inferenceSteps: undefined, guidanceScale: undefined, outputCount: undefined,
   })
 
   const model3d = definitions.get('prepare_3d').resolve({
@@ -182,4 +184,53 @@ test('speech preparation preserves authored multiline text, language metadata an
     prompt: 'x'.repeat(200_001) }), null)
   assert.equal(definition.resolve({ type: 'prepare_audio', audio_sub_mode: 'speech',
     prompt, negative_prompt: 'x'.repeat(200_001) }), null)
+})
+
+test('music preparation keeps literal lyrics/caption/description and native controls separate', async () => {
+  const definition = (await registeredStudioCapabilities()).get('prepare_audio')
+  const lyrics = '  [Verse]\nA line with 9,000 characters.\n' + 'la '.repeat(3_000) + '  '
+  const caption = '  acoustic pop\nbright brushed drums  '
+  const description = '  A nocturnal harbor at blue hour.\nNo spoken voice.  '
+  const languageIntent = {
+    contentLanguage: 'en', technicalPromptLanguage: 'en',
+    verbatimSegments: [{ kind: 'sung_lyrics', text: lyrics, language: 'en' }],
+  }
+  const action = definition.resolve({
+    type: 'prepare_audio', audio_sub_mode: 'music', prompt: lyrics, alt_prompt: caption,
+    music_description: description, music_instrumental: false,
+    model_type: 'ace_step_v1_5_xl_sft_lm_4b', duration_seconds: 5,
+    seed: 1234, inference_steps: 24, guidance_scale: 1.7, output_count: 1,
+  })
+  assert.equal(action.prompt, lyrics)
+  assert.equal(action.altPrompt, caption)
+  assert.equal(action.musicDescription, description)
+  assert.equal(action.musicInstrumental, false)
+  assert.equal(action.durationSeconds, 5)
+  assert.equal(action.seed, 1234)
+  assert.equal(action.inferenceSteps, 24)
+  assert.equal(action.guidanceScale, 1.7)
+  assert.equal(action.outputCount, 1)
+
+  const prepared = await definition.prepare({ ...action, languageIntent })
+  assert.equal(prepared.prompt, lyrics)
+  assert.equal(prepared.altPrompt, caption)
+  assert.equal(prepared.musicDescription, description)
+  assert.deepEqual(prepared.languageIntent, languageIntent)
+
+  let received
+  await definition.execute(prepared, { adapters: { studio: { async prepareAudio(value) {
+    received = value
+    return { message: 'Prepared music' }
+  } } } })
+  assert.equal(received.prompt, lyrics)
+  assert.equal(received.altPrompt, caption)
+  assert.equal(received.musicDescription, description)
+  assert.equal(received.musicInstrumental, false)
+  assert.equal(received.inferenceSteps, 24)
+  assert.equal(received.guidanceScale, 1.7)
+  assert.deepEqual(received.languageIntent, languageIntent)
+  assert.equal(definition.resolve({ type: 'prepare_audio', audio_sub_mode: 'music', prompt: lyrics,
+    alt_prompt: 'x'.repeat(200_001) }), null)
+  assert.equal(definition.resolve({ type: 'prepare_audio', audio_sub_mode: 'music', prompt: lyrics,
+    music_description: 'x'.repeat(200_001) }), null)
 })

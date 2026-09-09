@@ -341,10 +341,28 @@ export async function prepareAudio(action: PrepareAudioCommand): Promise<Command
     }, action.negativePrompt || '')
   } else {
     state.setDurationSeconds(action.durationSeconds ?? state.durationSeconds)
-    state.setParams({
+    const music = action.subMode === 'music'
+    if (music) {
+      // Music has two authored text fields and two separate form values. Keep
+      // them independent so lyrics never absorb the caption or description.
+      state.setMusicDescription(action.musicDescription ?? '')
+      state.setMusicInstrumental(action.musicInstrumental ?? false)
+      // The native Music schema admits one output per command. Reset a stale
+      // Video/Image repeat count when entering Music unless the action states
+      // the same native value explicitly.
+      state.setOutputCount(action.outputCount ?? 1)
+    }
+    const params: Record<string, unknown> = {
       prompt: action.prompt,
       negative_prompt: action.negativePrompt || '',
-    })
+    }
+    if (music) {
+      params.alt_prompt = action.altPrompt ?? ''
+      if (action.seed !== undefined) params.seed = action.seed
+      if (action.inferenceSteps !== undefined) params.num_inference_steps = action.inferenceSteps
+      if (action.guidanceScale !== undefined) params.guidance_scale = action.guidanceScale
+    }
+    state.setParams(params)
   }
   const duration = useStore.getState().durationSeconds
   const room = action.subMode === 'sfx' ? 'SFX' : action.subMode === 'music' ? 'Music' : 'Speech'

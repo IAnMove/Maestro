@@ -130,6 +130,17 @@ export interface AgentPrepareAudioAction extends AgentLanguageAwareAction {
   modelType?: string
   durationSeconds?: number
   negativePrompt?: string
+  /** ACE-Step Music Caption (style/genre/instruments), kept verbatim. */
+  altPrompt?: string
+  /** Visible Music description, persisted separately from lyrics. */
+  musicDescription?: string
+  /** Whether the Music form is explicitly instrumental. */
+  musicInstrumental?: boolean
+  seed?: number
+  inferenceSteps?: number
+  guidanceScale?: number
+  /** Music native generation currently admits one output per command. */
+  outputCount?: number
 }
 
 export interface AgentDownloadModelAction {
@@ -912,6 +923,11 @@ const cleanString = (value: unknown, maxLength: number): string => (
   typeof value === 'string' ? value.trim().slice(0, maxLength) : ''
 )
 
+/** Preserve authored text; callers validate blankness separately. */
+const literalString = (value: unknown, maxLength: number): string | undefined => (
+  typeof value === 'string' && value.length <= maxLength ? value : undefined
+)
+
 function canonicalActionType(value: unknown): string {
   const raw = cleanString(value, 40)
   const collapsed = raw.toLowerCase().replace(/[^a-z0-9]/g, '')
@@ -1021,7 +1037,7 @@ const CANONICAL_FIELD_NAMES = [
   'scene_name', 'layer_name', 'audio_output_name', 'videoclip_name', 'cue_source', 'rhythm_profile', 'intensity',
   'confirm', 'characters', 'locations', 'outline_beats', 'story_visual_selections', 'story_visual_scope', 'target_names',
   'target_kind', 'target_name', 'asset_name', 'primary',
-  'audio_sub_mode', 'sfx_clips', 'name', 'preset', 'comic_panels', 'comic_pages', 'caption', 'stage', 'image_provider',
+  'audio_sub_mode', 'alt_prompt', 'music_description', 'music_instrumental', 'sfx_clips', 'name', 'preset', 'comic_panels', 'comic_pages', 'caption', 'stage', 'image_provider',
   'page_number', 'panel_number', 'page_numbers', 'pilot',
   'factual_biography', 'biography_review',
   'kit_name', 'look_notes', 'preset_id',
@@ -1211,16 +1227,45 @@ function parseAction(value: unknown): AgentAction | null {
     }
   }
   if (type === 'prepare_audio') {
-    const prompt = cleanString(raw.prompt, 8_000)
-    if (!prompt) return null
     const subMode = cleanString(raw.audio_sub_mode, 12) as AgentPrepareAudioAction['subMode']
+    const speechOrMusic = subMode === 'speech' || subMode === 'music'
+    const prompt = speechOrMusic ? literalString(raw.prompt, 200_000) : cleanString(raw.prompt, 8_000)
+    if (!prompt?.trim()) return null
+    const music = subMode === 'music'
+    const altPrompt = music
+      ? (raw.alt_prompt === undefined ? undefined : literalString(raw.alt_prompt, 200_000))
+      : undefined
+    const musicDescription = music
+      ? (raw.music_description === undefined ? undefined : literalString(raw.music_description, 200_000))
+      : undefined
+    if (raw.alt_prompt !== undefined && altPrompt === undefined) return null
+    if (raw.music_description !== undefined && musicDescription === undefined) return null
+    if (raw.music_instrumental !== undefined && typeof raw.music_instrumental !== 'boolean') return null
+    const durationSeconds = subMode === 'speech'
+      ? optionalNumber(raw.duration_seconds, 0, 1_800)
+      : music
+        ? optionalNumber(raw.duration_seconds, 0, 360)
+        : optionalPositiveNumber(raw.duration_seconds, 1, 20)
+    const negativePrompt = speechOrMusic
+      ? (raw.negative_prompt === undefined ? undefined : literalString(raw.negative_prompt, 200_000))
+      : cleanString(raw.negative_prompt, 2_000) || undefined
+    if (raw.negative_prompt !== undefined && negativePrompt === undefined) return null
     return {
       type: 'prepare_audio',
       subMode: AUDIO_SUB_MODES.has(subMode) ? subMode : 'sfx',
       prompt,
       modelType: cleanString(raw.model_type, 160) || undefined,
-      durationSeconds: optionalPositiveNumber(raw.duration_seconds, 1, 20),
-      negativePrompt: cleanString(raw.negative_prompt, 2_000) || undefined,
+      durationSeconds,
+      negativePrompt: negativePrompt || undefined,
+      altPrompt,
+      musicDescription,
+      musicInstrumental: music ? raw.music_instrumental as boolean | undefined : undefined,
+      seed: music ? optionalNumber(raw.seed, -1, 2_147_483_647, true) : undefined,
+      inferenceSteps: music ? optionalPositiveNumber(raw.inference_steps, 1, 1_000, true) : undefined,
+      guidanceScale: music && typeof raw.guidance_scale === 'number' && raw.guidance_scale >= 0
+        ? optionalNumber(raw.guidance_scale, 0, 1_000)
+        : undefined,
+      outputCount: music ? optionalPositiveNumber(raw.output_count, 1, 1, true) : undefined,
     }
   }
   if (type === 'prepare_3d') {
