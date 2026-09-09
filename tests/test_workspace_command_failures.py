@@ -8,12 +8,13 @@ through different envelopes.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import sqlite3
 from pathlib import Path
 
 import pytest
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
 from routers.wangp_mcp import create_wangp_mcp_router, tool_definitions
@@ -21,6 +22,7 @@ from routers.workspace_collections import create_workspace_collections_router
 from services.wangp_agent_adapters import application_handlers
 from services.workspace_commands import catalog, validate_command
 from services.workspace_registry import WorkspaceRegistry
+from services.wangp_submission import JsonRequest
 
 
 _DEFAULT_RESOLVER = object()
@@ -206,3 +208,127 @@ def test_intent_ids_remain_opaque_and_are_preserved_in_receipts(tmp_path):
     receipt = registry.execute_command(_create_command(intent_id))
     assert receipt["commandId"] == intent_id
     assert registry.command_receipt(intent_id) == receipt
+
+
+@pytest.mark.parametrize("entry", [{}, {"digest": "malformed"}])
+def test_corrupt_command_receipt_is_storage_uncertainty_and_never_executes(tmp_path, entry):
+    path = tmp_path / "registry.json"
+    intent_id = "corrupt-intent"
+    path.write_text(json.dumps({
+        "version": 1,
+        "workspaces": {},
+        "commands": {intent_id: entry},
+    }), encoding="utf-8")
+    app, registry, _journal_path = _build_app(path, resolver=lambda _kind, identity: {"id": identity})
+
+    with TestClient(app, raise_server_exceptions=False) as client:
+        response = client.post("/api/v1/commands", json=_create_command(intent_id))
+
+    assert response.status_code == 503
+    detail = response.json()["detail"]
+    assert detail["code"] == "uncertain_response"
+    assert detail["retryable"] is True
+    assert registry.list() == []
+    assert json.loads(path.read_text(encoding="utf-8"))["commands"][intent_id] == entry
+
+
+def test_direct_legacy_organize_rejects_non_object_provenance_with_bounded_error(tmp_path):
+    path = tmp_path / "registry.json"
+    app, registry, _journal_path = _build_app(path, resolver=lambda _kind, identity: {"id": identity})
+    organize = application_handlers(app)["organize"]
+    request = JsonRequest({
+        "name": "Malformed provenance",
+        "asset_ids": ["asset-real"],
+        "provenance": [],
+    }, trusted_tool="external_agent")
+
+    with pytest.raises(ValueError, match="provenance"):
+        asyncio.run(organize(request))
+    assert registry.list() == []
+
+
+def test_reference_resolver_5xx_is_retryable_and_has_no_effect(tmp_path):
+    path = tmp_path / "registry.json"
+
+    def unavailable(_kind, _identity):
+        raise HTTPException(status_code=503, detail="catalog temporarily unavailable")
+
+    app, registry, _journal_path = _build_app(path, resolver=unavailable)
+    command = _create_command("resolver-503", asset_ids=["asset-real"])
+    with TestClient(app) as client:
+        response = client.post("/api/v1/commands", json=command)
+
+    assert response.status_code == 503
+    detail = response.json()["detail"]
+    assert detail["code"] == "reference_error"
+    assert detail["retryable"] is True
+    assert registry.list() == []
+
+
+def _catalog_operation(name, *, mutation=False):
+    return {
+        "name": name,
+        "description": "test executable operation",
+        "mutation": mutation,
+        "inputSchema": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "version": {"type": "integer", "const": 1},
+                "operation": {"type": "string", "const": name},
+                "input": {"type": "object"},
+            },
+            "required": ["version", "operation", "input"],
+        },
+    }
+
+
+def test_mcp_catalog_does_not_invoke_handler_omitted_from_selected_operations(tmp_path):
+    calls = []
+    visible = _catalog_operation("example.inspect")
+
+    def hidden(arguments=None):
+        calls.append(arguments)
+        return {"executed": True}
+
+    app = FastAPI()
+    app.include_router(create_wangp_mcp_router(
+        handlers={
+            "example.inspect": lambda arguments: {"observed": arguments},
+            "collections.create": hidden,
+        },
+        command_operations=[visible],
+        journal_path=tmp_path / "journal.sqlite",
+        token_getter=lambda: "test-token",
+    ))
+    with TestClient(app) as client:
+        discovered = client.post(
+            "/api/v1/wangp/mcp",
+            headers={"Authorization": "Bearer test-token"},
+            json={"jsonrpc": "2.0", "id": 0, "method": "tools/list"},
+        ).json()["result"]["tools"]
+        response = _mcp_call(client, "collections.create", {
+            "version": 1,
+            "intent_id": "hidden-command",
+            "input": {"name": "Should not execute"},
+        })
+
+    assert "collections.create" not in {tool["name"] for tool in discovered}
+    assert response.status_code == 200
+    assert response.json()["result"]["isError"] is True
+    assert calls == []
+
+
+@pytest.mark.parametrize("operations", [
+    [_catalog_operation("example.duplicate"), _catalog_operation("example.duplicate")],
+    [_catalog_operation("organize")],
+])
+def test_mcp_rejects_duplicate_or_legacy_colliding_catalog_names(tmp_path, operations):
+    handlers = {operation["name"]: lambda _arguments: {"ok": True} for operation in operations}
+    with pytest.raises(ValueError):
+        create_wangp_mcp_router(
+            handlers=handlers,
+            command_operations=operations,
+            journal_path=tmp_path / "journal.sqlite",
+            token_getter=lambda: "test-token",
+        )

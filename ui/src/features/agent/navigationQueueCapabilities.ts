@@ -91,43 +91,50 @@ function workspaceName<TAction extends AgentSelectWorkspaceAction | AgentCreateW
   return name ? { type, workspaceName: name } as TAction : null
 }
 
-function idList(value: unknown): string[] | undefined {
-  if (!Array.isArray(value)) return undefined
-  return [...new Set(value.map(item => text(item, 200)).filter(Boolean))].slice(0, 500)
+function canonicalId(value: unknown): value is string {
+  return typeof value === 'string' && value.length > 0 && value.length <= 240 && !/\s/.test(value)
+}
+
+function idList(value: unknown): string[] | undefined | null {
+  if (value === undefined) return undefined
+  if (!Array.isArray(value) || value.length > 500 || !value.every(canonicalId)
+    || new Set(value).size !== value.length) return null
+  return [...value]
+}
+
+function collectionText(value: unknown, limit: number): string | undefined | null {
+  if (value === undefined) return undefined
+  return typeof value === 'string' && value.length <= limit ? value.trim() : null
+}
+
+function collectionFields(raw: Record<string, unknown>) {
+  const name = collectionText(raw.name, 160)
+  const description = collectionText(raw.description, 2000)
+  const projectIds = idList(raw.project_ids)
+  const assetIds = idList(raw.asset_ids)
+  const productionIds = idList(raw.production_ids)
+  if (name === null || name === '' || description === null || projectIds === null || assetIds === null || productionIds === null) return null
+  return { name, description, projectIds, assetIds, productionIds }
 }
 
 function createWorkspaceCollection(raw: Record<string, unknown>): AgentCreateWorkspaceCollectionAction | null {
-  const name = text(raw.name, 160)
-  if (!name) return null
+  const fields = collectionFields(raw)
+  if (!fields?.name) return null
   return {
-    type: 'create_workspace_collection',
-    name,
-    description: text(raw.description, 2000),
-    projectIds: idList(raw.project_ids) || [],
-    assetIds: idList(raw.asset_ids) || [],
-    productionIds: idList(raw.production_ids) || [],
+    type: 'create_workspace_collection', name: fields.name, description: fields.description ?? '',
+    projectIds: fields.projectIds ?? [], assetIds: fields.assetIds ?? [], productionIds: fields.productionIds ?? [],
   }
 }
 
 function updateWorkspaceCollection(raw: Record<string, unknown>): AgentUpdateWorkspaceCollectionAction | null {
-  const workspaceId = text(raw.workspace_id, 200)
-  if (!workspaceId) return null
-  const name = text(raw.name, 160)
-  const description = text(raw.description, 2000)
-  const projectIds = idList(raw.project_ids)
-  const assetIds = idList(raw.asset_ids)
-  const productionIds = idList(raw.production_ids)
-  if (!name && raw.description === undefined && projectIds === undefined && assetIds === undefined && productionIds === undefined) return null
+  if (!canonicalId(raw.workspace_id)) return null
+  const fields = collectionFields(raw)
+  if (!fields || !Object.values(fields).some(value => value !== undefined)) return null
   const revision = raw.expected_revision
   const expectedRevision = typeof revision === 'number' && Number.isSafeInteger(revision) && revision > 0
     ? revision : undefined
   if (revision !== undefined && expectedRevision === undefined) return null
-  return {
-    type: 'update_workspace_collection', workspaceId, expectedRevision,
-    name: name || undefined,
-    description: raw.description === undefined ? undefined : description,
-    projectIds, assetIds, productionIds,
-  }
+  return { type: 'update_workspace_collection', workspaceId: raw.workspace_id, expectedRevision, ...fields }
 }
 
 function navigationOutcome(

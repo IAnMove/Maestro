@@ -74,6 +74,8 @@ same cross-process lock. The temporary file is flushed before replacement; the
 parent directory is also flushed on POSIX. A crash before replacement leaves no
 effect; a lost response after replacement can replay the persisted receipt.
 There is no reservation expiry that retries an unproven effect.
+An existing malformed receipt is a storage error, never an unused intention.
+Its mutation cannot be repeated while the registry needs repair.
 
 Successful mutation receipts carry `version`, `commandId`, `operation`,
 `status: completed`, `entities` with ID/revision, `result` with the canonical
@@ -97,6 +99,8 @@ sent after React commits those fields. Unrelated unsaved edits, a busy editor,
 an unmounted view or an obsolete revision stop preparation before admission.
 Manual controls in that editor are disabled only while the synchronous mutation
 is being submitted.
+Malformed or duplicate Wizard reference IDs reject the whole action; they are
+not silently dropped or truncated into a different collection membership.
 
 The shared command is the sole writer. Presentation never clicks a second
 mutation button. On success, the editor applies the returned ID and revision.
@@ -121,6 +125,8 @@ The MCP factory also accepts a trusted application-supplied `command_operations`
 catalog so later domains can reuse the same discovery, argument forwarding and
 structured results. The default remains these five collection operations;
 entries without a mounted handler are never published.
+An omitted command cannot be invoked through the legacy fallback. Supplied
+command names must be unique and cannot collide with the ten legacy names.
 For `tools/call`, use the operation name as the tool name and put `version`,
 `input` and (for mutations) `intent_id` in `arguments`; omit `operation` there.
 Responses expose structured content and readable JSON. Command errors set

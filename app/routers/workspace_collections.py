@@ -33,7 +33,7 @@ def create_workspace_collections_router(*, registry: Callable[[], WorkspaceRegis
         except WorkspaceRevisionConflict as exc:
             raise failure(409, "revision_conflict", str(exc)) from exc
         except HTTPException as exc:
-            raise failure(exc.status_code, "reference_error", str(exc.detail)) from exc
+            raise failure(exc.status_code, "reference_error", str(exc.detail), exc.status_code >= 500) from exc
         except (TypeError, ValueError) as exc:
             raise failure(400, "invalid_command", str(exc)) from exc
         except OSError as exc:

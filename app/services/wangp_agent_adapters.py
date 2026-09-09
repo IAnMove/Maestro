@@ -47,7 +47,11 @@ def application_handlers(api):
         if identity:
             if not isinstance(params.get('expected_revision'), int) or isinstance(params['expected_revision'], bool):
                 raise ValueError('Read the collection and provide its expected_revision before updating')
-        provenance = params.get('provenance') or {}
+        provenance = params.get('provenance', {})
+        if provenance is None:
+            provenance = {}
+        if not isinstance(provenance, dict) or not isinstance(provenance.get('command', {}), dict):
+            raise ValueError('provenance and provenance.command must be objects')
         intent_id = (provenance.get('command') or {}).get('command_id')
         if command is not None and getattr(request, 'trusted_tool', None) == 'external_agent' and intent_id:
             if identity:

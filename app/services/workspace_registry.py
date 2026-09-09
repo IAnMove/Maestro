@@ -68,6 +68,39 @@ def _record(value: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _command_digest(command: dict) -> str:
+    return hashlib.sha256(json.dumps(
+        {key: command[key] for key in ("version", "operation", "input")},
+        sort_keys=True, ensure_ascii=False, separators=(",", ":"),
+    ).encode()).hexdigest()
+
+
+def _valid_receipt(receipt: dict, intent_id: str) -> bool:
+    record = receipt.get("result")
+    if not isinstance(record, dict):
+        return False
+    return all((receipt.get("version") == 1, receipt.get("commandId") == intent_id,
+                receipt.get("status") == "completed", record == _record(record),
+                bool(record.get("id")), type(record.get("revision")) is int))
+
+
+def _command_entry(store: dict, intent_id: str) -> dict | None:
+    entries = store.get("commands", {})
+    if intent_id not in entries:
+        return None
+    entry = entries[intent_id]
+    try:
+        valid = all((entry["fingerprint_version"] == 1, isinstance(entry["original"], dict),
+                     _valid_receipt(entry["receipt"], intent_id),
+                     entry["digest"] == _command_digest(entry["effective"]),
+                     entry["receipt"]["operation"] == entry["effective"]["operation"]))
+    except (KeyError, TypeError, AttributeError, ValueError) as error:
+        raise OSError("Stored command receipt is unreadable; recover storage before retrying") from error
+    if not valid:
+        raise OSError("Stored command receipt is invalid; recover storage before retrying")
+    return entry
+
+
 class WorkspaceRegistry:
     """Small atomic JSON store; physical output folders remain independent."""
 
@@ -192,8 +225,8 @@ class WorkspaceRegistry:
 
     def command_receipt(self, intent_id: str) -> dict[str, Any] | None:
         with self._lock, workspace_store_lock(self.path):
-            item = self._load().get("commands", {}).get(intent_id)
-            return deepcopy(item["receipt"]) if item else None
+            item = _command_entry(self._load(), intent_id)
+            return deepcopy(item["receipt"]) if item is not None else None
 
     def execute_command(self, value: Any, resolve_reference=None) -> dict[str, Any]:
         from services.workspace_commands import MUTATIONS, validate_command
@@ -201,16 +234,13 @@ class WorkspaceRegistry:
         operation, data = command["operation"], command["input"]
         if operation not in MUTATIONS:
             return self._read_command(operation, data)
-        digest = hashlib.sha256(json.dumps(
-            {key: command[key] for key in ("version", "operation", "input")},
-            sort_keys=True, ensure_ascii=False, separators=(",", ":"),
-        ).encode()).hexdigest()
+        digest = _command_digest(command)
         intent_id = command["intent_id"]
         with self._lock, workspace_store_lock(self.path):
             store = self._load()
             receipts = store.setdefault("commands", {})
-            existing = receipts.get(intent_id)
-            if existing:
+            existing = _command_entry(store, intent_id)
+            if existing is not None:
                 if existing["digest"] != digest:
                     raise WorkspaceIntentConflict("intent_id was already used with different parameters or preconditions")
                 return {**deepcopy(existing["receipt"]), "replayed": True}

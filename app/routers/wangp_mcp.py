@@ -12,6 +12,7 @@ import os
 from pathlib import Path
 import secrets
 import sqlite3
+from copy import deepcopy
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse, Response
@@ -25,6 +26,17 @@ REQUEST_TOOLS = MUTATIONS | {'analyze'}
 # separate /api/v1/model3d/generate contract and is intentionally not routed
 # through this MCP tool.
 GENERATION_MODES = ('image', 'video', 'audio', 'avatar')
+LEGACY_TOOLS = REQUEST_TOOLS | {'models', 'processors', 'status', 'assets', 'collections'}
+
+
+def _selected_operations(command_operations):
+    entries = deepcopy(list(command_catalog()['operations'] if command_operations is None else command_operations))
+    names = [entry['name'] for entry in entries]
+    if any(not isinstance(name, str) or not name for name in names):
+        raise ValueError('Command catalog names must be nonempty strings')
+    if len(set(names)) != len(names) or LEGACY_TOOLS.intersection(names):
+        raise ValueError('Command catalog names must be unique and cannot collide with legacy tools')
+    return entries, frozenset(names)
 
 
 def _command_tool(operation):
@@ -90,7 +102,7 @@ def tool_definitions(available=None, command_operations=None):
         tools.append({'name': name, 'description': description,
                       'inputSchema': {'type': 'object', 'properties': properties, 'required': required, 'additionalProperties': False},
                       'annotations': {'readOnlyHint': name not in MUTATIONS, 'destructiveHint': False, 'idempotentHint': True}})
-    operations = command_catalog()['operations'] if command_operations is None else command_operations
+    operations, _ = _selected_operations(command_operations)
     for operation in operations:
         if available is not None and operation['name'] in available:
             tools.append(_command_tool(operation))
@@ -166,11 +178,11 @@ def create_wangp_mcp_router(*, handlers, journal_path, token_getter=None, comman
     journal = RequestJournal(journal_path)
     token_getter = token_getter or (lambda: os.environ.get('HOCUS_MCP_TOKEN', ''))
 
-    operations = command_catalog()['operations'] if command_operations is None else command_operations
-    operation_names = frozenset(item['name'] for item in operations)
+    operations, operation_names = _selected_operations(command_operations)
+    callable_names = LEGACY_TOOLS | operation_names
 
     async def call_tool(name, arguments):
-        if not isinstance(name, str) or name not in handlers or not isinstance(arguments, dict):
+        if not isinstance(name, str) or name not in callable_names or not callable(handlers.get(name)) or not isinstance(arguments, dict):
             raise ValueError('Unknown tool or invalid arguments')
         if name in operation_names:
             result = handlers[name](arguments)
@@ -242,7 +254,7 @@ def create_wangp_mcp_router(*, handlers, journal_path, token_getter=None, comman
             elif method == 'ping':
                 result = {}
             elif method == 'tools/list':
-                result = {'tools': tool_definitions(handlers, operations)}
+                result = {'tools': tool_definitions({name for name, handler in handlers.items() if callable(handler)}, operations)}
             elif method == 'tools/call':
                 params = message.get('params') or {}
                 if not isinstance(params, dict):
