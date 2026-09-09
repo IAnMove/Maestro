@@ -31,6 +31,7 @@ import { WizardVisualInput, type WizardVisualMedia } from './WizardVisualInput'
 import type { VisualEvidence } from './visualEvidence'
 import { WizardVisualEvidence } from './WizardVisualEvidence'
 import { reconcileWizardMediaTurn } from './wizardVisualPolicy'
+import { formatWizardTurnReply } from './wizardTurnReport'
 
 export { AgentAvatar, type AgentVisualState } from './AgentAvatar'
 
@@ -105,14 +106,6 @@ const welcomeMessage = (): AgentMessage => ({
   text: WIZARD_WELCOME_TEXT,
   createdAt: Date.now(),
 })
-
-function formatActionResults(results: AgentActionResult[]): string {
-  if (!results.length) return ''
-  const done = i18n.t('actionDone', { ns: 'wizard' })
-  const failed = i18n.t('actionFailed', { ns: 'wizard' })
-  const lines = results.map(result => `- **${result.ok ? done : failed}.** ${result.message}`)
-  return `### ${i18n.t('actionReport', { ns: 'wizard' })}\n${lines.join('\n')}`
-}
 
 function workflowStatusText(workflow: WizardWorkflowRecord): string {
   return workflow.state === 'awaiting_input'
@@ -494,20 +487,18 @@ export function AgentAssistantPanel({ workspace, tasks, onClose, embedded = fals
       })
       if (!mountedRef.current) return
       const cards = cardsFromResults(results)
-      const actionReport = formatActionResults(results)
       const assistantMessage: AgentMessage = {
         id: newId(),
         role: 'assistant',
-        text: [humanReply(turn.reply || '') || t('emptyReply'), actionReport]
-          .filter(Boolean)
-          .join('\n\n'),
+        text: formatWizardTurnReply({ ...turn, reply: humanReply(turn.reply || '') }, results,
+          (key, options) => String(t(key, options))),
         createdAt: Date.now(),
         language: turn.conversationLanguage || undefined,
         mediaEvidence,
         cards: cards.length ? cards : undefined,
       }
       setMessages(current => [...current, assistantMessage].slice(-40))
-      setState(results.some(result => !result.ok) ? 'error' : 'success')
+      setState(turn.rejections?.length || results.some(result => !result.ok) ? 'error' : 'success')
     } catch (error) {
       if (!mountedRef.current) return
       const message = error instanceof Error ? error.message : String(error)

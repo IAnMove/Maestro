@@ -37,3 +37,27 @@ migration from disabling an existing Wizard feature.
 Presentation hints are metadata only. Speed, panel visibility, scrolling,
 sound and detailed animation remain behind Decision gate A; none of them is
 required for action correctness.
+
+## Turn validation and displayed results
+
+The model response is a proposal. `parseAgentTurn` keeps bounded, locally derived
+rejections for malformed actions, missing parameters, action limits and invalid
+Studio generation order. `reconcileWizardMediaTurn` preserves those diagnostics
+and records actions excluded by request or visual-evidence policy. Model-supplied
+rejection fields are not authoritative.
+
+For a turn containing business actions or rejections, `wizardTurnReport.ts`
+builds the displayed answer from execution results and rejection reasons. It
+does not prepend a model claim such as “created” when parsing rejected the action.
+Queued, running, prepared and awaiting-input results have distinct labels;
+admission does not certify a completed artifact. Informational replies and
+navigation explanations retain the normal conversation path.
+
+Comic context comes from user requests. A general assistant inventory mentioning
+Comics must not redirect a later Flux retry, and an explicit Studio context takes
+precedence over an older comic request. Task retries continue through the existing
+canonical task adapter; this does not change backend retry/idempotency semantics.
+
+This layer does not fact-check unrestricted informational prose, migrate workflow
+execution to the server or implement the shared MCP command catalogue. Those are
+separate follow-up scopes.
