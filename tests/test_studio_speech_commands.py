@@ -128,6 +128,21 @@ def test_runtime_without_speech_adapter_does_not_adopt_its_recovery(tmp_path):
     assert restarted.dispatch_calls == []
 
 
+def test_speech_orphan_and_malformed_command_do_not_block_linked_recovery(tmp_path):
+    _run(configured_service(FakeNative(tmp_path)).submit(speech_command()))
+    restarted = FakeNative(tmp_path, interrupt_stale=True)
+    service = configured_service(restarted)
+    service.restore_recovery(["speech-test"])
+    linked = restarted.persist_calls[0]
+    orphan = deepcopy(linked)
+    orphan["provenance"]["command"]["command_id"] = "missing-speech-admission"
+    malformed = deepcopy(linked)
+    malformed["provenance"]["command"] = "invalid"
+    assert service.filter_recovery([orphan, malformed, linked]) == [linked]
+    service.discard_recovery([orphan, malformed, linked])
+    assert service.receipt("speech-test", "speech-test-intent")["task"]["status"] == "cancelled"
+
+
 def test_browser_catalog_matches_executable_speech_contract():
     path = Path(__file__).resolve().parents[1] / "ui/src/api/speechCommandCatalog.json"
     projection = json.loads(path.read_text(encoding="utf-8"))

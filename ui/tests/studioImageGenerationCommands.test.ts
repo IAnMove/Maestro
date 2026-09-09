@@ -156,6 +156,55 @@ test('the captured native Studio request fixture remains a valid v2 snapshot', {
   assert.equal('provenance' in command.input.params, false)
 })
 
+test('v2 builder omits Load Settings and primary-settings leftovers instead of blocking Generate', { concurrency: false }, () => {
+  const source = baseParams('reroll-leftovers')
+  // Small sidecar-shaped fixture from the real native params path. Keep only
+  // field names and scalar/list values here; no machine-local media paths.
+  Object.assign(source, {
+    apg_switch: 0,
+    cfg_star_switch: 0,
+    cfg_zero_step: -1,
+    custom_guide: null,
+    matanyone_version: 'v1',
+    min_frames_if_references: 1,
+    multi_images_gen_type: 0,
+    output_filename: '',
+    perturbation_switch: 0,
+  })
+  source.minimax_h3_planning_style = 'faithful'
+  source.minimax_h3_audio_policy = 'native'
+  source.minimax_h3_reference_sequence = false
+  source.minimax_h3_turbo_preset = 'standard'
+  source.duration_seconds = 0
+  source.pause_seconds = 0
+  source.perturbation_switch = 0
+  source.perturbation_layers = [9]
+  source.stg_scale = 1
+  source.keyframe_conditioning_mode = 'replace'
+  source.keyframe_inject_mode = 'additive'
+  source.speakers_locations = '0:45 55:100'
+  source.viggle_audio_mode = ''
+  source.attention_sparsity = 0
+  source.video_guide2 = ''
+  source.voice_clone_enabled = true
+  source.voice_clone_mode = 'in_place'
+  source.voice_clone_refs = ['/tmp/voice.wav']
+  const command = createStudioImageGenerationCommand(source, 'reroll-leftovers')
+
+  assert.equal(command.input.params.prompt, source.prompt)
+  assert.equal(command.input.params.model_type, source.model_type)
+  assert.equal(command.input.workspace, source.workspace)
+  assert.equal('minimax_h3_planning_style' in command.input.params, false)
+  assert.equal('duration_seconds' in command.input.params, false)
+  assert.equal('perturbation_layers' in command.input.params, false)
+  assert.equal('voice_clone_enabled' in command.input.params, false)
+  assert.equal('speakers_locations' in command.input.params, false)
+  assert.equal('viggle_audio_mode' in command.input.params, false)
+  assert.equal('apg_switch' in command.input.params, false)
+  assert.equal('cfg_zero_step' in command.input.params, false)
+  assert.equal('output_filename' in command.input.params, false)
+})
+
 test('v2 builder requires canonical references and rejects envelope injection', { concurrency: false }, () => {
   const legacyPath = baseParams('legacy')
   legacyPath.image_refs = ['/tmp/legacy.png']
@@ -173,6 +222,13 @@ test('v2 builder requires canonical references and rejects envelope injection', 
   injected.params = { prompt: 'nested envelope' }
   assert.throws(() => createStudioImageGenerationCommand(injected, 'injected'), /envelope field params/)
 
+  const flatCollection = baseParams('flat-collection')
+  flatCollection.workspace_collection_id = 'collection-v2'
+  assert.throws(
+    () => createStudioImageGenerationCommand(flatCollection, 'flat-collection'),
+    /envelope field workspace_collection_id/,
+  )
+
   const wrongMode = baseParams('wrong-mode')
   wrongMode.generation_mode = 'video'
   assert.throws(() => createStudioImageGenerationCommand(wrongMode, 'wrong-mode'), /generation_mode/)
@@ -184,6 +240,82 @@ test('v2 builder requires canonical references and rejects envelope injection', 
   const activeAudio = baseParams('active-audio')
   activeAudio.MMAudio_setting = 1
   assert.throws(() => createStudioImageGenerationCommand(activeAudio, 'active-audio'), /MMAudio_setting/)
+})
+
+test('v2 builder rejects unknown fields, including undefined typos, instead of dropping them', { concurrency: false }, () => {
+  const unknown = baseParams('unknown-field')
+  unknown.guidance_scal = 1
+  assert.throws(
+    () => createStudioImageGenerationCommand(unknown, 'unknown-field'),
+    /input\.params\.guidance_scal is not supported/,
+  )
+
+  const undefinedTypo = baseParams('undefined-typo')
+  undefinedTypo.gudance_scale = undefined
+  assert.throws(
+    () => createStudioImageGenerationCommand(undefinedTypo, 'undefined-typo'),
+    /input\.params\.gudance_scale is not supported/,
+  )
+})
+
+test('v2 builder rejects every envelope-shaped flat field before undefined omission', { concurrency: false }, () => {
+  for (const field of [
+    'version',
+    'operation',
+    'intent_id',
+    'input',
+    'params',
+    'workspace_collection_id',
+    'command',
+    'command_id',
+    'commandId',
+  ]) {
+    const source = baseParams('envelope-' + field)
+    source[field] = undefined
+    assert.throws(
+      () => createStudioImageGenerationCommand(source, 'envelope-' + field),
+      /workspace parameters cannot contain envelope field/,
+      field,
+    )
+  }
+})
+
+test('v2 builder rejects active advanced leftovers instead of silently losing image controls', { concurrency: false }, () => {
+  const perturbation = baseParams('active-perturbation')
+  perturbation.perturbation_switch = 2
+  perturbation.perturbation_layers = [9]
+  assert.throws(
+    () => createStudioImageGenerationCommand(perturbation, 'active-perturbation'),
+    /input\.params\.perturbation_switch is active and incompatible/,
+  )
+
+  const stgWithoutSwitch = baseParams('active-stg')
+  stgWithoutSwitch.stg_scale = 1
+  assert.throws(
+    () => createStudioImageGenerationCommand(stgWithoutSwitch, 'active-stg'),
+    /input\.params\.stg_scale is active and incompatible/,
+  )
+
+  const projectedGuidance = baseParams('active-guidance')
+  projectedGuidance.apg_switch = 1
+  assert.throws(
+    () => createStudioImageGenerationCommand(projectedGuidance, 'active-guidance'),
+    /input\.params\.apg_switch is active and incompatible/,
+  )
+
+  const cfgStar = baseParams('active-cfg-star')
+  cfgStar.cfg_star_switch = 1
+  assert.throws(
+    () => createStudioImageGenerationCommand(cfgStar, 'active-cfg-star'),
+    /input\.params\.cfg_star_switch is active and incompatible/,
+  )
+
+  const cfgZero = baseParams('active-cfg-zero')
+  cfgZero.cfg_zero_step = 0
+  assert.throws(
+    () => createStudioImageGenerationCommand(cfgZero, 'active-cfg-zero'),
+    /input\.params\.cfg_zero_step is active and incompatible/,
+  )
 })
 
 test('v2 submit posts the exact detached envelope, declares the UI surface, and keeps v1 receipt shape', { concurrency: false }, async () => {

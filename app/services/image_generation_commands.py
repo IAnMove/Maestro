@@ -191,6 +191,12 @@ class ImageGenerationCommands:
 
     def restore_recovery(self, workspaces):
         """Rebuild only the existing recovery projection; never start inference."""
+        try:
+            self._restore_recovery(workspaces)
+        except (OSError, sqlite3.Error) as error:
+            raise command_error(503, "storage_unavailable", "Recovery storage is unavailable; no queue records were discarded") from error
+
+    def _restore_recovery(self, workspaces):
         active = set(self.active_job_ids())
         for workspace in workspaces:
             registry = self._registry(workspace)
@@ -208,21 +214,61 @@ class ImageGenerationCommands:
                 self.persist_recovery({"id": task["backend_job_id"], "status": "interrupted",
                                        "created_at": task["created_at"], **deepcopy(runtime)})
 
-    def _recovery_task(self, record):
-        provenance = record.get("provenance") or {}
-        if provenance.get("capability") not in {"generation.image", *self.operations}:
+    def _recovery_identity(self, record):
+        if not isinstance(record, dict):
+            return False
+        provenance = record.get("provenance")
+        if provenance is None:
             return None
-        registry = self._registry(record["workspace"])
-        intent_id = provenance.get("command", {}).get("command_id")
-        entry = registry.command_admission(intent_id)
-        if entry is None or entry["receipt"]["result"]["job_id"] != record["id"]:
-            raise command_error(503, "recovery_mismatch", "Recovery does not match a durable generation admission")
-        return registry, registry.get(entry["task_id"])
+        if not isinstance(provenance, dict):
+            return False
+        capability = provenance.get("capability")
+        if capability is not None and not isinstance(capability, str):
+            return False
+        if capability not in {"generation.image", *self.operations}:
+            return None
+        command = provenance.get("command")
+        if not isinstance(command, dict):
+            return False
+        intent_id = command.get("command_id")
+        if not isinstance(intent_id, str) or not 1 <= len(intent_id) <= 160 or not intent_id.strip():
+            return False
+        return intent_id
+
+    def _recovery_task(self, record):
+        """Link one leftover to its admission, or withhold it.
+
+        Unregistered operations return None for legacy native recovery.
+        A linked command returns ``(registry, task)``. A registered row that
+        cannot be matched (missing admission, invalid queue metadata or job-id
+        drift) returns False so this one row is skipped. Storage failures,
+        including corrupt canonical admissions, remain errors: discard must
+        not delete recovery records while their tasks cannot be verified.
+        """
+        intent_id = self._recovery_identity(record)
+        if intent_id is None or intent_id is False:
+            return intent_id
+        try:
+            registry = self._registry(record.get("workspace"))
+            entry = registry.command_admission(intent_id)
+            if entry is None or entry["receipt"]["result"]["job_id"] != record.get("id"):
+                return False
+            return registry, registry.get(entry["task_id"])
+        except HTTPException as error:
+            if error.status_code in {404, 422}:
+                return False
+            raise
+        except (OSError, sqlite3.Error) as error:
+            raise command_error(503, "storage_unavailable", "Recovery storage is unavailable; no queue records were discarded") from error
+        except (TypeError, KeyError):
+            return False
 
     def filter_recovery(self, records):
         retained = []
         for record in records:
             linked = self._recovery_task(record)
+            if linked is False:
+                continue
             if linked is None or (linked[1] and linked[1]["status"] == "interrupted"):
                 retained.append(record)
         return retained
@@ -230,7 +276,7 @@ class ImageGenerationCommands:
     def discard_recovery(self, records):
         for record in records:
             linked = self._recovery_task(record)
-            if linked is not None and linked[1] and linked[1]["status"] == "interrupted":
+            if linked and linked[1] and linked[1]["status"] == "interrupted":
                 registry, task = linked
                 registry.update(task["id"], status="cancelled", phase="recovery_discarded",
                                 message="Recovery discarded", completed_at=time.time(), recoverable=False)
