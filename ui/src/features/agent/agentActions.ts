@@ -1,3 +1,4 @@
+import { rejectedWizardAction, type WizardActionRejection } from './wizardTurnReport'
 import { getModelsForFamily, getFamiliesForMode, useStore } from '../../stores/useStore'
 import { comicArtworkInventory } from '../comics/generateArtwork'
 import { buildWizardContextSnapshot, buildWizardLabSnapshots, comicLabSnapshot, type BuildWizardContextOptions, type WizardContextSnapshot } from './wizardContext'
@@ -676,6 +677,10 @@ export type AgentAction = AgentOpenTabAction
 export interface AgentTurn {
   reply: string
   actions: AgentAction[]
+  /** Locally derived validation/policy diagnostics, never trusted from the model. */
+  rejections?: WizardActionRejection[]
+  /** Original proposal positions when parser exclusions shifted action indices. */
+  proposalIndices?: number[]
   /** ISO language tag inferred from the user's final message, not the UI. */
   conversationLanguage?: string
 }
@@ -1756,21 +1761,38 @@ export function parseAgentTurn(raw: string): AgentTurn {
     if (typeof nested?.reply === 'string') reply = cleanString(nested.reply, 8_000)
   }
   const proposed = Array.isArray(object.actions) ? object.actions.slice(0, MAX_ACTIONS) : []
+  const rejections: WizardActionRejection[] = []
+  if (Object.hasOwn(object, 'actions') && !Array.isArray(object.actions)) {
+    rejections.push(rejectedWizardAction(null, 0, 'invalid_action_list'))
+  }
+  if (Array.isArray(object.actions) && object.actions.length > MAX_ACTIONS) {
+    rejections.push(rejectedWizardAction(null, MAX_ACTIONS, 'action_limit'))
+  }
   const actions: AgentAction[] = []
+  const proposalIndices: number[] = []
   let preparedStudio = false
   let startedGeneration = false
-  for (const value of proposed) {
+  for (const [index, value] of proposed.entries()) {
     const action = parseAction(value)
-    if (!action) continue
+    if (!action) {
+      rejections.push(rejectedWizardAction(value, index))
+      continue
+    }
     if (isPreparedStudioAction(action)) preparedStudio = true
-    if (!generationStartAllowed(action, preparedStudio, startedGeneration)) continue
+    if (!generationStartAllowed(action, preparedStudio, startedGeneration)) {
+      rejections.push(rejectedWizardAction(value, index, startedGeneration ? 'duplicate_generation' : 'preparation_required'))
+      continue
+    }
     if (action.type === 'start_generation') startedGeneration = true
     actions.push(action)
+    proposalIndices.push(index)
   }
   const conversationLanguage = normalizeConversationLanguageTag(object.conversation_language)
   return {
     reply: reply || (actions.length ? 'El hechizo está trazado; voy a mover HocusPocus.' : humanReply(raw.trim())),
     actions,
+    ...(proposalIndices.some((index, position) => index !== position) ? { proposalIndices } : {}),
+    ...(rejections.length ? { rejections } : {}),
     ...(conversationLanguage ? { conversationLanguage } : {}),
   }
 }
@@ -2050,10 +2072,14 @@ export function isExplicitComicArtworkRequest(request: string, history: ExampleC
 
 function inferComicContext(text: string, history: ExampleConversation[]): boolean {
   if (/\b(?:c[oó]mics?|vi[nñ]etas?|tebeo)\b/i.test(text)) return true
-  return [...history].reverse().some(entry => (
+  // An assistant's general app inventory is not a user-selected comic context.
+  // An explicit Studio request also takes precedence over an older comic turn.
+  const studioContext = /\b(?:studio|flux|hunyuan(?:3d)?|(?:image|video)\s+(?:task|model|generation))\b/i
+  if (studioContext.test(text)) return false
+  const latestStudio = [...history].reverse().findIndex(entry => entry.role === 'user' && studioContext.test(entry.text))
+  const recent = latestStudio < 0 ? history : history.slice(history.length - latestStudio)
+  return [...recent].reverse().some(entry => (
     entry.role === 'user' && /\b(?:c[oó]mics?|vi[nñ]etas?|tebeo)\b/i.test(entry.text)
-  )) || [...history].reverse().some(entry => (
-    /\b(?:c[oó]mics?|vi[nñ]etas?|Comics Lab|Comic Director)\b/i.test(entry.text)
   ))
 }
 

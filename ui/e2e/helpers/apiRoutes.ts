@@ -375,6 +375,7 @@ function exactCatalog(): Record<string, ReturnType<typeof json> | { sse: true }>
     'GET /api/v1/wizard/workflows': json(EMPTY_WIZARD_WORKFLOWS),
     'PUT /api/v1/wizard/workflows': json(EMPTY_WIZARD_WORKFLOWS),
     'GET /api/v1/stories/library': json(EMPTY_STORY_LIBRARY),
+    'GET /api/v1/character-kits/library': json({ version: 1, revision: 0, activeId: '', kits: {} }),
     'PUT /api/v1/stories/library': json(EMPTY_STORY_LIBRARY),
     'GET /api/v1/resolutions': json({ resolutions: [] }),
     'GET /api/v1/recipes': json({ recipes: [] }),

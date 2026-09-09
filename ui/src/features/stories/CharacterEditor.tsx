@@ -5,6 +5,7 @@ import { moveItem, pruneUnusedAssets } from './storyLabEditors'
 import { useStoryLabVisuals } from './storyLabVisuals'
 import { ReferenceGallery } from './ReferenceGallery'
 import type { StoryCharacter, StoryProject } from './types'
+import { CharacterKitLink } from '../characters/CharacterKitLink'
 
 export function CharacterEditor({
   character, index, total, project, update,
@@ -73,6 +74,7 @@ export function CharacterEditor({
         <button className={button} onClick={() => requestUpload({ kind: 'character', id: character.id })}><Upload size={13} /> {t('characters.upload')}</button>
       </div>
       <ReferenceGallery ids={character.referenceAssetIds} assets={project.assets} primaryId={character.primaryReferenceAssetId} onPrimary={id => set({ primaryReferenceAssetId: id })} onRemove={id => removeReference('character', character.id, id)} />
+      <CharacterKitLink value={character.characterKitRef} onChange={characterKitRef => set({ characterKitRef })} />
     </div>
   )
 }

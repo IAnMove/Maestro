@@ -1,4 +1,5 @@
 import { cinematicDocument, CINEMATIC_TEMPLATES, CINEMATIC_CATEGORIES } from './cinematicTemplates'
+import { speechTemplateDocument, SPEECH_TEMPLATES, SPEECH_CATEGORIES } from './speech/templates'
 import { mediaTemplateDocument, MEDIA_TEMPLATES, MEDIA_CATEGORIES } from './mediaTemplates'
 import { createDefaultScene3DDocument } from './document.ts'
 import { SCENE3D_TEMPLATE_IDS, type Scene3DCamera, type Scene3DCameraFamily, type Scene3DDocument, type Scene3DSlot, type Scene3DSlotId, type Scene3DTemplateId } from './types.ts'
@@ -15,6 +16,7 @@ export type Scene3DTemplate = {
 export type Scene3DTemplateCategory = 'cinema' | 'product' | 'music' | 'space' | 'drive'
 export const TEMPLATE_CATEGORIES: Record<Scene3DTemplateId, Scene3DTemplateCategory> = {
   ...CINEMATIC_CATEGORIES,
+  ...SPEECH_CATEGORIES,
   ...MEDIA_CATEGORIES,
   'coder-room': 'cinema',
   'clone-chase': 'cinema',
@@ -146,6 +148,7 @@ export const SCENE3D_TEMPLATES: readonly Scene3DTemplate[] = [
   { id: 'coder-room', camera: 'establishment', duration: 7, slots: ['subject_1', 'background'] },
   { id: 'clone-chase', camera: 'follow', duration: 7, slots: ['subject_1', 'subject_2', 'prop', 'background'] },
   ...CINEMATIC_TEMPLATES,
+  ...SPEECH_TEMPLATES,
   ...MEDIA_TEMPLATES,
 ]
 
@@ -339,6 +342,8 @@ function emptySlot(id: Scene3DSlotId): Scene3DSlot {
 }
 
 export function applyScene3DTemplate(id: Scene3DTemplateId): Scene3DDocument {
+  const speech = speechTemplateDocument(id)
+  if (speech) return speech
   const media = mediaTemplateDocument(id)
   if (media) return media
   const cinematic = cinematicDocument(id)
@@ -445,7 +450,7 @@ const DRESSING_BY_TEMPLATE: Partial<Record<Scene3DTemplateId, Scene3DDocument['d
 export function patchScene3DSlot(
   document: Scene3DDocument,
   slotId: string,
-  patch: Partial<Pick<Scene3DSlot, 'position' | 'rotationY' | 'scale' | 'sourceUrl' | 'sourceRef' | 'media' | 'clip' | 'clipPlayback' | 'motion' | 'loop' | 'surface' | 'performance' | 'grounded' | 'textureRepeat' | 'screen'>>,
+  patch: Partial<Pick<Scene3DSlot, 'position' | 'rotationY' | 'scale' | 'sourceUrl' | 'sourceRef' | 'media' | 'clip' | 'clipPlayback' | 'motion' | 'loop' | 'surface' | 'performance' | 'grounded' | 'textureRepeat' | 'speech' | 'screen' | 'character'>>,
 ): Scene3DDocument {
   return {
     ...document,
@@ -458,6 +463,9 @@ export function remountScene3DTemplate(id: Scene3DTemplateId, previous: Scene3DD
   const next = applyScene3DTemplate(id)
   next.playbackSpeed = previous.playbackSpeed
   next.clipNumber = previous.clipNumber
+  next.production = previous.production ? structuredClone(previous.production) : undefined
+  next.soundtrack = previous.soundtrack ? structuredClone(previous.soundtrack) : undefined
+  if (previous.production) next.duration = previous.duration
   next.texts = previous.texts ? structuredClone(previous.texts) : undefined
   next.width = previous.width
   next.height = previous.height
@@ -469,7 +477,7 @@ export function remountScene3DTemplate(id: Scene3DTemplateId, previous: Scene3DD
       if (oldScreen?.screen) slot.screen = { ...slot.screen, sourceUrl: oldScreen.screen.sourceUrl, sourceRef: oldScreen.screen.sourceRef, media: oldScreen.screen.media }
     }
     const old = previous.slots.find(item => item.slot === slot.slot && item.media === slot.media && item.sourceUrl)
-    return old ? { ...slot, sourceUrl: old.sourceUrl, sourceRef: old.sourceRef, clip: old.clip, clipPlayback: old.clipPlayback } : slot
+    return old ? { ...slot, character: old.character, sourceUrl: old.sourceUrl, sourceRef: old.sourceRef, clip: old.clip, clipPlayback: old.clipPlayback, speech: old.speech ? structuredClone(old.speech) : undefined } : slot
   })
   return next
 }

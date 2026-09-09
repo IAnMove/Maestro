@@ -1,4 +1,5 @@
 import { ArrayBufferTarget, Muxer } from 'mp4-muxer'
+import { encodeSpeechAudio } from './speech/encodeAudio'
 import { scene3dFrameCount, scene3dFrameTime } from './clock.ts'
 import { scene3dCopy } from './copy.ts'
 
@@ -38,24 +39,30 @@ function nextPaint(): Promise<void> {
   return new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
 }
 
+async function supportedEncoder(size: ReturnType<typeof world3dExportSize>, fps: number) {
+  if (!('VideoEncoder' in window) || typeof VideoEncoder.isConfigSupported !== 'function') {
+    throw new Error(scene3dCopy('stage.cannotEncode'))
+  }
+  const supported = await VideoEncoder.isConfigSupported(world3dEncoderConfig(size.width, size.height, fps))
+  if (!supported.supported || !supported.config) {
+    throw new Error(scene3dCopy('stage.cannotEncodeResolution'))
+  }
+  return supported.config
+}
+
 export async function encodeWorld3DFrames(options: {
   width: number
   height: number
   fps: number
   duration: number
+  audio?: AudioBuffer
   paint: (seconds: number) => HTMLCanvasElement | Promise<HTMLCanvasElement>
   onProgress?: (index: number, count: number) => void
   overlay?: (context: CanvasRenderingContext2D, width: number, height: number, seconds: number) => void
 }): Promise<Blob> {
-  if (!('VideoEncoder' in window) || typeof VideoEncoder.isConfigSupported !== 'function') {
-    throw new Error(scene3dCopy('stage.cannotEncode'))
-  }
   const size = world3dExportSize(options.width, options.height)
   const plan = world3dExportPlan(options.duration, options.fps)
-  const supported = await VideoEncoder.isConfigSupported(world3dEncoderConfig(size.width, size.height, plan.fps))
-  if (!supported.supported || !supported.config) {
-    throw new Error(scene3dCopy('stage.cannotEncodeResolution'))
-  }
+  const config = await supportedEncoder(size, plan.fps)
   const copy = document.createElement('canvas')
   copy.width = size.width
   copy.height = size.height
@@ -66,6 +73,7 @@ export async function encodeWorld3DFrames(options: {
     target,
     video: { codec: 'avc', width: size.width, height: size.height, frameRate: plan.fps },
     fastStart: 'in-memory',
+    audio: options.audio ? { codec: 'aac', numberOfChannels: 1, sampleRate: options.audio.sampleRate } : undefined,
     firstTimestampBehavior: 'strict',
   })
   let encoderError: Error | null = null
@@ -73,9 +81,10 @@ export async function encodeWorld3DFrames(options: {
     output: (chunk, metadata) => muxer.addVideoChunk(chunk, metadata),
     error: error => { encoderError = error instanceof Error ? error : new Error(String(error)) },
   })
-  encoder.configure(supported.config)
+  encoder.configure(config)
   const frameDurationUs = Math.round(1_000_000 / plan.fps)
   try {
+    if (options.audio) await encodeSpeechAudio(muxer, options.audio)
     for (let index = 0; index < plan.count; index += 1) {
       if (encoderError) throw encoderError
       const source = await options.paint(plan.times[index] ?? 0)
@@ -93,6 +102,6 @@ export async function encodeWorld3DFrames(options: {
     muxer.finalize()
     return new Blob([target.buffer], { type: 'video/mp4' })
   } finally {
-    encoder.close()
+    if (encoder.state !== 'closed') encoder.close()
   }
 }

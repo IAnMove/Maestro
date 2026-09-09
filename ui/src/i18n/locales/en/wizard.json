@@ -43,5 +43,28 @@
   },
   "actionDone": "Done",
   "actionFailed": "Could not",
-  "actionReport": "What I did"
+  "actionReport": "Execution results",
+  "noActionReceipt": "No action was executed in this turn. There is no execution receipt.",
+  "rejectedActions": "Actions not executed",
+  "rejectedAction": "{{action}}: {{reason}}",
+  "executionState": {
+    "completed": "Completed",
+    "queued": "Queued",
+    "running": "Running",
+    "prepared": "Prepared",
+    "awaiting_input": "Needs input",
+    "partial": "Partially completed",
+    "failed": "Failed",
+    "cancelled": "Cancelled",
+    "reported": "Reported"
+  },
+  "rejectionReason": {
+    "invalid_action": "Unknown action, missing required parameters or invalid values.",
+    "invalid_action_list": "The proposed actions must be a list.",
+    "action_limit": "The proposal exceeds the number of actions allowed in one turn.",
+    "preparation_required": "Generation requires a valid preparation in the same turn.",
+    "duplicate_generation": "A generation was already requested in this turn.",
+    "request_policy": "The action was excluded or replaced while checking your request and context.",
+    "visual_evidence_only": "The attached media was analyzed; that analysis did not authorize this action."
+  }
 }

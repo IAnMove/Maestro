@@ -43,7 +43,7 @@ test('the assembler resolves the same clean identities and rejects duplicates be
  const script=fileURLToPath(new URL('../../pinokio_agent/skills/api/Maestro-next.git/clients/world3d_assemble.py',import.meta.url));
  const run=shots=>{
   writeFileSync(join(directory,'plan.json'),JSON.stringify({shots}));
-  return spawnSync('python3',[script,'--base-url','http://127.0.0.1:1','--plan',join(directory,'plan.json'),'--render-dir',directory,'--workspace','test','--output',join(directory,'out.mp4')],{encoding:'utf8'});
+  return spawnSync(process.env.PYTHON || (process.platform === 'win32' ? 'python' : 'python3'),[script,'--base-url','http://127.0.0.1:1','--plan',join(directory,'plan.json'),'--render-dir',directory,'--workspace','test','--output',join(directory,'out.mp4')],{encoding:'utf8'});
  };
  try {
   for(const [shot,expected] of [[{document:{}},'clip-01'],[{number:6,document:{clipNumber:16}},'clip-06'],[{document:{clipNumber:16}},'clip-16']]){
