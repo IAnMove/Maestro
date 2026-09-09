@@ -9,7 +9,7 @@ window.matchMedia = () => ({ matches: false })
 
 const { parseAgentTurn } = await import('../src/features/agent/agentActions.ts')
 const { getCapability } = await import('../src/features/agent/capabilityRegistry.ts')
-const { prepareAudio } = await import('../src/features/studio/actions.ts')
+const { prepareAudio, queueSfxPack } = await import('../src/features/studio/actions.ts')
 const { useStore } = await import('../src/stores/useStore.ts')
 const guide = '/api/v1/file/guide.mp4?workspace=source'
 const literal = '  Rain on a tin roof.\nKeep this exact.  '
@@ -145,3 +145,31 @@ for (const settleWithFailure of [false, true]) {
     }
   })
 }
+
+test('queue_sfx_pack mints a unique generation.sfx intent for each clip', async () => {
+  await withStudio(async () => {
+    const seen = []
+    useStore.setState({
+      jobs: [],
+      loadModelOptions: async () => undefined,
+      startGeneration: async (_scheduled, context) => {
+        seen.push(context?.commandId)
+        const job = { id: `job-${seen.length}`, status: 'queued' }
+        useStore.setState(state => ({ jobs: [job, ...state.jobs] }))
+      },
+    })
+    await queueSfxPack({
+      type: 'queue_sfx_pack',
+      confirm: true,
+      clips: [
+        { name: 'hit', prompt: 'impact', durationSeconds: 2 },
+        { name: 'whoosh', prompt: 'whoosh', durationSeconds: 3 },
+        { name: 'hit-again', prompt: 'impact', durationSeconds: 2 },
+      ],
+      modelType: 'mmaudio_v2',
+    }, { actor: 'wizard', capability: 'queue_sfx_pack', commandId: 'pack-intent' })
+    assert.equal(seen.length, 3)
+    assert.equal(new Set(seen).size, 3)
+    assert.ok(seen.every(id => typeof id === 'string' && id.length > 0 && id !== 'pack-intent'))
+  })
+})

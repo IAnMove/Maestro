@@ -13,6 +13,7 @@ import type {
   PrepareVideoCommand,
   QueueSfxPackCommand,
 } from './commands'
+import { newSfxGenerationIntentId } from '../../api/sfxGenerationCommands'
 import {
   generationProvenancePayload,
   type GenerationSubmissionContext,
@@ -127,6 +128,13 @@ export async function selectAudioModel(
   return selectedModel?.name || selected
 }
 
+function sfxClipSubmissionContext(
+  context?: GenerationSubmissionContext,
+): GenerationSubmissionContext | undefined {
+  if (!context) return undefined
+  return { ...context, commandId: newSfxGenerationIntentId() }
+}
+
 export async function queueSfxPack(
   action: QueueSfxPackCommand,
   context?: GenerationSubmissionContext,
@@ -140,7 +148,10 @@ export async function queueSfxPack(
   for (const clip of action.clips) {
     applySfxClip(clip, negative)
     const before = new Set(useStore.getState().jobs)
-    await useStore.getState().startGeneration(undefined, context)
+    // Wizard issues one commandId for the pack capability. Reusing it as
+    // every clip's generation.sfx intent_id 409s distinct prompts and
+    // silently replays the first receipt when prompts match.
+    await useStore.getState().startGeneration(undefined, sfxClipSubmissionContext(context))
     const created = useStore.getState().jobs.find(job => !before.has(job))
     if (!created) throw new Error(`HocusPocus no encoló el efecto ${clip.name}.`)
     if (created.status === 'failed') throw new Error(created.error || created.message || `Falló ${clip.name}.`)
