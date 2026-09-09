@@ -21,22 +21,23 @@ def command_error(status: int, code: str, message: str):
     return HTTPException(status, {"code": code, "message": message, "retryable": status >= 500})
 
 
-def validate_image_model(params, *, model_definition, model_downloaded):
+def validate_image_model(params, *, model_definition, model_downloaded, allow_references=False):
     definition = model_definition(params["model_type"])
     if not definition or not definition.get("image_outputs") or definition.get("returns_audio"):
         raise command_error(422, "unsupported_model", "Choose an exact text-to-image model from the model catalog")
-    if definition.get("at_least_one_image_ref_needed"):
+    if definition.get("at_least_one_image_ref_needed") and not (allow_references and params.get("image_refs")):
         raise command_error(422, "reference_required", "This model requires references; choose a text-to-image model")
     if not model_downloaded(params["model_type"]):
         raise command_error(409, "model_unavailable", "Required model files are not installed; install them before submitting")
     match = re.fullmatch(r"([1-9][0-9]{1,4})x([1-9][0-9]{1,4})", params["resolution"])
     if not match or any(not 64 <= int(value) <= 4096 or int(value) % 8 for value in match.groups()):
         raise command_error(422, "invalid_resolution", "Resolution must be WIDTHxHEIGHT, each 64..4096 and a multiple of 8")
+    return definition
 
 
 class ImageGenerationCommands:
     def __init__(self, *, registry, prepare, preflight, make_job, task_fields,
-                 dispatch, persist_recovery, active_job_ids):
+                 dispatch, persist_recovery, active_job_ids, prepare_studio=None):
         self.registry = registry
         self.prepare = prepare
         self.preflight = preflight
@@ -45,6 +46,7 @@ class ImageGenerationCommands:
         self.dispatch = dispatch
         self.persist_recovery = persist_recovery
         self.active_job_ids = active_job_ids
+        self.prepare_studio = prepare_studio
         self.owner = uuid.uuid4().hex
 
     def _registry(self, workspace):
@@ -56,7 +58,8 @@ class ImageGenerationCommands:
 
     @staticmethod
     def _validate_replay(entry, frozen):
-        if entry["operation"] != "generation.image" or entry["digest"] != frozen["fingerprint"]:
+        if (entry["operation"] != "generation.image" or entry["digest"] != frozen["fingerprint"]
+                or entry["fingerprint_version"] != frozen["fingerprint_version"]):
             raise TaskCommandConflict("intent_id was already used with different parameters or preconditions")
 
     def _dispatch_admitted(self, registry, entry):
@@ -98,27 +101,43 @@ class ImageGenerationCommands:
         admitted = registry.admit_command_task(
             intent_id=frozen["original"]["intent_id"], operation="generation.image",
             digest=frozen["fingerprint"], original=frozen["original"], effective=effective,
-            task_fields=self.task_fields(job),
+            task_fields=self.task_fields(job), fingerprint_version=frozen["fingerprint_version"],
         )
         entry = registry.command_admission(frozen["original"]["intent_id"])
         self._dispatch_admitted(registry, entry)
         return admitted
 
-    async def submit(self, command, *, trusted_tool=None):
+    @staticmethod
+    def _provenance(frozen, trusted_tool, context):
+        command = {"command_id": frozen["original"]["intent_id"]}
+        for source, target in (("workflowId", "workflow_id"), ("runId", "run_id")):
+            if context and context.get(source):
+                command[target] = context[source]
+        result = {"actor": "wizard" if trusted_tool == "wizard" else "user",
+                  "capability": "generation.image", "command": command}
+        collection = frozen["original"]["input"].get("workspace_collection_id")
+        if collection is not None:
+            result["workspace_id"] = collection
+        return result
+
+    async def submit(self, command, *, trusted_tool=None, submission_context=None):
         try:
-            frozen = freeze_image_generation_spec(command)
-            params = frozen["effective"]["input"]
+            frozen, params = self._freeze(command)
             registry = self._registry(params["workspace"])
             previous = registry.command_admission(command["intent_id"])
             if previous is not None:
                 self._validate_replay(previous, frozen)
                 self._dispatch_admitted(registry, previous)
                 return {"receipt": previous["receipt"], "replayed": True}
-            self.preflight(params)
-            request = JsonRequest({**deepcopy(params), "provenance": {
-                "actor": "user", "capability": "generation.image",
-                "command": {"command_id": command["intent_id"]},
-            }}, trusted_tool=trusted_tool)
+            if command["version"] == 2:
+                if self.prepare_studio is None:
+                    raise command_error(422, "unsupported_version", "Studio image commands are unavailable in this runtime")
+                params, resources = self.prepare_studio(params)
+                frozen["effective"]["resources"] = resources
+            else:
+                self.preflight(params)
+            request = JsonRequest({**deepcopy(params), "provenance": self._provenance(
+                frozen, trusted_tool, submission_context)}, trusted_tool=trusted_tool)
             # This callback is an in-process capability, never a JSON option.
             # The native facade performs its ordinary validation first and then
             # transfers admission to the same canonical task/worker adapter.
@@ -130,6 +149,18 @@ class ImageGenerationCommands:
             raise command_error(409, "intent_conflict", str(error)) from error
         except (OSError, sqlite3.Error) as error:
             raise command_error(503, "storage_unavailable", "Command storage is unavailable; retry with the same intention") from error
+
+    @staticmethod
+    def _freeze(command):
+        if isinstance(command, dict) and type(command.get("version")) is int and command["version"] == 2:
+            from services.studio_image_spec import freeze_studio_image_spec
+            frozen = freeze_studio_image_spec(command)
+            params = {**deepcopy(frozen["effective"]["input"]["params"]),
+                      "workspace": frozen["effective"]["input"]["workspace"]}
+        else:
+            frozen = freeze_image_generation_spec(command)
+            params = frozen["effective"]["input"]
+        return frozen, params
 
     def receipt(self, workspace, intent_id):
         if not isinstance(intent_id, str) or not 1 <= len(intent_id) <= 160:

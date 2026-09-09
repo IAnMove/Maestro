@@ -1,4 +1,6 @@
 import * as api from '../../api/client'
+import type { ImageGenerationReceipt } from '../../api/imageGenerationCommands'
+import i18n from '../../i18n'
 import { commandResultFromSlice, type CommandResult } from '../../lib/commandContract'
 import { getFamiliesForMode, getModelsForFamily, useStore } from '../../stores/useStore'
 import type { ModelDef } from '../../types'
@@ -353,6 +355,17 @@ export async function prepareAudio(action: PrepareAudioCommand): Promise<Command
   )
 }
 
+function studioAdmissionResult(receipt: ImageGenerationReceipt): CommandResult {
+  const entity = { kind: 'generation_task', id: receipt.result.task_id, workspaceId: receipt.result.workspace }
+  return commandResultFromSlice({
+    commandId: receipt.commandId, status: 'queued', entity, taskIds: receipt.taskIds,
+    artifacts: [{ id: 'reply', kind: 'document', owner: entity, uri: 'studio:reply', metadata: {
+      summary: i18n.t('studio:commands.admitted', { id: receipt.result.job_id }),
+      title: 'Studio generation', mode: 'generation', receipt,
+    } }],
+  })
+}
+
 export async function startPreparedGeneration(context?: GenerationSubmissionContext): Promise<CommandResult> {
   const state = useStore.getState()
   if (state.generationMode === 'model3d') {
@@ -376,7 +389,8 @@ export async function startPreparedGeneration(context?: GenerationSubmissionCont
   }
   const before = useStore.getState().jobs
   const knownJobs = new Set(before)
-  await useStore.getState().startGeneration(undefined, context)
+  const admitted = await useStore.getState().startGeneration(undefined, context)
+  if (admitted) return studioAdmissionResult(admitted)
   const created = useStore.getState().jobs.find(job => !knownJobs.has(job))
   if (!created) throw new Error('HocusPocus no creó una tarea; revisa los requisitos del modelo y los campos visibles.')
   if (created.status === 'failed') throw new Error(created.error || created.message || 'La generación no pudo entrar en cola.')

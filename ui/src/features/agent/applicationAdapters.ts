@@ -1,4 +1,5 @@
 import { useStore } from '../../stores/useStore'
+import i18n from '../../i18n'
 import type { CommandResult } from '../../lib/commandContract'
 import { rememberedCharacterKitLibrary } from '../characters/session'
 import type { SeriesAssemblyJob } from '../series/assemblyContract'
@@ -361,7 +362,7 @@ export function createDefaultApplicationAdapters(): WizardApplicationAdapters {
       const result = await startGeneration(context || {
         actor: 'wizard', capability: action.type,
       })
-      const presented = await presentStudioSliceResult(result, 'Studio generation')
+      const presented = await presentAdmittedStudioResult(result)
       const taskId = result.taskIds[0]
       return {
         ...presented,
@@ -373,7 +374,7 @@ export function createDefaultApplicationAdapters(): WizardApplicationAdapters {
           taskId,
           recoverable: true,
           executionKey: executionKey({
-            workspace: useStore.getState().activeWorkspace || 'default',
+            workspace: result.entities[0]?.workspaceId || useStore.getState().activeWorkspace || 'default',
             type: action.type,
             params: action,
           }),
@@ -1014,6 +1015,22 @@ async function presentQueueSliceResult(result: CommandResult): Promise<AdapterOu
     message: summary,
     target: { kind: 'activity', id: result.entities[0]?.id || 'activity', title: 'Activity' },
     taskId: result.taskIds[0],
+  }
+}
+
+async function presentAdmittedStudioResult(result: CommandResult): Promise<AdapterOutcome> {
+  const receipt = result.artifacts[0]?.metadata?.receipt
+  if (result.status !== 'queued' || !receipt) return presentStudioSliceResult(result, 'Studio generation')
+  const metadata = { commandId: result.commandId, receipt }
+  try {
+    return { ...await presentStudioSliceResult(result, 'Studio generation'), metadata }
+  } catch {
+    const message = i18n.t('studio:commands.admittedNotVisible', { id: result.taskIds[0] })
+    return {
+      message, taskId: result.taskIds[0],
+      target: { kind: 'generation_task', id: result.taskIds[0], title: 'Studio generation' },
+      metadata: { ...metadata, presentationWarning: message },
+    }
   }
 }
 

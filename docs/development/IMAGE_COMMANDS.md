@@ -1,17 +1,21 @@
 # Shared image command admission
 
-This is the first image slice of the Wizard/MCP operations plan. It implements
-the strict text-to-image backend and a recoverable browser API client. The
-general Studio form and Wizard `start_generation` still use their existing
-submission path: wiring them requires preserving all their advanced settings,
-references and LoRAs, not reducing the form to the subset below. Video, audio,
-Tools, editorial domains and workflow execution are not covered by this slice.
+Studio's image Generate button, Wizard `start_generation` in image mode, and
+MCP `generation.image` share native preparation and durable command admission.
+The browser builds version 2 from its complete assembled image parameters,
+including references, LoRAs and advanced options. Version 1 remains available
+for small text-to-image clients. Video, audio, Tools, editorial domains and
+workflow execution are not covered by this slice.
 
 ## Contract and discovery
 
 `GET /api/v1/generation/commands` describes the two executable operations.
 The same entries generate MCP `generation.image` and `generation.receipt`.
 The original ten MCP tools retain their existing names and behavior.
+The Python schemas also generate `ui/src/api/imageCommandCatalog.json` through
+`python scripts/export_image_command_catalog.py`; `--check` rejects stale
+projections. Discovery preserves the correlation between each envelope version
+and its input schema. It does not expose an arbitrary runtime parameter map.
 
 Submit to `POST /api/v1/generation/commands`:
 
@@ -41,6 +45,72 @@ Resolution uses explicit dimensions, each 64..4096 and divisible by eight.
 No discovery call downloads a model. Native generation preparation remains the
 authority for its model-specific rules and execution policy.
 
+Studio and advanced MCP clients use this version 2 envelope:
+
+```json
+{
+  "version": 2,
+  "operation": "generation.image",
+  "intent_id": "another-explicit-intention",
+  "input": {
+    "workspace": "default",
+    "params": {
+      "model_type": "an-exact-installed-image-model-id",
+      "prompt": "A literal prompt\nwith a second line",
+      "resolution": "512x512",
+      "num_inference_steps": 4,
+      "seed": 42,
+      "guidance_scale": 1.0,
+      "image_refs": ["/api/v1/file/reference.png?workspace=source"],
+      "activated_loras": [],
+      "loras_multipliers": "",
+      "spatial_upsampling": ""
+    }
+  }
+}
+```
+
+The selected model must support the supplied conditioning. Version 2 accepts
+only the typed image fields declared in `studio_image_spec.py`. Optional native
+sentinels and explicit null values remain in the snapshot. Active video/audio
+inputs and unknown fields are rejected before admission. Repeat/batch and
+multiline policies are explicit native parameters; they can produce several
+images in one native job. Nested processor settings use a closed schema and
+must match the installed image processor's capabilities.
+
+References use exact asset IDs or local API URLs. Workspace file URLs must
+name their source workspace, which may differ from the output workspace.
+An asset with multiple locations requires an exact URL. The read-only
+`POST /api/v1/generation/commands/references` converts existing absolute paths
+from older UI state to canonical URLs; it never searches by basename. Selected
+images have their file structure verified and are hashed. LoRAs must exist unambiguously in the selected
+model's search directories and pass its existing compatibility rule. This does
+not add universal tensor compatibility validation for every model family.
+
+`input.workspace_collection_id` optionally names the target Workspace collection
+and contributes to the fingerprint. The native preparation layer validates the
+collection. It is separate from the physical output folder. UI surface and
+workflow/run attribution travel in typed `X-Hocus-UI-Surface` and
+`X-Hocus-UI-Context` headers; they grant no permissions. MCP supplies its own
+external tool context. A retry returns the first admission's attribution.
+
+## Visible browser execution
+
+The complete native form is assembled once and detached before submission.
+The shared client persists that exact command, then awaits the Studio panel's
+correlated React acknowledgement before POST. The panel shows the literal
+prompt, model, dimensions, workspace and reference/LoRA counts. It expands the
+sidebar when needed; mobile Generate waits for admission before closing it.
+The existing form remains available for manual editing. Changes to the form or
+workspace during preparation cancel the pending submission before its effect.
+
+The Wizard uses the admission's exact task/job IDs for execution cards. A later
+navigation failure retains the real receipt with a presentation warning. A
+pending command appears in its original output workspace after reload; its
+recovery button retries the stored intention and parameters, rather than the
+currently edited form. Native task/gallery projections remain authoritative
+for progress and finished assets.
+
 ## Admission and progress
 
 The response is `{receipt, replayed}`. An immutable receipt with status `queued`
@@ -60,10 +130,14 @@ the intention ID; another deliberate generation uses another intention.
 The content fingerprint excludes transport identity and includes all validated
 effective inputs. TaskRegistry stores the original envelope, effective input
 and the prepared native runtime snapshot separately from its bounded public
-task metadata. A snapshot checksum detects corrupt admission storage and fails
+task metadata. Version 2 receipts expose `commandVersion`, `fingerprintVersion`
+and `contentFingerprint` together. The fingerprint versions cannot adopt each
+other's intentions. A snapshot checksum detects corrupt admission storage and fails
 closed. This is integrity checking, not protection against a malicious database
 administrator. Server configuration and installed model bytes are external
-dependencies; storing a request does not freeze a model installation.
+dependencies; storing a request does not freeze a model installation. Resource
+hashes record the files inspected before admission; this slice does not make
+immutable copies of references or LoRAs during a queued job's lifetime.
 
 ## Atomicity and recovery
 

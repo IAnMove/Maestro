@@ -26,6 +26,15 @@ def _valid_dispatch_owner(owner):
     return owner is None or (isinstance(owner, str) and 1 <= len(owner) <= 160 and bool(owner.strip()))
 
 
+def _valid_fingerprint(row, values):
+    receipt = values["receipt"]
+    if row["fingerprint_version"] == 1:
+        return "fingerprintVersion" not in receipt
+    return (row["fingerprint_version"] == 2 and receipt.get("fingerprintVersion") == 2
+            and receipt.get("contentFingerprint") == row["digest"]
+            and receipt.get("commandVersion") == values["original"].get("version"))
+
+
 def _decode_admission(row):
     try:
         values = {key: json.loads(row[key]) for key in ("original", "effective", "receipt")}
@@ -35,6 +44,7 @@ def _decode_admission(row):
                  and receipt["operation"] == row["operation"] and receipt["status"] == "queued"
                  and receipt["taskIds"] == [row["task_id"]]
                  and receipt["result"]["task_id"] == row["task_id"]
+                 and _valid_fingerprint(row, values)
                  and _valid_dispatch_owner(row["dispatch_owner"])
                  and row["snapshot_digest"] == _snapshot_digest(**values))
         if not valid:
@@ -103,7 +113,7 @@ class TaskCommandAdmission:
         return [self.command_admission(row["intent_id"]) for row in rows]
 
     def admit_command_task(self, *, intent_id: str, operation: str, digest: str,
-                           original: dict, effective: dict, task_fields: dict) -> dict:
+                           original: dict, effective: dict, task_fields: dict, fingerprint_version: int = 1) -> dict:
         """Commit one task/event and its recoverable receipt, or replay it.
 
         The caller validates the domain specification and supplies trusted task
@@ -112,6 +122,8 @@ class TaskCommandAdmission:
         """
         if not all(isinstance(value, str) and value for value in (intent_id, operation, digest)):
             raise ValueError("Command identity, operation and fingerprint are required")
+        if type(fingerprint_version) is not int or fingerprint_version not in (1, 2):
+            raise ValueError("Unsupported command fingerprint version")
         # Validate serialization before opening a write transaction. Do not apply
         # the public task metadata truncation rules to literal command inputs.
         original_json, effective_json = _json(original), _json(effective)
@@ -119,6 +131,8 @@ class TaskCommandAdmission:
         if task["status"] != "queued" or not task["backend_job_id"]:
             raise ValueError("Command admission requires a queued task and exact backend job ID")
         receipt = _receipt(intent_id, operation, task)
+        if fingerprint_version == 2:
+            receipt.update(commandVersion=original["version"], contentFingerprint=digest, fingerprintVersion=2)
         with self._write_lock, self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             previous = connection.execute(
@@ -126,7 +140,8 @@ class TaskCommandAdmission:
             ).fetchone()
             if previous is not None:
                 previous = _decode_admission(previous)
-                if previous["operation"] != operation or previous["digest"] != digest:
+                if (previous["operation"] != operation or previous["digest"] != digest
+                        or previous["fingerprint_version"] != fingerprint_version):
                     raise TaskCommandConflict("intent_id was already used with different parameters or preconditions")
                 connection.rollback()
                 return {"receipt": previous["receipt"], "replayed": True}
@@ -135,8 +150,8 @@ class TaskCommandAdmission:
             self._insert_task(connection, task, {"metadata"})
             connection.execute("""INSERT INTO task_command_admissions
                 (intent_id, operation, fingerprint_version, digest, task_id, original, effective, receipt, snapshot_digest)
-                VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?)""",
-                (intent_id, operation, digest, task["id"], original_json, effective_json, _json(receipt),
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (intent_id, operation, fingerprint_version, digest, task["id"], original_json, effective_json, _json(receipt),
                  _snapshot_digest(original, effective, receipt)))
             connection.commit()
         self._after_task_created(task)

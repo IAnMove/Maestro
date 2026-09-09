@@ -1,5 +1,22 @@
 import { BASE } from './http'
 import { stableSerialize } from '../lib/commandContract'
+import type { GenerationSubmissionContext } from '../features/studio/generationProvenance'
+import {
+  assertStudioImageGenerationCommand,
+  detachedStudioImageGenerationCommand,
+  type StudioImageGenerationCommand,
+} from '../features/studio/generationSpec'
+
+export {
+  buildStudioImageGenerationCommand,
+  createStudioImageGenerationCommand,
+} from '../features/studio/generationSpec'
+export type {
+  StudioImageGenerationCommand,
+  StudioImageGenerationFullParams,
+  StudioImageGenerationInput,
+  StudioImageParams,
+} from '../features/studio/generationSpec'
 
 /** The first shared generation vertical deliberately exposes image only. */
 export const IMAGE_GENERATION_OPERATION = 'generation.image' as const
@@ -18,12 +35,15 @@ export interface ImageGenerationInput {
   video_length?: 1
 }
 
-export interface ImageGenerationCommand {
+export interface ImageGenerationCommandV1 {
   version: typeof IMAGE_GENERATION_SCHEMA_VERSION
   operation: typeof IMAGE_GENERATION_OPERATION
   intent_id: string
   input: ImageGenerationInput
 }
+
+export type ImageGenerationCommandV2 = StudioImageGenerationCommand
+export type ImageGenerationCommand = ImageGenerationCommandV1 | ImageGenerationCommandV2
 
 export interface ImageGenerationTaskResult {
   job_id: string
@@ -44,7 +64,17 @@ export interface ImageGenerationReceipt {
   pipelineIds: string[]
   result: ImageGenerationTaskResult
   replayed?: boolean
+  commandVersion?: 2
+  contentFingerprint?: string
+  fingerprintVersion?: 2
 }
+
+/**
+ * Recovery metadata is deliberately smaller than the caller context. It is
+ * stored beside the immutable command hint and only drives declared UI
+ * attribution headers; it is never part of the command or its fingerprint.
+ */
+type StoredSubmissionContext = Pick<GenerationSubmissionContext, 'actor' | 'workflowId' | 'runId'>
 
 export class ImageGenerationCommandError extends Error {
   readonly intentId: string
@@ -70,11 +100,14 @@ export class ImageGenerationCommandError extends Error {
 }
 
 const PENDING_KEY_PREFIX = 'hocuspocus.generation.image-commands.v1:'
+const PENDING_CONTEXT_KEY_PREFIX = 'hocuspocus.generation.image-command-context.v1:'
 const PENDING_CHANGED_EVENT = 'hocuspocus:generation-image-commands-changed'
 const MAX_INTENT_LENGTH = 160
 const MAX_ID_LENGTH = 240
 const MAX_PROMPT_LENGTH = 200_000
 const MAX_RESOLUTION_LENGTH = 128
+const MAX_SUBMISSION_CONTEXT_ID_LENGTH = 200
+const SUBMISSION_ACTORS = new Set(['user', 'wizard', 'system', 'unknown'])
 
 const INPUT_FIELDS = new Set([
   'workspace',
@@ -151,7 +184,7 @@ function assertImageGenerationInput(value: unknown): asserts value is ImageGener
   assertImageSelectors(value)
 }
 
-function assertImageGenerationCommand(value: unknown): asserts value is ImageGenerationCommand {
+export function assertImageGenerationCommandV1(value: unknown): asserts value is ImageGenerationCommandV1 {
   if (!isRecord(value)) throw new Error('image generation command must be an object')
   for (const key of Object.keys(value)) {
     if (!COMMAND_FIELDS.has(key)) throw new Error(`command.${key} is not supported by generation.image`)
@@ -163,7 +196,11 @@ function assertImageGenerationCommand(value: unknown): asserts value is ImageGen
 }
 
 function detachedCommand(value: unknown): ImageGenerationCommand {
-  assertImageGenerationCommand(value)
+  if (isRecord(value) && value.version === 2) {
+    assertStudioImageGenerationCommand(value)
+    return detachedStudioImageGenerationCommand(value)
+  }
+  assertImageGenerationCommandV1(value)
   // stableSerialize validates the JSON boundary and gives the retry an
   // immutable value-level snapshot. It never adds native defaults to input.
   return JSON.parse(stableSerialize(value)) as ImageGenerationCommand
@@ -207,6 +244,84 @@ function readPending(intentId: string): ImageGenerationCommand | null {
   }
 }
 
+const STORED_CONTEXT_ENVELOPE_FIELDS = new Set(['version', 'intent_id', 'workspace', 'context'])
+const STORED_CONTEXT_FIELDS = new Set(['actor', 'workflowId', 'runId'])
+
+function pendingContextKey(intentId: string): string {
+  return PENDING_CONTEXT_KEY_PREFIX + intentId
+}
+
+function invalidStoredContext(intentId: string): ImageGenerationCommandError {
+  return new ImageGenerationCommandError(
+    `Stored image generation context ${intentId} is invalid`,
+    intentId,
+    '',
+    { code: 'invalid_pending_context' },
+  )
+}
+
+function normalizeStoredSubmissionContext(value: unknown): StoredSubmissionContext {
+  if (!isRecord(value)) throw new Error('context must be an object')
+  for (const key of Object.keys(value)) {
+    if (!STORED_CONTEXT_FIELDS.has(key)) throw new Error('context contains an unsupported field')
+  }
+  if (typeof value.actor !== 'string' || !SUBMISSION_ACTORS.has(value.actor)) {
+    throw new Error('context.actor is invalid')
+  }
+  const workflowId = submissionContextPart(value.workflowId, 'context.workflowId')
+  const runId = submissionContextPart(value.runId, 'context.runId')
+  return {
+    actor: value.actor as StoredSubmissionContext['actor'],
+    ...(workflowId !== undefined ? { workflowId } : {}),
+    ...(runId !== undefined ? { runId } : {}),
+  }
+}
+
+function readPendingContext(command: ImageGenerationCommand): StoredSubmissionContext | null {
+  const raw = storage().getItem(pendingContextKey(command.intent_id))
+  if (raw == null) return null
+  try {
+    const value: unknown = JSON.parse(raw)
+    if (!isRecord(value)
+      || Object.keys(value).some(key => !STORED_CONTEXT_ENVELOPE_FIELDS.has(key))
+      || value.version !== 1
+      || value.intent_id !== command.intent_id
+      || value.workspace !== command.input.workspace) {
+      throw new Error('context envelope does not match its command')
+    }
+    return normalizeStoredSubmissionContext(value.context)
+  } catch {
+    throw invalidStoredContext(command.intent_id)
+  }
+}
+
+function persistPendingContext(
+  command: ImageGenerationCommand,
+  context: StoredSubmissionContext | undefined,
+): void {
+  const key = pendingContextKey(command.intent_id)
+  if (!context) {
+    // Avoid turning a no-op cleanup into a storage failure. This also keeps
+    // the legacy command-only path compatible with callers whose storage
+    // implementation rejects removeItem even when the key is absent.
+    if (storage().getItem(key) != null) storage().removeItem(key)
+    return
+  }
+  storage().setItem(key, stableSerialize({
+    version: 1,
+    intent_id: command.intent_id,
+    workspace: command.input.workspace,
+    context,
+  }))
+}
+
+function sameSubmissionContext(
+  left: StoredSubmissionContext,
+  right: StoredSubmissionContext,
+): boolean {
+  return stableSerialize(left) === stableSerialize(right)
+}
+
 function sameCommand(left: ImageGenerationCommand, right: ImageGenerationCommand): boolean {
   return stableSerialize(left) === stableSerialize(right)
 }
@@ -226,7 +341,18 @@ function retainPending(command: ImageGenerationCommand, done = false): boolean {
     // A different tab may have replaced the value. Never erase that command
     // while cleaning up a receipt for this one.
     const current = readPending(command.intent_id)
-    if (current && sameCommand(current, command)) storage().removeItem(key)
+    if (current && sameCommand(current, command)) {
+      // Clear the sidecar first. If storage cleanup fails, retain the command
+      // hint so a confirmed result remains recoverable as before this sidecar
+      // existed.
+      persistPendingContext(command, undefined)
+      storage().removeItem(key)
+    } else if (!current) {
+      // The command may already have been removed by another tab after its
+      // receipt was confirmed. Its context key is still scoped by intent and
+      // can be cleaned without touching a replacement command.
+      persistPendingContext(command, undefined)
+    }
   } else {
     storage().setItem(key, stableSerialize(command))
   }
@@ -247,13 +373,13 @@ export function newImageGenerationIntentId(): string {
 export function createImageGenerationCommand(
   intentId: string,
   input: ImageGenerationInput,
-): ImageGenerationCommand {
+): ImageGenerationCommandV1 {
   return detachedCommand({
     version: IMAGE_GENERATION_SCHEMA_VERSION,
     operation: IMAGE_GENERATION_OPERATION,
     intent_id: intentId,
     input,
-  })
+  }) as ImageGenerationCommandV1
 }
 
 export function pendingImageGenerationCommands(workspace?: string): ImageGenerationCommand[] {
@@ -322,7 +448,7 @@ function unwrapReceipt(value: unknown): ReceiptEnvelope {
   return { receipt: value }
 }
 
-type ReceiptContext = Pick<ImageGenerationCommand, 'intent_id' | 'operation'> & {
+type ReceiptContext = Pick<ImageGenerationCommand, 'intent_id' | 'operation' | 'version'> & {
   input: Pick<ImageGenerationInput, 'workspace'>
 }
 
@@ -348,6 +474,36 @@ function receiptReplay(value: Record<string, unknown>, command: ReceiptContext, 
   return typeof value.replayed === 'boolean' ? value.replayed : fallback
 }
 
+function receiptV2Metadata(value: Record<string, unknown>, command: ReceiptContext): {
+  commandVersion?: 2
+  contentFingerprint?: string
+  fingerprintVersion?: 2
+} {
+  const metadataFields = ['commandVersion', 'contentFingerprint', 'fingerprintVersion'] as const
+  const present = metadataFields.filter(field => field in value)
+  // A receipt is either the complete v1 shape or the complete v2 shape. A
+  // half-present fingerprint must never be treated as a legacy receipt.
+  if (present.length !== 0 && present.length !== metadataFields.length) {
+    throw invalidReceipt(command, 'Receipt fingerprint metadata is incomplete')
+  }
+  if (present.length === 0) {
+    if (command.version === 2) {
+      throw invalidReceipt(command, 'The v2 receipt is missing its content fingerprint')
+    }
+    return {}
+  }
+  if (value.commandVersion !== 2 || value.fingerprintVersion !== 2
+    || typeof value.contentFingerprint !== 'string'
+    || !/^[a-f0-9]{64}$/.test(value.contentFingerprint)) {
+    throw invalidReceipt(command, 'Receipt fingerprint metadata is invalid')
+  }
+  return {
+    commandVersion: 2,
+    contentFingerprint: value.contentFingerprint,
+    fingerprintVersion: 2,
+  }
+}
+
 function validateReceipt(
   value: unknown,
   command: ReceiptContext,
@@ -355,6 +511,7 @@ function validateReceipt(
 ): ImageGenerationReceipt {
   if (!isRecord(value)) throw invalidReceipt(command)
   const outerReplayed = receiptReplay(value, command, replayed)
+  const v2Metadata = receiptV2Metadata(value, command)
   const result = value.result
   const taskIds = value.taskIds
   if (value.version !== IMAGE_GENERATION_SCHEMA_VERSION
@@ -378,17 +535,56 @@ function validateReceipt(
     taskIds: [...taskIds] as string[],
     pipelineIds: [...value.pipelineIds] as string[],
     result: JSON.parse(stableSerialize(result)) as ImageGenerationTaskResult,
+    ...v2Metadata,
   }
   if (outerReplayed !== undefined) receipt.replayed = outerReplayed
   return receipt
 }
 
-async function postCommand(command: ImageGenerationCommand): Promise<unknown> {
+function submissionContextPart(value: unknown, field: string): string | undefined {
+  if (value === undefined || value === null || value === '') return undefined
+  if (typeof value !== 'string' || !value.trim() || value.trim() !== value
+    || value.length > MAX_SUBMISSION_CONTEXT_ID_LENGTH) {
+    throw new Error(field + ' must be an exact non-blank string of at most 200 characters')
+  }
+  return value
+}
+
+function validateSubmissionContext(
+  context: GenerationSubmissionContext | undefined,
+): StoredSubmissionContext | undefined {
+  if (!context) return undefined
+  if (!SUBMISSION_ACTORS.has(context.actor)) {
+    throw new Error('submissionContext.actor must be a known actor')
+  }
+  const workflowId = submissionContextPart(context.workflowId, 'submissionContext.workflowId')
+  const runId = submissionContextPart(context.runId, 'submissionContext.runId')
+  return {
+    actor: context.actor,
+    ...(workflowId !== undefined ? { workflowId } : {}),
+    ...(runId !== undefined ? { runId } : {}),
+  }
+}
+
+async function postCommand(
+  command: ImageGenerationCommand,
+  submissionContext?: StoredSubmissionContext,
+): Promise<unknown> {
   let response: Response
   try {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (submissionContext) {
+      headers['X-Hocus-UI-Surface'] = submissionContext.actor === 'wizard' ? 'wizard' : 'studio'
+      const context: Record<string, string> = {}
+      const workflowId = submissionContextPart(submissionContext.workflowId, 'submissionContext.workflowId')
+      const runId = submissionContextPart(submissionContext.runId, 'submissionContext.runId')
+      if (workflowId !== undefined) context.workflowId = workflowId
+      if (runId !== undefined) context.runId = runId
+      if (Object.keys(context).length > 0) headers['X-Hocus-UI-Context'] = JSON.stringify(context)
+    }
     response = await fetch(`${BASE}/api/v1/generation/commands`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(command),
     })
   } catch (error) {
@@ -414,58 +610,267 @@ async function postCommand(command: ImageGenerationCommand): Promise<unknown> {
   }
 }
 
-/** Submit or explicitly retry the same detached envelope and intention. */
-export async function submitImageGenerationCommand(
-  command: ImageGenerationCommand,
-): Promise<ImageGenerationReceipt> {
-  const snapshot = detachedCommand(command)
+export interface SubmitImageGenerationCommandOptions {
+  /**
+   * A declared UI surface is transport metadata, never part of the command
+   * snapshot and never an authorization decision.
+   */
+  submissionContext?: GenerationSubmissionContext
+  /**
+   * Runs after the pending hint is durable and before POST. The callback gets
+   * a detached copy so it cannot mutate the retry or transport snapshot.
+   */
+  onSnapshotReady?: (snapshot: ImageGenerationCommand) => void | Promise<void>
+}
+
+interface PreparedSubmission {
+  recovering: boolean
+  submissionContext?: StoredSubmissionContext
+}
+
+function requestedContext(
+  snapshot: ImageGenerationCommand,
+  context: GenerationSubmissionContext | undefined,
+): StoredSubmissionContext | undefined {
+  try {
+    return validateSubmissionContext(context)
+  } catch (error) {
+    throw new ImageGenerationCommandError(
+      error instanceof Error ? error.message : 'The submission context is invalid',
+      snapshot.intent_id,
+      snapshot.input.workspace,
+      { code: 'invalid_submission_context' },
+    )
+  }
+}
+
+function assertContextMatches(
+  snapshot: ImageGenerationCommand,
+  stored: StoredSubmissionContext | null,
+  requested: StoredSubmissionContext | undefined,
+): void {
+  if (stored && requested && !sameSubmissionContext(stored, requested)) {
+    throw new ImageGenerationCommandError(
+      `intent_id ${snapshot.intent_id} is already attributed to a different UI context`,
+      snapshot.intent_id,
+      snapshot.input.workspace,
+      { code: 'submission_context_conflict', uncertain: true },
+    )
+  }
+}
+
+function assertPendingCommandMatches(
+  snapshot: ImageGenerationCommand,
+  existing: ImageGenerationCommand | null,
+): void {
+  if (existing && !sameCommand(existing, snapshot)) {
+    throw new ImageGenerationCommandError(
+      `intent_id ${snapshot.intent_id} is already pending with a different command`,
+      snapshot.intent_id,
+      snapshot.input.workspace,
+      { code: 'intent_conflict' },
+    )
+  }
+}
+
+function prepareNewPendingContext(
+  snapshot: ImageGenerationCommand,
+  requested: StoredSubmissionContext | undefined,
+): void {
+  // A sidecar is written before its command hint. If this write fails, no
+  // recoverable command is left behind to suggest an admitted request.
+  // Clearing an orphan is strict for the same reason: a stale attribution
+  // must not be paired with a newly written command.
+  persistPendingContext(snapshot, requested)
+}
+
+function persistMissingRecoveryContext(
+  snapshot: ImageGenerationCommand,
+  recovering: boolean,
+  stored: StoredSubmissionContext | null,
+  requested: StoredSubmissionContext | undefined,
+): StoredSubmissionContext | undefined {
+  const submissionContext = stored || requested
+  if (recovering && !stored && requested) {
+    persistPendingContext(snapshot, requested)
+  }
+  return submissionContext
+}
+
+function preparePendingSubmission(
+  snapshot: ImageGenerationCommand,
+  requested: StoredSubmissionContext | undefined,
+): PreparedSubmission {
   let recovering = false
   try {
+    const existing = readPending(snapshot.intent_id)
+    assertPendingCommandMatches(snapshot, existing)
+    recovering = existing !== null
+    if (!recovering) prepareNewPendingContext(snapshot, requested)
     recovering = retainPending(snapshot)
+    const stored = recovering ? readPendingContext(snapshot) : null
+    assertContextMatches(snapshot, stored, requested)
+    return {
+      recovering,
+      submissionContext: persistMissingRecoveryContext(snapshot, recovering, stored, requested),
+    }
   } catch (error) {
     if (error instanceof ImageGenerationCommandError) throw error
     throw new ImageGenerationCommandError(
       error instanceof Error ? error.message : 'Could not persist image generation command',
       snapshot.intent_id,
       snapshot.input.workspace,
-      { code: 'pending_storage_failed' },
+      { code: 'pending_storage_failed', uncertain: recovering },
     )
   }
+}
 
+async function presentSnapshot(
+  snapshot: ImageGenerationCommand,
+  recovering: boolean,
+  hook: SubmitImageGenerationCommandOptions['onSnapshotReady'],
+): Promise<void> {
+  if (!hook) return
   try {
-    const envelope = unwrapReceipt(await postCommand(snapshot))
-    if (envelope.malformed) throw invalidReceipt(snapshot)
-    const receipt = validateReceipt(envelope.receipt, snapshot, envelope.replayed)
-    // A committed receipt is returned even if best-effort local cleanup fails.
-    forgetPending(snapshot)
-    return receipt
+    await hook(detachedCommand(snapshot))
   } catch (error) {
-    const commandError = error instanceof ImageGenerationCommandError
-      ? error
-      : new ImageGenerationCommandError(
-        error instanceof Error ? error.message : 'Image generation command failed',
-        snapshot.intent_id,
-        snapshot.input.workspace,
-        { uncertain: true, code: 'unknown_failure' },
-      )
-    // A first, explicit 4xx response is definitive before admission. Once a
-    // pending hint exists, a later rejection may follow an admitted request;
-    // preserve it, including a 401 after a timeout or lost response.
-    if (!recovering && commandError.status !== undefined
-      && commandError.status >= 400 && commandError.status < 500) {
-      forgetPending(snapshot)
-    }
+    // A hook failure happens before network admission and is therefore
+    // certain. Preserve an older recovery hint because it may represent a
+    // previously admitted request whose response was lost.
+    if (!recovering) forgetPending(snapshot)
     throw new ImageGenerationCommandError(
-      commandError.message,
+      error instanceof Error ? error.message : 'The image command snapshot could not be presented',
       snapshot.intent_id,
       snapshot.input.workspace,
-      {
-        status: commandError.status,
-        uncertain: commandError.uncertain || recovering,
-        code: commandError.code,
-      },
+      { code: 'snapshot_hook_failed' },
     )
   }
+}
+
+async function admitImageCommand(
+  snapshot: ImageGenerationCommand,
+  submissionContext: StoredSubmissionContext | undefined,
+): Promise<ImageGenerationReceipt> {
+  const envelope = unwrapReceipt(await postCommand(snapshot, submissionContext))
+  if (envelope.malformed) throw invalidReceipt(snapshot)
+  const receipt = validateReceipt(envelope.receipt, snapshot, envelope.replayed)
+  // A committed receipt is returned even if best-effort local cleanup fails.
+  forgetPending(snapshot)
+  return receipt
+}
+
+function isDefinitiveClientError(error: ImageGenerationCommandError): boolean {
+  return error.status !== undefined && error.status >= 400 && error.status < 500
+}
+
+function normalizeSubmissionFailure(
+  error: unknown,
+  snapshot: ImageGenerationCommand,
+  recovering: boolean,
+): ImageGenerationCommandError {
+  const commandError = error instanceof ImageGenerationCommandError
+    ? error
+    : new ImageGenerationCommandError(
+      error instanceof Error ? error.message : 'Image generation command failed',
+      snapshot.intent_id,
+      snapshot.input.workspace,
+      { uncertain: true, code: 'unknown_failure' },
+    )
+  // A first, explicit 4xx response is definitive before admission. Once a
+  // pending hint exists, a later rejection may follow an admitted request;
+  // preserve it, including a 401 after a timeout or lost response.
+  if (!recovering && isDefinitiveClientError(commandError)) forgetPending(snapshot)
+  return new ImageGenerationCommandError(
+    commandError.message,
+    snapshot.intent_id,
+    snapshot.input.workspace,
+    {
+      status: commandError.status,
+      uncertain: commandError.uncertain || recovering,
+      code: commandError.code,
+    },
+  )
+}
+
+/** Submit or explicitly retry the same detached envelope and intention. */
+export async function submitImageGenerationCommand(
+  command: ImageGenerationCommand,
+  options: SubmitImageGenerationCommandOptions = {},
+): Promise<ImageGenerationReceipt> {
+  const snapshot = detachedCommand(command)
+  const requestedSubmissionContext = requestedContext(snapshot, options.submissionContext)
+  const prepared = preparePendingSubmission(snapshot, requestedSubmissionContext)
+
+  await presentSnapshot(snapshot, prepared.recovering, options.onSnapshotReady)
+  try {
+    return await admitImageCommand(snapshot, prepared.submissionContext)
+  } catch (error) {
+    throw normalizeSubmissionFailure(error, snapshot, prepared.recovering)
+  }
+}
+
+function receiptCommandContext(intentId: string, workspace: string): ReceiptContext {
+  const fallback: ReceiptContext = {
+    version: 1,
+    intent_id: intentId,
+    operation: IMAGE_GENERATION_OPERATION,
+    input: { workspace },
+  }
+  try {
+    const pending = readPending(intentId)
+    return pending && pending.input.workspace === workspace ? pending : fallback
+  } catch {
+    // A receipt read must remain available when local recovery storage is damaged.
+    return fallback
+  }
+}
+
+async function requestReceipt(workspace: string, intentId: string): Promise<Response> {
+  try {
+    const response = await fetch(
+      `${BASE}/api/v1/generation/commands/receipt?workspace=${encodeURIComponent(workspace)}&intent_id=${encodeURIComponent(intentId)}`,
+    )
+    if (!response.ok) throw await responseError(response, intentId, workspace)
+    return response
+  } catch (error) {
+    if (error instanceof ImageGenerationCommandError) throw error
+    throw new ImageGenerationCommandError(
+      error instanceof Error ? error.message : 'Receipt request failed',
+      intentId,
+      workspace,
+      { uncertain: true, code: 'transport_uncertain' },
+    )
+  }
+}
+
+async function decodeReceiptResponse(
+  response: Response,
+  command: ReceiptContext,
+): Promise<ImageGenerationReceipt> {
+  try {
+    const payload = unwrapReceipt(await response.json())
+    if (payload.malformed) throw invalidReceipt(command)
+    return validateReceipt(payload.receipt, command, payload.replayed)
+  } catch (error) {
+    if (error instanceof ImageGenerationCommandError) throw error
+    throw new ImageGenerationCommandError(
+      error instanceof Error ? error.message : `Receipt could not be verified for ${command.intent_id}`,
+      command.intent_id,
+      command.input.workspace,
+      { status: 200, uncertain: true, code: 'invalid_receipt' },
+    )
+  }
+}
+
+function clearReceiptPending(intentId: string, workspace: string): void {
+  try {
+    const pending = readPending(intentId)
+    if (pending && pending.input.workspace === workspace) clearPendingReceipt(pending)
+  } catch { /* Keep the valid receipt even if local recovery storage is corrupt. */ }
+}
+
+function clearPendingReceipt(command: ImageGenerationCommand): void {
+  try { retainPending(command, true) } catch { /* Keep the receipt visible if storage cleanup is unavailable. */ }
 }
 
 /** Query a durable receipt after a lost response; this never invents a new ID. */
@@ -475,52 +880,18 @@ export async function fetchImageGenerationCommandReceipt(
 ): Promise<ImageGenerationReceipt> {
   requiredText(workspace, 'workspace', MAX_ID_LENGTH)
   requiredText(intentId, 'intent_id', MAX_INTENT_LENGTH)
-  let response: Response
-  try {
-    response = await fetch(
-      `${BASE}/api/v1/generation/commands/receipt?workspace=${encodeURIComponent(workspace)}&intent_id=${encodeURIComponent(intentId)}`,
-    )
-  } catch (error) {
-    throw new ImageGenerationCommandError(
-      error instanceof Error ? error.message : 'Receipt request failed',
-      intentId,
-      workspace,
-      { uncertain: true, code: 'transport_uncertain' },
-    )
-  }
-  if (!response.ok) {
-    throw await responseError(response, intentId, workspace)
-  }
-  try {
-    const payload = unwrapReceipt(await response.json())
-    if (payload.malformed) throw invalidReceipt({
-      intent_id: intentId,
-      operation: IMAGE_GENERATION_OPERATION,
-      input: { workspace },
-    })
-    const receipt = validateReceipt(payload.receipt, {
-      intent_id: intentId,
-      operation: IMAGE_GENERATION_OPERATION,
-      input: { workspace },
-    }, payload.replayed)
-    // Receipt validation is authoritative. Storage read/removal is only a
-    // recovery hint and must never turn a valid GET into an apparent failure.
-    try {
-      const pending = readPending(intentId)
-      if (pending && pending.input.workspace === workspace) {
-        try { retainPending(pending, true) } catch { /* Keep the receipt visible if storage cleanup is unavailable. */ }
-      }
-    } catch { /* Keep the valid receipt even if local recovery storage is corrupt. */ }
-    return receipt
-  } catch (error) {
-    if (error instanceof ImageGenerationCommandError) throw error
-    throw new ImageGenerationCommandError(
-      error instanceof Error ? error.message : `Receipt could not be verified for ${intentId}`,
-      intentId,
-      workspace,
-      { status: 200, uncertain: true, code: 'invalid_receipt' },
-    )
-  }
+  // A receipt query has no command envelope of its own. When the durable hint
+  // is present, use its version so a lost v2 response cannot be accepted as a
+  // legacy v1 receipt. If the hint is unavailable, the endpoint remains a
+  // legacy-compatible read and the server's receipt metadata is still
+  // validated when it is present.
+  const receiptCommand = receiptCommandContext(intentId, workspace)
+  const response = await requestReceipt(workspace, intentId)
+  const receipt = await decodeReceiptResponse(response, receiptCommand)
+  // Receipt validation is authoritative. Storage read/removal is only a
+  // recovery hint and must never turn a valid GET into an apparent failure.
+  clearReceiptPending(intentId, workspace)
+  return receipt
 }
 
 export const getImageGenerationCommandReceipt = fetchImageGenerationCommandReceipt

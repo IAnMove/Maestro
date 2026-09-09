@@ -13,6 +13,7 @@ import copy
 import json
 import logging
 import os
+from pathlib import Path
 import re
 import sqlite3
 import threading
@@ -22,6 +23,7 @@ from typing import Any, Iterator, TypedDict
 
 from services.operation_logging import log_operation
 from services.task_command_admission import TaskCommandAdmission
+from services.workspace_store_lock import workspace_store_lock
 
 
 _LOGGER = logging.getLogger("loreframe.operations.tasks")
@@ -317,12 +319,20 @@ class TaskRegistry(TaskCommandAdmission):
         connection = sqlite3.connect(self.path, timeout=15, isolation_level=None)
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA busy_timeout=15000")
-        connection.execute("PRAGMA journal_mode=WAL")
         connection.execute("PRAGMA foreign_keys=ON")
         return connection
 
     def _initialize(self) -> None:
+        # A journal-mode transition can fail immediately under concurrent first
+        # connections, even with SQLite busy_timeout. Serialize bootstrap using
+        # the existing portable file lock; ordinary transactions remain SQLite.
+        with workspace_store_lock(Path(self.path)):
+            self._initialize_tables()
+
+    def _initialize_tables(self) -> None:
         with self._connect() as connection:
+            if connection.execute("PRAGMA journal_mode").fetchone()[0] != "wal":
+                connection.execute("PRAGMA journal_mode=WAL")
             connection.executescript("""
                 CREATE TABLE IF NOT EXISTS tasks (
                     id TEXT PRIMARY KEY,

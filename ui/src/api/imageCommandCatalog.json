@@ -1,0 +1,3429 @@
+{
+  "version": 2,
+  "operations": [
+    {
+      "name": "generation.image",
+      "version": 2,
+      "supportedVersions": [
+        1,
+        2
+      ],
+      "domain": "studio",
+      "mutation": true,
+      "description": "Admit an image job with an installed model and explicit output workspace. Version 1 is a single text-to-image request; version 2 accepts the complete typed Studio image parameters, canonical references, LoRAs and image processors. Preserve literal prompts and reuse intent_id only for retries. The receipt proves admission; inspect its task for completion.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "version": {
+            "type": "integer",
+            "enum": [
+              1,
+              2
+            ]
+          },
+          "operation": {
+            "const": "generation.image"
+          },
+          "intent_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "input": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "version",
+          "operation",
+          "intent_id",
+          "input"
+        ],
+        "$defs": {
+          "StudioImageCustomSettings": {
+            "additionalProperties": false,
+            "description": "Known model-specific image settings, with no untyped JSON map.",
+            "properties": {
+              "sensenova_kv_cache": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "Disabled",
+                      "Enabled"
+                    ],
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Sensenova Kv Cache"
+              },
+              "noise_scale_start": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Noise Scale Start"
+              },
+              "noise_scale_end": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Noise Scale End"
+              },
+              "noise_clip_std": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Noise Clip Std"
+              }
+            },
+            "title": "StudioImageCustomSettings",
+            "type": "object"
+          },
+          "StudioImageParams": {
+            "additionalProperties": false,
+            "description": "The closed native parameter family for one Studio image job.",
+            "properties": {
+              "prompt": {
+                "maxLength": 200000,
+                "minLength": 1,
+                "title": "Prompt",
+                "type": "string"
+              },
+              "alt_prompt": {
+                "default": "",
+                "maxLength": 200000,
+                "title": "Alt Prompt",
+                "type": "string"
+              },
+              "model_type": {
+                "maxLength": 240,
+                "minLength": 1,
+                "title": "Model Type",
+                "type": "string"
+              },
+              "resolution": {
+                "maxLength": 8192,
+                "minLength": 1,
+                "title": "Resolution",
+                "type": "string"
+              },
+              "video_length": {
+                "default": 1,
+                "maximum": 1,
+                "minimum": 1,
+                "title": "Video Length",
+                "type": "integer"
+              },
+              "num_inference_steps": {
+                "maximum": 1000,
+                "minimum": 1,
+                "title": "Num Inference Steps",
+                "type": "integer"
+              },
+              "guidance_scale": {
+                "title": "Guidance Scale",
+                "type": "number"
+              },
+              "seed": {
+                "maximum": 9223372036854775807,
+                "minimum": -9223372036854775808,
+                "title": "Seed",
+                "type": "integer"
+              },
+              "image_mode": {
+                "default": 1,
+                "maximum": 1,
+                "minimum": 1,
+                "title": "Image Mode",
+                "type": "integer"
+              },
+              "generation_mode": {
+                "const": "image",
+                "default": "image",
+                "title": "Generation Mode",
+                "type": "string"
+              },
+              "negative_prompt": {
+                "default": "",
+                "maxLength": 200000,
+                "title": "Negative Prompt",
+                "type": "string"
+              },
+              "repeat_generation": {
+                "default": 1,
+                "maximum": 100,
+                "minimum": 1,
+                "title": "Repeat Generation",
+                "type": "integer"
+              },
+              "batch_size": {
+                "default": 1,
+                "maximum": 100,
+                "minimum": 1,
+                "title": "Batch Size",
+                "type": "integer"
+              },
+              "activated_loras": {
+                "items": {
+                  "maxLength": 8192,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "maxItems": 64,
+                "title": "Activated Loras",
+                "type": "array"
+              },
+              "loras_multipliers": {
+                "default": "",
+                "maxLength": 8192,
+                "title": "Loras Multipliers",
+                "type": "string"
+              },
+              "image_start": {
+                "anyOf": [
+                  {
+                    "maxLength": 8192,
+                    "type": "string"
+                  },
+                  {
+                    "items": {
+                      "maxLength": 8192,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Image Start"
+              },
+              "image_end": {
+                "anyOf": [
+                  {
+                    "maxLength": 8192,
+                    "type": "string"
+                  },
+                  {
+                    "items": {
+                      "maxLength": 8192,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Image End"
+              },
+              "image_refs": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "maxLength": 8192,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "maxItems": 64,
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Image Refs"
+              },
+              "image_guide": {
+                "anyOf": [
+                  {
+                    "maxLength": 8192,
+                    "type": "string"
+                  },
+                  {
+                    "items": {
+                      "maxLength": 8192,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Image Guide"
+              },
+              "image_mask": {
+                "anyOf": [
+                  {
+                    "maxLength": 8192,
+                    "type": "string"
+                  },
+                  {
+                    "items": {
+                      "maxLength": 8192,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Image Mask"
+              },
+              "image_prompt_type": {
+                "default": "",
+                "maxLength": 8192,
+                "title": "Image Prompt Type",
+                "type": "string"
+              },
+              "video_prompt_type": {
+                "default": "",
+                "maxLength": 8192,
+                "title": "Video Prompt Type",
+                "type": "string"
+              },
+              "frames_positions": {
+                "default": "",
+                "maxLength": 8192,
+                "title": "Frames Positions",
+                "type": "string"
+              },
+              "canonical_image_refs": {
+                "default": false,
+                "title": "Canonical Image Refs",
+                "type": "boolean"
+              },
+              "multi_prompts_gen_type": {
+                "default": 2,
+                "maximum": 100000,
+                "minimum": 0,
+                "title": "Multi Prompts Gen Type",
+                "type": "integer"
+              },
+              "image_fit_mode": {
+                "default": "",
+                "enum": [
+                  "",
+                  "contain",
+                  "source",
+                  "crop"
+                ],
+                "title": "Image Fit Mode",
+                "type": "string"
+              },
+              "input_video_strength": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Input Video Strength"
+              },
+              "denoising_strength": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Denoising Strength"
+              },
+              "masking_strength": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Masking Strength"
+              },
+              "video_guide_outpainting": {
+                "default": "",
+                "maxLength": 8192,
+                "minLength": 1,
+                "title": "Video Guide Outpainting",
+                "type": "string"
+              },
+              "control_net_weight": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Control Net Weight"
+              },
+              "control_net_weight2": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Control Net Weight2"
+              },
+              "control_net_weight_alt": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Control Net Weight Alt"
+              },
+              "motion_amplitude": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Motion Amplitude"
+              },
+              "mask_expand": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Mask Expand"
+              },
+              "image_refs_relative_size": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Image Refs Relative Size"
+              },
+              "remove_background_images_ref": {
+                "default": 0,
+                "maximum": 1,
+                "minimum": 0,
+                "title": "Remove Background Images Ref",
+                "type": "integer"
+              },
+              "model_mode": {
+                "anyOf": [
+                  {
+                    "maximum": 100000,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": 0,
+                "title": "Model Mode"
+              },
+              "temporal_upsampling": {
+                "default": "",
+                "enum": [
+                  "",
+                  null
+                ],
+                "title": "Temporal Upsampling"
+              },
+              "audio_prompt_type": {
+                "default": "",
+                "enum": [
+                  "",
+                  null
+                ],
+                "title": "Audio Prompt Type"
+              },
+              "video_guide": {
+                "default": null,
+                "enum": [
+                  "",
+                  null
+                ],
+                "title": "Video Guide"
+              },
+              "video_mask": {
+                "default": null,
+                "enum": [
+                  "",
+                  null
+                ],
+                "title": "Video Mask"
+              },
+              "video_source": {
+                "default": null,
+                "enum": [
+                  "",
+                  null
+                ],
+                "title": "Video Source"
+              },
+              "audio_guide": {
+                "default": null,
+                "enum": [
+                  "",
+                  null
+                ],
+                "title": "Audio Guide"
+              },
+              "audio_guide2": {
+                "default": null,
+                "enum": [
+                  "",
+                  null
+                ],
+                "title": "Audio Guide2"
+              },
+              "audio_guide3": {
+                "default": null,
+                "enum": [
+                  "",
+                  null
+                ],
+                "title": "Audio Guide3"
+              },
+              "audio_guide4": {
+                "default": null,
+                "enum": [
+                  "",
+                  null
+                ],
+                "title": "Audio Guide4"
+              },
+              "audio_guide5": {
+                "default": null,
+                "enum": [
+                  "",
+                  null
+                ],
+                "title": "Audio Guide5"
+              },
+              "audio_guide6": {
+                "default": null,
+                "enum": [
+                  "",
+                  null
+                ],
+                "title": "Audio Guide6"
+              },
+              "audio_source": {
+                "default": null,
+                "enum": [
+                  "",
+                  null
+                ],
+                "title": "Audio Source"
+              },
+              "MMAudio_setting": {
+                "anyOf": [
+                  {
+                    "maximum": 0,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Mmaudio Setting"
+              },
+              "MMAudio_prompt": {
+                "default": null,
+                "enum": [
+                  "",
+                  null
+                ],
+                "title": "Mmaudio Prompt"
+              },
+              "MMAudio_neg_prompt": {
+                "default": null,
+                "enum": [
+                  "",
+                  null
+                ],
+                "title": "Mmaudio Neg Prompt"
+              },
+              "h3_ref_videos": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "maxLength": 8192,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "H3 Ref Videos"
+              },
+              "h3_ref_audios": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "maxLength": 8192,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "H3 Ref Audios"
+              },
+              "minimax_h3_references": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "maxLength": 8192,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Minimax H3 References"
+              },
+              "minimax_h3_turbo_mode": {
+                "anyOf": [
+                  {
+                    "const": false,
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Minimax H3 Turbo Mode"
+              },
+              "sliding_window_size": {
+                "anyOf": [
+                  {
+                    "maximum": 100000,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Sliding Window Size"
+              },
+              "sliding_window_overlap": {
+                "anyOf": [
+                  {
+                    "maximum": 100000,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Sliding Window Overlap"
+              },
+              "sliding_window_memory_override": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Sliding Window Memory Override"
+              },
+              "sliding_window_discard_last_frames": {
+                "anyOf": [
+                  {
+                    "maximum": 100000,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Sliding Window Discard Last Frames"
+              },
+              "sliding_window_color_correction_strength": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Sliding Window Color Correction Strength"
+              },
+              "sliding_window_overlap_noise": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Sliding Window Overlap Noise"
+              },
+              "keep_frames_video_source": {
+                "default": null,
+                "enum": [
+                  "",
+                  null
+                ],
+                "title": "Keep Frames Video Source"
+              },
+              "keep_frames_video_guide": {
+                "default": null,
+                "enum": [
+                  "",
+                  null
+                ],
+                "title": "Keep Frames Video Guide"
+              },
+              "force_fps": {
+                "default": "",
+                "enum": [
+                  "",
+                  null
+                ],
+                "title": "Force Fps"
+              },
+              "flow_shift": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Flow Shift"
+              },
+              "sample_solver": {
+                "default": "",
+                "maxLength": 8192,
+                "title": "Sample Solver",
+                "type": "string"
+              },
+              "embedded_guidance_scale": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Embedded Guidance Scale"
+              },
+              "guidance2_scale": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Guidance2 Scale"
+              },
+              "guidance3_scale": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Guidance3 Scale"
+              },
+              "switch_threshold": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Switch Threshold"
+              },
+              "switch_threshold2": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Switch Threshold2"
+              },
+              "guidance_phases": {
+                "default": 1,
+                "maximum": 16,
+                "minimum": 1,
+                "title": "Guidance Phases",
+                "type": "integer"
+              },
+              "model_switch_phase": {
+                "default": 1,
+                "maximum": 16,
+                "minimum": 1,
+                "title": "Model Switch Phase",
+                "type": "integer"
+              },
+              "alt_guidance_scale": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Alt Guidance Scale"
+              },
+              "alt_scale": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Alt Scale"
+              },
+              "audio_guidance_scale": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Audio Guidance Scale"
+              },
+              "audio_scale": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Audio Scale"
+              },
+              "NAG_scale": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Nag Scale"
+              },
+              "NAG_tau": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Nag Tau"
+              },
+              "NAG_alpha": {
+                "anyOf": [
+                  {
+                    "maximum": 1.0,
+                    "minimum": 0.0,
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Nag Alpha"
+              },
+              "RIFLEx_setting": {
+                "anyOf": [
+                  {
+                    "maximum": 100000,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Riflex Setting"
+              },
+              "injection_strength": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Injection Strength"
+              },
+              "identity_guidance_scale": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Identity Guidance Scale"
+              },
+              "skip_steps_cache_type": {
+                "default": "",
+                "enum": [
+                  "",
+                  "first_block"
+                ],
+                "title": "Skip Steps Cache Type",
+                "type": "string"
+              },
+              "skip_steps_multiplier": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Skip Steps Multiplier"
+              },
+              "skip_steps_start_step_perc": {
+                "anyOf": [
+                  {
+                    "maximum": 100.0,
+                    "minimum": 0.0,
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Skip Steps Start Step Perc"
+              },
+              "settings_version": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Settings Version"
+              },
+              "prompt_enhancer": {
+                "default": "",
+                "maxLength": 8192,
+                "title": "Prompt Enhancer",
+                "type": "string"
+              },
+              "spatial_upsampling": {
+                "default": "",
+                "maxLength": 8192,
+                "title": "Spatial Upsampling",
+                "type": "string"
+              },
+              "film_grain_intensity": {
+                "anyOf": [
+                  {
+                    "maximum": 1.0,
+                    "minimum": 0.0,
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Film Grain Intensity"
+              },
+              "film_grain_saturation": {
+                "anyOf": [
+                  {
+                    "maximum": 1.0,
+                    "minimum": 0.0,
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Film Grain Saturation"
+              },
+              "progressive_pipeline": {
+                "default": false,
+                "title": "Progressive Pipeline",
+                "type": "boolean"
+              },
+              "single_stage_pipeline": {
+                "default": false,
+                "title": "Single Stage Pipeline",
+                "type": "boolean"
+              },
+              "reference_pipeline": {
+                "default": false,
+                "title": "Reference Pipeline",
+                "type": "boolean"
+              },
+              "progressive_stage1_image_weight": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Progressive Stage1 Image Weight"
+              },
+              "progressive_stage2_steps": {
+                "anyOf": [
+                  {
+                    "maximum": 100000,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Progressive Stage2 Steps"
+              },
+              "progressive_stage2_sigma": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Progressive Stage2 Sigma"
+              },
+              "progressive_stage3_steps": {
+                "anyOf": [
+                  {
+                    "maximum": 100000,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Progressive Stage3 Steps"
+              },
+              "progressive_stage3_sigma": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Progressive Stage3 Sigma"
+              },
+              "progressive_stage3_image_weight": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Progressive Stage3 Image Weight"
+              },
+              "override_profile": {
+                "anyOf": [
+                  {
+                    "maxLength": 8192,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Override Profile"
+              },
+              "override_attention": {
+                "anyOf": [
+                  {
+                    "maxLength": 8192,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Override Attention"
+              },
+              "temperature": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Temperature"
+              },
+              "top_p": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Top P"
+              },
+              "top_k": {
+                "anyOf": [
+                  {
+                    "maximum": 100000,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Top K"
+              },
+              "self_refiner_setting": {
+                "anyOf": [
+                  {
+                    "maximum": 100000,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Self Refiner Setting"
+              },
+              "self_refiner_plan": {
+                "anyOf": [
+                  {
+                    "maxLength": 200000,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Self Refiner Plan"
+              },
+              "self_refiner_f_uncertainty": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Self Refiner F Uncertainty"
+              },
+              "self_refiner_certain_percentage": {
+                "anyOf": [
+                  {
+                    "maximum": 1.0,
+                    "minimum": 0.0,
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Self Refiner Certain Percentage"
+              },
+              "cfg_rescale": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Cfg Rescale"
+              },
+              "modality_scale": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Modality Scale"
+              },
+              "use_gradient_estimation": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Use Gradient Estimation"
+              },
+              "ge_gamma": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Ge Gamma"
+              },
+              "ge_alpha": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Ge Alpha"
+              },
+              "outpaint_lora_strength": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Outpaint Lora Strength"
+              },
+              "outpaint_mask_preserve": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Outpaint Mask Preserve"
+              },
+              "outpaint_official_stack": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Outpaint Official Stack"
+              },
+              "custom_settings": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/StudioImageCustomSettings"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "wangp_processor_settings": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/WangpProcessorSettings"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              }
+            },
+            "required": [
+              "prompt",
+              "model_type",
+              "resolution",
+              "num_inference_steps",
+              "guidance_scale",
+              "seed"
+            ],
+            "title": "StudioImageParams",
+            "type": "object"
+          },
+          "WangpProcessorSettings": {
+            "additionalProperties": false,
+            "description": "Typed settings currently declared by image-capable processors.",
+            "properties": {
+              "spatial_upsampler_strength": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Spatial Upsampler Strength"
+              },
+              "spatial_upsampler_face_count": {
+                "anyOf": [
+                  {
+                    "maximum": 5,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Spatial Upsampler Face Count"
+              },
+              "spatial_upsampler_h3_strength": {
+                "anyOf": [
+                  {
+                    "maximum": 1.0,
+                    "minimum": 0.0,
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Spatial Upsampler H3 Strength"
+              },
+              "spatial_upsampler_prompt": {
+                "anyOf": [
+                  {
+                    "maxLength": 200000,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Spatial Upsampler Prompt"
+              },
+              "spatial_upsampler_reference_images": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "maxLength": 8192,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "maxItems": 64,
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Spatial Upsampler Reference Images"
+              },
+              "spatial_upsampler_dlss_strength": {
+                "anyOf": [
+                  {
+                    "maximum": 2.0,
+                    "minimum": 0.0,
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Spatial Upsampler Dlss Strength"
+              }
+            },
+            "title": "WangpProcessorSettings",
+            "type": "object"
+          },
+          "StudioCommandInput": {
+            "additionalProperties": false,
+            "properties": {
+              "workspace": {
+                "maxLength": 240,
+                "minLength": 1,
+                "pattern": "^(?:default|[A-Za-z0-9][A-Za-z0-9_-]*)$",
+                "title": "Workspace",
+                "type": "string"
+              },
+              "workspace_collection_id": {
+                "anyOf": [
+                  {
+                    "maxLength": 200,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Workspace Collection Id"
+              },
+              "params": {
+                "$ref": "#/$defs/StudioImageParams"
+              }
+            },
+            "required": [
+              "workspace",
+              "params"
+            ],
+            "title": "StudioImageInput",
+            "type": "object"
+          }
+        },
+        "oneOf": [
+          {
+            "properties": {
+              "version": {
+                "const": 1
+              },
+              "input": {
+                "additionalProperties": false,
+                "description": "Strict input fields supported by ``generation.image``.\n\nDefaults on ``negative_prompt``, ``image_mode`` and ``video_length`` are\ncontract-owned.  ``exclude_unset=True`` is used for the original input so\nomitted fields remain omitted there, while the effective native map has\nall three deterministic defaults.",
+                "properties": {
+                  "workspace": {
+                    "maxLength": 240,
+                    "minLength": 1,
+                    "pattern": "^(?:default|[A-Za-z0-9][A-Za-z0-9_-]*)$",
+                    "title": "Workspace",
+                    "type": "string"
+                  },
+                  "model_type": {
+                    "maxLength": 240,
+                    "minLength": 1,
+                    "title": "Model Type",
+                    "type": "string"
+                  },
+                  "prompt": {
+                    "maxLength": 200000,
+                    "minLength": 1,
+                    "title": "Prompt",
+                    "type": "string"
+                  },
+                  "negative_prompt": {
+                    "default": "",
+                    "maxLength": 200000,
+                    "title": "Negative Prompt",
+                    "type": "string"
+                  },
+                  "resolution": {
+                    "maxLength": 128,
+                    "minLength": 1,
+                    "title": "Resolution",
+                    "type": "string"
+                  },
+                  "num_inference_steps": {
+                    "maximum": 1000,
+                    "minimum": 1,
+                    "title": "Num Inference Steps",
+                    "type": "integer"
+                  },
+                  "seed": {
+                    "maximum": 9223372036854775807,
+                    "minimum": -9223372036854775808,
+                    "title": "Seed",
+                    "type": "integer"
+                  },
+                  "guidance_scale": {
+                    "maximum": 1000.0,
+                    "minimum": 0.0,
+                    "title": "Guidance Scale",
+                    "type": "number"
+                  },
+                  "image_mode": {
+                    "default": 1,
+                    "maximum": 1,
+                    "minimum": 1,
+                    "title": "Image Mode",
+                    "type": "integer"
+                  },
+                  "video_length": {
+                    "default": 1,
+                    "maximum": 1,
+                    "minimum": 1,
+                    "title": "Video Length",
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "workspace",
+                  "model_type",
+                  "prompt",
+                  "resolution",
+                  "num_inference_steps",
+                  "seed",
+                  "guidance_scale"
+                ],
+                "title": "ImageGenerationInput",
+                "type": "object"
+              }
+            }
+          },
+          {
+            "properties": {
+              "version": {
+                "const": 2
+              },
+              "input": {
+                "$ref": "#/$defs/StudioCommandInput"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "generation.receipt",
+      "version": 1,
+      "domain": "studio",
+      "mutation": false,
+      "description": "Read an immutable image admission and its current canonical task in the exact original output workspace.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "version": {
+            "type": "integer",
+            "const": 1
+          },
+          "operation": {
+            "const": "generation.receipt"
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "workspace": {
+                "maxLength": 240,
+                "minLength": 1,
+                "pattern": "^(?:default|[A-Za-z0-9][A-Za-z0-9_-]*)$",
+                "title": "Workspace",
+                "type": "string"
+              },
+              "intent_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              }
+            },
+            "required": [
+              "workspace",
+              "intent_id"
+            ]
+          }
+        },
+        "required": [
+          "version",
+          "operation",
+          "input"
+        ]
+      }
+    }
+  ],
+  "studio": {
+    "version": 2,
+    "operation": "generation.image",
+    "intent_id": {
+      "maxLength": 160,
+      "minLength": 1,
+      "title": "Intent Id",
+      "type": "string"
+    },
+    "input": {
+      "$defs": {
+        "StudioImageCustomSettings": {
+          "additionalProperties": false,
+          "description": "Known model-specific image settings, with no untyped JSON map.",
+          "properties": {
+            "sensenova_kv_cache": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "Disabled",
+                    "Enabled"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Sensenova Kv Cache"
+            },
+            "noise_scale_start": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Noise Scale Start"
+            },
+            "noise_scale_end": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Noise Scale End"
+            },
+            "noise_clip_std": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Noise Clip Std"
+            }
+          },
+          "title": "StudioImageCustomSettings",
+          "type": "object"
+        },
+        "StudioImageParams": {
+          "additionalProperties": false,
+          "description": "The closed native parameter family for one Studio image job.",
+          "properties": {
+            "prompt": {
+              "maxLength": 200000,
+              "minLength": 1,
+              "title": "Prompt",
+              "type": "string"
+            },
+            "alt_prompt": {
+              "default": "",
+              "maxLength": 200000,
+              "title": "Alt Prompt",
+              "type": "string"
+            },
+            "model_type": {
+              "maxLength": 240,
+              "minLength": 1,
+              "title": "Model Type",
+              "type": "string"
+            },
+            "resolution": {
+              "maxLength": 8192,
+              "minLength": 1,
+              "title": "Resolution",
+              "type": "string"
+            },
+            "video_length": {
+              "default": 1,
+              "maximum": 1,
+              "minimum": 1,
+              "title": "Video Length",
+              "type": "integer"
+            },
+            "num_inference_steps": {
+              "maximum": 1000,
+              "minimum": 1,
+              "title": "Num Inference Steps",
+              "type": "integer"
+            },
+            "guidance_scale": {
+              "title": "Guidance Scale",
+              "type": "number"
+            },
+            "seed": {
+              "maximum": 9223372036854775807,
+              "minimum": -9223372036854775808,
+              "title": "Seed",
+              "type": "integer"
+            },
+            "image_mode": {
+              "default": 1,
+              "maximum": 1,
+              "minimum": 1,
+              "title": "Image Mode",
+              "type": "integer"
+            },
+            "generation_mode": {
+              "const": "image",
+              "default": "image",
+              "title": "Generation Mode",
+              "type": "string"
+            },
+            "negative_prompt": {
+              "default": "",
+              "maxLength": 200000,
+              "title": "Negative Prompt",
+              "type": "string"
+            },
+            "repeat_generation": {
+              "default": 1,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Repeat Generation",
+              "type": "integer"
+            },
+            "batch_size": {
+              "default": 1,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Batch Size",
+              "type": "integer"
+            },
+            "activated_loras": {
+              "items": {
+                "maxLength": 8192,
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 64,
+              "title": "Activated Loras",
+              "type": "array"
+            },
+            "loras_multipliers": {
+              "default": "",
+              "maxLength": 8192,
+              "title": "Loras Multipliers",
+              "type": "string"
+            },
+            "image_start": {
+              "anyOf": [
+                {
+                  "maxLength": 8192,
+                  "type": "string"
+                },
+                {
+                  "items": {
+                    "maxLength": 8192,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Image Start"
+            },
+            "image_end": {
+              "anyOf": [
+                {
+                  "maxLength": 8192,
+                  "type": "string"
+                },
+                {
+                  "items": {
+                    "maxLength": 8192,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Image End"
+            },
+            "image_refs": {
+              "anyOf": [
+                {
+                  "items": {
+                    "maxLength": 8192,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "maxItems": 64,
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Image Refs"
+            },
+            "image_guide": {
+              "anyOf": [
+                {
+                  "maxLength": 8192,
+                  "type": "string"
+                },
+                {
+                  "items": {
+                    "maxLength": 8192,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Image Guide"
+            },
+            "image_mask": {
+              "anyOf": [
+                {
+                  "maxLength": 8192,
+                  "type": "string"
+                },
+                {
+                  "items": {
+                    "maxLength": 8192,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Image Mask"
+            },
+            "image_prompt_type": {
+              "default": "",
+              "maxLength": 8192,
+              "title": "Image Prompt Type",
+              "type": "string"
+            },
+            "video_prompt_type": {
+              "default": "",
+              "maxLength": 8192,
+              "title": "Video Prompt Type",
+              "type": "string"
+            },
+            "frames_positions": {
+              "default": "",
+              "maxLength": 8192,
+              "title": "Frames Positions",
+              "type": "string"
+            },
+            "canonical_image_refs": {
+              "default": false,
+              "title": "Canonical Image Refs",
+              "type": "boolean"
+            },
+            "multi_prompts_gen_type": {
+              "default": 2,
+              "maximum": 100000,
+              "minimum": 0,
+              "title": "Multi Prompts Gen Type",
+              "type": "integer"
+            },
+            "image_fit_mode": {
+              "default": "",
+              "enum": [
+                "",
+                "contain",
+                "source",
+                "crop"
+              ],
+              "title": "Image Fit Mode",
+              "type": "string"
+            },
+            "input_video_strength": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Input Video Strength"
+            },
+            "denoising_strength": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Denoising Strength"
+            },
+            "masking_strength": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Masking Strength"
+            },
+            "video_guide_outpainting": {
+              "default": "",
+              "maxLength": 8192,
+              "minLength": 1,
+              "title": "Video Guide Outpainting",
+              "type": "string"
+            },
+            "control_net_weight": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Control Net Weight"
+            },
+            "control_net_weight2": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Control Net Weight2"
+            },
+            "control_net_weight_alt": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Control Net Weight Alt"
+            },
+            "motion_amplitude": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Motion Amplitude"
+            },
+            "mask_expand": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Mask Expand"
+            },
+            "image_refs_relative_size": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Image Refs Relative Size"
+            },
+            "remove_background_images_ref": {
+              "default": 0,
+              "maximum": 1,
+              "minimum": 0,
+              "title": "Remove Background Images Ref",
+              "type": "integer"
+            },
+            "model_mode": {
+              "anyOf": [
+                {
+                  "maximum": 100000,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": 0,
+              "title": "Model Mode"
+            },
+            "temporal_upsampling": {
+              "default": "",
+              "enum": [
+                "",
+                null
+              ],
+              "title": "Temporal Upsampling"
+            },
+            "audio_prompt_type": {
+              "default": "",
+              "enum": [
+                "",
+                null
+              ],
+              "title": "Audio Prompt Type"
+            },
+            "video_guide": {
+              "default": null,
+              "enum": [
+                "",
+                null
+              ],
+              "title": "Video Guide"
+            },
+            "video_mask": {
+              "default": null,
+              "enum": [
+                "",
+                null
+              ],
+              "title": "Video Mask"
+            },
+            "video_source": {
+              "default": null,
+              "enum": [
+                "",
+                null
+              ],
+              "title": "Video Source"
+            },
+            "audio_guide": {
+              "default": null,
+              "enum": [
+                "",
+                null
+              ],
+              "title": "Audio Guide"
+            },
+            "audio_guide2": {
+              "default": null,
+              "enum": [
+                "",
+                null
+              ],
+              "title": "Audio Guide2"
+            },
+            "audio_guide3": {
+              "default": null,
+              "enum": [
+                "",
+                null
+              ],
+              "title": "Audio Guide3"
+            },
+            "audio_guide4": {
+              "default": null,
+              "enum": [
+                "",
+                null
+              ],
+              "title": "Audio Guide4"
+            },
+            "audio_guide5": {
+              "default": null,
+              "enum": [
+                "",
+                null
+              ],
+              "title": "Audio Guide5"
+            },
+            "audio_guide6": {
+              "default": null,
+              "enum": [
+                "",
+                null
+              ],
+              "title": "Audio Guide6"
+            },
+            "audio_source": {
+              "default": null,
+              "enum": [
+                "",
+                null
+              ],
+              "title": "Audio Source"
+            },
+            "MMAudio_setting": {
+              "anyOf": [
+                {
+                  "maximum": 0,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Mmaudio Setting"
+            },
+            "MMAudio_prompt": {
+              "default": null,
+              "enum": [
+                "",
+                null
+              ],
+              "title": "Mmaudio Prompt"
+            },
+            "MMAudio_neg_prompt": {
+              "default": null,
+              "enum": [
+                "",
+                null
+              ],
+              "title": "Mmaudio Neg Prompt"
+            },
+            "h3_ref_videos": {
+              "anyOf": [
+                {
+                  "items": {
+                    "maxLength": 8192,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "H3 Ref Videos"
+            },
+            "h3_ref_audios": {
+              "anyOf": [
+                {
+                  "items": {
+                    "maxLength": 8192,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "H3 Ref Audios"
+            },
+            "minimax_h3_references": {
+              "anyOf": [
+                {
+                  "items": {
+                    "maxLength": 8192,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Minimax H3 References"
+            },
+            "minimax_h3_turbo_mode": {
+              "anyOf": [
+                {
+                  "const": false,
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Minimax H3 Turbo Mode"
+            },
+            "sliding_window_size": {
+              "anyOf": [
+                {
+                  "maximum": 100000,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Sliding Window Size"
+            },
+            "sliding_window_overlap": {
+              "anyOf": [
+                {
+                  "maximum": 100000,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Sliding Window Overlap"
+            },
+            "sliding_window_memory_override": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Sliding Window Memory Override"
+            },
+            "sliding_window_discard_last_frames": {
+              "anyOf": [
+                {
+                  "maximum": 100000,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Sliding Window Discard Last Frames"
+            },
+            "sliding_window_color_correction_strength": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Sliding Window Color Correction Strength"
+            },
+            "sliding_window_overlap_noise": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Sliding Window Overlap Noise"
+            },
+            "keep_frames_video_source": {
+              "default": null,
+              "enum": [
+                "",
+                null
+              ],
+              "title": "Keep Frames Video Source"
+            },
+            "keep_frames_video_guide": {
+              "default": null,
+              "enum": [
+                "",
+                null
+              ],
+              "title": "Keep Frames Video Guide"
+            },
+            "force_fps": {
+              "default": "",
+              "enum": [
+                "",
+                null
+              ],
+              "title": "Force Fps"
+            },
+            "flow_shift": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Flow Shift"
+            },
+            "sample_solver": {
+              "default": "",
+              "maxLength": 8192,
+              "title": "Sample Solver",
+              "type": "string"
+            },
+            "embedded_guidance_scale": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Embedded Guidance Scale"
+            },
+            "guidance2_scale": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Guidance2 Scale"
+            },
+            "guidance3_scale": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Guidance3 Scale"
+            },
+            "switch_threshold": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Switch Threshold"
+            },
+            "switch_threshold2": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Switch Threshold2"
+            },
+            "guidance_phases": {
+              "default": 1,
+              "maximum": 16,
+              "minimum": 1,
+              "title": "Guidance Phases",
+              "type": "integer"
+            },
+            "model_switch_phase": {
+              "default": 1,
+              "maximum": 16,
+              "minimum": 1,
+              "title": "Model Switch Phase",
+              "type": "integer"
+            },
+            "alt_guidance_scale": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Alt Guidance Scale"
+            },
+            "alt_scale": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Alt Scale"
+            },
+            "audio_guidance_scale": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Audio Guidance Scale"
+            },
+            "audio_scale": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Audio Scale"
+            },
+            "NAG_scale": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Nag Scale"
+            },
+            "NAG_tau": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Nag Tau"
+            },
+            "NAG_alpha": {
+              "anyOf": [
+                {
+                  "maximum": 1.0,
+                  "minimum": 0.0,
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Nag Alpha"
+            },
+            "RIFLEx_setting": {
+              "anyOf": [
+                {
+                  "maximum": 100000,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Riflex Setting"
+            },
+            "injection_strength": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Injection Strength"
+            },
+            "identity_guidance_scale": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Identity Guidance Scale"
+            },
+            "skip_steps_cache_type": {
+              "default": "",
+              "enum": [
+                "",
+                "first_block"
+              ],
+              "title": "Skip Steps Cache Type",
+              "type": "string"
+            },
+            "skip_steps_multiplier": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Skip Steps Multiplier"
+            },
+            "skip_steps_start_step_perc": {
+              "anyOf": [
+                {
+                  "maximum": 100.0,
+                  "minimum": 0.0,
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Skip Steps Start Step Perc"
+            },
+            "settings_version": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Settings Version"
+            },
+            "prompt_enhancer": {
+              "default": "",
+              "maxLength": 8192,
+              "title": "Prompt Enhancer",
+              "type": "string"
+            },
+            "spatial_upsampling": {
+              "default": "",
+              "maxLength": 8192,
+              "title": "Spatial Upsampling",
+              "type": "string"
+            },
+            "film_grain_intensity": {
+              "anyOf": [
+                {
+                  "maximum": 1.0,
+                  "minimum": 0.0,
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Film Grain Intensity"
+            },
+            "film_grain_saturation": {
+              "anyOf": [
+                {
+                  "maximum": 1.0,
+                  "minimum": 0.0,
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Film Grain Saturation"
+            },
+            "progressive_pipeline": {
+              "default": false,
+              "title": "Progressive Pipeline",
+              "type": "boolean"
+            },
+            "single_stage_pipeline": {
+              "default": false,
+              "title": "Single Stage Pipeline",
+              "type": "boolean"
+            },
+            "reference_pipeline": {
+              "default": false,
+              "title": "Reference Pipeline",
+              "type": "boolean"
+            },
+            "progressive_stage1_image_weight": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Progressive Stage1 Image Weight"
+            },
+            "progressive_stage2_steps": {
+              "anyOf": [
+                {
+                  "maximum": 100000,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Progressive Stage2 Steps"
+            },
+            "progressive_stage2_sigma": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Progressive Stage2 Sigma"
+            },
+            "progressive_stage3_steps": {
+              "anyOf": [
+                {
+                  "maximum": 100000,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Progressive Stage3 Steps"
+            },
+            "progressive_stage3_sigma": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Progressive Stage3 Sigma"
+            },
+            "progressive_stage3_image_weight": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Progressive Stage3 Image Weight"
+            },
+            "override_profile": {
+              "anyOf": [
+                {
+                  "maxLength": 8192,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Override Profile"
+            },
+            "override_attention": {
+              "anyOf": [
+                {
+                  "maxLength": 8192,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Override Attention"
+            },
+            "temperature": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Temperature"
+            },
+            "top_p": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Top P"
+            },
+            "top_k": {
+              "anyOf": [
+                {
+                  "maximum": 100000,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Top K"
+            },
+            "self_refiner_setting": {
+              "anyOf": [
+                {
+                  "maximum": 100000,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Self Refiner Setting"
+            },
+            "self_refiner_plan": {
+              "anyOf": [
+                {
+                  "maxLength": 200000,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Self Refiner Plan"
+            },
+            "self_refiner_f_uncertainty": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Self Refiner F Uncertainty"
+            },
+            "self_refiner_certain_percentage": {
+              "anyOf": [
+                {
+                  "maximum": 1.0,
+                  "minimum": 0.0,
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Self Refiner Certain Percentage"
+            },
+            "cfg_rescale": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Cfg Rescale"
+            },
+            "modality_scale": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Modality Scale"
+            },
+            "use_gradient_estimation": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Use Gradient Estimation"
+            },
+            "ge_gamma": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Ge Gamma"
+            },
+            "ge_alpha": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Ge Alpha"
+            },
+            "outpaint_lora_strength": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Outpaint Lora Strength"
+            },
+            "outpaint_mask_preserve": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Outpaint Mask Preserve"
+            },
+            "outpaint_official_stack": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Outpaint Official Stack"
+            },
+            "custom_settings": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/StudioImageCustomSettings"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "wangp_processor_settings": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/WangpProcessorSettings"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            }
+          },
+          "required": [
+            "prompt",
+            "model_type",
+            "resolution",
+            "num_inference_steps",
+            "guidance_scale",
+            "seed"
+          ],
+          "title": "StudioImageParams",
+          "type": "object"
+        },
+        "WangpProcessorSettings": {
+          "additionalProperties": false,
+          "description": "Typed settings currently declared by image-capable processors.",
+          "properties": {
+            "spatial_upsampler_strength": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Spatial Upsampler Strength"
+            },
+            "spatial_upsampler_face_count": {
+              "anyOf": [
+                {
+                  "maximum": 5,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Spatial Upsampler Face Count"
+            },
+            "spatial_upsampler_h3_strength": {
+              "anyOf": [
+                {
+                  "maximum": 1.0,
+                  "minimum": 0.0,
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Spatial Upsampler H3 Strength"
+            },
+            "spatial_upsampler_prompt": {
+              "anyOf": [
+                {
+                  "maxLength": 200000,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Spatial Upsampler Prompt"
+            },
+            "spatial_upsampler_reference_images": {
+              "anyOf": [
+                {
+                  "items": {
+                    "maxLength": 8192,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "maxItems": 64,
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Spatial Upsampler Reference Images"
+            },
+            "spatial_upsampler_dlss_strength": {
+              "anyOf": [
+                {
+                  "maximum": 2.0,
+                  "minimum": 0.0,
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Spatial Upsampler Dlss Strength"
+            }
+          },
+          "title": "WangpProcessorSettings",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "workspace": {
+          "maxLength": 240,
+          "minLength": 1,
+          "pattern": "^(?:default|[A-Za-z0-9][A-Za-z0-9_-]*)$",
+          "title": "Workspace",
+          "type": "string"
+        },
+        "workspace_collection_id": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Workspace Collection Id"
+        },
+        "params": {
+          "$ref": "#/$defs/StudioImageParams"
+        }
+      },
+      "required": [
+        "workspace",
+        "params"
+      ],
+      "title": "StudioImageInput",
+      "type": "object"
+    },
+    "supported_input_fields": [
+      "minimax_h3_turbo_mode",
+      "workspace",
+      "workspace_collection_id",
+      "prompt",
+      "alt_prompt",
+      "model_type",
+      "resolution",
+      "video_length",
+      "num_inference_steps",
+      "guidance_scale",
+      "seed",
+      "image_mode",
+      "generation_mode",
+      "negative_prompt",
+      "repeat_generation",
+      "batch_size",
+      "activated_loras",
+      "loras_multipliers",
+      "image_start",
+      "image_end",
+      "image_refs",
+      "image_guide",
+      "image_mask",
+      "video_guide",
+      "video_mask",
+      "video_source",
+      "audio_guide",
+      "audio_guide2",
+      "audio_guide3",
+      "audio_guide4",
+      "audio_guide5",
+      "audio_guide6",
+      "audio_source",
+      "MMAudio_setting",
+      "MMAudio_prompt",
+      "MMAudio_neg_prompt",
+      "h3_ref_videos",
+      "h3_ref_audios",
+      "minimax_h3_references",
+      "image_prompt_type",
+      "video_prompt_type",
+      "frames_positions",
+      "canonical_image_refs",
+      "multi_prompts_gen_type",
+      "image_fit_mode",
+      "input_video_strength",
+      "denoising_strength",
+      "masking_strength",
+      "video_guide_outpainting",
+      "control_net_weight",
+      "control_net_weight2",
+      "control_net_weight_alt",
+      "motion_amplitude",
+      "mask_expand",
+      "image_refs_relative_size",
+      "remove_background_images_ref",
+      "model_mode",
+      "temporal_upsampling",
+      "audio_prompt_type",
+      "sliding_window_size",
+      "sliding_window_overlap",
+      "sliding_window_memory_override",
+      "sliding_window_discard_last_frames",
+      "sliding_window_color_correction_strength",
+      "sliding_window_overlap_noise",
+      "keep_frames_video_source",
+      "keep_frames_video_guide",
+      "force_fps",
+      "flow_shift",
+      "sample_solver",
+      "embedded_guidance_scale",
+      "guidance2_scale",
+      "guidance3_scale",
+      "switch_threshold",
+      "switch_threshold2",
+      "guidance_phases",
+      "model_switch_phase",
+      "alt_guidance_scale",
+      "alt_scale",
+      "audio_guidance_scale",
+      "audio_scale",
+      "NAG_scale",
+      "NAG_tau",
+      "NAG_alpha",
+      "RIFLEx_setting",
+      "injection_strength",
+      "identity_guidance_scale",
+      "skip_steps_cache_type",
+      "skip_steps_multiplier",
+      "skip_steps_start_step_perc",
+      "settings_version",
+      "prompt_enhancer",
+      "spatial_upsampling",
+      "film_grain_intensity",
+      "film_grain_saturation",
+      "progressive_pipeline",
+      "single_stage_pipeline",
+      "reference_pipeline",
+      "progressive_stage1_image_weight",
+      "progressive_stage2_steps",
+      "progressive_stage2_sigma",
+      "progressive_stage3_steps",
+      "progressive_stage3_sigma",
+      "progressive_stage3_image_weight",
+      "override_profile",
+      "override_attention",
+      "temperature",
+      "top_p",
+      "top_k",
+      "self_refiner_setting",
+      "self_refiner_plan",
+      "self_refiner_f_uncertainty",
+      "self_refiner_certain_percentage",
+      "cfg_rescale",
+      "modality_scale",
+      "use_gradient_estimation",
+      "ge_gamma",
+      "ge_alpha",
+      "outpaint_lora_strength",
+      "outpaint_mask_preserve",
+      "outpaint_official_stack",
+      "custom_settings",
+      "wangp_processor_settings"
+    ],
+    "effects": {
+      "generation_mode": "image",
+      "image_mode": 1,
+      "video_length": 1,
+      "multi_prompts_gen_type": 2,
+      "repeat_generation": 1,
+      "batch_size": 1,
+      "prompt_enhancer": "",
+      "activated_loras": [],
+      "loras_multipliers": "",
+      "canonical_image_refs": false
+    },
+    "inactive": [
+      "minimax_h3_turbo_mode",
+      "audio_guide",
+      "audio_guide2",
+      "audio_guide3",
+      "audio_guide4",
+      "audio_guide5",
+      "audio_guide6",
+      "audio_source",
+      "video_source",
+      "video_guide",
+      "video_mask",
+      "temporal_upsampling",
+      "audio_prompt_type",
+      "sliding_window_size",
+      "sliding_window_overlap",
+      "sliding_window_memory_override",
+      "sliding_window_discard_last_frames",
+      "sliding_window_color_correction_strength",
+      "sliding_window_overlap_noise",
+      "keep_frames_video_source",
+      "keep_frames_video_guide",
+      "force_fps",
+      "h3_ref_videos",
+      "h3_ref_audios",
+      "minimax_h3_references",
+      "MMAudio_setting",
+      "MMAudio_prompt",
+      "MMAudio_neg_prompt"
+    ],
+    "excluded": [
+      "actor",
+      "client",
+      "permission",
+      "provenance",
+      "workspace inside input.params",
+      "viggle_audio_mode",
+      "preserve_source_style",
+      "stage2_steps",
+      "per_clip_frames",
+      "per_clip_keyframes",
+      "perturbation_switch",
+      "perturbation_layers",
+      "perturbation_start_perc",
+      "perturbation_end_perc",
+      "stg_scale",
+      "keyframe_conditioning_mode",
+      "keyframe_inject_mode",
+      "h3_audio_shift",
+      "h3_audio_prompt",
+      "h3_ref_image_size",
+      "h3_reference_mode",
+      "h3_model_profile",
+      "h3_reference_context",
+      "h3_window_prompts",
+      "h3_window_plan_signature",
+      "h3_window_plan",
+      "minimax_h3_reference_detail",
+      "minimax_h3_text_encoder",
+      "minimax_h3_turbo_preset",
+      "minimax_h3_planning_style",
+      "minimax_h3_audio_policy",
+      "minimax_h3_reference_sequence",
+      "minimax_h3_semantic_bridge_alpha",
+      "minimax_h3_semantic_bridge_magnitude",
+      "minimax_h3_multi_window",
+      "minimax_h3_window_storyboard",
+      "continue_video",
+      "voice_reference",
+      "voice_clone_enabled",
+      "voice_clone_mode",
+      "voice_clone_refs",
+      "tts_dynaudnorm",
+      "tts_comp_threshold",
+      "tts_comp_attack",
+      "tts_comp_release",
+      "tts_comp_makeup",
+      "tts_voice_count",
+      "duration_seconds",
+      "pause_seconds",
+      "_audio_sub_mode",
+      "_music_description",
+      "_music_instrumental",
+      "_tts_original_prompt",
+      "_tts_speaker_name1",
+      "_tts_speaker_name2",
+      "sfx_mode",
+      "free-form JSON settings",
+      "filesystem paths"
+    ]
+  }
+}
