@@ -833,7 +833,10 @@ export function InputsPanel() {
   return (
     <div>
       <label className="text-[11px] text-text-muted uppercase tracking-wider mb-1.5 block">{t('inputs.title')}</label>
-      <div className="flex gap-2 overflow-x-auto pb-1">
+      {/* Se desplaza, pero el borde se desvanece para que se vea que hay más.
+          Envolver mostraba las cinco entradas a costa de comerse el campo
+          de prompt, que es el input principal. */}
+      <div className="hp-edge-fade flex gap-2 overflow-x-auto pb-1">
         {/* Extend-from source video (Extend mode only) — the timeline anchor. */}
         {isExtend && (continueVideo ? (
           <div onClick={() => setSelected(selected === 'extend' ? null : 'extend')}

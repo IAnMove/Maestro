@@ -164,9 +164,20 @@ export function TabFilter() {
     const row = topRowRef.current
     row?.addEventListener('scroll', alignJoin, { passive: true })
     window.addEventListener('resize', alignJoin)
+    // `resize` only covers the window. The button's width also changes when
+    // the sidebar opens and when the web font swaps in, and the seal used to
+    // stay where it was: that is where the visible seam came from.
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(alignJoin)
+    const expandedButton = expandedCategory ? categoryRefs.current[expandedCategory] : null
+    if (observer) {
+      if (row) observer.observe(row)
+      if (expandedButton) observer.observe(expandedButton)
+      if (childBarRef.current) observer.observe(childBarRef.current)
+    }
     return () => {
       row?.removeEventListener('scroll', alignJoin)
       window.removeEventListener('resize', alignJoin)
+      observer?.disconnect()
     }
   }, [expandedCategory])
 
@@ -308,7 +319,7 @@ export function TabFilter() {
   return (
     <nav aria-label={t('aria.sections')} className="flex min-w-0 flex-1 flex-col rounded-xl border border-border bg-bg-tertiary/70 p-1">
       <div className="flex min-w-0 flex-col gap-1 md:flex-row md:items-center">
-        <div ref={topRowRef} className="flex min-w-0 w-full flex-nowrap items-center gap-1 overflow-x-auto md:w-auto md:flex-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div ref={topRowRef} className="hp-navigation-row flex min-w-0 w-full flex-nowrap items-center gap-1 overflow-x-auto md:w-auto md:flex-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <PrimaryButton active={activeCategory === 'direct-generation'} expanded={expandedCategory === 'direct-generation'} category="direct-generation" buttonRef={element => { categoryRefs.current['direct-generation'] = element }} icon={<Sparkles size={14} />} label={t('primary.directGeneration')} onClick={() => selectCategory('direct-generation')} />
           <PrimaryButton active={activeCategory === 'studios'} expanded={expandedCategory === 'studios'} category="studios" buttonRef={element => { categoryRefs.current.studios = element }} icon={<BookOpen size={14} />} label={t('primary.studios')} onClick={() => selectCategory('studios')} />
           <PrimaryButton active={activeCategory === 'production'} expanded={expandedCategory === 'production'} category="production" buttonRef={element => { categoryRefs.current.production = element }} icon={<Clapperboard size={14} />} label={t('primary.production')} onClick={() => selectCategory('production')} />
