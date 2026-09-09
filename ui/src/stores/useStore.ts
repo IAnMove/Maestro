@@ -724,6 +724,11 @@ function isMusicModelType(modelType: string): boolean {
   return musicModelPrefixes.some(p => modelType.startsWith(p))
 }
 
+function audioSubModeForModel(modelType: string): import('../types').AudioSubMode {
+  if (sfxModelTypes.has(modelType)) return 'sfx'
+  return isMusicModelType(modelType) ? 'music' : 'speech'
+}
+
 // Model types that belong to the SFX sub-family (MMAudio variants)
 const sfxModelTypes = new Set([
   'mmaudio_v2',
@@ -2647,7 +2652,7 @@ export const useStore = create<AppState>((set, get) => {
   selectedModelPerAudioSubMode: {} as Partial<Record<import('../types').AudioSubMode, string>>,
   setAudioSubMode: (subMode) => {
     const { audioSubMode: prevSub, params, models } = get()
-    if (subMode === prevSub) return
+    if (subMode === prevSub && (subMode === 'mixer' || audioSubModeForModel(params.model_type) === subMode)) return
     // Save current model for the sub-mode we're leaving
     const savedModels = { ...get().selectedModelPerAudioSubMode, [prevSub]: params.model_type }
     // Determine model for target sub-mode
@@ -2660,7 +2665,7 @@ export const useStore = create<AppState>((set, get) => {
       mixer: '',  // Mixer doesn't use a model — it's an ffmpeg-based tool
     }
     const saved = savedModels[subMode]
-    const targetModel = (saved && models.some(m => m.model_type === saved))
+    const targetModel = (saved && audioSubModeForModel(saved) === subMode && models.some(m => m.model_type === saved))
       ? saved
       : audioSubModeDefaults[subMode]
     const audioReferenceStash = stashAudioReferences(get())
@@ -2778,6 +2783,7 @@ export const useStore = create<AppState>((set, get) => {
 
     set(() => ({
       generationMode: mode,
+      ...(mode === 'audio' ? { audioSubMode: audioSubModeForModel(newModelType) } : {}),
       selectedModelPerMode: savedModels,
       savedLoraPerMode: savedLoras,
       savedParamsPerMode: savedParams,
@@ -8729,10 +8735,7 @@ export const useStore = create<AppState>((set, get) => {
       // params restored below.
       if (mode === 'audio') {
         const recordedSub = p._audio_sub_mode as import('../types').AudioSubMode | undefined
-        const inferredSub: import('../types').AudioSubMode =
-          sfxModelTypes.has(modelType) || p.sfx_mode ? 'sfx'
-          : isMusicModelType(modelType) ? 'music'
-          : 'speech'
+        const inferredSub = p.sfx_mode ? 'sfx' : audioSubModeForModel(modelType)
         const subMode = (recordedSub === 'speech' || recordedSub === 'music' || recordedSub === 'sfx')
           ? recordedSub : inferredSub
         const restoredLyrics = (p._tts_original_prompt as string) || (p.prompt as string) || ''

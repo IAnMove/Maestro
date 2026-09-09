@@ -165,3 +165,26 @@ test('direct Music commands still reject active TTS metadata', () => {
     _tts_voice_count: 1, audio_prompt_type: 'A', audio_guide: musicRef,
   }, 'invalid-tts-residue'), /_tts_voice_count/)
 })
+
+for (const [model, subMode] of [['mmaudio_v2', 'sfx'], ['ace_step_v1_5_xl_sft_lm_4b', 'music'], ['kugelaudio_0_open', 'speech']] as const) {
+  test(`entering Audio aligns its tab with the saved ${model} model`, async () => {
+    await withStudio(() => {
+      useStore.setState({ generationMode: 'video', audioSubMode: 'speech',
+        selectedModelPerMode: { audio: model },
+        params: { ...useStore.getState().params, model_type: 'ltx2_22B_distilled_1_1' },
+      })
+      useStore.getState().setGenerationMode('audio')
+      assert.equal(useStore.getState().params.model_type, model)
+      assert.equal(useStore.getState().audioSubMode, subMode)
+    })
+  })
+}
+
+test('selecting Speech repairs a mismatched SFX model instead of remembering it as a Speech model', async () => {
+  await withStudio(() => {
+    useStore.setState({ params: { ...useStore.getState().params, model_type: 'mmaudio_v2' },
+      audioSubMode: 'speech', selectedModelPerAudioSubMode: { speech: 'mmaudio_v2' } })
+    useStore.getState().setAudioSubMode('speech')
+    assert.equal(useStore.getState().params.model_type, 'kugelaudio_0_open')
+  })
+})
