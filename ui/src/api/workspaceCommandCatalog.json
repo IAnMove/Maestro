@@ -1,0 +1,307 @@
+{
+  "version": 1,
+  "scope": "installation",
+  "operations": [
+    {
+      "name": "collections.create",
+      "description": "Create a collection of exact references without moving source files.",
+      "mutation": true,
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "version": {
+            "type": "integer",
+            "const": 1
+          },
+          "operation": {
+            "type": "string",
+            "const": "collections.create"
+          },
+          "input": {
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "maxLength": 160,
+                "minLength": 1,
+                "pattern": "\\S",
+                "title": "Name",
+                "type": "string"
+              },
+              "description": {
+                "default": "",
+                "maxLength": 2000,
+                "title": "Description",
+                "type": "string"
+              },
+              "project_ids": {
+                "items": {
+                  "maxLength": 240,
+                  "minLength": 1,
+                  "pattern": "^\\S+$",
+                  "type": "string"
+                },
+                "maxItems": 500,
+                "title": "Project Ids",
+                "type": "array",
+                "uniqueItems": true
+              },
+              "asset_ids": {
+                "items": {
+                  "maxLength": 240,
+                  "minLength": 1,
+                  "pattern": "^\\S+$",
+                  "type": "string"
+                },
+                "maxItems": 500,
+                "title": "Asset Ids",
+                "type": "array",
+                "uniqueItems": true
+              },
+              "production_ids": {
+                "items": {
+                  "maxLength": 240,
+                  "minLength": 1,
+                  "pattern": "^\\S+$",
+                  "type": "string"
+                },
+                "maxItems": 500,
+                "title": "Production Ids",
+                "type": "array",
+                "uniqueItems": true
+              }
+            },
+            "required": [
+              "name"
+            ],
+            "title": "CollectionFields",
+            "type": "object"
+          },
+          "intent_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          }
+        },
+        "required": [
+          "version",
+          "operation",
+          "input",
+          "intent_id"
+        ]
+      }
+    },
+    {
+      "name": "collections.update",
+      "description": "Update an exact collection and expected revision. Omitted fields are preserved.",
+      "mutation": true,
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "version": {
+            "type": "integer",
+            "const": 1
+          },
+          "operation": {
+            "type": "string",
+            "const": "collections.update"
+          },
+          "input": {
+            "additionalProperties": false,
+            "properties": {
+              "workspace_id": {
+                "maxLength": 240,
+                "minLength": 1,
+                "pattern": "^\\S+$",
+                "title": "Workspace Id",
+                "type": "string"
+              },
+              "expected_revision": {
+                "minimum": 1,
+                "title": "Expected Revision",
+                "type": "integer"
+              },
+              "name": {
+                "title": "Name",
+                "maxLength": 160,
+                "minLength": 1,
+                "pattern": "\\S",
+                "type": "string"
+              },
+              "description": {
+                "title": "Description",
+                "maxLength": 2000,
+                "type": "string"
+              },
+              "project_ids": {
+                "title": "Project Ids",
+                "items": {
+                  "maxLength": 240,
+                  "minLength": 1,
+                  "pattern": "^\\S+$",
+                  "type": "string"
+                },
+                "maxItems": 500,
+                "type": "array",
+                "uniqueItems": true
+              },
+              "asset_ids": {
+                "title": "Asset Ids",
+                "items": {
+                  "maxLength": 240,
+                  "minLength": 1,
+                  "pattern": "^\\S+$",
+                  "type": "string"
+                },
+                "maxItems": 500,
+                "type": "array",
+                "uniqueItems": true
+              },
+              "production_ids": {
+                "title": "Production Ids",
+                "items": {
+                  "maxLength": 240,
+                  "minLength": 1,
+                  "pattern": "^\\S+$",
+                  "type": "string"
+                },
+                "maxItems": 500,
+                "type": "array",
+                "uniqueItems": true
+              }
+            },
+            "required": [
+              "workspace_id",
+              "expected_revision"
+            ],
+            "title": "CollectionUpdate",
+            "type": "object"
+          },
+          "intent_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          }
+        },
+        "required": [
+          "version",
+          "operation",
+          "input",
+          "intent_id"
+        ]
+      }
+    },
+    {
+      "name": "collections.get",
+      "description": "Read a collection by immutable ID, including revision and membership.",
+      "mutation": false,
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "version": {
+            "type": "integer",
+            "const": 1
+          },
+          "operation": {
+            "type": "string",
+            "const": "collections.get"
+          },
+          "input": {
+            "additionalProperties": false,
+            "properties": {
+              "workspace_id": {
+                "maxLength": 240,
+                "minLength": 1,
+                "pattern": "^\\S+$",
+                "title": "Workspace Id",
+                "type": "string"
+              }
+            },
+            "required": [
+              "workspace_id"
+            ],
+            "title": "CollectionGet",
+            "type": "object"
+          }
+        },
+        "required": [
+          "version",
+          "operation",
+          "input"
+        ]
+      }
+    },
+    {
+      "name": "collections.list",
+      "description": "List logical collections; these are independent of physical output folders.",
+      "mutation": false,
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "version": {
+            "type": "integer",
+            "const": 1
+          },
+          "operation": {
+            "type": "string",
+            "const": "collections.list"
+          },
+          "input": {
+            "additionalProperties": false,
+            "properties": {},
+            "title": "StrictInput",
+            "type": "object"
+          }
+        },
+        "required": [
+          "version",
+          "operation",
+          "input"
+        ]
+      }
+    },
+    {
+      "name": "commands.receipt",
+      "description": "Recover a committed collection command by its exact intention ID, including after restart.",
+      "mutation": false,
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "version": {
+            "type": "integer",
+            "const": 1
+          },
+          "operation": {
+            "type": "string",
+            "const": "commands.receipt"
+          },
+          "input": {
+            "additionalProperties": false,
+            "properties": {
+              "intent_id": {
+                "maxLength": 160,
+                "minLength": 1,
+                "title": "Intent Id",
+                "type": "string"
+              }
+            },
+            "required": [
+              "intent_id"
+            ],
+            "title": "ReceiptGet",
+            "type": "object"
+          }
+        },
+        "required": [
+          "version",
+          "operation",
+          "input"
+        ]
+      }
+    }
+  ]
+}

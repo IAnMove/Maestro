@@ -57,6 +57,7 @@ export function tabForExecutionTarget(kind?: string): AgentTab {
     case 'scene': return 'video_3d'
     case 'character_kit': return 'character_kit'
     case 'video_editor': return 'video_editor'
+    case 'workspace_collection': return 'workspaces'
     default: return 'studio'
   }
 }

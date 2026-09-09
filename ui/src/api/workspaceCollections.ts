@@ -1,4 +1,5 @@
 import { BASE } from './http'
+import { newCollectionIntentId, submitCollectionCommand } from './workspaceCommands'
 
 export interface WorkspaceCollection {
   schema: 'hocuspocus.workspace-record'
@@ -37,22 +38,22 @@ export async function createWorkspaceCollection(value: {
   asset_ids?: string[]
   production_ids?: string[]
 }) {
-  return request<WorkspaceCollection>('/api/v1/workspace-collections', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(value),
-  })
+  const receipt = await submitCollectionCommand({ version: 1, operation: 'collections.create', intent_id: newCollectionIntentId(), input: value })
+  return receipt.result
 }
 
 export async function updateWorkspaceCollection(value: WorkspaceCollection) {
-  return request<WorkspaceCollection>(`/api/v1/workspace-collections/${encodeURIComponent(value.id)}`, {
-    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+  const receipt = await submitCollectionCommand({ version: 1, operation: 'collections.update', intent_id: newCollectionIntentId(), input: {
+      workspace_id: value.id,
       expected_revision: value.revision,
       name: value.name,
       description: value.description,
       project_ids: value.project_ids,
       asset_ids: value.asset_ids,
       production_ids: value.production_ids,
-    }),
+    },
   })
+  return receipt.result
 }
 
 export async function deleteWorkspaceCollection(workspaceId: string) {
