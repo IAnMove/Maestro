@@ -179,6 +179,12 @@ class ImageGenerationCommands:
 
     def restore_recovery(self, workspaces):
         """Rebuild only the existing recovery projection; never start inference."""
+        try:
+            self._restore_recovery(workspaces)
+        except (OSError, sqlite3.Error) as error:
+            raise command_error(503, "storage_unavailable", "Recovery storage is unavailable; no queue records were discarded") from error
+
+    def _restore_recovery(self, workspaces):
         active = set(self.active_job_ids())
         for workspace in workspaces:
             registry = self._registry(workspace)
@@ -192,26 +198,54 @@ class ImageGenerationCommands:
                 self.persist_recovery({"id": task["backend_job_id"], "status": "interrupted",
                                        "created_at": task["created_at"], **deepcopy(runtime)})
 
+    @staticmethod
+    def _recovery_identity(record):
+        if not isinstance(record, dict):
+            return False
+        provenance = record.get("provenance")
+        if provenance is None:
+            return None
+        if not isinstance(provenance, dict):
+            return False
+        capability = provenance.get("capability")
+        if capability is not None and not isinstance(capability, str):
+            return False
+        if capability != "generation.image":
+            return None
+        command = provenance.get("command")
+        if not isinstance(command, dict):
+            return False
+        intent_id = command.get("command_id")
+        if not isinstance(intent_id, str) or not 1 <= len(intent_id) <= 160 or not intent_id.strip():
+            return False
+        return intent_id
+
     def _recovery_task(self, record):
         """Link one leftover to its admission, or withhold it.
 
         Non-image leftovers return None so the native queue can recover them.
         A linked image leftover returns ``(registry, task)``. An image row that
-        cannot be matched — deleted workspace, missing admission, corrupt
-        snapshot, or job-id drift — returns False so this one row is skipped.
-        Raising here would take down list/resume/discard for every other job.
+        cannot be matched (missing admission, invalid queue metadata or job-id
+        drift) returns False so this one row is skipped. Storage failures,
+        including corrupt canonical admissions, remain errors: discard must
+        not delete recovery records while their tasks cannot be verified.
         """
-        provenance = record.get("provenance") or {}
-        if provenance.get("capability") != "generation.image":
-            return None
+        intent_id = self._recovery_identity(record)
+        if intent_id is None or intent_id is False:
+            return intent_id
         try:
             registry = self._registry(record.get("workspace"))
-            intent_id = (provenance.get("command") or {}).get("command_id")
             entry = registry.command_admission(intent_id)
             if entry is None or entry["receipt"]["result"]["job_id"] != record.get("id"):
                 return False
             return registry, registry.get(entry["task_id"])
-        except (HTTPException, OSError, sqlite3.Error, TypeError, KeyError):
+        except HTTPException as error:
+            if error.status_code in {404, 422}:
+                return False
+            raise
+        except (OSError, sqlite3.Error) as error:
+            raise command_error(503, "storage_unavailable", "Recovery storage is unavailable; no queue records were discarded") from error
+        except (TypeError, KeyError):
             return False
 
     def filter_recovery(self, records):
