@@ -293,3 +293,13 @@ test('Wizard keeps every admitted SFX receipt if final navigation fails', async 
     assert.equal(native.receipts.size, 3)
   })
 })
+
+
+test('explicit SFX pack reconciliation retains its chosen model and empty negative prompt', async () => {
+  const { reconcileAgentTurnWithRequest } = await import('../src/features/agent/agentActions.ts')
+  const action = { ...pack, negativePrompt: '', modelType: 'mmaudio_nsfw' }
+  const result = await reconcileAgentTurnWithRequest('Create and enqueue one SFX pack now.', { reply: 'Prepared', actions: [action] })
+  assert.equal(result.actions[0].modelType, 'mmaudio_nsfw')
+  assert.equal(result.actions[0].negativePrompt, '')
+  assert.deepEqual(result.actions[0].clips, pack.clips)
+})

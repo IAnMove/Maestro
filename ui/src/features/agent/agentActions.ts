@@ -2421,6 +2421,7 @@ export async function reconcileAgentTurnWithRequest(
       return {
         reply: 'Prepararé Studio → Audio → SFX y encolaré el pack de efectos. Irán detrás de lo que ya use la GPU. La galería Audios solo muestra resultados cuando terminen. 🪄',
         actions: [{
+          ...existing,
           type: 'queue_sfx_pack',
           style: existing?.style || 'retro fantasy arcade',
           clips,
