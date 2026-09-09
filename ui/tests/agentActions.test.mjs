@@ -1656,6 +1656,85 @@ test('drops cancel_task unless confirm is true and repairs an explicit cancel re
   assert.equal(repaired.actions[0].confirm, true)
 })
 
+test('informational stop and cancel questions do not cancel the active GPU task', async () => {
+  const { isExplicitCancelRequest, isHowToGenerateQuestion, reconcileAgentTurnWithRequest } = await import('../src/features/agent/agentActions.ts')
+  for (const request of [
+    'How do I stop video generation if it fails?',
+    'When should I stop the video generation?',
+    'Can you explain when to cancel a running job?',
+    'How can I cancel the generation?',
+    'What happens if I cancel the generation?',
+    'Why would I cancel the generation?',
+    'Should I cancel the generation?',
+    '¿Puedo cancelar la generación?',
+    '¿Cómo cancelo la generación?',
+  ]) {
+    assert.equal(isHowToGenerateQuestion(request), true, request)
+    assert.equal(isExplicitCancelRequest(request), false, request)
+    const turn = await reconcileAgentTurnWithRequest(request, { reply: 'Cancelo.', actions: [] })
+    assert.equal(turn.actions.some(action => action.type === 'cancel_task'), false, request)
+  }
+
+  for (const request of [
+    'cancela el vídeo',
+    'cancel the generation',
+    'Can you cancel the generation?',
+    'Please cancel the generation',
+    'I want to cancel the generation',
+    '¿Puedes cancelar la generación?',
+  ]) {
+    assert.equal(isExplicitCancelRequest(request), true, request)
+    const turn = await reconcileAgentTurnWithRequest(request, { reply: 'Vale.', actions: [] })
+    assert.equal(turn.actions[0].type, 'cancel_task', request)
+  }
+})
+
+test('UI-label generate questions do not enqueue Studio generation', async () => {
+  const { useStore } = await import('../src/stores/useStore.ts')
+  const {
+    isHowToGenerateQuestion,
+    isExplicitVideoGenerationRequest,
+    isResumePreparedStudioVideoRequest,
+    reconcileAgentTurnWithRequest,
+  } = await import('../src/features/agent/agentActions.ts')
+  const original = {
+    generationMode: useStore.getState().generationMode,
+    params: useStore.getState().params,
+    savedPromptPerMode: useStore.getState().savedPromptPerMode,
+  }
+  useStore.setState({
+    generationMode: 'video',
+    params: { ...useStore.getState().params, prompt: 'un mago en la torre' },
+    savedPromptPerMode: { ...useStore.getState().savedPromptPerMode, video: 'un mago en la torre' },
+  })
+
+  try {
+    for (const request of [
+      'What does the generate video button do?',
+      'Tell me about the generate video workflow',
+      'Explica qué significa genera el video en Studio',
+      '¿Qué hace el botón genera el video?',
+    ]) {
+      assert.equal(isHowToGenerateQuestion(request), true, request)
+      assert.equal(isExplicitVideoGenerationRequest(request), false, request)
+      assert.equal(isResumePreparedStudioVideoRequest(request), false, request)
+      const turn = await reconcileAgentTurnWithRequest(request, {
+        reply: 'Lanzo el vídeo.',
+        actions: [{ type: 'prepare_video', prompt: 'un mago en la torre' }, { type: 'start_generation', confirm: true }],
+      })
+      assert.deepEqual(turn.actions.map(action => action.type), [], request)
+    }
+
+    const command = await reconcileAgentTurnWithRequest('Generate a video of a wizard on a tower', {
+      reply: '¿De qué?',
+      actions: [],
+    })
+    assert.deepEqual(command.actions.map(action => action.type), ['prepare_video', 'start_generation'])
+  } finally {
+    useStore.setState(original)
+  }
+})
+
 test('Spanish para-preposition does not cancel the active GPU task', async () => {
   const { isExplicitCancelRequest, reconcileAgentTurnWithRequest } = await import('../src/features/agent/agentActions.ts')
   for (const request of [
