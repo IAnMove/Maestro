@@ -101,6 +101,7 @@ SUPPORTED_INPUT_FIELDS = (
     "alt_prompt",
     "model_type",
     "resolution",
+    "lyrics_language",
     "video_length",
     "num_inference_steps",
     "guidance_scale",
