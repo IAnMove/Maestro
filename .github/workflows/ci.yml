@@ -164,14 +164,52 @@ jobs:
       - name: Install Playwright Chromium
         working-directory: ui
         run: npx playwright install --with-deps chromium
+      - name: Install Chrome for native H.264 and AAC speech export checks
+        working-directory: ui
+        run: npx playwright install chrome
       - name: UI E2E
         working-directory: ui
         run: npm run test:e2e
       - name: Upload Playwright artifacts
-        if: failure()
+        # Passing speech tests also attach screenshots, native JSON and MP4 evidence.
+        if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: ui-e2e-artifacts
+          path: |
+            ui/playwright-report
+            ui/test-results
+          if-no-files-found: ignore
+
+  ui-speech-windows:
+    name: Speech E2E Windows (real H.264 + AAC)
+    runs-on: windows-2025
+    timeout-minutes: 15
+    env:
+      # This job may not pass via the unsupported-codec assertion.
+      HOCUSPOCUS_REQUIRE_SPEECH_AAC: "1"
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: "24.18.0"
+          check-latest: false
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - name: Install UI deps
+        working-directory: ui
+        run: npm ci
+      - name: Install Chromium for screen regression and Edge for native AAC
+        working-directory: ui
+        run: npx playwright install chromium msedge
+      - name: Speech E2E with real export required
+        working-directory: ui
+        run: npm run test:e2e -- scene3d-speech.spec.ts scene3d-media-screen.spec.ts --workers=1
+      - name: Upload speech evidence
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: ui-speech-windows-artifacts
           path: |
             ui/playwright-report
             ui/test-results
@@ -207,7 +245,7 @@ jobs:
   ci-required:
     name: CI required
     if: always()
-    needs: [guard, ui-check, ui-e2e]
+    needs: [guard, ui-check, ui-e2e, ui-speech-windows]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -217,4 +255,5 @@ jobs:
           python3 scripts/ci_required.py \
             "Clean-repo guard + Python checks=${{ needs.guard.result }}" \
             "UI tests + lint + type-check + build=${{ needs.ui-check.result }}" \
-            "UI E2E boot (Chromium + simulated API)=${{ needs.ui-e2e.result }}"
+            "UI E2E boot (Chromium + simulated API)=${{ needs.ui-e2e.result }}" \
+            "Speech E2E Windows (real H.264 + AAC)=${{ needs.ui-speech-windows.result }}"

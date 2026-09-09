@@ -1,4 +1,5 @@
 import * as api from '../../api/client'
+import { SpeechProductionEntry } from '../scene3d/speech/SpeechProductionEntry'
 import { getOutputReference } from '../../lib/outputReference'
 import { useUiTranslation } from '../../i18n'
 import { input } from './storyLabChrome'
@@ -42,6 +43,11 @@ export function StoryMusicProductionSong(props: StoryProductionsTabProps) {
             <p className="text-[10px] text-text-secondary">{selectedMusicOption.cue.purpose}</p>
           )}
           <audio src={api.getPlayableFileUrl(selectedMusicOption.candidate.source, selectedMusicOption.candidate.name, workspace)} controls preload="metadata" className="h-8 w-full" />
+          <SpeechProductionEntry key={workspace + '/' + selectedMusicOption.candidate.id} kind="song" workspace={workspace}
+              title={selectedMusicOption.label} sourceId={selectedMusicOption.candidate.id}
+              castOptions={props.project?.characters}
+            audio={{ workspaceId: workspace, filename: selectedMusicOption.candidate.name,
+              url: api.getPlayableFileUrl(selectedMusicOption.candidate.source, selectedMusicOption.candidate.name, workspace) }} />
         </div>
       )}
     </>

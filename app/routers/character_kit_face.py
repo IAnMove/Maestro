@@ -7,6 +7,8 @@ from collections.abc import Callable
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
+from routers.scene3d_speech import create_scene3d_speech_router
+from routers.scene3d_profiles import create_scene3d_profiles_router
 
 from services.character_kit_face_cleanup import (
     CharacterKitFaceCleanupError,
@@ -26,6 +28,8 @@ def create_character_kit_face_router(
     uploads_root: Callable[[], str],
 ) -> APIRouter:
     router = APIRouter(prefix="/api/v1/character-kits", tags=["Character kits"])
+    router.include_router(create_scene3d_speech_router())
+    router.include_router(create_scene3d_profiles_router(workspace_dir))
 
     @router.post("/face-rig/cleanup")
     def cleanup_face_rig_overlay(payload: FaceRigCleanupRequest):

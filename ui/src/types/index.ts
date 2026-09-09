@@ -440,6 +440,7 @@ export interface SceneAnimationEvent {
 }
 
 export interface SceneLayer {
+  characterKitRef?: import('../lib/characterVoice').CharacterKitRef
   id: string
   name: string
   type: SceneLayerType

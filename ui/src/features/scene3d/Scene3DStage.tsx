@@ -5,6 +5,8 @@ import { bindScreenMedia } from './screenMediaRuntime'
 import { slotMountKey } from './backdrop'
 import { createTransformGizmo, type TransformMode, type TransformPatch } from './transformGizmo.ts'
 import { TextureLoader } from 'three'
+import { estimateFace, FACE_PROFILES, type FaceProfile } from './speech/calibration'
+import type { FacePlacement } from './speech/types'
 import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js'
 import { adoptCafeMaps, loadCafeMaps } from './cafeSet.ts'
 import { syncDressing } from './dressing.ts'
@@ -51,6 +53,7 @@ export type Scene3DStageHandle = {
   restoreSize: () => void
   beginExport: (document: Scene3DDocument) => void
   endExport: () => void
+  facePlacement?: (slotId: string, profile: FaceProfile) => FacePlacement | undefined
   prepareFrame?: (seconds: number, document: Scene3DDocument) => Promise<void>
 }
 
@@ -93,6 +96,7 @@ function loadSlotGltf(
         disposeObject(gltf.scene)
         return
       }
+      gltf.scene.userData.speechPlacements = Object.fromEntries(FACE_PROFILES.map(profile => [profile, estimateFace(gltf.scene, profile)]))
       const baseScale = fitGltf(gltf.scene, live)
       placeSlot(world, live, gltf.scene, gltf.animations, baseScale, true)
       onLoaded(live, gltf)
@@ -184,6 +188,10 @@ export const Scene3DStage = forwardRef<Scene3DStageHandle, Props>(function Scene
       const world = worldRef.current
       const host = hostRef.current
       if (world && host) resizeWorld(world, host)
+    },
+    facePlacement(slotId, profile) {
+      const placement = worldRef.current?.slots.get(slotId)?.root.userData.speechPlacements?.[profile] as FacePlacement | undefined
+      return placement ? structuredClone(placement) : undefined
     },
     beginExport(next) {
       gizmoRef.current?.hide()
@@ -283,7 +291,10 @@ export const Scene3DStage = forwardRef<Scene3DStageHandle, Props>(function Scene
         loadSlotImage(world, slot, gone, live)
         continue
       }
-      loadSlotGltf(world, slot, loader, gone, live, (slotId, clips) => onSlotClipsRef.current?.(slotId, clips), (loaded, gltf) => {
+      loadSlotGltf(world, slot, loader, gone, live, (slotId, clips) => {
+        onSlotClipsRef.current?.(slotId, clips)
+        paintWorld(world, documentRef.current, secondsRef.current)
+      }, (loaded, gltf) => {
         const names: string[] = []
         gltf.scene.traverse(child => { if (child instanceof Mesh) names.push(child.name) })
         onSlotMeshesRef.current?.(loaded.id, names)
