@@ -6,7 +6,6 @@ import pytest
 from fastapi import HTTPException
 
 from services.studio_sfx_preparation import prepare_studio_sfx
-from services.studio_sfx_resources import required_mmaudio_files
 
 
 def params(**overrides):
@@ -36,9 +35,9 @@ class FakeResources:
 
 
 def invoke(incoming, *, resources=None, downloaded=True, definition=None,
-           policy_error=None, model_files=None):
+           policy_error=None):
     resources = resources or FakeResources()
-    calls = {"policy": [], "definition": [], "downloaded": [], "files": []}
+    calls = {"policy": [], "definition": [], "downloaded": []}
 
     def policy(workspace):
         calls["policy"].append(workspace)
@@ -53,17 +52,12 @@ def invoke(incoming, *, resources=None, downloaded=True, definition=None,
         calls["downloaded"].append(model_type)
         return downloaded
 
-    def files(variant):
-        calls["files"].append(variant)
-        return model_files(variant) if callable(model_files) else model_files
-
     result = prepare_studio_sfx(
         incoming,
         model_definition=model_definition,
         model_downloaded=model_downloaded,
         resources=resources,
         execution_policy=policy,
-        model_files=files if model_files is not None else None,
     )
     return result, calls, resources
 
@@ -147,27 +141,10 @@ def test_policy_runs_before_model_or_resource_inspection():
     assert resources.calls == []
 
 
-def test_optional_installed_file_report_requires_all_variant_dependencies():
-    required = list(required_mmaudio_files("v2"))
-    (native, _), calls, _ = invoke(params(), model_files=required)
-    assert native["_mmaudio_variant"] == "v2"
-    assert calls["files"] == ["v2"]
-
-    missing = required[:-1]
+def test_model_downloaded_is_the_single_installed_dependency_gate():
     with pytest.raises(HTTPException) as error:
-        invoke(params(), model_files=missing)
+        invoke(params(), downloaded=False)
     assert error.value.status_code == 409
-
-
-def test_model_file_callback_never_receives_host_paths_or_controls():
-    seen = []
-
-    def inspect(variant):
-        seen.append(variant)
-        return True
-
-    invoke(params(), model_files=inspect)
-    assert seen == ["v2"]
 
 
 @pytest.mark.parametrize("duration", [0, -1, float("nan"), float("inf")])

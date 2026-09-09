@@ -150,20 +150,12 @@ class StudioSfxResources(StudioImageResources):
         return working, [record]
 
 
-# The shared names are useful to the runtime/catalog adapter and make the
-# no-download boundary explicit without exposing a filesystem implementation.
-SFXResources = StudioSfxResources
-mmaudio_required_files = required_mmaudio_files
-
-
 __all__ = [
     "MMAUDIO_SHARED_FILES",
     "MMAUDIO_VARIANT_FILES",
     "SFX_VIDEO_FIELDS",
-    "SFXResources",
     "StudioSfxResources",
     "missing_mmaudio_files",
-    "mmaudio_required_files",
     "required_mmaudio_files",
     "validate_mmaudio_files",
 ]

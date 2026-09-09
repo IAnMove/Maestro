@@ -2,8 +2,9 @@
 
 `generation.sfx` is the version 2 command for the existing MMAudio sound
 effects worker. It uses the shared command admission, receipt, task and
-recovery path. This slice defines the contract and pure resource preparation;
-runtime/UI wiring and a real model run remain separate acceptance work.
+recovery path. Studio, Wizard and MCP share this runtime path. The visible SFX panel
+acknowledges the exact command before admission; real model validation remains
+separate acceptance work.
 
 ## Envelope
 
@@ -75,15 +76,14 @@ prepare_studio_sfx(
     model_downloaded,
     resources,
     execution_policy,
-    model_files=None,
 )
 ```
 
 `model_definition(model_type)` and `model_downloaded(model_type)` are injected
-catalog/install inspections. The optional `model_files(variant)` callback may
-return a trusted boolean, a report with `missing`/`files`, or the complete set
-of relative dependency names. A missing dependency produces `409`; no callback
-downloads anything. The required files are exposed by
+catalog/install inspections. `model_downloaded` is the single required,
+read-only dependency gate and must verify the complete installed-file set for
+the selected model. A missing dependency produces `409`; no callback downloads
+anything. The required files are exposed by
 `required_mmaudio_files()` and match the files opened by `postprocessing.mmaudio`:
 the selected v2 or NSFW weight, `mmaudio/v1-44.pth`,
 `mmaudio/synchformer_state_dict.pth`, the DFN5B CLIP config/weights, and the
@@ -108,3 +108,24 @@ admission; a changed request needs a new intent.
 This contract and its provider-free tests do not certify a GPU generation,
 decoded WAV/MP4, or full Wizard/MCP presentation. Those require separate
 runtime/UI acceptance evidence with an already-installed model.
+
+
+## Runtime and visible Studio integration
+
+The runtime registers SFX against the existing `_run_generation` worker. It does
+not generate a carrier video. Admission checks all seven installed dependencies
+and the worker rechecks them without downloading. A guide is hashed again before
+model work; this detects changes before that check but is not an immutable copy
+or protection against a later filesystem replacement.
+
+The SFX panel displays the literal description, selected model, destination and
+canonical guide. Without a guide it displays the requested duration; with a guide
+it explains that output preserves the source duration and replaces its audio.
+The selected source remains visible and removable after restoring settings. Its
+source URL is retained even when the output belongs to another workspace.
+
+Recovery reuses the original command and receipt. The typed worker publishes
+full parameter sidecars for WAV and video-guided MP4 output. Tests exercise the
+real worker function with a provider stand-in, plus SQLite admissions, concurrent
+retries, changed-resource failures and DOM acknowledgement. These checks do not
+certify actual MMAudio inference or media decoding.

@@ -18,11 +18,7 @@ from typing import Any
 from fastapi import HTTPException
 
 from services.image_generation_commands import command_error
-from services.studio_sfx_resources import (
-    SFX_MODEL_VARIANTS,
-    required_mmaudio_files,
-)
-from services.studio_sfx_spec import SFX_MODEL_TYPES
+from services.studio_sfx_spec import SFX_MODEL_TYPES, SFX_MODEL_VARIANTS
 
 
 def _definition_for(model_definition, model_type: str) -> dict[str, Any]:
@@ -63,69 +59,6 @@ def _validate_model_definition(
     return expected_variant
 
 
-def _validate_file_report(model_or_variant: str, report: Any) -> None:
-    """Validate an optional trusted installed-file report without inspecting paths.
-
-    ``model_downloaded`` remains the required boolean admission callback.  A
-    caller may additionally supply ``model_files`` to expose the concrete
-    relative names used by the installed-file check.  Accepted reports are a
-    truthy boolean, a mapping with ``missing``/``available`` or an iterable of
-    relative names.  Host paths and download controls are never interpreted.
-    """
-    required = set(required_mmaudio_files(model_or_variant))
-    if isinstance(report, bool):
-        if not report:
-            raise command_error(
-                409,
-                "model_unavailable",
-                "Required MMAudio files are not installed; install them before submitting",
-            )
-        return
-    if isinstance(report, Mapping):
-        if report.get("available") is False:
-            raise command_error(
-                409,
-                "model_unavailable",
-                "Required MMAudio files are not installed; install them before submitting",
-            )
-        missing = report.get("missing")
-        if missing:
-            if not isinstance(missing, (list, tuple, set)):
-                raise ValueError("Installed MMAudio file report has an invalid missing list")
-            raise command_error(
-                409,
-                "model_unavailable",
-                "Required MMAudio files are not installed; install them before submitting",
-            )
-        names = report.get("files", report.get("available_files"))
-        if names is None:
-            return
-        report = names
-    if isinstance(report, (str, bytes)) or not isinstance(report, (list, tuple, set, frozenset)):
-        raise ValueError("model_files must return an installed-file report")
-    names = set(report)
-    if any(not isinstance(item, str) for item in names):
-        raise ValueError("model_files must contain relative file names")
-    if required - names:
-        raise command_error(
-            409,
-            "model_unavailable",
-            "Required MMAudio files are not installed; install them before submitting",
-        )
-
-
-def _check_model_files(model_files, variant: str) -> None:
-    if model_files is None:
-        return
-    if not callable(model_files):
-        raise TypeError("model_files must be a trusted installed-file inspection callback")
-    try:
-        report = model_files(variant)
-    except (OSError, TypeError, ValueError) as error:
-        raise ValueError("Installed MMAudio files could not be inspected") from error
-    _validate_file_report(variant, report)
-
-
 def _finite_duration(value: Any, *, video: bool) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise ValueError("input.params.duration_seconds must be a finite number")
@@ -157,15 +90,8 @@ def prepare_studio_sfx(
     model_downloaded,
     resources,
     execution_policy,
-    model_files=None,
 ):
-    """Return detached native MMAudio parameters and portable identities.
-
-    ``model_files`` is optional for compatibility with runtimes whose
-    ``model_downloaded`` callback already checks the complete file set.  When
-    supplied it must be a trusted, read-only callback for the derived variant;
-    it is never a downloader.
-    """
+    """Return detached native MMAudio parameters and portable identities."""
     if not isinstance(params, dict):
         raise command_error(422, "invalid_studio_sfx_input", "SFX parameters must be an object")
     working = deepcopy(params)
@@ -182,7 +108,6 @@ def prepare_studio_sfx(
             raise ValueError("input.params.model_type must be a string")
         definition = _definition_for(model_definition, model_type)
         variant = _validate_model_definition(model_type, definition, model_downloaded)
-        _check_model_files(model_files, variant)
 
         guide_selected = working.get("video_guide") not in (None, "")
         requested_duration = _finite_duration(
