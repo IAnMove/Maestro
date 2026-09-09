@@ -14,40 +14,27 @@ export async function prepareStudioSubmission(
   context?: Inputs[3], referenceErrors?: Inputs[4],
   load: Loader = () => import('./imageCommandSubmission'),
 ): Promise<StudioSubmission> {
-  if (before.generationMode === 'image') {
-    try {
+  try {
+    if (before.generationMode === 'image') {
       const implementation = await load()
       return await implementation.prepareStudioSubmission(params, before, current, context, referenceErrors)
-    } catch (error) {
-      return { params, submit: () => Promise.reject(error) }
     }
-  }
-  // Speech gets the same durable snapshot/ACK boundary as typed image jobs.
-  // Keep this import inside the selected sub-mode so opening Studio Image or
-  // another audio tool does not pull the speech contract into the main chunk.
-  if (before.generationMode === 'audio' && before.audioSubMode === 'speech') {
-    try {
+    // Import only the selected modality; all typed failures retain the same
+    // rejected submission and cannot fall back to the legacy endpoint.
+    if (before.generationMode === 'audio' && before.audioSubMode === 'speech') {
       const implementation = await import('./speechCommandSubmission')
       return await implementation.prepareStudioSpeechSubmission(params, before, current, context, referenceErrors)
-    } catch (error) {
-      return { params, submit: () => Promise.reject(error) }
     }
-  }
-  if (before.generationMode === 'audio' && before.audioSubMode === 'music') {
-    try {
+    if (before.generationMode === 'audio' && before.audioSubMode === 'music') {
       const implementation = await import('./musicCommandSubmission')
       return await implementation.prepareStudioMusicSubmission(params, before, current, context, referenceErrors)
-    } catch (error) {
-      return { params, submit: () => Promise.reject(error) }
     }
-  }
-  if (before.generationMode === 'audio' && before.audioSubMode === 'sfx') {
-    try {
+    if (before.generationMode === 'audio' && before.audioSubMode === 'sfx') {
       const implementation = await import('./sfxCommandSubmission')
       return await implementation.prepareStudioSfxSubmission(params, before, current, context, referenceErrors)
-    } catch (error) {
-      return { params, submit: () => Promise.reject(error) }
     }
+  } catch (error) {
+    return { params, submit: () => Promise.reject(error) }
   }
   return { params, submit: () => api.submitGeneration(params) }
 }

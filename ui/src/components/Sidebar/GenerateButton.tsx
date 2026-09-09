@@ -108,9 +108,9 @@ export function GenerateButton() {
     <button
       onClick={handleClick}
       data-wizard-anchor="generate"
-      disabled={submitting || checkingFrame || needsScheduledPrompts}
+      disabled={submitting || checkingFrame}
       className={`px-4 py-2 rounded-lg flex items-center gap-1.5 font-medium text-xs transition-all whitespace-nowrap ${
-        submitting || checkingFrame || needsScheduledPrompts
+        submitting || checkingFrame
           ? 'bg-bg-active text-text-muted cursor-not-allowed'
           // Classic theme: bg-cta resolves to a flat accent-green.
           // HocusPocus Blue resolves to the branded blue gradient, while
@@ -118,10 +118,8 @@ export function GenerateButton() {
           : 'bg-cta hover:brightness-110 shadow-accent-glow text-white'
       }`}
     >
-      <Play size={13} fill={submitting || needsScheduledPrompts ? 'currentColor' : 'white'} />
-      {checkingFrame ? t('wangp.checkingFrame') : needsScheduledPrompts
-        ? t('generate.addPrompts')
-        : submitting
+      <Play size={13} fill={submitting ? 'currentColor' : 'white'} />
+      {checkingFrame ? t('wangp.checkingFrame') : submitting
           ? t('generate.submitting')
           : scheduledVideoCount > 1
             ? t('generate.queueCount', { count: scheduledVideoCount })

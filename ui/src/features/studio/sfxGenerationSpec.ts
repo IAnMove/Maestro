@@ -85,11 +85,7 @@ export function projectStudioSfxFormParams(params: Record<string, unknown>): Rec
  */
 export function neutralizeStudioSfxFormResidue(params: Record<string, unknown>): Record<string, unknown> {
   const native = typeof params.MMAudio_prompt === 'string' ? params.MMAudio_prompt : ''
-  if (!native.trim()) {
-    const next = { ...params }
-    delete next.prompt
-    delete next.MMAudio_prompt
-    return next
-  }
-  return { ...params, prompt: native, MMAudio_prompt: native }
+  const fields = Object.fromEntries(Object.entries(params)
+    .filter(([key]) => key !== 'prompt' && key !== 'MMAudio_prompt'))
+  return native.trim() ? { ...fields, prompt: native, MMAudio_prompt: native } : fields
 }
