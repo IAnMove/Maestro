@@ -263,5 +263,8 @@ class ImageGenerationCommands:
             linked = self._recovery_task(record)
             if linked and linked[1] and linked[1]["status"] == "interrupted":
                 registry, task = linked
-                registry.update(task["id"], status="cancelled", phase="recovery_discarded",
-                                message="Recovery discarded", completed_at=time.time(), recoverable=False)
+                try:
+                    registry.update(task["id"], status="cancelled", phase="recovery_discarded",
+                                    message="Recovery discarded", completed_at=time.time(), recoverable=False)
+                except (OSError, sqlite3.Error) as error:
+                    raise command_error(503, "storage_unavailable", "Recovery storage is unavailable; no queue records were discarded") from error
