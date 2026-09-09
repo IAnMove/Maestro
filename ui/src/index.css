@@ -1138,6 +1138,15 @@ input[type="range"]::-webkit-slider-thumb {
 [data-navigation-category='studios'] { --hp-navigation-rgb: 88, 143, 121; }
 [data-navigation-category='production'] { --hp-navigation-rgb: 160, 96, 103; }
 [data-navigation-category='media'] { --hp-navigation-rgb: 166, 139, 82; }
+/* Trailing-edge fade for a row that always overflows its column. The row
+   scrolls, but a hard cut at the edge reads as a clipped layout rather than
+   as "there is more this way". Mask only — no extra element, no measuring,
+   and it leaves the scrollbar and hit areas untouched. */
+.hp-edge-fade {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 26px), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 26px), transparent);
+}
+
 /* Two-level navigation. The expanded parent and its panel are the SAME
  * layer: one flat shared fill, no borders, so there is no seam to disguise
  * with an outline. Depth comes from the surroundings — the track is the
