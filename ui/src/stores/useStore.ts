@@ -4060,6 +4060,15 @@ export const useStore = create<AppState>((set, get) => {
     // reusing runTool()'s submit+poll. The Tools panel reflects this clip
     // afterward (harmless — and convenient if the user opens it).
     set({ toolsTool: 'upscale', toolsSourcePath: name, toolsSourceName: name, toolsSourceUrl: url, toolsSourceAssetId: null, toolsSourceWorkspace: null, toolsSourceKind: 'video' })
+    // The shortcut is exposed from the video activity view, so the current
+    // mode is usually video. Switch to Tools before runTool snapshots the
+    // form; this also mounts the durable ACK panel that presents the command.
+    const state = get()
+    state.setSettingsOpen(false)
+    state.setDashboardOpen(false)
+    state.setSidebarMode('studio')
+    state.setSidebarOpen(true)
+    state.setGenerationMode('tools')
     await get().runTool()
   },
   sendClipToTools: (name, url, tool) => {

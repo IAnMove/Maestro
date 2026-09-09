@@ -167,6 +167,84 @@ test('upscale accepts an image while revoice remains video-only', { concurrency:
   }
 })
 
+test('quick video upscale enters Tools and presents one durable command', { concurrency: false }, async () => {
+  const { render, cleanup, waitFor } = await import('@testing-library/react')
+  const { ToolsPanel } = await import('../src/components/Sidebar/ToolsPanel.tsx')
+  const { useStore } = await import('../src/stores/useStore.ts')
+  const previousFetch = globalThis.fetch
+  const previousSetInterval = globalThis.setInterval
+  const commandPosts: Array<Record<string, unknown>> = []
+  globalThis.fetch = async (input, init) => {
+    const requestUrl = typeof input === 'string' ? input : (input as Request).url || String(input)
+    if (requestUrl.includes('/api/v1/assets')) {
+      return new Response(JSON.stringify({ total: 0, assets: [] }), {
+        status: 200, headers: { 'Content-Type': 'application/json' },
+      })
+    }
+    if (requestUrl.includes('/api/v1/generation/commands')) {
+      const body = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : {}
+      commandPosts.push(body)
+      return new Response(JSON.stringify({
+        version: 1,
+        commandId: String(body.intent_id || ''),
+        operation: 'tools.upscale',
+        status: 'queued',
+        entities: [],
+        artifacts: [],
+        taskIds: ['task-quick-upscale'],
+        pipelineIds: [],
+        result: {
+          job_id: 'job-quick-upscale', task_id: 'task-quick-upscale',
+          workspace: 'default', status: 'queued',
+        },
+        commandVersion: 2,
+        contentFingerprint: 'b'.repeat(64),
+        fingerprintVersion: 2,
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    }
+    return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } })
+  }
+  globalThis.setInterval = (() => 1) as unknown as typeof setInterval
+  useStore.setState({
+    generationMode: 'video',
+    sidebarMode: 'director', sidebarOpen: false, settingsOpen: true, dashboardOpen: true,
+    toolsTool: 'upscale',
+    toolsSourcePath: null, toolsSourceName: null, toolsSourceUrl: null,
+    toolsSourceAssetId: null, toolsSourceWorkspace: null, toolsSourceKind: null,
+    toolsUpscaleMethod: 'flashvsr2', toolsSubmitting: false,
+    activeWorkspace: 'default', jobs: [], outputs: [], selectedOutput: -1,
+  } as never)
+  try {
+    render(<ToolsPanel />)
+    await waitFor(() => assert.equal(
+      document.querySelector('[data-studio-tools-listening="true"]')?.getAttribute('data-studio-tools-listening'),
+      'true',
+    ))
+    await useStore.getState().quickUpscaleClip(
+      'clip.mp4', '/api/v1/file/clip.mp4?workspace=default',
+    )
+    assert.equal(useStore.getState().generationMode, 'tools')
+    assert.equal(useStore.getState().sidebarMode, 'studio')
+    assert.equal(useStore.getState().sidebarOpen, true)
+    assert.equal(useStore.getState().settingsOpen, false)
+    assert.equal(useStore.getState().dashboardOpen, false)
+    assert.equal(commandPosts.length, 1)
+    assert.equal(commandPosts[0].version, 2)
+    assert.equal(commandPosts[0].operation, 'tools.upscale')
+    const input = commandPosts[0].input as Record<string, unknown>
+    const params = input.params as Record<string, unknown>
+    assert.equal(input.workspace, 'default')
+    assert.equal(params.source, '/api/v1/file/clip.mp4?workspace=default')
+    assert.equal(params.source_kind, 'video')
+    assert.equal(params.method, 'flashvsr2')
+  } finally {
+    cleanup()
+    globalThis.fetch = previousFetch
+    globalThis.setInterval = previousSetInterval
+    useStore.setState({ toolsSubmitting: false, jobs: [] } as never)
+  }
+})
+
 test('video tools can run only with a video source', { concurrency: false }, async () => {
   const { render, screen, fireEvent, cleanup } = await import('@testing-library/react')
   const { ToolsPanel } = await import('../src/components/Sidebar/ToolsPanel.tsx')
