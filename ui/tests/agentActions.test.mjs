@@ -1666,8 +1666,14 @@ test('informational stop and cancel questions do not cancel the active GPU task'
     'What happens if I cancel the generation?',
     'Why would I cancel the generation?',
     'Should I cancel the generation?',
+    'Can I cancel the generation?',
+    'Could I cancel the generation?',
+    'Where do I cancel the generation?',
+    'Is there a way to cancel the generation?',
     '¿Puedo cancelar la generación?',
     '¿Cómo cancelo la generación?',
+    '¿Dónde cancelo la generación?',
+    '¿Hay alguna forma de cancelar la generación?',
   ]) {
     assert.equal(isHowToGenerateQuestion(request), true, request)
     assert.equal(isExplicitCancelRequest(request), false, request)
@@ -1711,9 +1717,13 @@ test('UI-label generate questions do not enqueue Studio generation', async () =>
   try {
     for (const request of [
       'What does the generate video button do?',
+      'How does the generate video button work?',
+      'What is the generate video button?',
       'Tell me about the generate video workflow',
       'Explica qué significa genera el video en Studio',
       '¿Qué hace el botón genera el video?',
+      '¿Qué es el botón genera el video?',
+      '¿Cómo funciona el botón genera el video?',
     ]) {
       assert.equal(isHowToGenerateQuestion(request), true, request)
       assert.equal(isExplicitVideoGenerationRequest(request), false, request)
