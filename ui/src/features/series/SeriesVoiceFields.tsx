@@ -2,6 +2,7 @@ import { SeriesField } from './components'
 import { inputClass, textareaClass } from './styles'
 import type { SeriesProject } from './types'
 import { useUiTranslation } from '../../i18n'
+import { CharacterKitLink } from '../characters/CharacterKitLink'
 
 export function SeriesVoiceFields({
   series, onPatchVoice,
@@ -15,6 +16,7 @@ export function SeriesVoiceFields({
       {series.characters.map((character, index) => (
         <div key={character.id} className="rounded-lg border border-border p-3">
           <strong className="text-xs text-text-primary">{character.name || t('canon.character')}</strong>
+          <CharacterKitLink value={character.voiceProfile?.characterKitRef} onChange={characterKitRef => onPatchVoice(index, { characterKitRef })} />
           <div className="mt-2 grid gap-2 md:grid-cols-3">
             <SeriesField label={t('canon.provider')}>
               <input className={inputClass} value={String(character.voiceProfile?.provider || '')} onChange={event => onPatchVoice(index, { provider: event.target.value })} />

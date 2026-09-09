@@ -80,10 +80,16 @@ class DevelopmentBranchPolicyTests(unittest.TestCase):
         self.assertIn('name: UI E2E boot (Chromium + simulated API)', text)
         self.assertIn('name: CI required', text)
         self.assertIn('if: always()', text)
-        self.assertIn('needs: [guard, ui-check, ui-e2e]', text)
-        self.assertNotIn('code-health-comment', text.split('needs: [guard, ui-check, ui-e2e]', 1)[1][:200])
-        self.assertNotIn('independent-qa', text.split('needs: [guard, ui-check, ui-e2e]', 1)[1][:200])
-        self.assertNotIn('Independent QA', text.split('needs: [guard, ui-check, ui-e2e]', 1)[1][:400])
+        dependencies = 'needs: [guard, ui-check, ui-e2e, ui-speech-windows]'
+        self.assertIn(dependencies, text)
+        self.assertNotIn('code-health-comment', text.split(dependencies, 1)[1][:200])
+        self.assertNotIn('independent-qa', text.split(dependencies, 1)[1][:200])
+        self.assertNotIn('Independent QA', text.split(dependencies, 1)[1][:400])
+        self.assertIn('Speech E2E Windows (real H.264 + AAC)=${{ needs.ui-speech-windows.result }}', text)
+        windows = text.split('  ui-speech-windows:', 1)[1].split('  code-health-comment:', 1)[0]
+        self.assertIn('HOCUSPOCUS_REQUIRE_SPEECH_AAC: "1"', windows)
+        self.assertIn('playwright install chromium msedge', windows)
+        self.assertIn('scene3d-speech.spec.ts scene3d-media-screen.spec.ts', windows)
 
     def test_agent_qa_policy_still_lists_ci_required(self):
         text = (ROOT / 'docs/development/AGENT_QA_POLICY.md').read_text(encoding='utf-8')

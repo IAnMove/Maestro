@@ -1,4 +1,5 @@
 import { paintKineticTexts } from '../../lib/kineticText.ts'
+import { mixSceneSpeech } from './speech/audio'
 import { scene3dOutputDuration, scene3dPlaybackSpeed } from './clock.ts'
 import { scene3dCopy } from './copy.ts'
 import { paintClipNumber } from './performance.ts'
@@ -34,7 +35,9 @@ export async function exportWorld3DDocument(
   const snapshot = startWorld3DExport(handle, document, size)
   try {
     await waitForWorld3DAssets(handle, snapshot)
+    const audio = await mixSceneSpeech(snapshot)
     const blob = await encodeWorld3DFrames({
+      audio,
       width: size.width,
       height: size.height,
       fps: snapshot.fps,

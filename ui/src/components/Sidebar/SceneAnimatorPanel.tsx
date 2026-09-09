@@ -2756,7 +2756,19 @@ export function SceneAnimatorPanel() {
       setRhythmBusy(false)
     }
   }), [outputs, selectedId, updateScene, t])
+  const animateModelDialogue = async () => {
+    if (playing || recording || publishing || cutoutDialogueBusy) return
+    if (selected?.type !== 'model3d' || !selectedDialogueTrack) { setMessage(t('animator.attachSpeechFirst')); return }
+    const snapshot = structuredClone(scene)
+    setCutoutDialogueBusy(true)
+    try {
+      const { speakLegacyModel } = await import('../../features/scene3d/speech/prepareProduction')
+      await speakLegacyModel(snapshot, selected.id, selectedDialogueTrack.id, workspace, cutoutDialogueStart, cutoutDialogueEnd, cutoutDialogueText)
+    } catch (error) { setMessage(error instanceof Error ? error.message : String(error)) }
+    finally { setCutoutDialogueBusy(false) }
+  }
   const animateCutoutDialogue = () => {
+    if (selected?.type === 'model3d') { void animateModelDialogue(); return }
     const text = cutoutDialogueText.trim()
     if (!text) { setMessage(t('animator.writeDialogueFirst')); return }
     const poseLayerId = selected?.faceBinding?.poseLayerId
@@ -2781,6 +2793,7 @@ export function SceneAnimatorPanel() {
     setMessage(t('animator.animatedMouths', { beats: plan.visemes.length, states: Object.keys(frames).length }))
   }
   const animateCutoutDialogueFromAudio = async () => {
+    if (selected?.type === 'model3d') { await animateModelDialogue(); return }
     const poseLayerId = selected?.faceBinding?.poseLayerId
       ?? (selected?.relationship?.type === 'parent' && isCutoutFaceLayer(selected) ? selected.relationship.targetLayerId : undefined)
       ?? (selected && selected.type !== 'camera' && selected.type !== 'effect' && !isCutoutFaceLayer(selected) ? selected.id : undefined)
@@ -3092,6 +3105,8 @@ export function SceneAnimatorPanel() {
       <div className="space-y-1.5 rounded border border-amber-400/30 bg-amber-400/[.04] p-2">
         <div className="flex items-center justify-between gap-2"><span className="text-[10px] font-medium text-amber-100">{t('animator.sceneAudio')}</span><span className="text-[8px] text-amber-200/75">{t('animator.sceneAudioMeta')}</span></div>
         <p className="text-[8px] leading-relaxed text-text-muted">{t('animator.sceneAudioHelp')}</p>
+        <ModelCharacterLink layer={selected} workspace={workspace} disabled={playing || recording || publishing}
+          onChange={(id, characterKitRef) => updateLayer(id, layer => ({ ...layer, characterKitRef }))} />
         <textarea value={sceneAudioPrompt} disabled={sceneAudioBusy || playing || recording || publishing} onChange={event => setSceneAudioPrompt(event.target.value)} placeholder={t('animator.sceneAudioPlaceholder')} rows={2} className="w-full resize-y rounded border border-border bg-bg-primary px-2 py-1 text-[10px] disabled:opacity-50" />
         <button type="button" disabled={!sceneAudioPrompt.trim() || sceneAudioBusy || playing || recording || publishing} onClick={() => void generateSceneSpeech()} className="w-full rounded border border-amber-300/50 bg-amber-400/10 px-2 py-1 text-[10px] text-amber-100 disabled:opacity-40">{sceneAudioBusy ? t('animator.generatingNarration') : t('animator.generateSpeech', { model: selectedSpeechModel })}</button>
         {generatedAudio.length > 0 && <SceneAnimatorAudioInput audio={generatedAudio} disabled={playing || recording || publishing} onAttach={(filename, title, kind) => attachSceneAudio(filename, title, kind)} />}
@@ -3307,3 +3322,4 @@ export function SceneAnimatorPanel() {
     />
   </div>
 }
+import { ModelCharacterLink } from '../../features/characters/ModelCharacterLink'

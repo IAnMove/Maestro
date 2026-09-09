@@ -1,4 +1,5 @@
 import { framingPose } from './framing'
+import { SpeechFaceRuntime } from './speech/runtime'
 import { screenGeometry } from './screenGeometry'
 import type { ScreenMediaRuntime } from './screenMediaRuntime'
 import { framingAnchor } from './framingAnchor'
@@ -62,6 +63,7 @@ export type SlotGpu = {
   looping: boolean
   loaded: boolean
   contactShadow?: Mesh
+  speechFace?: SpeechFaceRuntime
   screen?: ScreenMediaRuntime
   screenAbort?: AbortController
   screenError?: Error
@@ -250,6 +252,7 @@ export function dropSlot(world: GpuWorld, slotId: string) {
   const current = world.slots.get(slotId)
   if (!current) return
   current.mixer?.stopAllAction()
+  current.speechFace?.dispose()
   current.screenAbort?.abort()
   current.screen?.dispose()
   world.scene.remove(current.root)
@@ -296,7 +299,13 @@ export function placeSlot(
 export function worldAssetsReady(world: GpuWorld, slots: readonly Scene3DSlot[]): boolean {
   if (!world.dressingReady) return false
   return slots.every(slot => {
+    if (slot.speech?.enabled && !slot.sourceUrl) throw new Error('Choose a 3D model before exporting a speech scene.')
     const gpu = world.slots.get(slot.id)
+    if (slot.speech?.enabled) {
+      if (!slot.speech.face) throw new Error('Calibrate the face before exporting a speech scene.')
+      if (gpu?.speechFace?.error) throw gpu.speechFace.error
+      if (!gpu?.speechFace || !gpu.speechFace.ready) return false
+    }
     if (slot.screen && gpu?.mountKey !== slotMountKey(slot)) return false
     if (gpu?.screenError) throw gpu.screenError
     if (gpu?.screen?.error) throw gpu.screen.error
@@ -342,6 +351,10 @@ export function paintWorld(world: GpuWorld, document: Scene3DDocument, sceneSeco
     if (local != null && clip && gpu.mixer) seekBoundMixer(gpu.mixer, clip, local)
     groundLoadedSlot(gpu, slot)
     if (slot.performance === 'typing') applyTypingPose(gpu.root, slot, sceneSeconds)
+    if (gpu.loaded && gpu.kind === 'model' && (slot.speech || gpu.speechFace)) {
+      gpu.speechFace ??= new SpeechFaceRuntime(() => world.renderer.render(world.scene, world.camera))
+      gpu.speechFace.sync(gpu.root, slot.speech, sceneSeconds)
+    }
   }
   const framing = document.camera.framing
   const target = posedSlots.find(slot => slot.id === framing?.targetSlot)

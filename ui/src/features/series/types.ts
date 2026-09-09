@@ -48,6 +48,7 @@ export interface SeriesVisualVariant {
 }
 
 export interface SeriesVoiceProfile {
+  characterKitRef?: import('../../lib/characterVoice').CharacterKitRef
   provider?: string
   voiceId?: string
   language?: string
