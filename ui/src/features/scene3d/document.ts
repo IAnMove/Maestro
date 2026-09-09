@@ -71,6 +71,20 @@ export function cloneScene3DDocument(document: Scene3DDocument): Scene3DDocument
   return structuredClone(document)
 }
 
+function validProduction(p: Scene3DDocument['production']) {
+  if (p === undefined) return true
+  return !!p && ['song', 'dialogue', 'episode', 'trailer'].includes(p.kind)
+    && typeof p.title === 'string' && p.title.length <= 500
+    && typeof p.workspace === 'string' && !!p.workspace && p.workspace.length <= 120
+    && (p.sourceId === undefined || (typeof p.sourceId === 'string' && p.sourceId.length <= 300))
+}
+function knownTemplateId(value: unknown): Scene3DTemplateId {
+  return typeof value === 'string' && (SCENE3D_TEMPLATE_IDS as readonly string[]).includes(value) ? value as Scene3DTemplateId : 'two-shot'
+}
+
+function parseWorkshopScreen(value: unknown) {
+  return value === 'error' || value === 'success' ? value : undefined
+}
 export function parseScene3DDocument(raw: unknown): Scene3DDocument | null {
   if (!raw || typeof raw !== 'object') return null
   const value = raw as Partial<Scene3DDocument>
@@ -80,15 +94,9 @@ export function parseScene3DDocument(raw: unknown): Scene3DDocument | null {
   let slots: Scene3DSlot[]
   let soundtrack: Scene3DDocument['soundtrack']
   try { slots = value.slots.map(normalizeScene3DSlot); soundtrack = parseSoundtrack(value.soundtrack) } catch { return null }
-  const p = value.production
-  if (p !== undefined && (!p || !['song', 'dialogue', 'episode', 'trailer'].includes(p.kind)
-    || typeof p.title !== 'string' || p.title.length > 500 || typeof p.workspace !== 'string' || !p.workspace || p.workspace.length > 120
-    || (p.sourceId !== undefined && (typeof p.sourceId !== 'string' || p.sourceId.length > 300)))) return null
-  const templateId: Scene3DTemplateId = typeof value.templateId === 'string'
-    && (SCENE3D_TEMPLATE_IDS as readonly string[]).includes(value.templateId)
-    ? value.templateId as Scene3DTemplateId
-    : 'two-shot'
+  if (!validProduction(value.production)) return null
+  const templateId = knownTemplateId(value.templateId)
   const dressing = parseDressing(value.dressing)
-  const workshopScreen = value.workshopScreen === 'error' || value.workshopScreen === 'success' ? value.workshopScreen : undefined
+  const workshopScreen = parseWorkshopScreen(value.workshopScreen)
   return { ...value, ...(soundtrack !== undefined ? { soundtrack } : {}), workshopScreen, texts: parseKineticTexts(value.texts), slots, templateId, dressing, clipNumber: reviewClipNumber(value.clipNumber), playbackSpeed: scene3dPlaybackSpeed(value.playbackSpeed) } as Scene3DDocument
 }

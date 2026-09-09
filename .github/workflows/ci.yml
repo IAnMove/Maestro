@@ -164,11 +164,15 @@ jobs:
       - name: Install Playwright Chromium
         working-directory: ui
         run: npx playwright install --with-deps chromium
+      - name: Install Chrome for native H.264 and AAC speech export checks
+        working-directory: ui
+        run: npx playwright install chrome
       - name: UI E2E
         working-directory: ui
         run: npm run test:e2e
       - name: Upload Playwright artifacts
-        if: failure()
+        # Passing speech tests also attach screenshots, native JSON and MP4 evidence.
+        if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: ui-e2e-artifacts

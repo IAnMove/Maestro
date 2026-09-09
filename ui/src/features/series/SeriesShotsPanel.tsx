@@ -164,7 +164,8 @@ export function SeriesShotsPanel({
           </details>
           {shot.dialogueBeats.length > 0 && <SpeechProductionEntry key={workspace + '/' + shot.id} kind="episode" workspace={workspace}
             title={episode.title + ' · ' + shot.order} sourceId={series.id + '/' + episode.id + '/' + shot.id}
-            cast={[...new Set(shot.dialogueBeats.map(beat => beat.characterId))].map(id => ({ id, name: characters[id] || id }))}
+              cast={[...new Set(shot.dialogueBeats.map(beat => beat.characterId))].map(id => ({ id, name: characters[id] || id,
+                characterKitRef: series.characters.find(character => character.id === id)?.voiceProfile?.characterKitRef }))}
             lines={shot.dialogueBeats.map(beat => ({ id: beat.id, characterId: beat.characterId, text: beat.text }))} />}
           {shot.attempts.length > 0 && <div className="mt-3 flex flex-wrap gap-2">{shot.attempts.map(attempt => <Pill key={attempt.id} tone={attempt.status === 'completed' ? 'green' : attempt.status === 'failed' ? 'red' : attempt.status === 'running' ? 'violet' : 'neutral'}>{t('shots.attempt', { status: seriesStatusLabel(t, attempt.status), seed: attempt.seed ?? t('shots.seedRandom'), elapsed: (attempt.elapsedMs / 1000).toFixed(1), model: attempt.model })}</Pill>)}</div>}
         </article>

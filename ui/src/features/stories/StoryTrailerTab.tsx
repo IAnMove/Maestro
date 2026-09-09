@@ -82,7 +82,7 @@ export function StoryTrailerTab(props: StoryTrailerTabProps) {
       </div>
 
       <StoryTrailerClipProduction {...props} />
-      <SpeechProductionEntry key={props.project.id} kind="trailer" title={props.project.title} sourceId={props.project.id} />
+      <SpeechProductionEntry key={props.project.id} kind="trailer" title={props.project.title} sourceId={props.project.id} castOptions={props.project.characters} />
     </div>
   )
 }

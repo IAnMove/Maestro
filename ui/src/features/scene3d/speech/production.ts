@@ -11,18 +11,19 @@ export type SpeechProductionInput = {
   workspace: string
   duration: number
   offset: number
-  cast: { id: string; name: string; model: Scene3DSourceRef }[]
-  audio: Scene3DSourceRef
+  cast: { id: string; name: string; model: Scene3DSourceRef;
+    character?: import('../types').Scene3DSlot['character']; settings?: import('./profiles').FaceSettings }[]
+  audio?: Scene3DSourceRef
   lines?: { id: string; characterId: string; text: string; start?: number; end?: number }[]
 }
 export function buildSpeechProduction(input: SpeechProductionInput): Scene3DDocument {
   if (!input.cast.length || input.cast.length > 2 || new Set(input.cast.map(c => c.id)).size !== input.cast.length) throw new Error('Choose one or two distinct speakers per shot.')
   if (!Number.isFinite(input.duration) || input.duration < .1 || input.duration > 90 || !Number.isFinite(input.offset) || input.offset < 0 || input.offset + input.duration > 600) throw new Error('Choose a source fragment up to 90 seconds, within the first 600 seconds.')
-  if (!safeMediaUrl(input.audio.url) || input.cast.some(c => !safeMediaUrl(c.model.url) || !/\.glb$/i.test(c.model.filename))) throw new Error('Use saved GLB models and audio.')
+  if ((input.audio && !safeMediaUrl(input.audio.url)) || input.cast.some(c => !safeMediaUrl(c.model.url) || !/\.glb$/i.test(c.model.filename))) throw new Error('Use saved GLB models and audio.')
   const doc = applyScene3DTemplate(input.cast.length === 2 ? 'speech-dialogue' : 'speech-portrait')
   doc.duration = input.duration
   doc.production = { kind: input.kind, title: input.title, sourceId: input.sourceId, workspace: input.workspace }
-  doc.soundtrack = [{ id: 'production-audio', audio: input.audio, start: 0, offset: input.offset, end: input.duration, gain: 1 }]
+  doc.soundtrack = input.audio ? [{ id: 'production-audio', audio: input.audio, start: 0, offset: input.offset, end: input.duration, gain: 1 }] : undefined
   const lines = input.lines?.length ? input.lines : input.cast.map((c, i) => ({
     id: 'line-' + i, characterId: c.id, text: '', start: i * input.duration / input.cast.length, end: (i + 1) * input.duration / input.cast.length,
   }))
@@ -37,10 +38,10 @@ export function buildSpeechProduction(input: SpeechProductionInput): Scene3DDocu
       const end = line.end ?? (i + 1) * input.duration / lines.length
       if (start < 0 || end > input.duration || end <= start) throw new Error('Dialogue timing is outside the shot.')
       return [{ id: line.id, text: line.text, audio: input.audio, start, end, offset: input.offset + start,
-        gain: 1, audible: false, cues: [], driver: 'imported' }]
+        gain: 1, audible: !input.audio, cues: [], driver: 'imported' }]
     })
-    return { ...slot, character: { id: character.id, name: character.name }, sourceUrl: character.model.url, sourceRef: character.model, clip: null,
-      speech: { ...defaultSpeech(), clips } }
+    return { ...slot, character: { ...character.character, id: character.id, name: character.name }, sourceUrl: character.model.url, sourceRef: character.model, clip: null,
+      speech: { ...defaultSpeech(), ...character.settings, clips } }
   })
   const parsed = parseScene3DDocument(doc)
   if (!parsed) throw new Error('Invalid 3D speech production.')

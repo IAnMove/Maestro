@@ -1,13 +1,13 @@
 """Workspace-scoped, content-addressed face calibration. No audio or model bytes."""
 from __future__ import annotations
 import json
-import math
 import os
 import threading
 import uuid
 from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+from services.character_speech_definition import face_settings
 
 _lock = threading.Lock()
 
@@ -27,27 +27,7 @@ class ProfileWrite(BaseModel):
     @field_validator("settings")
     @classmethod
     def face_only(cls, value):
-        allowed = {"face", "atlas", "strength", "clean", "style", "lip", "expression", "blink", "eyes"}
-        if not isinstance(value.get("face"), dict) or not set(value).issubset(allowed):
-            raise ValueError("Only face settings may be stored.")
-        face = value["face"]
-        eyes = face.get("eyes", {})
-        def vector(raw, length, low, high):
-            return isinstance(raw, list) and len(raw) == length and all(
-                type(n) in (int, float) and math.isfinite(n) and low <= n <= high for n in raw)
-        if (set(face) != {"meshIndex", "center", "size", "skin", "eyes"}
-            or type(face["meshIndex"]) is not int or not 0 <= face["meshIndex"] <= 1023
-            or not isinstance(eyes, dict) or set(eyes) != {"left", "right", "size", "skinLeft", "skinRight"}
-            or not vector(face.get("center"), 3, -10000, 10000)
-            or not vector(face.get("size"), 2, .00001, 10000)
-            or not vector(face.get("skin"), 3, 0, 1)
-            or any(not vector(eyes.get(k), 3, -10000, 10000) for k in ("left", "right"))
-            or not vector(eyes.get("size"), 2, .00001, 10000)
-            or any(not vector(eyes.get(k), 3, 0, 1) for k in ("skinLeft", "skinRight"))):
-            raise ValueError("Invalid face placement.")
-        if len(json.dumps(value, allow_nan=False)) > 24000:
-            raise ValueError("Face profile too large.")
-        return value
+        return face_settings(value)
 
 def create_scene3d_profiles_router(workspace_dir):
     router = APIRouter()

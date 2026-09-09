@@ -1,8 +1,12 @@
 import { expect, test } from '@playwright/test'
 import { gotoApp, closeApp } from '../helpers/gotoApp'
+import { speechApp, openSpeech, saveSpeech, seekSpeech, exportSpeech } from '../helpers/speechFlow'
+import { speechFixture, speechTestWav } from '../helpers/speechAssets'
 
 // Closed API simulation, real application/editor/WebGL. No generation providers.
-test.use({ channel: 'msedge' })
+// Branded Chromium supplies H.264 + AAC for the real export assertion.
+test.use({ channel: process.platform === 'win32' ? 'msedge' : 'chrome' })
+test.setTimeout(120000)
 test('new talking shots are reachable in the existing 3D video editor', async ({ page }) => {
   const session = await gotoApp(page)
   await page.getByRole('tab', { name: 'Video 3D', exact: true }).click()
@@ -34,4 +38,100 @@ test('new talking shots are reachable in the existing 3D video editor', async ({
     await expect(workspace.getByTestId('scene3d-roundtrip')).toHaveText('ok')
   }
   await closeApp(page, session)
+})
+
+test('one 3D character speaks, rests during silence, seeks and exports real H.264 + AAC', async ({ page }, info) => {
+  const app = await speechApp(page)
+  await openSpeech(page, speechFixture())
+  await page.getByLabel('Dialogue or lyrics (literal reference)').fill('Hello, this is a speaking character.')
+  const controls = page.getByTestId('scene3d-speech')
+  await controls.getByTestId('asset-input-file').first().setInputFiles({ name: 'speech-test.wav', mimeType: 'audio/wav', buffer: speechTestWav() })
+  await controls.getByRole('button', { name: 'Calculate gestures with Rhubarb (local)', exact: true }).click()
+  await expect(controls).toContainText('Rhubarb')
+  await seekSpeech(page, .4)
+  await expect(page.getByTestId('speech-state')).toHaveAttribute('data-viseme', 'A')
+  const talking = await page.getByTestId('scene3d-stage').screenshot()
+  await seekSpeech(page, 1.0)
+  await expect(page.getByTestId('speech-state')).toHaveAttribute('data-viseme', 'rest')
+  const silent = await page.getByTestId('scene3d-stage').screenshot()
+  expect(talking.equals(silent)).toBe(false)
+  await seekSpeech(page, .4) // Backward seek must recover the same mouth.
+  await expect(page.getByTestId('speech-state')).toHaveAttribute('data-viseme', 'A')
+  await page.getByRole('button', { name: 'Play', exact: true }).click()
+  await expect(controls.getByRole('button', { name: 'Calculate gestures with Rhubarb (local)', exact: true })).toBeDisabled()
+  await page.getByRole('button', { name: 'Pause', exact: true }).click()
+  const saved = await saveSpeech(page, info, 'single')
+  expect(saved.slots[0].speech?.clips?.[0].driver).toBe('rhubarb')
+  expect(saved.slots[0].speech?.clips?.[0].text).toBe('Hello, this is a speaking character.')
+  await info.attach('talking.png', { body: talking, contentType: 'image/png' })
+  await info.attach('silence.png', { body: silent, contentType: 'image/png' })
+  const exported = await exportSpeech(page, info)
+  expect(exported.duration).toBeGreaterThanOrEqual(4)
+  expect(exported.duration).toBeLessThan(4.1)
+  expect(app.requests).toHaveLength(0)
+  await closeApp(page, app.session)
+})
+
+test('A → B → A: only the intended mouth moves, pauses remain and soundtrack is not doubled', async ({ page }, info) => {
+  const app = await speechApp(page)
+  await openSpeech(page, speechFixture(true, true))
+  for (const [speaker, intervention] of [['subject_1', '0'], ['subject_2', '0'], ['subject_1', '1']]) {
+    await page.getByLabel('Character', { exact: true }).selectOption(speaker)
+    await page.getByLabel('Intervention', { exact: true }).selectOption(intervention)
+    await page.getByRole('button', { name: 'Calculate gestures with Rhubarb (local)', exact: true }).click()
+    await expect(page.getByRole('button', { name: 'Calculate gestures with Rhubarb (local)', exact: true })).toBeEnabled()
+  }
+  for (const [time, a, b] of [[.4, 'A', 'rest'], [1.0, 'rest', 'rest'], [1.6, 'rest', 'A'], [2.2, 'rest', 'rest'], [2.8, 'A', 'rest']] as const) {
+    await seekSpeech(page, time)
+    await expect(page.locator('[data-testid=speech-state][data-speaker=subject_1]')).toHaveAttribute('data-viseme', a)
+    await expect(page.locator('[data-testid=speech-state][data-speaker=subject_2]')).toHaveAttribute('data-viseme', b)
+    await info.attach('turn-' + time + '.png', { body: await page.getByTestId('scene3d-stage').screenshot(), contentType: 'image/png' })
+  }
+  await seekSpeech(page, .3)
+  await page.getByRole('button', { name: 'Play', exact: true }).click()
+  await expect.poll(() => page.evaluate(() => (window as Window & { __speechPlayers: HTMLAudioElement[] }).__speechPlayers.filter(audio => !audio.paused).length)).toBe(1)
+  await page.getByRole('button', { name: 'Pause', exact: true }).click()
+  const saved = await saveSpeech(page, info, 'dialogue')
+  expect(saved.soundtrack).toHaveLength(1)
+  expect(saved.slots.flatMap(slot => slot.speech?.clips ?? [])).toHaveLength(3)
+  expect(saved.slots.flatMap(slot => slot.speech?.clips ?? []).every(clip => clip.audible === false && clip.cues.length > 0)).toBe(true)
+  await exportSpeech(page, info)
+  expect(app.requests).toHaveLength(0)
+  await closeApp(page, app.session)
+})
+
+test('save/reopen/reuse character face and preferred voice; explicit text-to-audio once, existing audio wins', async ({ page }, info) => {
+  const app = await speechApp(page)
+  await openSpeech(page, speechFixture())
+  await page.getByText('Adjust mouth and expressions', { exact: true }).click()
+  await page.getByLabel('Mouth X', { exact: true }).fill('0.025')
+  await page.getByTestId('character-name').fill('Alice reusable')
+  await page.getByTestId('character-voice').selectOption('serena')
+  await page.getByTestId('save-character').click()
+  await expect(page.getByTestId('character-definition')).toContainText('Character saved.')
+  const kit = Object.values(app.library().kits)[0]
+  expect(kit.voice?.voiceId).toBe('serena')
+  expect(kit.speech3d?.settings?.face?.center[0]).toBe(.025)
+  const before = await saveSpeech(page, info, 'saved-character')
+  await openSpeech(page, speechFixture())
+  await page.getByTestId('saved-character').selectOption(kit.id)
+  await page.getByTestId('apply-character').click()
+  await expect(page.getByTestId('character-voice')).toHaveValue('serena')
+  await page.getByLabel('Dialogue or lyrics (literal reference)').fill('This is my reusable voice.')
+  expect(app.requests).toHaveLength(0)
+  await page.getByTestId('generate-character-line').click()
+  await expect(page.getByTestId('generate-character-line')).toBeDisabled()
+  await expect(page.getByText('This line already has audio: reuse it without generating another voice.')).toBeVisible()
+  expect(app.requests).toHaveLength(1)
+  expect(app.requests[0]).toMatchObject({ model_type: 'qwen3_tts_customvoice', model_mode: 'serena', prompt: 'This is my reusable voice.', workspace: 'default' })
+  const reused = await saveSpeech(page, info, 'reused-character')
+  expect(reused.slots[0].speech?.face).toEqual(before.slots[0].speech?.face)
+  expect(reused.slots[0].character?.kitRef).toEqual({ id: kit.id, workspace: 'default' })
+  expect(reused.slots[0].speech?.clips?.[0]).toMatchObject({ driver: 'rhubarb', text: 'This is my reusable voice.', audio: { filename: 'tts-test.wav' } })
+  await openSpeech(page, reused)
+  await expect(page.getByTestId('character-voice')).toHaveValue('serena')
+  await expect(page.getByTestId('generate-character-line')).toBeDisabled()
+  expect(app.requests).toHaveLength(1)
+  await info.attach('reused-character.png', { body: await page.screenshot(), contentType: 'image/png' })
+  await closeApp(page, app.session)
 })

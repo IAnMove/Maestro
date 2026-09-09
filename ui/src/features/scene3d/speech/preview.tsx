@@ -4,6 +4,15 @@ import { scene3dPlaybackSpeed } from '../clock'
 import { useUiTranslation } from '../../../i18n'
 import { sceneVoiceTracks } from './timeline'
 
+function syncPlayer(audio: HTMLAudioElement, voice: ReturnType<typeof sceneVoiceTracks>[number], document: Scene3DDocument, seconds: number, playing: boolean, onFailure: () => void) {
+  const local = seconds - voice.start + voice.offset
+  const active = playing && seconds >= voice.start && seconds < Math.min(document.duration, voice.end ?? document.duration) && (!Number.isFinite(audio.duration) || local < audio.duration)
+  audio.volume = Math.min(1, voice.gain); audio.playbackRate = scene3dPlaybackSpeed(document.playbackSpeed)
+  if (!active) audio.pause()
+  if (audio.readyState > 0 && Math.abs(audio.currentTime - Math.max(0, local)) > .12) audio.currentTime = Math.max(0, local)
+  if (active && audio.paused) void audio.play().catch(onFailure)
+}
+
 export function SceneSpeechAudio({ document, seconds, playing }: { document: Scene3DDocument; seconds: number; playing: boolean }) {
   const { t } = useUiTranslation('scene3dEditor')
   const players = useRef(new Map<string, HTMLAudioElement>())
@@ -21,11 +30,7 @@ export function SceneSpeechAudio({ document, seconds, playing }: { document: Sce
         audio.preservesPitch = false
         players.current.set(voice.key, audio)
       }
-      const local = seconds - voice.start + voice.offset, active = playing && seconds >= voice.start && seconds < Math.min(document.duration, voice.end ?? document.duration) && (!Number.isFinite(audio.duration) || local < audio.duration)
-      audio.volume = Math.min(1, voice.gain); audio.playbackRate = scene3dPlaybackSpeed(document.playbackSpeed)
-      if (!active) audio.pause()
-      if (audio.readyState > 0 && Math.abs(audio.currentTime - Math.max(0, local)) > .12) audio.currentTime = Math.max(0, local)
-      if (active && audio.paused) void audio.play().catch(() => setFailed(true))
+      syncPlayer(audio, voice, document, seconds, playing, () => setFailed(true))
     }
     for (const [id, audio] of players.current) if (!wanted.has(id)) { audio.pause(); audio.removeAttribute('src'); audio.load(); players.current.delete(id) }
   }, [document, seconds, playing])

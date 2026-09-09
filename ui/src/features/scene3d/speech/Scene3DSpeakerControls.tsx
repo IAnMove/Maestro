@@ -6,6 +6,8 @@ import { parseSpeech } from './track'
 import { speechClips } from './timeline'
 import { faceSettings, loadFaceProfile, saveFaceProfile } from './profiles'
 import { SpeechNumber, speechInput } from './FaceControls'
+import { CharacterDefinitionEditor } from '../../characters/CharacterDefinitionEditor'
+import { GenerateCharacterLine } from './GenerateCharacterLine'
 
 export function Scene3DSpeakerControls(props: SpeechControlsProps) {
   const { t } = useUiTranslation('scene3dEditor')
@@ -14,7 +16,10 @@ export function Scene3DSpeakerControls(props: SpeechControlsProps) {
   const [notice, setNotice] = useState('')
   const [busy, setBusy] = useState(false)
   const [childBusy, setChildBusy] = useState(false)
-  const locked = props.disabled || busy || childBusy
+  const [definitionBusy, setDefinitionBusy] = useState(false), [voiceBusy, setVoiceBusy] = useState(false)
+  const locks = { profile: busy, controls: childBusy, definition: definitionBusy, voice: voiceBusy }
+  const isLocked = (except?: keyof typeof locks) => Boolean(props.disabled) || Object.entries(locks).some(([key, value]) => key !== except && value)
+  const locked = isLocked()
   const [profileRevision, setProfileRevision] = useState<{ digest: string; revision: number }>()
   const alive = useRef(true)
   useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
@@ -32,6 +37,8 @@ export function Scene3DSpeakerControls(props: SpeechControlsProps) {
     commit({ ...stored, ...faceSettings(next), enabled: next.enabled, clips: clips.map((item, i) => i === index ? updated : item) })
   }
   return <div className="space-y-2">
+    <CharacterDefinitionEditor workspace={props.workspace} slot={props.slot} disabled={isLocked('definition')}
+      onApply={props.onImport} onBusyChange={setDefinitionBusy} />
     <section className="space-y-2 rounded-lg border border-border bg-bg-secondary p-3">
       <h3 className="text-xs font-semibold">{t('speech.interventions')}</h3>
       {stored.clips && <select className={speechInput + ' w-full'} aria-label={t('speech.intervention')} value={index}
@@ -48,15 +55,18 @@ export function Scene3DSpeakerControls(props: SpeechControlsProps) {
       }}>{t('speech.addIntervention')}</button>
       {stored.clips && clip && <label className="block text-xs">{t('speech.literalText')}<textarea className={speechInput + ' mt-1 w-full'} value={clip.text ?? ''}
         disabled={locked} maxLength={4000} onChange={event => commit({ ...stored, clips: clips.map((item, i) => i === index ? { ...item, text: event.target.value } : item) })} /></label>}
+      {stored.clips && clip && <GenerateCharacterLine key={clip.id} clip={clip} voice={props.slot.character?.voice} workspace={props.workspace}
+        disabled={isLocked('voice')} onBusyChange={setVoiceBusy}
+        onChange={next => { commit({ ...stored, clips: clips.map((item, i) => i === index ? next : item) }); props.onFit(next.end!) }} />}
     </section>
-    <Scene3DSpeechControls key={clip?.id ?? 'voice'} {...props} onBusyChange={setChildBusy} disabled={props.disabled || busy} slot={{ ...props.slot, speech: editing }} onChange={change} />
+    <Scene3DSpeechControls key={clip?.id ?? 'voice'} {...props} onBusyChange={setChildBusy} disabled={isLocked('controls')} slot={{ ...props.slot, speech: editing }} onChange={change} />
     <fieldset disabled={locked} className="space-y-2 rounded-lg border border-border p-3 text-xs">
-      <SpeechNumber label={t('speech.end')} value={editing.end ?? Math.max(editing.start + .1, editing.start + (editing.cues.at(-1)?.end ?? 5) - editing.offset)}
+      <SpeechNumber label={t('speech.end')} value={interventionEnd(editing)}
         min={editing.start + .01} max={600} step={.1} onChange={end => { if (!locked) change({ ...editing, end }) }} />
-      <label className="flex items-center gap-2"><input type="checkbox" disabled={props.disabled || busy} checked={editing.audible !== false}
+      <label className="flex items-center gap-2"><input type="checkbox" disabled={locked} checked={editing.audible !== false}
         onChange={event => change({ ...editing, audible: event.target.checked })} />{t('speech.playVoice')}</label>
       <p className="text-text-muted">{t('speech.playVoiceHint')}</p>
-      <button className={speechInput} disabled={props.disabled || busy || !stored.face || !props.slot.sourceUrl} onClick={() => {
+      <button className={speechInput} disabled={locked || !stored.face || !props.slot.sourceUrl} onClick={() => {
         setBusy(true); setNotice('')
         void (async () => {
           const known = profileRevision ?? await loadFaceProfile(props.slot.sourceUrl, props.workspace)
@@ -66,7 +76,7 @@ export function Scene3DSpeakerControls(props: SpeechControlsProps) {
           setProfileRevision({ digest: known.digest, revision: saved.revision }); setNotice(t('speech.profileSaved'))
         })().catch(error => setNotice(error.message)).finally(() => setBusy(false))
       }}>{t('speech.saveProfile')}</button>
-      <button className={speechInput} disabled={props.disabled || busy || !props.slot.sourceUrl} onClick={() => {
+      <button className={speechInput} disabled={locked || !props.slot.sourceUrl} onClick={() => {
         setBusy(true)
         void loadFaceProfile(props.slot.sourceUrl, props.workspace).then(profile => {
           setProfileRevision(profile)
@@ -77,4 +87,8 @@ export function Scene3DSpeakerControls(props: SpeechControlsProps) {
       {notice && <p role="status">{notice}</p>}
     </fieldset>
   </div>
+}
+
+function interventionEnd(speech: Scene3DSpeech) {
+  return speech.end ?? Math.max(speech.start + .1, speech.start + (speech.cues.at(-1)?.end ?? 5) - speech.offset)
 }

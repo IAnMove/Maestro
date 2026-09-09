@@ -1205,6 +1205,7 @@ def import_story_project(story: dict, workspace_id: str = "default") -> dict:
             "personality": _text(raw.get("personality")), "desire": _text(raw.get("desire")),
             "need": _text(raw.get("need")), "flaw": _text(raw.get("flaw")),
             "longArc": _text(raw.get("arc")), "voiceAndDialogue": _text(raw.get("voice")),
+            **({"voiceProfile": {"characterKitRef": copy.deepcopy(raw["characterKitRef"])}} if isinstance(raw.get("characterKitRef"), dict) else {}),
             "appearance": _text(raw.get("appearance")),
             "identityLock": _text(raw.get("visualPrompt")),
             "wardrobeVariants": ([{

@@ -104,6 +104,7 @@ export interface StoryWorld {
 }
 
 export interface StoryCharacter {
+  characterKitRef?: import('../../lib/characterVoice').CharacterKitRef
   id: string
   name: string
   role: string

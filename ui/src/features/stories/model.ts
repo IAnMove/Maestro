@@ -307,6 +307,7 @@ export function normalizeStoryCharacter(value: unknown, index: number): StoryCha
     conflict: text(item.conflict),
     arc: text(item.arc),
     voice: text(item.voice),
+    characterKitRef: item.characterKitRef ? parseCharacterKitRef(item.characterKitRef) : undefined,
     appearance: text(item.appearance),
     wardrobe: text(item.wardrobe),
     visualPrompt: text(item.visualPrompt),
@@ -732,3 +733,4 @@ export function changedSections(before: StoryProject, after: StoryProject): Stor
   if (JSON.stringify(before.beats) !== JSON.stringify(after.beats)) changed.push('structure')
   return changed
 }
+import { parseCharacterKitRef } from '../../lib/characterVoice'

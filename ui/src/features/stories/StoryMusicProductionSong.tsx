@@ -44,7 +44,8 @@ export function StoryMusicProductionSong(props: StoryProductionsTabProps) {
           )}
           <audio src={api.getPlayableFileUrl(selectedMusicOption.candidate.source, selectedMusicOption.candidate.name, workspace)} controls preload="metadata" className="h-8 w-full" />
           <SpeechProductionEntry key={workspace + '/' + selectedMusicOption.candidate.id} kind="song" workspace={workspace}
-            title={selectedMusicOption.label} sourceId={selectedMusicOption.candidate.id}
+              title={selectedMusicOption.label} sourceId={selectedMusicOption.candidate.id}
+              castOptions={props.project?.characters}
             audio={{ workspaceId: workspace, filename: selectedMusicOption.candidate.name,
               url: api.getPlayableFileUrl(selectedMusicOption.candidate.source, selectedMusicOption.candidate.name, workspace) }} />
         </div>

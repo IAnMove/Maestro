@@ -28,6 +28,13 @@ export interface CharacterFaceAnchor {
 }
 
 export interface CharacterKit {
+  /** Additive to the existing 2D kit; scene utterances never live in the character. */
+  speech3d?: {
+    model: import('../features/scene3d/types').Scene3DSourceRef
+    digest: string
+    settings?: import('../features/scene3d/speech/profiles').FaceSettings
+  }
+  voice?: import('./characterVoice').CharacterVoice
   version: 1
   id: string
   name: string

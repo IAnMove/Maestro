@@ -18,6 +18,7 @@ from fastapi.staticfiles import StaticFiles
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "app"))
 from routers.character_kit_face import create_character_kit_face_router  # noqa: E402
+from services.character_kit_library import read_character_kit_library, patch_character_kit, CharacterKitRevisionConflict  # noqa: E402
 
 
 def review_app(assets: Path) -> FastAPI:
@@ -25,6 +26,24 @@ def review_app(assets: Path) -> FastAPI:
     assets.mkdir(parents=True, exist_ok=True)
     app = FastAPI(title="3D voice review only — no generation services")
     app.include_router(create_character_kit_face_router(workspace_dir=lambda _: str(assets), uploads_root=lambda: str(assets)))
+
+    @app.get("/api/v1/character-kits/library")
+    def character_library(workspace: str):
+        if workspace != "speech-review":
+            raise HTTPException(400, "Only the isolated review workspace is available.")
+        return read_character_kit_library(str(assets))
+
+    @app.patch("/api/v1/character-kits/library/kits/{kit_id}")
+    async def save_character(kit_id: str, request: Request):
+        body = await request.json()
+        if body.get("workspace") != "speech-review":
+            raise HTTPException(400, "Only the isolated review workspace is available.")
+        try:
+            return patch_character_kit(str(assets), kit_id, body.get("kit"), base_revision=body.get("baseRevision"))
+        except CharacterKitRevisionConflict as exc:
+            raise HTTPException(409, str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
 
     # Read-only empty boot fixtures for the REAL Hocuspocus UI at /. This process
     # has no credentials, generation runtime, account or production workspace.

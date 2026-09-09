@@ -56,8 +56,7 @@ export function Scene3DSpeechControls({ slot, workspace, disabled, calibrate, on
       return () => onChange({ ...speech, audio: sourceRefFromOutput(item, workspace), cues: amplitudeCues(buffer), driver: 'amplitude' })
     })
   }
-  const audioValue: ApiOutput | undefined = speech.audio ? { name: speech.audio.filename, url: speech.audio.url, type: 'audio', mode: null, size: 0,
-    created_at: 0, thumbnail_url: '', workspace_id: speech.audio.workspaceId, asset_id: speech.audio.assetId } : undefined
+  const audioValue = speechAudioOutput(speech)
   return <section data-testid="scene3d-speech" className="space-y-3 rounded-xl border border-border bg-bg-secondary p-3 text-text-secondary">
     <h3 className="text-sm font-semibold text-text-primary">{t('speech.option')} · {slot.character?.name || sceneT(`stage.slot.${slot.slot}`)}</h3>
     <p className="text-xs leading-5">{t('speech.intro')}</p>
@@ -119,4 +118,9 @@ export function Scene3DSpeechControls({ slot, workspace, disabled, calibrate, on
     {busy && <p role="status" className="text-xs">{t('speech.busy')}</p>}
     {error && <p role="alert" className="text-xs text-red-300">{error}</p>}
   </section>
+}
+
+function speechAudioOutput(speech: Scene3DSpeech): ApiOutput | undefined {
+  return speech.audio ? { name: speech.audio.filename, url: speech.audio.url, type: 'audio', mode: null, size: 0,
+    created_at: 0, thumbnail_url: '', workspace_id: speech.audio.workspaceId, asset_id: speech.audio.assetId } : undefined
 }

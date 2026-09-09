@@ -27,6 +27,22 @@ export function validFace(value: unknown): value is FacePlacement {
     && vector(eyes.left, 3, -10000, 10000) && vector(eyes.right, 3, -10000, 10000)
     && vector(eyes.size, 2, .00001, 10000) && vector(eyes.skinLeft, 3, 0, 1) && vector(eyes.skinRight, 3, 0, 1)
 }
+function speechAppearance(data: Record<string, unknown>, defaults: Scene3DSpeech) {
+  return { clean: data.clean !== false,
+    style: data.style === 'toon' || data.style === 'pixel' ? data.style : 'soft',
+    driver: data.driver === 'rhubarb' || data.driver === 'amplitude' ? data.driver : 'imported',
+    lip: typeof data.lip === 'string' && /^#[0-9a-f]{6}$/i.test(data.lip) ? data.lip : defaults.lip,
+    expression: EXPRESSIONS.includes(data.expression as typeof EXPRESSIONS[number]) ? data.expression as typeof EXPRESSIONS[number] : 'neutral',
+    blink: data.blink !== false, eyes: data.eyes !== false } as Pick<Scene3DSpeech, 'clean' | 'style' | 'driver' | 'lip' | 'expression' | 'blink' | 'eyes'>
+}
+
+function speechRange(data: Record<string, unknown>) {
+  if (data.end !== undefined && (!finite(data.end, 0, 600) || data.end <= (data.start as number))) throw new Error('Invalid speech end.')
+  if (data.audible !== undefined && typeof data.audible !== 'boolean') throw new Error('Invalid speech audio switch.')
+  return { ...(data.end !== undefined ? { end: data.end as number } : {}),
+    ...(data.audible !== undefined ? { audible: data.audible as boolean } : {}) }
+}
+
 export function parseSpeech(raw: unknown): Scene3DSpeech | undefined {
   if (raw === undefined) return undefined
   const data = object(raw), defaults = defaultSpeech()
@@ -42,18 +58,10 @@ export function parseSpeech(raw: unknown): Scene3DSpeech | undefined {
     if (!finite(data[key], min, max)) throw new Error('Invalid speech timing or level.')
   }
   const clips = data.clips === undefined ? undefined : parseSpeechClips(data.clips)
-  if (data.end !== undefined && (!finite(data.end, 0, 600) || data.end <= (data.start as number))) throw new Error('Invalid speech end.')
-  if (data.audible !== undefined && typeof data.audible !== 'boolean') throw new Error('Invalid speech audio switch.')
-  return { ...defaults, ...(clips ? { clips } : {}), ...(data.end !== undefined ? { end: data.end as number } : {}),
-    ...(data.audible !== undefined ? { audible: data.audible as boolean } : {}),
+  return { ...defaults, ...speechAppearance(data, defaults), ...speechRange(data), ...(clips ? { clips } : {}),
     version: 1, enabled: data.enabled, face: data.face as FacePlacement | undefined,
     audio: ref('audio'), atlas: ref('atlas'), cues: parseMouthCues(data.cues), start: data.start as number, offset: data.offset as number,
-    gain: data.gain as number, strength: data.strength as number, clean: data.clean !== false,
-    style: data.style === 'toon' || data.style === 'pixel' ? data.style : 'soft',
-    driver: data.driver === 'rhubarb' || data.driver === 'amplitude' ? data.driver : 'imported',
-    lip: typeof data.lip === 'string' && /^#[0-9a-f]{6}$/i.test(data.lip) ? data.lip : defaults.lip,
-    expression: EXPRESSIONS.includes(data.expression as typeof EXPRESSIONS[number]) ? data.expression as typeof EXPRESSIONS[number] : 'neutral',
-    blink: data.blink !== false, eyes: data.eyes !== false }
+    gain: data.gain as number, strength: data.strength as number }
 }
 export function parseSpeechClips(raw: unknown): SpeechClip[] {
   if (!Array.isArray(raw) || raw.length > 32) throw new Error('Maximum 32 interventions per character.')

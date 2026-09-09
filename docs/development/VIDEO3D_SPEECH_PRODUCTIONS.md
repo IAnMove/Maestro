@@ -4,7 +4,9 @@
 
 - Rama de trabajo: `codex/3d-speech-productions`.
 - Base explícita: `codex/3d-lipsync-scenes`, checkpoint `dedd3ee`.
-- No incluye los cambios posteriores de development ni modifica ese checkout.
+- Actualizada con `development` `735e7eb` mediante el merge `c187c2b`: se
+  conservan tanto lip-sync como pantallas multimedia y exportación asíncrona.
+  No se modifica el checkout original ni se fusiona esta PR en development.
 - Integra el motor facial existente en **Estudios → Vídeo 3D**. No crea otra
   web, otro formato de escena ni un renderizador paralelo.
 - Las acciones existentes conservan su ruta 2D para imágenes/recortables.
@@ -21,8 +23,9 @@
 4. En el compositor 2,5D, seleccionar una capa GLB, su pista de voz y el rango
    de diálogo. La acción existente abre el motor nativo de Vídeo 3D.
 
-Se usan archivos existentes o subidos por el usuario. Ninguna entrada genera
-modelos, voces, imágenes o vídeo mediante proveedores.
+Se usan archivos existentes o subidos por el usuario. Abrir, guardar, reutilizar
+o exportar no lanza generaciones. La generación de voz es opcional y explícita,
+desde el botón de cada intervención descrito abajo.
 
 ## Uso
 
@@ -42,7 +45,76 @@ modelos, voces, imágenes o vídeo mediante proveedores.
 
 Los tiempos ausentes en el guion se reparten inicialmente en intervalos iguales.
 Son una propuesta editable, **no** reconocimiento de hablante ni alineación de
-palabras. El texto se conserva literalmente como referencia; no genera una voz.
+palabras. El texto se conserva literalmente; por sí solo no genera una voz.
+
+## Ficha compartida: personaje, cara y voz
+
+En **Personajes / Character Creator → Personaje reutilizable · modelo 3D, cara y voz**
+se crea o amplía un Character Kit existente. Elegir GLB, nombre y, opcionalmente,
+una voz. **Ajustar boca y ojos en Vídeo3D** abre el editor nativo; después de
+calibrar, **Guardar personaje con cara y voz** actualiza esa misma ficha.
+El inspector de Vídeo3D permite crear, cargar y actualizar la ficha directamente.
+Los recursos 2D (poses, bocas y ojos) anteriores se conservan.
+
+- Fuente de verdad: la biblioteca existente `.character-kit-library-v1.json`,
+  con CAS por revisión e historial `.vN.json`. No es otro catálogo paralelo.
+- `speech3d` guarda referencia GLB, SHA-256 de los bytes y ajuste facial.
+- `voice` guarda preferencias públicas, nunca claves: proveedor local, modelo
+  `qwen3_tts_customvoice`, preset de hablante y dirección opcional.
+- Historia guarda `characterKitRef={id,workspace}`; Series lo guarda dentro de
+  `voiceProfile`. La importación Historia→Series conserva ese vínculo.
+- Canciones y tráileres permiten elegir un personaje de Historia. Los planos
+  de Series recuperan las fichas por los IDs de los hablantes del guion.
+- Una capa GLB de Vídeo 2,5D puede vincular la misma ficha junto a sus controles
+  de audio. El traspaso rechaza un GLB diferente al calibrado. Las capas 2D
+  no reciben estos controles ni cambian su comportamiento.
+- Cada instancia 3D guarda una copia de cara/voz y la referencia/revisión.
+  Cambiar la ficha después no reescribe escenas ya guardadas.
+
+El guion, audio y tiempos pertenecen a `speech.clips`, no al personaje. Sin
+audio, la preparación abre turnos editables. Para crear voz: escribir una frase
+literal, reservar su intervalo y pulsar **Generar voz de esta frase**. Se usa
+el scheduler de generación existente, se decodifica el audio producido y
+Rhubarb calcula sus gestos. Requiere Qwen3 CustomVoice instalado/configurado;
+no se descarga ni arranca automáticamente desde la ficha.
+
+Si ya hay audio, el botón queda desactivado y se reutiliza el archivo. Si la
+generación no cabe en el turno, se conserva su archivo y se pide ampliar el fin;
+el reintento aplica el archivo ya creado, no genera otra voz ni desplaza a otros
+personajes. Cerrar el editor cancela únicamente el job iniciado por esa acción.
+El idioma lo detecta el modelo a partir del texto. Esta versión no añade
+clonación de voces ni conecta proveedores TTS remotos.
+
+## Tres E2E de aceptación
+
+`ui/e2e/specs/scene3d-speech.spec.ts` contiene la navegación previa y estos
+tres recorridos nuevos, todos sobre la aplicación nativa en `/`:
+
+1. Subir WAV, analizar, hablar/silencio/seek hacia atrás y exportar MP4 real.
+2. A→B→A, pausas, lectura del hablante activo, un solo reproductor y MP4 con
+   nivel de audio sin duplicar.
+3. Guardar cara/voz, abrir otro plano, reutilizar por ID, generar desde texto
+   con API simulada una sola vez y reabrir sin volver a generar.
+
+El GLB y WAV de CI son procedurales y originales. Se simulan biblioteca,
+subida, Rhubarb y TTS; WebGL, reloj, reproducción, muxer, H.264 y AAC son reales.
+Edge en Windows / Chrome en Linux aportan los codecs. El test exporta y
+decodifica audio del MP4, y adjunta capturas, JSON y MP4 al resultado.
+CI conserva esos artefactos también cuando las pruebas pasan.
+
+```powershell
+$env:HOCUSPOCUS_API_TARGET = 'http://127.0.0.1:1'
+$env:HOCUSPOCUS_E2E_PORT = '8806'
+npm run test:e2e -- scene3d-speech.spec.ts scene3d-media-screen.spec.ts --workers=1
+```
+
+Esto no sustituye una prueba de calidad de canto o de la voz de un modelo TTS
+real. La revisión complementaria `node scripts/review-reusable-speech.mjs`
+usa la aplicación sin interceptar peticiones, el GLB/WAV existente de Mira,
+Rhubarb local real, biblioteca en disco y exportación MP4. No genera voz.
+Dos instancias del mismo modelo demuestran A→B→A y reutilización, no dos
+personajes generados nuevos. Los originales y los archivos de revisión siguen
+en `.codex-tmp/speech-review`, fuera de Git.
 
 Para cantar, una voz aislada suele dar una guía mejor que la mezcla instrumental.
 Puede seleccionarse como voz de intervención, manteniendo desactivada su
@@ -118,11 +190,31 @@ cambio de workspace, recuperación antes de carga del GLB, entrada desde la canc
 y navegación E2E de la aplicación. Esto es QA del implementador: no revisión
 independiente, CI remoto, merge ni validación del capítulo completo.
 
-Resultado final: 1.216 tests UI, 57 tests backend de cara/voz, 1 E2E nativo,
+Resultado del checkpoint anterior `60ca05f`: 1.216 tests UI, 57 tests backend de cara/voz, 1 E2E nativo,
 compilación y TypeScript, i18n, lint de los componentes afectados y guard de
 archivos limpios correctos. Entrada JS: 325.266 B gzip / 327.680 B permitidos.
 
-## Coste de la tarea
+## Validación de la ampliación (9 de septiembre)
+
+- 1.243 tests UI y los tres E2E nuevos pasan. Sumando navegación anterior y
+  pantalla multimedia, el recorrido seleccionado da **5 E2E correctos**.
+- 63 tests Python de biblioteca, limpieza facial, definición reutilizable,
+  perfiles, análisis de voz y Series pasan en la última repetición, incluida
+  la importación Historia→Series. Una batería anterior más amplia dio 89.
+- La suite Python completa no se pudo recoger: este entorno carece de
+  `diffusers` y `safetensors`, requeridos por pruebas de otros modelos.
+  No se considera equivalente a CI completo ni se han instalado modelos.
+- Revisión real: ficha en disco, dos instancias, A→B→A, Rhubarb real y MP4
+  1280×720 H.264 + AAC mono 48 kHz; 6,016 s, decodificación completa sin errores.
+- `reusable-mira.world3d.json`, `reusable-dialogue.world3d.json`,
+  `personaje-reutilizable-integrado.jpg`, `dialogo-reutilizable-integrado.jpg`,
+  `mira-parpadeo.png` y `dialogo-reutilizable.mp4` están en el directorio
+  ignorado de revisión. No se ha borrado material anterior.
+- El control de complejidad pasa contra la base de la PR sin cambiar su
+  política. TypeScript, lint y presupuesto de entrada JS: 325.399 B gzip
+  de 327.680 B permitidos.
+
+## Coste del checkpoint anterior
 
 - Tests simulados: 0 tokens externos.
 - Tests reales: análisis local Rhubarb y exportación local de un MP4; sin proveedores.
