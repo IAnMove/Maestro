@@ -146,6 +146,8 @@ export const STUDIO_SPEECH_FORM_RESIDUAL_FIELDS = [
   '_mmaudio_variant',
   '_music_description',
   '_music_instrumental',
+  'alt_guidance_scale',
+  'lyrics_language',
   'edit_sub_mode',
 ] as const
 
