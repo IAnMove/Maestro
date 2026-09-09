@@ -188,3 +188,30 @@ test('selecting Speech repairs a mismatched SFX model instead of remembering it 
     assert.equal(useStore.getState().params.model_type, 'kugelaudio_0_open')
   })
 })
+
+test('late model defaults cannot disable restored Speech or newly chosen Music references', async () => {
+  await withStudio(async () => {
+    const defaults: Array<() => void> = []
+    globalThis.fetch = async input => {
+      if (String(input).includes('/defaults/')) {
+        return new Promise<Response>(resolve => { defaults.push(() => resolve(new Response(
+          JSON.stringify({ audio_prompt_type: '' }), { headers: { 'content-type': 'application/json' } },
+        ))) })
+      }
+      assert.match(String(input), /model-selections/)
+      return new Response('{}', { headers: { 'content-type': 'application/json' } })
+    }
+    useStore.getState().setAudioSubMode('music'); chooseMusicReference()
+    assert.equal(defaults.length, 1)
+    defaults.shift()!()
+    await new Promise(resolve => setTimeout(resolve, 0))
+    assert.equal(useStore.getState().params.audio_prompt_type, 'A')
+    assert.equal(useStore.getState().params.audio_guide, musicRef)
+    useStore.getState().setAudioSubMode('speech')
+    assert.equal(defaults.length, 1)
+    defaults.shift()!()
+    await new Promise(resolve => setTimeout(resolve, 0))
+    assert.equal(useStore.getState().params.audio_prompt_type, 'AN')
+    assert.equal(useStore.getState().params.audio_guide, speechRef)
+  })
+})

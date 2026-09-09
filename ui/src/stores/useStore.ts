@@ -595,6 +595,9 @@ function _applyModelDefaults(
     if (active !== modelType) return
     const overrides: Record<string, unknown> = {}
     for (const field of _PRIMARY_MODEL_DEFAULT_FIELDS) {
+      // Audio references belong to the selected tab. A late defaults response
+      // must not disable a restored voice/music reference by resetting its selector.
+      if (state.generationMode === 'audio' && field === 'audio_prompt_type') continue
       // A one-click Full -> Pruned Turbo recommendation switches models and
       // then restores the managed 6-step preset. Do not let the asynchronous
       // base-model defaults response race in afterward and put it back at
