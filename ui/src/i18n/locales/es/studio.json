@@ -37,6 +37,7 @@
     "mixer": "Mezclador"
   },
   "generate": {
+    "submitting": "Preparando…",
     "needImage": "Falta imagen",
     "needReference": "Falta referencia",
     "needSource": "Falta origen",

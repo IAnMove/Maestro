@@ -336,3 +336,36 @@ test('Studio SFX submission rejects leftover Speech lyrics when MMAudio_prompt i
   assert.equal(generationCalls, 0)
   assert.deepEqual(pendingSfxGenerationCommands(), [])
 })
+
+for (const terminal of ['resolved', 'rejected'] as const) {
+  test(`Generate shows preparation without claiming admission (${terminal})`, async () => {
+    const { render, fireEvent, act } = await import('@testing-library/react')
+    const { GenerateButton } = await import('../src/components/Sidebar/GenerateButton')
+    const before = useStore.getState()
+    let finish!: () => void, calls = 0
+    const pending = new Promise<void>((resolve, reject) => {
+      finish = () => terminal === 'resolved' ? resolve() : reject(new Error('Sound description is required'))
+    })
+    useStore.setState({ generationMode: 'audio', audioSubMode: 'sfx', modelOptions: null,
+      params: { ...before.params, model_type: 'mmaudio_v2' },
+      jobs: [{ id: 'rejected-at-admission', status: 'failed' }] as never, promptSchedulerEnabled: false,
+      startGeneration: () => { calls += 1; return pending }, setSidebarOpen: () => {},
+    })
+    const view = render(<GenerateButton />)
+    try {
+      const button = view.getByRole('button', { name: 'Generate' })
+      await act(async () => { fireEvent.click(button); fireEvent.click(button) })
+      assert.equal(calls, 1)
+      assert.equal(button.textContent, 'Preparing…')
+      assert.equal(button.hasAttribute('disabled'), true)
+      await act(async () => { finish(); await pending.catch(() => {}) })
+      assert.equal(button.textContent, 'Generate')
+      assert.equal(button.hasAttribute('disabled'), false)
+      assert.equal(view.container.textContent?.includes('Queued'), false)
+      if (terminal === 'rejected') assert.match(view.getByRole('alert').textContent || '', /Sound description is required/)
+    } finally {
+      finish(); await pending.catch(() => {})
+      view.unmount(); useStore.setState(before)
+    }
+  })
+}

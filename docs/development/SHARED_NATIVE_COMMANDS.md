@@ -19,6 +19,12 @@ by this guarantee.
 5. If a submission response is lost, recover the saved request in the panel.
    Recovery reuses its intention; it must not silently create a new generation.
 
+The Generate button stays disabled while preparation/submission is pending and
+shows “Preparing…”, never an optimistic “Queued” based on the click alone. Rapid
+repeat clicks in that interval share the pending UI action. Admission and its
+identity are reported by the command panel/Activity. Failed local placeholders
+do not increase the active-job count on the button.
+
 The shared native routes currently cover image, speech, local music, SFX and upscale. Other
 Studio modes continue through their existing paths until migrated. Speech
 model duration controls have model-specific meanings: for example, a 20-second

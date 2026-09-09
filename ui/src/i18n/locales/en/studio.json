@@ -37,6 +37,7 @@
     "mixer": "Mixer"
   },
   "generate": {
+    "submitting": "Preparing…",
     "needImage": "Need image",
     "needReference": "Need reference",
     "needSource": "Need source",
