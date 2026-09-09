@@ -183,14 +183,27 @@ def test_execution_policy_runs_before_model_or_resource_lookup():
     assert resources.media_calls == resources.lora_calls == []
 
 
-def test_duration_uses_declared_default_but_shared_music_minimum_is_enforced():
-    params = frozen_params()
+@pytest.mark.parametrize(
+    ("model_type", "definition"),
+    [("ace_step_v1_5_xl_sft_lm_4b", ACE_DEFINITION), ("minimax_music3", MUSIC3_DEFINITION)],
+)
+def test_duration_uses_native_slider_bounds_not_story_minimum(model_type, definition):
+    params = frozen_params(model_type=model_type)
     params.pop("duration_seconds")
-    (native, _), _, _ = invoke(params)
+    (native, _), _, _ = invoke(params, definition=definition)
     assert native["duration_seconds"] == 120
 
+    short = frozen_params(model_type=model_type, duration_seconds=5)
+    (native, _), _, _ = invoke(short, definition=definition)
+    assert native["duration_seconds"] == 5
+
     with pytest.raises(HTTPException) as error:
-        invoke(frozen_params(duration_seconds=19))
+        invoke(frozen_params(model_type=model_type, duration_seconds=4), definition=definition)
+    assert "duration_seconds" in error.value.detail["message"]
+
+    maximum = definition["duration_slider"]["max"]
+    with pytest.raises(HTTPException) as error:
+        invoke(frozen_params(model_type=model_type, duration_seconds=maximum + 1), definition=definition)
     assert "duration_seconds" in error.value.detail["message"]
 
 

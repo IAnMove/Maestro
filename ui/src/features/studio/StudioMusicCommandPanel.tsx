@@ -16,7 +16,7 @@ function MusicSummary({ command }: { command: StudioMusicGenerationCommand }) {
   const references = ['audio_guide', 'audio_guide2'].filter(field => Boolean(params[field as keyof typeof params])).length
   return <div className="space-y-1 min-w-0">
     <div className="text-xs break-words">
-      {String(params.model_type)} · {params.duration_seconds === undefined
+      {String(params.model_type)} · {params.duration_seconds == null
         ? t('musicCommands.defaultDuration') : `${String(params.duration_seconds)}s`} · {command.input.workspace}
     </div>
     <p className="text-xs whitespace-pre-wrap break-words max-h-24 overflow-auto" aria-label={t('musicCommands.lyrics')}>

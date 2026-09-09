@@ -17,7 +17,6 @@ from fastapi import HTTPException
 from services.image_generation_commands import command_error
 from services.music_model_contract import (
     ACE_DEFAULT,
-    DURATION_MIN,
     MUSIC3_LOCAL,
     MusicModelError,
     assert_enqueue_guard,
@@ -102,11 +101,16 @@ def _validate_model(model_type: str, definition: dict[str, Any], model_downloade
 def _duration_bounds(model_type: str, definition: Mapping[str, Any]) -> tuple[float, float]:
     entry = require_catalog_entry(model_type)
     slider = definition.get("duration_slider")
-    lower = float(entry["duration_min"])
+    # ``duration_min`` in music_model_contract is the Story policy (20s).
+    # Studio must use the selected native handler's declared slider instead:
+    # both local handlers currently accept 5s, and a future handler may have a
+    # different bound.  Keep the catalog maximum as a safety ceiling while
+    # never raising the native minimum to satisfy Story's longer cue policy.
+    lower = 0.0
     upper = float(entry["duration_max"])
     if isinstance(slider, Mapping):
         if slider.get("min") is not None:
-            lower = max(lower, float(slider["min"]))
+            lower = float(slider["min"])
         if slider.get("max") is not None:
             upper = min(upper, float(slider["max"]))
     if lower > upper:
@@ -123,7 +127,7 @@ def _fill_duration(working: dict[str, Any], model_type: str,
         value = _MODEL_DEFAULTS[model_type]["duration_seconds"] if value is None else value
         working["duration_seconds"] = value
     lower, upper = _duration_bounds(model_type, definition)
-    _finite(value, "duration_seconds", minimum=max(float(DURATION_MIN), lower), maximum=upper)
+    _finite(value, "duration_seconds", minimum=lower, maximum=upper)
 
 
 def _fill_steps(working: dict[str, Any], model_type: str,
