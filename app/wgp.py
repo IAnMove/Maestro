@@ -6136,6 +6136,7 @@ def edit_video(
                 spatial_upsampling,
                 seed=seed,
                 abort_callback=lambda: gen.get("abort", False),
+                still_image=has_image_file_extension(video_source),
             )
             if sample is None or gen.get("abort", False):
                 return
@@ -9268,6 +9269,7 @@ def generate_video(
                         abort_callback=lambda: gen.get("abort", False),
                         progress_callback=_spatial_progress,
                         fps=output_fps,
+                        still_image=is_image,
                         processor_settings=wangp_processor_settings,
                         audio_context=wangp_processors.generation_audio_context(
                             prompt=prompt, generated_audio=generated_audio, sample_rate=output_audio_sampling_rate,
