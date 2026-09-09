@@ -15,7 +15,7 @@ export function finishStudioImageCommand(intentId: string, receipt?: ImageGenera
 
 async function mountedPanel(): Promise<HTMLElement> {
   window.dispatchEvent(new Event('hocuspocus:studio-image-open'))
-  const find = () => document.querySelector<HTMLElement>('[data-studio-image-ready="true"]')
+  const find = () => document.querySelector<HTMLElement>('[data-studio-image-ready="true"][data-studio-image-listening="true"]')
   const current = find()
   if (current) return current
   return new Promise((resolve, reject) => {
@@ -24,7 +24,7 @@ async function mountedPanel(): Promise<HTMLElement> {
       const panel = find()
       if (panel) { observer.disconnect(); clearTimeout(timer); resolve(panel) }
     })
-    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-studio-image-ready'] })
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-studio-image-ready', 'data-studio-image-listening'] })
   })
 }
 
@@ -38,11 +38,16 @@ export async function presentStudioImageCommand(command: ImageGenerationCommand)
         if (!request.active) return
         request.active = false
         clearTimeout(timer)
+        observer.disconnect()
         if (error) reject(new Error(error))
         else resolve()
       },
     }
     const timer = window.setTimeout(() => request.respond(i18n.t('studio:commands.panelUnavailable')), 8000)
+    const observer = new MutationObserver(() => {
+      if (!root.isConnected) request.respond(i18n.t('studio:commands.panelUnavailable'))
+    })
+    observer.observe(document.body, { childList: true, subtree: true })
     window.dispatchEvent(new CustomEvent<ImagePresentation>(IMAGE_PRESENTATION_EVENT, { detail: request }))
   })
   if (!root.isConnected || root.dataset.studioImageCommand !== command.intent_id) {

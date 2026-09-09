@@ -307,6 +307,64 @@ test('a transient Suspense hide preserves the waiting request until the panel is
   } finally { cleanup() }
 })
 
+test('a request started in a hidden Suspense tree waits for the receiver to reconnect', { concurrency: false }, async () => {
+  const { render, waitFor, cleanup, act } = await import('@testing-library/react')
+  const never = new Promise<void>(() => undefined)
+  function Sibling({ suspended }: { suspended: boolean }) {
+    if (suspended) throw never
+    return null
+  }
+  const tree = (suspended: boolean) => <React.Suspense fallback={<p>Loading</p>}>
+    <StudioImageCommandPanel workspace="studio-ack-workspace" model="pi_flux2" visible onRecovered={async () => undefined} />
+    <Sibling suspended={suspended} />
+  </React.Suspense>
+  const params = baseParams('start-while-hidden')
+  const state = formState(params)
+  const transport = setSubmissionFetch()
+  const view = render(tree(false))
+  try {
+    view.rerender(tree(true))
+    const prepared = await prepareStudioSubmission(params, state, () => state, { actor: 'wizard', commandId: 'start-while-hidden' })
+    let submission!: ReturnType<typeof prepared.submit>
+    await act(async () => { submission = prepared.submit() })
+    assert.equal(transport.generationCalls(), 0)
+    view.rerender(tree(false))
+    await waitFor(() => assert.equal(document.querySelector('[data-studio-image-command]')?.getAttribute('data-studio-image-command'), 'start-while-hidden'))
+    await act(async () => { await flushAnimationFrames() })
+    await submission
+    assert.equal(transport.generationCalls(), 1)
+  } finally { cleanup() }
+})
+
+test('removing an already hidden Suspense tree cancels its pending acknowledgement', { concurrency: false }, async () => {
+  const { render, waitFor, cleanup, act } = await import('@testing-library/react')
+  const never = new Promise<void>(() => undefined)
+  function Sibling({ suspended }: { suspended: boolean }) {
+    if (suspended) throw never
+    return null
+  }
+  const tree = (suspended: boolean) => <React.Suspense fallback={<p>Loading</p>}>
+    <StudioImageCommandPanel workspace="studio-ack-workspace" model="pi_flux2" visible onRecovered={async () => undefined} />
+    <Sibling suspended={suspended} />
+  </React.Suspense>
+  const params = baseParams('unmount-after-hide')
+  const state = formState(params)
+  const transport = setSubmissionFetch()
+  const view = render(tree(false))
+  try {
+    const prepared = await prepareStudioSubmission(params, state, () => state, { actor: 'wizard', commandId: 'unmount-after-hide' })
+    let submission!: ReturnType<typeof prepared.submit>
+    await act(async () => { submission = prepared.submit() })
+    const rejected = assert.rejects(submission, error => (error as { code?: string }).code === 'snapshot_hook_failed')
+    await waitFor(() => assert.equal(document.querySelector('[data-studio-image-command]')?.getAttribute('data-studio-image-command'), 'unmount-after-hide'))
+    view.rerender(tree(true))
+    view.unmount()
+    await rejected
+    assert.equal(transport.generationCalls(), 0)
+    assert.deepEqual(pendingImageGenerationCommands(), [])
+  } finally { cleanup() }
+})
+
 test('recovery reload reuses the exact intention after 503 and keeps its receipt if reconnect fails', { concurrency: false }, async () => {
   const { render, screen, fireEvent, waitFor, cleanup } = await import('@testing-library/react')
   const saved = command('recovery-reload')

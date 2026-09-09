@@ -69,8 +69,10 @@ export function StudioImageCommandPanel({ workspace, model, visible, onRecovered
       setError('')
     }
     window.addEventListener(IMAGE_PRESENTATION_EVENT, receive)
+    if (element) element.dataset.studioImageListening = 'true'
     return () => {
       window.removeEventListener(IMAGE_PRESENTATION_EVENT, receive)
+      if (element) element.dataset.studioImageListening = 'false'
       const request = waiting.current
       // Suspense temporarily disconnects layout effects while retaining the
       // DOM. Keep the same request until reveal reconnects its ACK effect.
