@@ -83,6 +83,37 @@ def _resource_duration(resources: list[dict[str, Any]]) -> float:
     return duration
 
 
+def _prepare_media_duration(working, resources):
+    """Resolve guide timing without losing the requested duration control."""
+    guide_selected = working.get("video_guide") not in (None, "")
+    requested_duration = _finite_duration(
+        working.get("duration_seconds"), video=guide_selected
+    )
+    prepared, media = resources.prepare_media(working)
+    if not isinstance(prepared, dict) or not isinstance(media, list):
+        raise ValueError("SFX resource preparation returned invalid native parameters")
+    prepared = deepcopy(prepared)
+    media = deepcopy(media)
+    if guide_selected:
+        effective_duration = _resource_duration(media)
+        if prepared.get("video_guide") in (None, ""):
+            raise ValueError("A selected SFX video guide was not preserved by resource preparation")
+        prepared["duration_source"] = "video"
+        prepared["duration_seconds_requested"] = requested_duration
+        prepared["duration_seconds_effective"] = effective_duration
+        # MMAudio's video path derives the actual duration from the guide.
+        prepared["duration_seconds"] = effective_duration
+    else:
+        if prepared.get("video_guide") not in (None, ""):
+            raise ValueError("Text-only SFX preparation unexpectedly retained a video guide")
+        prepared["duration_source"] = "text"
+        prepared["duration_seconds_requested"] = requested_duration
+        prepared["duration_seconds_effective"] = requested_duration
+        prepared["duration_seconds"] = requested_duration
+
+    return prepared, media
+
+
 def prepare_studio_sfx(
     params,
     *,
@@ -109,31 +140,7 @@ def prepare_studio_sfx(
         definition = _definition_for(model_definition, model_type)
         variant = _validate_model_definition(model_type, definition, model_downloaded)
 
-        guide_selected = working.get("video_guide") not in (None, "")
-        requested_duration = _finite_duration(
-            working.get("duration_seconds"), video=guide_selected
-        )
-        prepared, media = resources.prepare_media(working)
-        if not isinstance(prepared, dict) or not isinstance(media, list):
-            raise ValueError("SFX resource preparation returned invalid native parameters")
-        prepared = deepcopy(prepared)
-        media = deepcopy(media)
-        if guide_selected:
-            effective_duration = _resource_duration(media)
-            if prepared.get("video_guide") in (None, ""):
-                raise ValueError("A selected SFX video guide was not preserved by resource preparation")
-            prepared["duration_source"] = "video"
-            prepared["duration_seconds_requested"] = requested_duration
-            prepared["duration_seconds_effective"] = effective_duration
-            # MMAudio's video path derives the actual duration from the guide.
-            prepared["duration_seconds"] = effective_duration
-        else:
-            if prepared.get("video_guide") not in (None, ""):
-                raise ValueError("Text-only SFX preparation unexpectedly retained a video guide")
-            prepared["duration_source"] = "text"
-            prepared["duration_seconds_requested"] = requested_duration
-            prepared["duration_seconds_effective"] = requested_duration
-            prepared["duration_seconds"] = requested_duration
+        prepared, media = _prepare_media_duration(working, resources)
 
         # These values select the already-registered native MMAudio worker.
         # They are generated here after model/resource checks, never trusted

@@ -196,6 +196,13 @@ _TextWeight = Annotated[
 _Steps = Annotated[StrictInt, Field(ge=25, le=25)]
 
 
+def _validate_prompt_aliases(prompt: str | None, native: str | None) -> None:
+    if (prompt is None or not prompt.strip()) and (native is None or not native.strip()):
+        raise ValueError("prompt or MMAudio_prompt must contain a non-blank value")
+    if prompt is not None and native is not None and prompt != native:
+        raise ValueError("prompt and MMAudio_prompt must match when both are supplied")
+
+
 class StudioSfxParams(_ClosedModel):
     """Typed native SFX parameters emitted by Studio."""
 
@@ -260,18 +267,7 @@ class StudioSfxParams(_ClosedModel):
 
     @model_validator(mode="after")
     def _check_semantics(self):
-        prompt = self.prompt
-        mmaudio_prompt = self.mmaudio_prompt
-        if (prompt is None or not prompt.strip()) and (
-            mmaudio_prompt is None or not mmaudio_prompt.strip()
-        ):
-            raise ValueError("prompt or MMAudio_prompt must contain a non-blank value")
-        if (
-            prompt is not None
-            and mmaudio_prompt is not None
-            and prompt != mmaudio_prompt
-        ):
-            raise ValueError("prompt and MMAudio_prompt must match when both are supplied")
+        _validate_prompt_aliases(self.prompt, self.mmaudio_prompt)
         if self.model_type not in SFX_MODEL_TYPES:
             raise ValueError("model_type must be mmaudio_v2 or mmaudio_nsfw")
         # MMAudio's text-only worker path caps its requested duration at 20 s.

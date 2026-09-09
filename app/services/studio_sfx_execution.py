@@ -9,6 +9,24 @@ import json
 from services.studio_image_resources import file_identity
 
 
+def _check_guide_identity(params, resources):
+    """A selected guide must retain its admitted bytes and identity."""
+    guides = [resource for resource in resources
+              if resource.get("role") == "video_guide"]
+    path = params.get("video_guide")
+    if path:
+        if len(guides) != 1:
+            raise ValueError("The admitted SFX video has no unique resource identity")
+        try:
+            current = file_identity(path)
+        except OSError as error:
+            raise ValueError("The admitted SFX video is no longer available") from error
+        if any(current[key] != guides[0].get(key) for key in ("sha256", "size_bytes")):
+            raise ValueError("The admitted SFX video changed; select it in a new request")
+    elif guides:
+        raise ValueError("The admitted SFX video must not become a text-only request")
+
+
 def prepared_sfx_execution(job, params, *, registry, check_models):
     """Return whether this is a verified command, or reject changed resources.
 
@@ -36,19 +54,6 @@ def prepared_sfx_execution(job, params, *, registry, check_models):
             or json.dumps(params, sort_keys=True, allow_nan=False)
             != json.dumps(expected, sort_keys=True, allow_nan=False)):
         raise ValueError("SFX execution parameters changed after admission")
-    guides = [resource for resource in entry["effective"].get("resources", [])
-              if resource.get("role") == "video_guide"]
-    path = params.get("video_guide")
-    if path:
-        if len(guides) != 1:
-            raise ValueError("The admitted SFX video has no unique resource identity")
-        try:
-            current = file_identity(path)
-        except OSError as error:
-            raise ValueError("The admitted SFX video is no longer available") from error
-        if any(current[key] != guides[0].get(key) for key in ("sha256", "size_bytes")):
-            raise ValueError("The admitted SFX video changed; select it in a new request")
-    elif guides:
-        raise ValueError("The admitted SFX video must not become a text-only request")
+    _check_guide_identity(params, entry["effective"].get("resources", []))
     check_models(params["_mmaudio_variant"])
     return True

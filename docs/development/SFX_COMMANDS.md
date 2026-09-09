@@ -129,3 +129,17 @@ full parameter sidecars for WAV and video-guided MP4 output. Tests exercise the
 real worker function with a provider stand-in, plus SQLite admissions, concurrent
 retries, changed-resource failures and DOM acknowledgement. These checks do not
 certify actual MMAudio inference or media decoding.
+
+## Wizard preparation
+
+`prepare_audio` with `audio_sub_mode=sfx` uses the same registered parser as
+other audio actions. It retains prompt and negative prompt literally and
+validates seed, guidance, 25 steps, one output and text weight. Preparation
+checks the effective command before changing the form; it never compiles a
+language-contract suffix into the sound description.
+
+Omitting `video_guide` retains the current selected guide. Explicit `null`
+removes it. A nonempty canonical reference selects that source; empty action
+strings and host/remote paths are rejected. The request duration is retained
+until server preparation probes the guide. No-guidance requests are limited
+to 20 seconds; the legacy SFX pack helper retains its separate clip behavior.

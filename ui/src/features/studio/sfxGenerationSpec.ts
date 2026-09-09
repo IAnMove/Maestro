@@ -18,15 +18,15 @@ const schema = catalog.operations[0].inputSchema as unknown as CommandSchema
 const validate = createCatalogValidator(schema.$defs, STUDIO_SFX_OPERATION)
 const paramKeys = Object.keys(catalog.studio.input.$defs.StudioSfxParams.properties)
 
-export function assertStudioSfxGenerationCommand(value: unknown): asserts value is StudioSfxGenerationCommand {
-  validate(value, schema, 'command')
-  const command = value as StudioSfxGenerationCommand
-  const params = command.input.params
+function assertSfxIdentity(command: StudioSfxGenerationCommand): void {
   if (!command.intent_id.trim() || !/^(?:default|[A-Za-z0-9][A-Za-z0-9_-]*)$/.test(command.input.workspace)) {
     throw new Error('Use an exact intention and output workspace')
   }
-  if (command.input.workspace_collection_id !== undefined && command.input.workspace_collection_id !== null
-      && !command.input.workspace_collection_id.trim()) throw new Error('Use a non-blank collection ID')
+  const collection = command.input.workspace_collection_id
+  if (collection != null && !collection.trim()) throw new Error('Use a non-blank collection ID')
+}
+
+function assertSfxModel(params: StudioSfxParams): void {
   if (!catalog.studio.sfx_model_types.includes(String(params.model_type))) {
     throw new Error('Choose mmaudio_v2 or mmaudio_nsfw')
   }
@@ -34,16 +34,27 @@ export function assertStudioSfxGenerationCommand(value: unknown): asserts value 
   if (params._mmaudio_variant != null && params._mmaudio_variant !== variant) {
     throw new Error('MMAudio variant does not match the selected model')
   }
+  if (params.sfx_mode != null && params.sfx_mode !== true) throw new Error('SFX mode must be active')
+}
+
+function assertSfxContent(params: StudioSfxParams): void {
   const prompt = params.MMAudio_prompt || params.prompt
   if (typeof prompt !== 'string' || !prompt.trim()) throw new Error('A literal sound description is required')
   if (params.prompt != null && params.MMAudio_prompt != null && params.prompt !== params.MMAudio_prompt) {
     throw new Error('The main and MMAudio prompts must identify the same sound description')
   }
-  if (params.sfx_mode != null && params.sfx_mode !== true) throw new Error('SFX mode must be active')
   const duration = params.duration_seconds
   if (typeof duration !== 'number' || !Number.isFinite(duration) || duration <= 0
       || (!params.video_guide && duration > 20)) throw new Error('Text-only SFX duration must be greater than zero and at most 20 seconds')
   if (params.video_guide) assertCanonicalAudioReference(params.video_guide, 'video_guide', 'video')
+}
+
+export function assertStudioSfxGenerationCommand(value: unknown): asserts value is StudioSfxGenerationCommand {
+  validate(value, schema, 'command')
+  const command = value as StudioSfxGenerationCommand
+  assertSfxIdentity(command)
+  assertSfxModel(command.input.params)
+  assertSfxContent(command.input.params)
   stableSerialize(command)
 }
 
