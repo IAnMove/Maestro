@@ -1667,6 +1667,8 @@ test('informational stop and cancel questions do not cancel the active GPU task'
     'Why would I cancel the generation?',
     'Should I cancel the generation?',
     'Can I cancel the generation?',
+    'Can we cancel the generation?',
+    'Could we please stop the task?',
     'Could I cancel the generation?',
     'Where do I cancel the generation?',
     'Is there a way to cancel the generation?',
@@ -1674,11 +1676,14 @@ test('informational stop and cancel questions do not cancel the active GPU task'
     '¿Cómo cancelo la generación?',
     '¿Dónde cancelo la generación?',
     '¿Hay alguna forma de cancelar la generación?',
+    '¿Existe un botón para cancelar la generación?',
   ]) {
     assert.equal(isHowToGenerateQuestion(request), true, request)
     assert.equal(isExplicitCancelRequest(request), false, request)
-    const turn = await reconcileAgentTurnWithRequest(request, { reply: 'Cancelo.', actions: [] })
-    assert.equal(turn.actions.some(action => action.type === 'cancel_task'), false, request)
+    const turn = await reconcileAgentTurnWithRequest(request, { reply: 'Cancelo.', actions: [
+      { type: 'open_tab', tab: 'audio' }, { type: 'cancel_task', taskId: 'running-job', confirm: true },
+    ] })
+    assert.deepEqual(turn.actions.map(action => action.type), ['open_tab'], request)
   }
 
   for (const request of [
@@ -1699,6 +1704,12 @@ test('informational retry questions do not relaunch a failed GPU task', async ()
   const { isExplicitRetryRequest, isHowToGenerateQuestion, reconcileAgentTurnWithRequest } = await import('../src/features/agent/agentActions.ts')
   for (const request of [
     'How do I retry a failed generation?',
+    'Can I retry the generation?',
+    'May we retry the generation?',
+    'Where can I retry the generation?',
+    'Is there a button to retry the generation?',
+    '¿Dónde reintento la generación?',
+    '¿Hay alguna forma de reintentar la generación?',
     'How can I retry the generation?',
     'How to retry a failed job?',
     'When should I retry the generation?',
@@ -1712,8 +1723,10 @@ test('informational retry questions do not relaunch a failed GPU task', async ()
   ]) {
     assert.equal(isHowToGenerateQuestion(request), true, request)
     assert.equal(isExplicitRetryRequest(request), false, request)
-    const turn = await reconcileAgentTurnWithRequest(request, { reply: 'Reintento.', actions: [] })
-    assert.equal(turn.actions.some(action => action.type === 'retry_task'), false, request)
+    const turn = await reconcileAgentTurnWithRequest(request, { reply: 'Reintento.', actions: [
+      { type: 'open_tab', tab: 'audio' }, { type: 'retry_task', taskId: 'failed-job', confirm: true },
+    ] })
+    assert.deepEqual(turn.actions.map(action => action.type), ['open_tab'], request)
   }
 
   for (const request of [
@@ -1779,6 +1792,23 @@ test('UI-label generate questions do not enqueue Studio generation', async () =>
     assert.deepEqual(command.actions.map(action => action.type), ['prepare_video', 'start_generation'])
   } finally {
     useStore.setState(original)
+  }
+})
+
+test('new UI-label question patterns preserve literal captions in explicit video commands', async () => {
+  const { isHowToGenerateQuestion, reconcileAgentTurnWithRequest } = await import('../src/features/agent/agentActions.ts')
+  for (const request of [
+    'Generate a video showing a sign that reads "How does the generate video button work?"',
+    'Generate a video showing a sign that reads "What is the generate video button?"',
+    'Genera un vídeo con un cartel que dice "¿Cómo funciona el botón genera el video?"',
+    'Genera un vídeo con un cartel que dice "¿Qué es el botón genera el video?"',
+  ]) {
+    assert.equal(isHowToGenerateQuestion(request), false, request)
+    const proposal = { reply: 'Ready', actions: [
+      { type: 'prepare_video', prompt: request }, { type: 'start_generation', confirm: true },
+    ] }
+    const turn = await reconcileAgentTurnWithRequest(request, proposal)
+    assert.deepEqual(turn.actions, proposal.actions, request)
   }
 })
 

@@ -2001,17 +2001,19 @@ const HOW_TO_GENERATE = [
   /\bhow\s+to\s+(?:stop|cancel|abort)\b/i,
   /\bwhen\s+(?:should|do|can|would)\s+(?:i|we|you)\s+(?:stop|cancel|abort)\b/i,
   /\bshould\s+(?:i|we)\s+(?:stop|cancel|abort)\b/i,
-  // "Can I cancel" is a capability question; "Can you cancel" stays a command.
-  /\b(?:can|could|may)\s+i\s+(?:please\s+)?(?:stop|cancel|abort)\b/i,
-  /\bwhere\s+(?:do|can|should|would)\s+(?:i|we|you)\s+(?:stop|cancel|abort)\b/i,
-  /\bis\s+there\s+a\s+(?:way|button|option|control)\s+to\s+(?:stop|cancel|abort)\b/i,
+  // Capability questions cover cancel and retry. "Can you cancel" stays a command.
+  // Anchor these additions to the request opening, not a caption inside a prompt.
+  /^(?:can|could|may)\s+(?:i|we)\s+(?:please\s+)?(?:stop|cancel|abort|retry|try\s+again)\b/i,
+  /^where\s+(?:do|can|should|would)\s+(?:i|we|you)\s+(?:stop|cancel|abort|retry|try\s+again)\b/i,
+  /^is\s+there\s+a\s+(?:way|button|option|control)\s+to\s+(?:stop|cancel|abort|retry|try\s+again)\b/i,
   /\b(?:what|why)\b[^.!?\n]{0,80}\b(?:stop|cancel|abort)\b/i,
   /\b(?:explain|describe|tell\s+me)\b[^.!?\n]{0,96}\b(?:stop|cancel|abort)\b/i,
   /\b(?:c[oó]mo(?:\s+(?:lo|la|las|los|puedo|se))?\s+(?:paro|parar|cancelo|cancelar|detengo|detener))\b/i,
-  /\b(?:cu[aá]ndo|por\s+qu[eé]|qu[eé]\s+pasa|d[oó]nde)\b[^.!?\n]{0,80}\b(?:paro|parar|cancelo|cancelar|detengo|detener|stop|cancel)\b/i,
+  /\b(?:cu[aá]ndo|por\s+qu[eé]|qu[eé]\s+pasa)\b[^.!?\n]{0,80}\b(?:paro|parar|cancelo|cancelar|detengo|detener|stop|cancel)\b/i,
   /\b(?:puedo|podemos|podr[ií]a)\s+(?:cancelar|parar|detener)\b/i,
   /\b(?:debo|deber[ií]a)\s+(?:cancelar|parar|detener)\b/i,
-  /\b(?:hay|existe)\s+(?:alguna\s+)?(?:forma|manera|modo|bot[oó]n|opci[oó]n)\s+de\s+(?:cancelar|parar|detener)\b/i,
+  /^(?:¿\s*)?d[oó]nde\b[^.!?\n]{0,80}\b(?:paro|parar|cancelo|cancelar|detengo|detener|reintento|reintentar|repite|repetir|stop|cancel|retry)\b/i,
+  /^(?:¿\s*)?(?:hay|existe)\s+(?:(?:alguna?|un|una)\s+)?(?:forma|manera|modo|bot[oó]n|opci[oó]n)\s+(?:de|para)\s+(?:cancelar|parar|detener|reintentar|repetir)\b/i,
   // Educational retry questions must not relaunch a failed GPU job.
   /\bhow\s+(?:can|do|would|should)\s+(?:i|we|you)\s+(?:retry|try\s+again)\b/i,
   /\bhow\s+to\s+(?:retry|try\s+again)\b/i,
@@ -2025,12 +2027,13 @@ const HOW_TO_GENERATE = [
   /\b(?:debo|deber[ií]a)\s+(?:reintentar|repetir)\b/i,
   // UI-label questions mention "generate video" without being a launch command.
   /\bwhat\s+does\b[^.!?\n]{0,80}\b(?:the\s+)?(?:generate|genera|launch|start)\b/i,
-  /\bhow\s+does\b[^.!?\n]{0,80}\b(?:the\s+)?(?:generate|genera|launch|start)\b/i,
-  /\bwhat\s+is\b[^.!?\n]{0,80}\b(?:the\s+)?(?:generate\s+video|generate\s+button|video\s+generation|generation\s+workflow)\b/i,
+  /^how\s+does\b[^.!?\n]{0,80}\b(?:the\s+)?(?:generate|genera|launch|start)\b/i,
+  /^what\s+is\b[^.!?\n]{0,80}\b(?:the\s+)?(?:generate\s+video|generate\s+button|video\s+generation|generation\s+workflow)\b/i,
   /\btell\s+me\s+about\b[^.!?\n]{0,64}\b(?:the\s+)?(?:generate\s+video|video\s+generation|generation\s+workflow)\b/i,
   /\bexpli(?:ca|came)\b[^.!?\n]{0,80}\b(?:qu[eé]\s+)?(?:significa|hace)\b[^.!?\n]{0,48}\b(?:genera|generate)\b/i,
-  /\bqu[eé]\s+(?:hace|es|significa)\b[^.!?\n]{0,80}\b(?:el\s+)?(?:bot[oó]n\s+)?(?:genera|generate)\b/i,
-  /\bc[oó]mo\s+funciona\b[^.!?\n]{0,80}\b(?:el\s+)?(?:bot[oó]n\s+)?(?:genera|generate)\b/i,
+  /\bqu[eé]\s+hace\b[^.!?\n]{0,80}\b(?:el\s+)?(?:bot[oó]n\s+)?(?:genera|generate)\b/i,
+  /^(?:¿\s*)?qu[eé]\s+(?:es|significa)\b[^.!?\n]{0,80}\b(?:el\s+)?(?:bot[oó]n\s+)?(?:genera|generate)\b/i,
+  /^(?:¿\s*)?c[oó]mo\s+funciona\b[^.!?\n]{0,80}\b(?:el\s+)?(?:bot[oó]n\s+)?(?:genera|generate)\b/i,
 ]
 
 export function isHowToGenerateQuestion(request: string): boolean {
