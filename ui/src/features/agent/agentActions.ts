@@ -1870,13 +1870,13 @@ export function isExplicitRetryRequest(request: string): boolean {
 
 export function isExplicitVideoGenerationRequest(request: string): boolean {
   const text = request.trim()
-  if (!text || NEGATED_VIDEO_REQUEST.test(text)) return false
+  if (!text || NEGATED_VIDEO_REQUEST.test(text) || isHowToGenerateQuestion(text)) return false
   return EXPLICIT_VIDEO_REQUESTS.some(pattern => pattern.test(text))
 }
 
 export function isResumePreparedStudioVideoRequest(request: string): boolean {
   const text = request.trim()
-  if (!text || NEGATED_VIDEO_REQUEST.test(text)) return false
+  if (!text || NEGATED_VIDEO_REQUEST.test(text) || isHowToGenerateQuestion(text)) return false
   const match = text.match(
     /\b(?:genera|generad|lanza|lanzad|encola|encolad|env[ií]a|enviad|start|queue|launch)\b[^.!?\n]{0,24}\b(?:el|la|este|esta|the)\s+(?:video|v[ií]deo|clip)\b(.*)$/i,
   )
@@ -1900,7 +1900,7 @@ const EXPLICIT_IMAGE_REQUESTS = [
 
 export function isExplicitImageGenerationRequest(request: string): boolean {
   const text = request.trim()
-  if (!text || NEGATED_VIDEO_REQUEST.test(text)) return false
+  if (!text || NEGATED_VIDEO_REQUEST.test(text) || isHowToGenerateQuestion(text)) return false
   if (isExplicitVideoGenerationRequest(text)) return false
   return EXPLICIT_IMAGE_REQUESTS.some(pattern => pattern.test(text))
 }
@@ -1920,7 +1920,7 @@ const STUDIO_AUDIO_CONTEXT = [
 export function isExplicitAudioGenerationRequest(request: string): boolean {
   const text = request.trim()
   if (!text || NEGATED_VIDEO_REQUEST.test(text) || MUSIC_VIDEO_CONTEXT.test(text)) return false
-  if (isExplicitSfxGenerationRequest(text)) return false
+  if (isHowToGenerateQuestion(text) || isExplicitSfxGenerationRequest(text)) return false
   if (!STUDIO_AUDIO_CONTEXT.some(pattern => pattern.test(text))) return false
   return EXPLICIT_AUDIO_GENERATION_REQUESTS.some(pattern => pattern.test(text))
 }
@@ -1941,7 +1941,7 @@ const EXPLICIT_3D_REQUESTS = [
 
 export function isExplicit3dGenerationRequest(request: string): boolean {
   const text = request.trim()
-  if (!text || NEGATED_VIDEO_REQUEST.test(text)) return false
+  if (!text || NEGATED_VIDEO_REQUEST.test(text) || isHowToGenerateQuestion(text)) return false
   if (isExplicitVideoGenerationRequest(text) || isExplicitImageGenerationRequest(text) || isExplicitSfxGenerationRequest(text)) return false
   return EXPLICIT_3D_REQUESTS.some(pattern => pattern.test(text))
 }
@@ -2015,8 +2015,11 @@ const HOW_TO_GENERATE = [
 
 export function isHowToGenerateQuestion(request: string): boolean {
   const text = request.trim()
-  if (!text || text.length > 240) return false
-  return HOW_TO_GENERATE.some(pattern => pattern.test(text))
+  if (!text) return false
+  // Classify from the opening window so a long explanation after
+  // "how do I generate a video?" stays educational. A later command
+  // after 240 characters is treated as a separate request.
+  return HOW_TO_GENERATE.some(pattern => pattern.test(text.slice(0, 240)))
 }
 
 const LABS_INVENTORY = /(?:¿\s*)?(?:qu[eé]\s+puedes\s+hacer|what\s+can\s+you\s+do)(?:\s+(?:en|in|con|with))?\s+(?:el\s+)?(?:series\s+lab|story\s+lab)/i
@@ -2145,6 +2148,26 @@ export async function reconcileAgentTurnWithRequest(
       }
     : candidate
   turn = preserveExactEpisodeTitle(turn)
+  if (isComicLaunchHowQuestion(request, history)) {
+    return {
+      reply: [
+        'No hay un botón llamado **Render page**.',
+        'El dibujo de las viñetas es **Generate all images** en Comic Director (barra de Comics), o dímelo aquí: **lánzalo**.',
+        'Las viñetas entran en la **misma GPU**, una detrás de otra, no en paralelo. No es un segundo motor.',
+      ].join('\n\n'),
+      actions: [{ type: 'open_tab', tab: 'comics' }],
+    }
+  }
+  if (isHowToGenerateQuestion(request)) {
+    return {
+      ...turn,
+      actions: turn.actions.filter(action => (
+        action.type === 'open_tab'
+        || action.type === 'open_story_section'
+        || action.type === 'open_series_section'
+      )),
+    }
+  }
   if (isResumePreparedStudioVideoRequest(request)) {
     const existing = turn.actions.find(
       (action): action is AgentPrepareVideoAction => action.type === 'prepare_video',
@@ -2183,28 +2206,8 @@ export async function reconcileAgentTurnWithRequest(
       actions: [rhythmic3dWorkflow],
     }
   }
-  if (isComicLaunchHowQuestion(request, history)) {
-    return {
-      reply: [
-        'No hay un botón llamado **Render page**.',
-        'El dibujo de las viñetas es **Generate all images** en Comic Director (barra de Comics), o dímelo aquí: **lánzalo**.',
-        'Las viñetas entran en la **misma GPU**, una detrás de otra, no en paralelo. No es un segundo motor.',
-      ].join('\n\n'),
-      actions: [{ type: 'open_tab', tab: 'comics' }],
-    }
-  }
   if (isLabsInventoryQuestion(request)) {
     return { ...turn, actions: [] }
-  }
-  if (isHowToGenerateQuestion(request)) {
-    return {
-      ...turn,
-      actions: turn.actions.filter(action => (
-        action.type === 'open_tab'
-        || action.type === 'open_story_section'
-        || action.type === 'open_series_section'
-      )),
-    }
   }
   if (!requestAuthorizesEditorialCommit(request)) {
     const actions = turn.actions.filter(action => !EDITORIAL_COMMIT_TYPES.has(action.type))
