@@ -157,55 +157,6 @@ function isEmptyList(value: unknown): boolean {
   return Array.isArray(value) && value.every(item => item === null || item === undefined || item === '')
 }
 
-function hasAudioGuide(value: Record<string, unknown>): boolean {
-  return AUDIO_REFERENCE_FIELDS.some(field => {
-    const item = value[field]
-    return item !== undefined && item !== null && item !== ''
-  })
-}
-
-/**
- * Speech and Music share `params`. Adding a voice clone writes
- * `audio_prompt_type` (and Load Settings may restore `audio_guide`).
- * The closed music command then fails (`audio_guide requires its selector`
- * or `_tts_voice_count must be zero`) or, worse, treats a TTS clone as an
- * ACE reference. Neutralize that residue before the command builder.
- * Real ACE refs from a music sidecar stay intact when no speech voices
- * are active.
- */
-export function neutralizeStudioMusicSpeechResidue(
-  params: Record<string, unknown>,
-  options: { speechVoiceCount?: number } = {},
-): Record<string, unknown> {
-  if (!isRecord(params)) throw new Error('Studio music parameters must be an object')
-  const next = { ...params }
-  const speechVoiceCount = Math.max(
-    0,
-    Number(options.speechVoiceCount) || 0,
-    Number(next._tts_voice_count) || 0,
-  )
-  next._tts_voice_count = 0
-  for (const field of TTS_SPEAKER_FIELDS) {
-    if (next[field] !== undefined && next[field] !== null && next[field] !== '') {
-      next[field] = ''
-    }
-  }
-  if (speechVoiceCount > 0) {
-    for (const field of AUDIO_REFERENCE_FIELDS) {
-      if (next[field] !== undefined && next[field] !== null && next[field] !== '') {
-        next[field] = null
-      }
-    }
-    next.audio_prompt_type = ''
-  } else if (!hasAudioGuide(next) && typeof next.audio_prompt_type === 'string' && next.audio_prompt_type !== '') {
-    next.audio_prompt_type = ''
-  }
-  for (const field of AUDIO_REFERENCE_FIELDS) {
-    if (next[field] === '') next[field] = null
-  }
-  return next
-}
-
 const RESIDUAL_TEXT_FIELDS = new Set([
   'viggle_audio_mode', 'video_prompt_type', 'image_prompt_type', 'video_guide',
   'video_guide_outpainting',
