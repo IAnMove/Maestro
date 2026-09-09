@@ -18,9 +18,11 @@ const {
   submitMusicGenerationCommand,
   MusicGenerationCommandError,
 } = await import('../src/api/musicGenerationCommands.ts')
+const { prepareStudioMusicSubmission } = await import('../src/features/studio/musicCommandSubmission.ts')
 const {
   STUDIO_MUSIC_MODEL_TYPES,
   STUDIO_MUSIC_PARAM_KEYS,
+  neutralizeStudioMusicSpeechResidue,
   projectStudioMusicFormParams,
 } = await import('../src/features/studio/musicGenerationSpec.ts')
 
@@ -183,6 +185,14 @@ test('music builder retains inactive sentinels but rejects active modes, TTS and
     /_tts_speaker_name1/,
   )
   assert.throws(
+    () => command('music-orphan-selector', { audio_prompt_type: 'A', audio_guide: null }),
+    /audio_guide requires/,
+  )
+  assert.throws(
+    () => command('music-active-tts-count', { _tts_voice_count: 1 }),
+    /_tts_voice_count/,
+  )
+  assert.throws(
     () => command('music-host-path', { audio_guide: '/tmp/guide.wav', audio_prompt_type: 'A' }),
     /canonical audio URL or asset ID/,
   )
@@ -194,6 +204,72 @@ test('music builder retains inactive sentinels but rejects active modes, TTS and
     () => command('music-remote', { model_type: 'music-3.0' }),
     /registered local music model/,
   )
+})
+
+test('speech leftovers on the shared form do not fail or become ACE music references', { concurrency: false }, () => {
+  const orphanSelector = neutralizeStudioMusicSpeechResidue({
+    ...nativeParams(),
+    audio_prompt_type: 'A',
+    audio_guide: '',
+    _tts_speaker_name1: 'Alice',
+  })
+  assert.equal(orphanSelector.audio_prompt_type, '')
+  assert.equal(orphanSelector._tts_voice_count, 0)
+  assert.equal(orphanSelector._tts_speaker_name1, '')
+  assert.doesNotThrow(() => createStudioMusicGenerationCommand(orphanSelector, 'music-orphan-selector'))
+
+  const speechRestore = neutralizeStudioMusicSpeechResidue({
+    ...nativeParams(),
+    audio_prompt_type: 'A',
+    audio_guide: '/api/v1/uploads/voice-clone.wav',
+    _tts_voice_count: 2,
+    _tts_speaker_name1: 'Alice',
+  }, { speechVoiceCount: 2 })
+  assert.equal(speechRestore.audio_prompt_type, '')
+  assert.equal(speechRestore.audio_guide, null)
+  assert.equal(speechRestore._tts_voice_count, 0)
+  assert.equal(speechRestore._tts_speaker_name1, '')
+  assert.doesNotThrow(() => createStudioMusicGenerationCommand(speechRestore, 'music-speech-restore'))
+
+  const aceReference = neutralizeStudioMusicSpeechResidue({
+    ...nativeParams(),
+    audio_prompt_type: 'A',
+    audio_guide: '/api/v1/uploads/ace-ref.wav',
+  }, { speechVoiceCount: 0 })
+  assert.equal(aceReference.audio_prompt_type, 'A')
+  assert.equal(aceReference.audio_guide, '/api/v1/uploads/ace-ref.wav')
+})
+
+test('music submission projection strips leftover speech voices before the closed builder', { concurrency: false }, async () => {
+  const params = {
+    ...nativeParams(),
+    audio_prompt_type: 'A',
+    audio_guide: '',
+    _tts_speaker_name1: 'Alice',
+    _tts_voice_count: 1,
+  }
+  const state = {
+    params,
+    activeWorkspace: 'music-workspace',
+    generationMode: 'audio',
+    audioSubMode: 'music',
+    durationSeconds: 20,
+    musicDescription: params._music_description,
+    musicInstrumental: false,
+    settingsOpen: false,
+    dashboardOpen: false,
+    sidebarMode: 'studio',
+    ttsVoiceCount: 1,
+  } as Parameters<typeof prepareStudioMusicSubmission>[1]
+  const prepared = await prepareStudioMusicSubmission(params, state, () => state, {
+    actor: 'user', commandId: 'music-speech-residue',
+  })
+  assert.equal(prepared.params.audio_prompt_type, '')
+  assert.equal(prepared.params._tts_voice_count, 0)
+  assert.equal(prepared.params._tts_speaker_name1, '')
+  assert.equal(prepared.params.audio_guide, null)
+  assert.equal(prepared.params.prompt, params.prompt)
+  assert.equal(typeof prepared.submit, 'function')
 })
 
 test('form projection preserves music text, language, refs and sentinels while rejecting active stale controls', { concurrency: false }, () => {

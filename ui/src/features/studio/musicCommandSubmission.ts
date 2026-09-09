@@ -5,6 +5,7 @@ import type { AppState } from '../../stores/useStore'
 import type { GenerationSubmissionContext } from './generationProvenance'
 import {
   createStudioMusicGenerationCommand,
+  neutralizeStudioMusicSpeechResidue,
   projectStudioMusicFormParams,
   type StudioMusicGenerationCommand,
 } from './musicGenerationSpec'
@@ -68,6 +69,11 @@ export async function prepareStudioMusicSubmission(
   try {
     if (referenceErrors.length) throw new Error(i18n.t('studio:commands.referenceFailed'))
     snapshotParams = JSON.parse(stableSerialize(params)) as Record<string, unknown>
+    // Speech voice clones share this form. Strip that residue before the
+    // closed music builder sees an orphan selector or an active TTS count.
+    snapshotParams = neutralizeStudioMusicSpeechResidue(snapshotParams, {
+      speechVoiceCount: before.ttsVoiceCount,
+    })
     // Load Settings/reroll restores the shared Studio form, which can carry
     // known video/H3 controls alongside the music fields. Project only that
     // explicit form residue; the command builder remains closed for direct
