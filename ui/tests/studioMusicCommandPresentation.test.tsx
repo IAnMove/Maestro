@@ -433,3 +433,20 @@ test('store startGeneration keeps real defaults and ignores stale speech and voi
     useStore.setState(before)
   }
 })
+
+test('Music form submission admits after leftover SFX prompt and weight', { concurrency: false }, async () => {
+  const params = {
+    ...baseParams('sfx-residue'),
+    MMAudio_prompt: 'thunder crash on tin roof',
+    MMAudio_neg_prompt: 'music',
+    sfx_text_weight: 2.5,
+    sfx_mode: true,
+  }
+  const state = formState(params)
+  const prepared = await prepareStudioMusicSubmission(
+    params, state, () => state, { actor: 'user', commandId: 'music-sfx-residue' },
+  )
+  assert.equal(prepared.params.prompt, params.prompt)
+  assert.equal('MMAudio_prompt' in prepared.params, false)
+  assert.equal('sfx_text_weight' in prepared.params, false)
+})

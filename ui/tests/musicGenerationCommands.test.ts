@@ -23,6 +23,7 @@ const {
   STUDIO_MUSIC_PARAM_KEYS,
   projectStudioMusicFormParams,
 } = await import('../src/features/studio/musicGenerationSpec.ts')
+const { neutralizeSfxOwnedFormFields } = await import('../src/features/studio/sfxFormResidue.ts')
 
 const originalFetch = globalThis.fetch
 
@@ -254,6 +255,29 @@ test('form projection preserves music text, language, refs and sentinels while r
     () => createStudioMusicGenerationCommand(source, 'music-direct-closed'),
     /skip_steps_cache_type|image_refs|voice_clone_enabled/,
   )
+})
+
+test('Music form adapter drops leftover SFX prompt and weight without opening the closed builder', { concurrency: false }, () => {
+  const leftover = {
+    ...nativeParams(),
+    MMAudio_prompt: 'thunder crash on tin roof',
+    MMAudio_neg_prompt: 'music',
+    MMAudio_setting: 1,
+    sfx_text_weight: 2.5,
+    sfx_mode: true,
+    _mmaudio_variant: 'v2',
+    _sfx_virtual_model: 'mmaudio_v2',
+  }
+  assert.throws(
+    () => projectStudioMusicFormParams(leftover),
+    /MMAudio_prompt is active|sfx_text_weight is not supported/,
+  )
+  const projection = projectStudioMusicFormParams(neutralizeSfxOwnedFormFields(leftover))
+  const command = createStudioMusicGenerationCommand(projection.params, 'music-sfx-form')
+  assert.equal(command.input.params.prompt, leftover.prompt)
+  assert.equal('MMAudio_prompt' in command.input.params, false)
+  assert.equal('sfx_text_weight' in command.input.params, false)
+  assert.equal('sfx_mode' in command.input.params, false)
 })
 
 test('music admission persists exact envelope before POST and validates a correlated queued receipt', { concurrency: false }, async () => {

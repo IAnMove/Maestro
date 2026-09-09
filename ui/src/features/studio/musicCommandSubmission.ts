@@ -3,6 +3,7 @@ import { canonicalAudioReferences } from './audioCommandReferences'
 import { stableSerialize } from '../../lib/commandContract'
 import type { AppState } from '../../stores/useStore'
 import type { GenerationSubmissionContext } from './generationProvenance'
+import { neutralizeSfxOwnedFormFields } from './sfxFormResidue'
 import {
   createStudioMusicGenerationCommand,
   projectStudioMusicFormParams,
@@ -72,7 +73,9 @@ export async function prepareStudioMusicSubmission(
     // known video/H3 controls alongside the music fields. Project only that
     // explicit form residue; the command builder remains closed for direct
     // Wizard/MCP envelopes and rejects every other unknown key.
-    snapshotParams = projectStudioMusicFormParams(snapshotParams).params
+    snapshotParams = projectStudioMusicFormParams(
+      neutralizeSfxOwnedFormFields(snapshotParams),
+    ).params
     assertSameMusicForm(before, current())
     await canonicalAudioReferences(snapshotParams)
     assertSameMusicForm(before, current())

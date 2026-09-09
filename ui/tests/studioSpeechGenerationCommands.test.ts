@@ -22,6 +22,7 @@ const {
   STUDIO_SPEECH_PARAM_KEYS,
   projectStudioSpeechFormParams: projectSpeechFormParams,
 } = await import('../src/features/studio/speechGenerationSpec.ts')
+const { neutralizeSfxOwnedFormFields } = await import('../src/features/studio/sfxFormResidue.ts')
 
 const originalFetch = globalThis.fetch
 
@@ -173,6 +174,32 @@ test('Load Settings/reroll projects known video and H3 form residue without weak
     ),
     /minimax_h3_planning_style/,
   )
+})
+
+test('Speech form adapter drops leftover SFX prompt and weight without opening the closed builder', { concurrency: false }, () => {
+  const leftover = {
+    ...nativeParams(),
+    workspace: 'speech-test',
+    MMAudio_prompt: 'thunder crash on tin roof',
+    MMAudio_neg_prompt: 'music',
+    MMAudio_setting: 1,
+    sfx_text_weight: 2.5,
+    sfx_mode: true,
+    _mmaudio_variant: 'v2',
+    _sfx_virtual_model: 'mmaudio_v2',
+  }
+  assert.throws(
+    () => createStudioSpeechGenerationCommand(leftover, 'speech-sfx-direct'),
+    /MMAudio_prompt|sfx_text_weight|sfx_mode/,
+  )
+  const command = createStudioSpeechGenerationCommand(
+    projectSpeechFormParams(neutralizeSfxOwnedFormFields(leftover)).params,
+    'speech-sfx-form',
+  )
+  assert.equal(command.input.params.prompt, leftover.prompt)
+  assert.equal('MMAudio_prompt' in command.input.params, false)
+  assert.equal('sfx_text_weight' in command.input.params, false)
+  assert.equal('sfx_mode' in command.input.params, false)
 })
 
 test('speech admission persists exact envelope before POST and validates typed v2 receipt', { concurrency: false }, async () => {
