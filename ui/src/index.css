@@ -766,6 +766,7 @@ input[type="range"]::-webkit-slider-thumb {
   bottom: 0;
   width: min(100dvh, 66vw);
   aspect-ratio: 1 / 1;
+  isolation: isolate;
 }
 .hp-intro-art-frame,
 .hp-intro-art {
@@ -773,6 +774,9 @@ input[type="range"]::-webkit-slider-thumb {
   inset: 0;
   width: 100%;
   height: 100%;
+}
+.hp-intro-art-frame {
+  z-index: 1;
 }
 .hp-intro-art {
   object-fit: contain;
@@ -794,19 +798,23 @@ input[type="range"]::-webkit-slider-thumb {
   position: absolute;
   left: 76%;
   top: 40%;
-  width: 110%;
+  /* Tight on the quill, in front of the art. A plate-sized wash sat
+     behind the PNG so the painted halo never got the extra light, and
+     `filter: blur` on that wash re-rastered every breathe frame. */
+  z-index: 2;
+  width: 44%;
   aspect-ratio: 1 / 1;
   transform: translate(-50%, -50%);
+  pointer-events: none;
   background: radial-gradient(
     circle,
-    rgba(255, 186, 92, 0.3) 0%,
-    rgba(226, 132, 46, 0.15) 26%,
-    rgba(92, 58, 138, 0.13) 50%,
+    rgba(255, 224, 150, 0.72) 0%,
+    rgba(255, 186, 92, 0.38) 16%,
+    rgba(226, 132, 46, 0.16) 38%,
+    rgba(92, 58, 138, 0.06) 58%,
     transparent 72%
   );
-  /* No blur here on purpose: a 12px blur over a gradient this soft is
-     invisible, and it turned the breathing scale below into a
-     re-rendered filter on a viewport-sized element every frame. */
+  mix-blend-mode: screen;
   will-change: transform, opacity;
 }
 
@@ -816,15 +824,17 @@ input[type="range"]::-webkit-slider-thumb {
 .hp-intro-scrim {
   position: absolute;
   inset: 0;
+  /* Copy-side only. Previous stops reached ~58% and crushed the quill
+     halo that sits on the inner edge of the art. */
   background:
     linear-gradient(
       260deg,
-      #07060b 12%,
-      rgba(7, 6, 11, 0.88) 33%,
-      rgba(7, 6, 11, 0.14) 58%,
-      rgba(7, 6, 11, 0) 74%
+      #07060b 8%,
+      rgba(7, 6, 11, 0.88) 22%,
+      rgba(7, 6, 11, 0.28) 34%,
+      rgba(7, 6, 11, 0) 46%
     ),
-    radial-gradient(125% 95% at 48% 46%, transparent 52%, rgba(4, 3, 8, 0.74) 100%);
+    radial-gradient(125% 95% at 48% 46%, transparent 62%, rgba(4, 3, 8, 0.55) 100%);
 }
 
 /* Grain. Half a point of texture over the whole composite, which also
@@ -858,12 +868,12 @@ input[type="range"]::-webkit-slider-thumb {
     background:
       linear-gradient(
         to bottom,
-        #07060b 10%,
-        rgba(7, 6, 11, 0.84) 32%,
-        rgba(7, 6, 11, 0.16) 62%,
-        rgba(7, 6, 11, 0) 78%
+        #07060b 6%,
+        rgba(7, 6, 11, 0.78) 22%,
+        rgba(7, 6, 11, 0.18) 42%,
+        rgba(7, 6, 11, 0) 58%
       ),
-      radial-gradient(125% 95% at 50% 42%, transparent 52%, rgba(4, 3, 8, 0.74) 100%);
+      radial-gradient(125% 95% at 50% 42%, transparent 64%, rgba(4, 3, 8, 0.5) 100%);
   }
 }
 
@@ -874,6 +884,7 @@ input[type="range"]::-webkit-slider-thumb {
    loading spinner. */
 .hp-intro-mote {
   position: absolute;
+  z-index: 3;
   width: 3px;
   height: 3px;
   border-radius: 999px;
@@ -929,7 +940,7 @@ input[type="range"]::-webkit-slider-thumb {
   to { transform: scale(1); }
 }
 @keyframes hp-intro-bloom-in {
-  from { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
+  from { opacity: 0.7; transform: translate(-50%, -50%) scale(0.92); }
   to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 }
 @keyframes hp-intro-breathe {
@@ -1111,20 +1122,57 @@ input[type="range"]::-webkit-slider-thumb {
 [data-navigation-category='studios'] { --hp-navigation-rgb: 88, 143, 121; }
 [data-navigation-category='production'] { --hp-navigation-rgb: 160, 96, 103; }
 [data-navigation-category='media'] { --hp-navigation-rgb: 166, 139, 82; }
+/* Two-level navigation. The expanded parent and its panel are the SAME
+ * layer: one flat shared fill, no borders, so there is no seam to disguise
+ * with an outline. Depth comes from the surroundings — the track is the
+ * part that sinks — and a single material describes all three states:
+ *
+ *   raised → can be pressed   (collapsed parents and every child)
+ *   flush  → is the surface   (the expanded parent and its panel)
+ *   sunken → is the current one (the selected child)
+ *
+ * The fills are translucent so the same rule holds over the track and over
+ * the plateau. No color-mix(): a solid background plus a tint layer gives
+ * the same result without leaving pre-2023 browsers with no fill at all,
+ * which is exactly when the seam became visible. */
+.hp-navigation-row {
+  border-radius: 0.6rem 0.6rem 0 0;
+  background-color: rgba(0, 0, 0, 0.34);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.55), inset 0 -1px 0 rgba(255, 255, 255, 0.035);
+}
+.hp-navigation-primary,
+.hp-navigation-child {
+  background-color: rgba(255, 255, 255, 0.055);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+.hp-navigation-primary:hover,
+.hp-navigation-child:hover { background-color: rgba(255, 255, 255, 0.095); }
+.hp-navigation-primary:active,
+.hp-navigation-child:active {
+  background-color: rgba(0, 0, 0, 0.2);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5);
+}
 .hp-navigation-primary[data-navigation-expanded='true'] {
   z-index: 3;
-  border: 1px solid rgba(var(--hp-navigation-rgb), 0.34);
-  border-bottom: 0;
+  border: 0;
   border-radius: 0.55rem 0.55rem 0 0;
-  background: color-mix(in srgb, rgb(var(--hp-navigation-rgb)) 9%, rgb(8, 10, 16));
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.28), 0 0 13px rgba(var(--hp-navigation-rgb), 0.12);
+  background-color: #141824;
+  /* the top edge catches the category light */
+  box-shadow: inset 0 1px 0 rgba(var(--hp-navigation-rgb), 0.5);
   transform: translateY(1px);
 }
 .hp-navigation-children {
-  border-color: rgba(var(--hp-navigation-rgb), 0.3);
-  background: color-mix(in srgb, rgb(var(--hp-navigation-rgb)) 9%, rgb(8, 10, 16));
-  box-shadow: inset 0 1px 0 rgba(var(--hp-navigation-rgb), 0.14);
+  border: 0;
+  /* same base as the parent; the light rides on a separate layer so the
+     shared fill stays continuous */
+  background-color: #141824;
+  background-image: linear-gradient(rgba(var(--hp-navigation-rgb), 0.14), rgba(var(--hp-navigation-rgb), 0) 46%);
+  box-shadow: 0 10px 24px -14px rgba(0, 0, 0, 0.9),
+              0 0 34px -14px rgba(var(--hp-navigation-rgb), 0.45);
 }
+/* Seals the millimetre left between the parent and the panel. With no
+   borders it no longer covers a line; it just continues the fill. Its width
+   is kept current by the ResizeObserver in TabFilter. */
 .hp-navigation-children::before {
   content: '';
   position: absolute;
@@ -1132,16 +1180,18 @@ input[type="range"]::-webkit-slider-thumb {
   top: 0;
   left: var(--hp-navigation-notch-left, 0);
   width: var(--hp-navigation-notch-width, 0);
-  height: 2px;
+  height: 3px;
   pointer-events: none;
-  background: color-mix(in srgb, rgb(var(--hp-navigation-rgb)) 9%, rgb(8, 10, 16));
+  background-color: #141824;
 }
-.hp-navigation-child:hover { background: rgba(var(--hp-navigation-rgb), 0.13); }
 .hp-navigation-child[aria-selected='true'] {
+  outline: 0;
   color: rgb(var(--hp-navigation-rgb));
-  outline: 1px solid rgba(var(--hp-navigation-rgb), 0.48);
-  background: rgba(var(--hp-navigation-rgb), 0.15);
-  box-shadow: 0 0 14px rgba(var(--hp-navigation-rgb), 0.2);
+  background-color: rgba(0, 0, 0, 0.24);
+  /* the same light, pooled in the recess */
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.55),
+              inset 0 0 13px rgba(var(--hp-navigation-rgb), 0.17),
+              inset 0 -1px 0 rgba(255, 255, 255, 0.05);
 }
 [data-wizard-anchor][data-wizard-magic] {
   z-index: 2;
