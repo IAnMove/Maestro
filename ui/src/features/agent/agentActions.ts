@@ -1843,8 +1843,13 @@ const EXPLICIT_VIDEO_REQUESTS = [
 const NEGATED_VIDEO_REQUEST = /\b(?:no|sin|don['’]?t|do\s+not)\b[^.!?\n]{0,32}\b(?:hagas|generes|crees|lances|encoles|hacer|generar|crear|lanzar|encolar|make|create|generate|render|launch|start|queue)\b/i
 
 const EXPLICIT_CANCEL_REQUESTS = [
-  /\b(?:cancela|cancelad|cancelar|para|parad|det[eé]n|detened)\b[^.!?\n]*\b(?:tarea|trabajo|job|cola|generaci[oó]n|v[ií]deo|video|clip)\b/i,
-  /\b(?:para|parad|det[eé]n)\b[^.!?\n]*\b(?:lo que est[aá] (?:generando|renderizando|en cola|corriendo))\b/i,
+  /\b(?:cancela|cancelad|cancelar|parad|det[eé]n|detened)\b[^.!?\n]*\b(?:tarea|trabajo|job|cola|generaci[oó]n|v[ií]deo|video|clip)\b/i,
+  // "para" is also the Spanish preposition ("pasos para generar un vídeo").
+  // Treat it as the imperative of parar only at a sentence start and only
+  // when the object is a job, never media or an infinitive.
+  /(?:^|[.!?;]\s*)(?:por favor[, ]+)?para\b(?:\s+(?:ya|ahora))?\s+(?:el|la|este|esta|esa)?\s*(?:tarea|trabajo|job|cola|generaci[oó]n)\b/i,
+  /\b(?:parad|det[eé]n)\b[^.!?\n]*\b(?:lo que est[aá] (?:generando|renderizando|en cola|corriendo))\b/i,
+  /(?:^|[.!?;]\s*)(?:por favor[, ]+)?para\b[^.!?\n]{0,24}\blo que est[aá] (?:generando|renderizando|en cola|corriendo)\b/i,
   /\b(?:cancel|stop|abort)\b[^.!?\n]*\b(?:task|job|queue|generation|video|clip|active)\b/i,
 ]
 const NEGATED_CANCEL_REQUEST = /\b(?:no|sin|don['’]?t|do\s+not)\b[^.!?\n]{0,24}\b(?:cancel|cancela|canceles|pares|detengas|stop|abort)\b/i
@@ -1870,7 +1875,7 @@ export function isExplicitRetryRequest(request: string): boolean {
 
 export function isExplicitVideoGenerationRequest(request: string): boolean {
   const text = request.trim()
-  if (!text || NEGATED_VIDEO_REQUEST.test(text)) return false
+  if (!text || NEGATED_VIDEO_REQUEST.test(text) || isHowToGenerateQuestion(text)) return false
   return EXPLICIT_VIDEO_REQUESTS.some(pattern => pattern.test(text))
 }
 
@@ -1900,7 +1905,7 @@ const EXPLICIT_IMAGE_REQUESTS = [
 
 export function isExplicitImageGenerationRequest(request: string): boolean {
   const text = request.trim()
-  if (!text || NEGATED_VIDEO_REQUEST.test(text)) return false
+  if (!text || NEGATED_VIDEO_REQUEST.test(text) || isHowToGenerateQuestion(text)) return false
   if (isExplicitVideoGenerationRequest(text)) return false
   return EXPLICIT_IMAGE_REQUESTS.some(pattern => pattern.test(text))
 }
@@ -1920,7 +1925,7 @@ const STUDIO_AUDIO_CONTEXT = [
 export function isExplicitAudioGenerationRequest(request: string): boolean {
   const text = request.trim()
   if (!text || NEGATED_VIDEO_REQUEST.test(text) || MUSIC_VIDEO_CONTEXT.test(text)) return false
-  if (isExplicitSfxGenerationRequest(text)) return false
+  if (isHowToGenerateQuestion(text) || isExplicitSfxGenerationRequest(text)) return false
   if (!STUDIO_AUDIO_CONTEXT.some(pattern => pattern.test(text))) return false
   return EXPLICIT_AUDIO_GENERATION_REQUESTS.some(pattern => pattern.test(text))
 }
@@ -1941,7 +1946,7 @@ const EXPLICIT_3D_REQUESTS = [
 
 export function isExplicit3dGenerationRequest(request: string): boolean {
   const text = request.trim()
-  if (!text || NEGATED_VIDEO_REQUEST.test(text)) return false
+  if (!text || NEGATED_VIDEO_REQUEST.test(text) || isHowToGenerateQuestion(text)) return false
   if (isExplicitVideoGenerationRequest(text) || isExplicitImageGenerationRequest(text) || isExplicitSfxGenerationRequest(text)) return false
   return EXPLICIT_3D_REQUESTS.some(pattern => pattern.test(text))
 }
@@ -2009,8 +2014,12 @@ function comicPanelTarget(
 const HOW_TO_GENERATE = [
   /\b(?:c[oó]mo(?:\s+(?:lo|la|las|los|puedo|se))?\s+(?:genero|generar|lanzo|lanzar|creo|crear|hago|hacer)|how\s+(?:can|do)\s+(?:i|we|you)\s+(?:generate|create|launch|start|make)|how\s+do\s+i\s+(?:generate|create|launch|start|make))\b/i,
   /\bhow\s+to\s+(?:generate|create|launch|start|make)\b/i,
-  /\b(?:explain|describe|tell\s+me|show(?:\s+me)?|can\s+you\s+show\s+me)\b[^.!?\n]{0,96}\bhow\s+(?:to|do(?:\s+i)?)\b/i,
-  /\b(?:what|which)\s+(?:model|provider)\b[^.!?\n]{0,160}\b(?:generate|create|launch|start|make)\b/i,
+  /\b(?:explain|describe|tell\s+me|show(?:\s+me)?|can\s+you\s+(?:explain|describe|tell\s+me|show\s+me))\b[^.!?\n]{0,96}\b(?:how\s+(?:to|do(?:\s+i)?)|steps?(?:\s+to)?|(?:what|which)\s+happens)\b/i,
+  /\b(?:what|which)\s+(?:model|provider|steps?)\b[^.!?\n]{0,160}\b(?:generate|create|launch|start|make)\b/i,
+  /\b(?:before\s+i\s+(?:generate|create|launch|start|make)|what\s+(?:should|do)\s+i\s+(?:configure|set|know|check|prepare))\b/i,
+  /\b(?:dime|expl[ií]came|descr[ií]beme|mu[eé]strame)\b[^.!?\n]{0,96}\b(?:c[oó]mo|pasos?(?:\s+para)?)\b/i,
+  /\b(?:qu[eé])\s+pasos?\b[^.!?\n]{0,160}\b(?:gener|cre|lanz)/i,
+  /\b(?:antes\s+de\s+(?:generar|crear|lanzar)|qu[eé]\s+(?:debo|deber[ií]a)\s+(?:configurar|saber|preparar))\b/i,
 ]
 
 export function isHowToGenerateQuestion(request: string): boolean {

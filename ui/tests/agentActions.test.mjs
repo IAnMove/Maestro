@@ -1656,6 +1656,37 @@ test('drops cancel_task unless confirm is true and repairs an explicit cancel re
   assert.equal(repaired.actions[0].confirm, true)
 })
 
+test('Spanish para-preposition does not cancel the active GPU task', async () => {
+  const { isExplicitCancelRequest, reconcileAgentTurnWithRequest } = await import('../src/features/agent/agentActions.ts')
+  for (const request of [
+    'Dime los pasos para generar un vídeo',
+    'Qué pasos sigo para generar un vídeo',
+    'Abre Studio para generar un vídeo',
+    'Necesito ayuda para lanzar el vídeo',
+    'Ajustes para la generación en Studio',
+    'Ayuda para la tarea de vídeo',
+  ]) {
+    assert.equal(isExplicitCancelRequest(request), false, request)
+    const turn = await reconcileAgentTurnWithRequest(request, { reply: 'Cancelo.', actions: [] })
+    assert.equal(turn.actions.some(action => action.type === 'cancel_task'), false, request)
+  }
+
+  for (const request of [
+    'para la generación',
+    'Para la tarea',
+    'por favor para ya la cola',
+    'Para lo que está generando',
+    'detén el vídeo',
+    'cancela el vídeo',
+  ]) {
+    assert.equal(isExplicitCancelRequest(request), true, request)
+  }
+  for (const request of ['para la generación', 'Para la tarea', 'por favor para ya la cola', 'Para lo que está generando']) {
+    const turn = await reconcileAgentTurnWithRequest(request, { reply: 'Vale.', actions: [] })
+    assert.equal(turn.actions[0].type, 'cancel_task', request)
+  }
+})
+
 test('requires confirmation for retry and resolves an explicit latest failure request', async () => {
   const { parseAgentTurn, reconcileAgentTurnWithRequest } = await import('../src/features/agent/agentActions.ts')
   const unsigned = parseAgentTurn(JSON.stringify({
@@ -1752,6 +1783,54 @@ test('repairs an explicit Studio audio request when the model only prepares it',
   })
   assert.deepEqual(voice.actions.map(action => action.type), ['prepare_audio', 'start_generation'])
   assert.equal(voice.actions[0].subMode, 'speech')
+})
+
+test('educational generate paraphrases do not enqueue Studio generation', async () => {
+  const {
+    isHowToGenerateQuestion,
+    isExplicitVideoGenerationRequest,
+    isExplicitImageGenerationRequest,
+    reconcileAgentTurnWithRequest,
+  } = await import('../src/features/agent/agentActions.ts')
+
+  for (const question of [
+    'Tell me the steps to generate a video in Studio.',
+    'What steps do I follow to generate a video?',
+    'Before I generate a video, what should I configure in Studio?',
+    'Can you explain what happens when you generate a video?',
+    'Dime los pasos para generar un vídeo',
+    'Qué pasos sigo para generar un vídeo',
+  ]) {
+    assert.equal(isHowToGenerateQuestion(question), true, question)
+    assert.equal(isExplicitVideoGenerationRequest(question), false, question)
+    const turn = await reconcileAgentTurnWithRequest(question, {
+      reply: 'I will generate it now.',
+      actions: [
+        { type: 'prepare_video', prompt: 'un mago en la torre' },
+        { type: 'start_generation', confirm: true },
+      ],
+    })
+    assert.deepEqual(turn.actions.map(action => action.type), [], question)
+  }
+
+  const imageQuestion = 'Tell me the steps to generate an image in Studio.'
+  assert.equal(isHowToGenerateQuestion(imageQuestion), true)
+  assert.equal(isExplicitImageGenerationRequest(imageQuestion), false)
+  const imageTurn = await reconcileAgentTurnWithRequest(imageQuestion, {
+    reply: 'I will paint it now.',
+    actions: [
+      { type: 'prepare_image', prompt: 'un gato naranja' },
+      { type: 'start_generation', confirm: true },
+    ],
+  })
+  assert.deepEqual(imageTurn.actions.map(action => action.type), [])
+
+  const command = await reconcileAgentTurnWithRequest('Generate a video of a wizard on a tower', {
+    reply: '¿De qué?',
+    actions: [],
+  })
+  assert.deepEqual(command.actions.map(action => action.type), ['prepare_video', 'start_generation'])
+  assert.ok(String(command.actions[0].prompt).includes('wizard'))
 })
 
 test('keeps Story Lab song generation out of the Studio Audio shortcut', async () => {
