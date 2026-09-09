@@ -927,6 +927,7 @@
     }
   },
   "commands": {
+    "generationAdmitted": "Generation queued · {{id}}",
     "prepared": "Image request ready",
     "admitted": "Image queued · {{id}}",
     "admittedNotVisible": "Image task {{id}} was admitted. Reopen Studio or Activity to follow it.",

@@ -396,12 +396,20 @@ export async function prepareAudio(action: PrepareAudioCommand): Promise<Command
   )
 }
 
+const ADMISSION_MESSAGE_KEYS = {
+  'generation.image': 'studio:commands.admitted',
+  'generation.speech': 'studio:speechCommands.admitted',
+  'generation.music': 'studio:musicCommands.admitted',
+  'generation.sfx': 'studio:sfxCommands.admitted',
+  'tools.upscale': 'studio:toolsCommands.admitted',
+} as const
+
 function studioAdmissionResult(receipt: GenerationReceiptLike): CommandResult {
   const entity = { kind: 'generation_task', id: receipt.result.task_id, workspaceId: receipt.result.workspace }
   return commandResultFromSlice({
     commandId: receipt.commandId, status: 'queued', entity, taskIds: receipt.taskIds,
     artifacts: [{ id: 'reply', kind: 'document', owner: entity, uri: 'studio:reply', metadata: {
-      summary: i18n.t('studio:commands.admitted', { id: receipt.result.job_id }),
+      summary: i18n.t(ADMISSION_MESSAGE_KEYS[receipt.operation as keyof typeof ADMISSION_MESSAGE_KEYS] || 'studio:commands.generationAdmitted', { id: receipt.result.job_id }),
       title: 'Studio generation', mode: 'generation', receipt,
     } }],
   })

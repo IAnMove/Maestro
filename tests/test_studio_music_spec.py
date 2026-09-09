@@ -243,3 +243,15 @@ def test_supported_input_fields_identify_every_closed_native_property_once():
     assert len(supported) == len(set(supported))
     assert set(schema["supported_input_fields"]) == set(properties)
     assert "lyrics_language" in properties
+
+
+@pytest.mark.parametrize("caption", ["", "  ", None])
+def test_music3_still_requires_caption_before_admission(caption):
+    command = music_command()
+    command["input"]["params"]["model_type"] = "minimax_music3"
+    if caption is None:
+        command["input"]["params"].pop("alt_prompt")
+    else:
+        command["input"]["params"]["alt_prompt"] = caption
+    with pytest.raises(StudioMusicSpecError, match="alt_prompt"):
+        freeze_studio_music_spec(command)

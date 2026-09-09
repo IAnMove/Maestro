@@ -927,6 +927,7 @@
     }
   },
   "commands": {
+    "generationAdmitted": "Generación en cola · {{id}}",
     "prepared": "Solicitud de imagen preparada",
     "admitted": "Imagen en cola · {{id}}",
     "admittedNotVisible": "La tarea de imagen {{id}} está admitida. Abre Studio o Actividad para seguirla.",

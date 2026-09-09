@@ -343,8 +343,10 @@ class StudioMusicParams(_ClosedModel):
     @model_validator(mode="after")
     def _check_semantics(self):
         _non_blank(self.prompt, "input.params.prompt")
-        # Caption/style is optional. ACE-Step accepts an empty alt_prompt;
-        # MiniMax-Music3 still rejects a blank caption in its handler.
+        # ACE-Step accepts lyrics without a style caption. MiniMax requires
+        # one; reject that request here, before resources or task admission.
+        if self.model_type == MUSIC3_LOCAL:
+            _non_blank(self.alt_prompt, "input.params.alt_prompt")
         _non_blank(self.model_type, "input.params.model_type")
         if self.model_type not in STUDIO_MUSIC_MODEL_TYPES:
             raise ValueError("input.params.model_type is not a registered local music model")

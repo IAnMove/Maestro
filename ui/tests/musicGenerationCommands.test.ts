@@ -201,7 +201,8 @@ test('music builder admits empty or omitted style captions', { concurrency: fals
   assert.equal(blank.input.params.alt_prompt, '')
   assert.equal(blank.input.params.prompt, nativeParams().prompt)
 
-  const { alt_prompt: _omitted, ...withoutCaption } = nativeParams()
+  const withoutCaption = nativeParams()
+  delete withoutCaption.alt_prompt
   const omitted = createStudioMusicGenerationCommand({
     ...withoutCaption,
     workspace: 'music-workspace',
@@ -381,4 +382,11 @@ test('uncorrelated 200 and invalid GET receipts remain recoverable, valid GET cl
   assert.equal(recovered.commandId, value.intent_id)
   assert.deepEqual(pendingMusicGenerationCommands(), [])
   assert.equal(pendingMusicGenerationCommand(value.intent_id), null)
+})
+
+
+test('Music3 still rejects blank or omitted captions before submission', () => {
+  for (const caption of ['', '  ', undefined]) {
+    assert.throws(() => command('music3-caption', { model_type: 'minimax_music3', alt_prompt: caption }), /alt_prompt/)
+  }
 })
