@@ -69,6 +69,7 @@ import {
 } from './capabilityRegistry'
 import { defaultApplicationAdapters } from './applicationAdapters'
 import { runRegisteredCapability } from './capabilityRunner'
+import { parsePrepareAudioAction } from './audioActionParser'
 import {
   applySongLanguageIntent,
   extractRequestedSongLanguage,
@@ -849,7 +850,6 @@ const SERIES_SECTIONS = new Set<AgentSeriesSection>([
   'setup', 'canon', 'episode', 'shots', 'review',
 ])
 const MAX_ACTIONS = 6
-const AUDIO_SUB_MODES = new Set<AgentPrepareAudioAction['subMode']>(['speech', 'music', 'sfx'])
 const ACTION_TYPE_ALIASES: Record<string, AgentAction['type']> = {
   opentab: 'open_tab',
   openstorysection: 'open_story_section',
@@ -923,11 +923,6 @@ const cleanString = (value: unknown, maxLength: number): string => (
   typeof value === 'string' ? value.trim().slice(0, maxLength) : ''
 )
 
-/** Preserve authored text; callers validate blankness separately. */
-const literalString = (value: unknown, maxLength: number): string | undefined => (
-  typeof value === 'string' && value.length <= maxLength ? value : undefined
-)
-
 function canonicalActionType(value: unknown): string {
   const raw = cleanString(value, 40)
   const collapsed = raw.toLowerCase().replace(/[^a-z0-9]/g, '')
@@ -943,19 +938,6 @@ const optionalNumber = (
   if (typeof value !== 'number' || !Number.isFinite(value)) return undefined
   const bounded = Math.max(minimum, Math.min(maximum, value))
   return integer ? Math.round(bounded) : bounded
-}
-
-/** Validate a Music control without silently changing the requested value. */
-const strictNumber = (
-  value: unknown,
-  minimum: number,
-  maximum: number,
-  integer = false,
-): number | undefined => {
-  if (value === undefined) return undefined
-  if (typeof value !== 'number' || !Number.isFinite(value)) return undefined
-  if (value < minimum || value > maximum || (integer && !Number.isInteger(value))) return undefined
-  return value
 }
 
 const optionalPositiveNumber = (
@@ -1239,57 +1221,7 @@ function parseAction(value: unknown): AgentAction | null {
       outputCount: optionalPositiveNumber(raw.output_count, 1, 8, true),
     }
   }
-  if (type === 'prepare_audio') {
-    const subMode = cleanString(raw.audio_sub_mode, 12) as AgentPrepareAudioAction['subMode']
-    const speechOrMusic = subMode === 'speech' || subMode === 'music'
-    const prompt = speechOrMusic ? literalString(raw.prompt, 200_000) : cleanString(raw.prompt, 8_000)
-    if (!prompt?.trim()) return null
-    const music = subMode === 'music'
-    const altPrompt = music
-      ? (raw.alt_prompt === undefined ? undefined : literalString(raw.alt_prompt, 200_000))
-      : undefined
-    const musicDescription = music
-      ? (raw.music_description === undefined ? undefined : literalString(raw.music_description, 200_000))
-      : undefined
-    if (raw.alt_prompt !== undefined && altPrompt === undefined) return null
-    if (raw.music_description !== undefined && musicDescription === undefined) return null
-    if (raw.music_instrumental !== undefined && typeof raw.music_instrumental !== 'boolean') return null
-    const durationSeconds = subMode === 'speech'
-      ? optionalNumber(raw.duration_seconds, 0, 1_800)
-      : music
-        ? strictNumber(raw.duration_seconds, 5, 360)
-        : optionalPositiveNumber(raw.duration_seconds, 1, 20)
-    const negativePrompt = speechOrMusic
-      ? (raw.negative_prompt === undefined ? undefined : literalString(raw.negative_prompt, 200_000))
-      : cleanString(raw.negative_prompt, 2_000) || undefined
-    if (raw.negative_prompt !== undefined && negativePrompt === undefined) return null
-    const seed = music ? strictNumber(raw.seed, -1, 2_147_483_647, true) : undefined
-    const inferenceSteps = music ? strictNumber(raw.inference_steps, 1, 1_000, true) : undefined
-    const guidanceScale = music ? strictNumber(raw.guidance_scale, 0, 1_000) : undefined
-    const outputCount = music ? strictNumber(raw.output_count, 1, 1, true) : undefined
-    if (music && (
-      (raw.duration_seconds !== undefined && durationSeconds === undefined)
-      || (raw.seed !== undefined && seed === undefined)
-      || (raw.inference_steps !== undefined && inferenceSteps === undefined)
-      || (raw.guidance_scale !== undefined && guidanceScale === undefined)
-      || (raw.output_count !== undefined && outputCount === undefined)
-    )) return null
-    return {
-      type: 'prepare_audio',
-      subMode: AUDIO_SUB_MODES.has(subMode) ? subMode : 'sfx',
-      prompt,
-      modelType: cleanString(raw.model_type, 160) || undefined,
-      durationSeconds,
-      negativePrompt: negativePrompt || undefined,
-      altPrompt,
-      musicDescription,
-      musicInstrumental: music ? raw.music_instrumental as boolean | undefined : undefined,
-      seed,
-      inferenceSteps,
-      guidanceScale,
-      outputCount,
-    }
-  }
+  if (type === 'prepare_audio') return parsePrepareAudioAction(raw)
   if (type === 'prepare_3d') {
     const prompt = cleanString(raw.prompt, 8_000)
     if (!prompt) return null

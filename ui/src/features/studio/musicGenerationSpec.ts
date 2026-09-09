@@ -191,12 +191,16 @@ const RESIDUAL_ZERO_FIELDS = new Set([
   'tts_voice_count', 'MMAudio_setting',
 ])
 
-function isInactiveResidual(key: string, value: unknown, fullParams: Record<string, unknown>): boolean {
+function isAlwaysInactiveResidual(key: string, value: unknown): boolean {
   if (value === undefined || value === null) return true
   if (value === '' && RESIDUAL_TEXT_FIELDS.has(key)) return true
   if (value === false && RESIDUAL_BOOLEAN_FIELDS.has(key)) return true
   if (value === 0 && RESIDUAL_ZERO_FIELDS.has(key)) return true
   if (isEmptyList(value) && RESIDUAL_LIST_FIELDS.has(key)) return true
+  return false
+}
+
+function isContextInactiveResidual(key: string, value: unknown, fullParams: Record<string, unknown>): boolean {
   if (key === 'cfg_zero_step') return value === -1
   if (key === 'skip_steps_multiplier' || key === 'skip_steps_start_step_perc') {
     return fullParams.skip_steps_cache_type === undefined || fullParams.skip_steps_cache_type === ''
@@ -206,6 +210,10 @@ function isInactiveResidual(key: string, value: unknown, fullParams: Record<stri
   }
   if (key === 'stg_scale') return value === 0
   return false
+}
+
+function isInactiveResidual(key: string, value: unknown, fullParams: Record<string, unknown>): boolean {
+  return isAlwaysInactiveResidual(key, value) || isContextInactiveResidual(key, value, fullParams)
 }
 
 function assertActiveResidual(key: string, value: unknown, fullParams: Record<string, unknown>): void {
@@ -254,7 +262,7 @@ function assertLoraNames(value: Record<string, unknown>): void {
   })
 }
 
-function assertMusicSelectors(value: Record<string, unknown>): void {
+function assertMusicModeSelectors(value: Record<string, unknown>): void {
   if (value.generation_mode !== undefined && value.generation_mode !== 'audio') {
     throw new Error('input.params.generation_mode must be audio')
   }
@@ -275,6 +283,9 @@ function assertMusicSelectors(value: Record<string, unknown>): void {
   if (value._tts_original_prompt === null) {
     throw new Error('input.params._tts_original_prompt must be a string when supplied')
   }
+}
+
+function assertUnusedMusicAudioGuides(value: Record<string, unknown>): void {
   if (value.audio_guide3 !== undefined && value.audio_guide3 !== null && value.audio_guide3 !== '') {
     throw new Error('input.params.audio_guide3 is not supported by Studio music')
   }
@@ -287,6 +298,9 @@ function assertMusicSelectors(value: Record<string, unknown>): void {
   if (value.audio_guide6 !== undefined && value.audio_guide6 !== null && value.audio_guide6 !== '') {
     throw new Error('input.params.audio_guide6 is not supported by Studio music')
   }
+}
+
+function assertMusicAudioGuideSelector(value: Record<string, unknown>): void {
   const mode = typeof value.audio_prompt_type === 'string' ? value.audio_prompt_type : ''
   const first = value.audio_guide
   const second = value.audio_guide2
@@ -299,6 +313,12 @@ function assertMusicSelectors(value: Record<string, unknown>): void {
   if (mode.includes('B') !== Boolean(second)) {
     throw new Error('input.params.audio_guide2 requires its audio_prompt_type selector')
   }
+}
+
+function assertMusicSelectors(value: Record<string, unknown>): void {
+  assertMusicModeSelectors(value)
+  assertUnusedMusicAudioGuides(value)
+  assertMusicAudioGuideSelector(value)
 }
 
 function assertMusicParams(value: unknown): asserts value is StudioMusicParams {
