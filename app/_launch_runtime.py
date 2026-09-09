@@ -36242,7 +36242,7 @@ def _generation_task_fields(job: dict) -> dict:
     }.get(mode, "Generation job")
     if str(provenance.get("capability") or "") == "remove_background":
         task_title = "Tools · Remove background"
-    elif str(provenance.get("capability") or "") == "upscale":
+    elif str(provenance.get("capability") or "") in {"upscale", "tools.upscale"}:
         task_title = "Tools · Upscale"
     elif str(provenance.get("capability") or "") == "revoice":
         task_title = "Tools · Revoice"

@@ -111,6 +111,13 @@ def test_tool_recovery_retains_native_snapshot_and_requires_exact_admission(tmp_
         recovery.native_worker(forged)
     assert caught.value.status_code == 503
     assert workers == [record["id"]]
+    drifted = deepcopy(record)
+    drifted["id"] = "different-native-job"
+    with pytest.raises(HTTPException) as mismatch:
+        recovery.native_worker(drifted)
+    assert mismatch.value.status_code == 503
+    assert mismatch.value.detail["code"] == "recovery_mismatch"
+    assert workers == [record["id"]]
     assert legacy == []
     assert _run(recovery.submit(command()))["receipt"] == accepted["receipt"]
     assert restarted.dispatch_calls == []
@@ -137,3 +144,31 @@ def test_image_admission_cannot_be_relabelled_as_a_tool_worker(tmp_path):
     with pytest.raises(HTTPException):
         service.native_worker(record)
     assert workers == []
+
+
+@pytest.mark.parametrize("capability", ["upscale", "tools.upscale"])
+def test_native_task_projection_identifies_upscale_for_activity(tmp_path, capability):
+    source = Path(__file__).resolve().parents[1] / "app" / "_launch_runtime.py"
+    tree = ast.parse(source.read_text(encoding="utf-8"))
+    definition = next(node for node in tree.body if isinstance(node, ast.FunctionDef)
+                      and node.name == "_generation_task_fields")
+    namespace = {
+        "time": time,
+        "_public_generation_details": lambda params: params,
+        "_task_status": lambda status: status,
+        "_task_timestamp": lambda job, key: job.get(key),
+        "_canonical_legacy_progress": lambda *_args: 0,
+        "_is_durable_generation_job": lambda _job: True,
+        "_local_gpu_lane": SimpleNamespace(key="local_gpu:0"),
+    }
+    exec(compile(ast.Module(body=[definition], type_ignores=[]), str(source), "exec"), namespace)
+    task = namespace["_generation_task_fields"]({
+        "id": "upscale-job", "status": "queued", "workspace": "tool-destination",
+        "params": {"generation_mode": "image", "model_type": "post_processing"},
+        "provenance": {"capability": capability, "command": {"command_id": "tool-intent"}},
+    })
+    assert task["title"] == "Tools · Upscale"
+    assert task["metadata"]["capability"] == capability
+    assert task["metadata"]["command_id"] == "tool-intent"
+    assert task["workspace"] == "tool-destination"
+    assert task["backend_job_id"] == "upscale-job"

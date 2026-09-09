@@ -24,7 +24,7 @@ same envelope used by the other shared commands:
 
 `workspace` is the output workspace. An optional `workspace_collection_id`
 identifies the logical collection associated with the command; it is retained
-in the receipt and fingerprint and is not a native processor setting. `source` is either an exact asset ID
+in the durable command snapshots, provenance and fingerprint and is not a native processor setting. `source` is either an exact asset ID
 (`asset_...`) or one canonical local API reference: an upload URL, a
 workspace-qualified file URL, or an exact asset URL. Absolute host paths,
 remote URLs, traversal, fragments and ambiguous source locations are rejected.
@@ -45,7 +45,8 @@ The freeze result keeps `original` detached and value-preserving. `effective`
 adds only `seed=-1` and an empty processor-settings object when omitted. Its
 fingerprint covers operation, output workspace and effective parameters while
 excluding `intent_id` and caller metadata. The optional collection identity is
-part of that fingerprint. Resource identities are attached by the shared
+part of that fingerprint. The public receipt reports the physical output workspace;
+collection identity is not a separate public receipt field. Resource identities are attached by the shared
 submission service after preparation; the adapter does not create a queue or
 write a journal.
 
