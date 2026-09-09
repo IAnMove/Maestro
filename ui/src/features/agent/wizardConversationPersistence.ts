@@ -1,3 +1,4 @@
+import { insertMissingConversationValues } from './wizardMessageOrder'
 import {
   fetchWizardConversation,
   saveWizardConversation,
@@ -56,7 +57,7 @@ export function rebaseStaleWizardConversationHydration(
   const conversation: WizardConversationPayload = {
     version: 1,
     revision: confirmed.revision,
-    messages: mergeQueuedValues(visible.messages, stale.messages, confirmed.messages, honorLocalDeletes),
+    messages: mergeQueuedValues(visible.messages, stale.messages, confirmed.messages, honorLocalDeletes, true),
     executions: mergeQueuedValues(visible.executions, stale.executions, confirmed.executions, honorLocalDeletes),
     requestedActions: mergeQueuedValues(
       visible.requestedActions,
@@ -159,6 +160,7 @@ function mergeQueuedValues(
   base: unknown,
   canonical: unknown,
   honorLocalDeletes = true,
+  preserveTurnOrder = false,
 ): unknown[] {
   const localValues = Array.isArray(local) ? local : []
   const baseValues = Array.isArray(base) ? base : []
@@ -180,6 +182,10 @@ function mergeQueuedValues(
     }
     seen.add(id)
   })
+  const hasDeletes = honorLocalDeletes && baseValues.some(value => !localById.has(valueIdentity(value)))
+  if (preserveTurnOrder && !hasDeletes) {
+    return insertMissingConversationValues(merged, localValues, valueIdentity).slice(-80)
+  }
   localValues.forEach(value => {
     const id = valueIdentity(value)
     if (seen.has(id)) return
@@ -199,7 +205,7 @@ export function mergeQueuedWizardConversationSnapshots(
   return {
     version: 1,
     revision: canonical.revision,
-    messages: mergeQueuedValues(local.messages, base?.messages, canonical.messages, honorLocalDeletes),
+    messages: mergeQueuedValues(local.messages, base?.messages, canonical.messages, honorLocalDeletes, true),
     executions: mergeQueuedValues(local.executions, base?.executions, canonical.executions, honorLocalDeletes),
     requestedActions: local.requestedActions === undefined
       ? canonical.requestedActions
@@ -217,7 +223,7 @@ export function mergeQueuedWizardConversationSnapshots(
  * Build the one payload used after a CAS conflict.
  *
  * The server snapshot is canonical. Existing ids remain in server order and
- * local-only turn ids are appended once, so repeating the merge is harmless.
+ * local-only turn ids keep their neighbours, so repeating the merge is harmless.
  */
 export function mergeWizardConversationSnapshots(
   local: WizardConversationPayload,

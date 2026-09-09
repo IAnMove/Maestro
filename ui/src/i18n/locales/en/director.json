@@ -1,4 +1,14 @@
 {
+  "modelPicker": {
+    "image": "Image",
+    "video": "Video",
+    "externalApi": "External API",
+    "empty": "No compatible models enabled",
+    "about": "About {{name}}",
+    "imageHint": "Only models that can create an establishing image and edit reference-based start frames are shown.",
+    "storyHint": "Only models that can render Director-planned shots with synchronized native audio are shown.",
+    "soundtrackHint": "Only models that can follow the uploaded soundtrack or dialogue timeline are shown."
+  },
   "queueRecovery": {
     "titleBusy": "Older leftovers besides the current generation",
     "titleIdle": "A generation queue can be recovered",

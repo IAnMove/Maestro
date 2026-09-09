@@ -105,7 +105,7 @@ function AssetExplorerBody({
   return (
     <div
       data-testid="asset-explorer"
-      className="flex max-h-[86vh] w-[860px] max-w-[96vw] flex-col overflow-hidden rounded-xl border border-border bg-bg-secondary shadow-2xl"
+      className="flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-bg-secondary shadow-2xl"
       onMouseDown={event => event.stopPropagation()}
     >
       <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
@@ -132,8 +132,8 @@ function AssetExplorerBody({
         onSort={value => { setSort(value); setPage(0) }}
         onClear={() => confirm(null)}
       />
-      <div className="grid min-h-0 flex-1 gap-3 overflow-hidden p-4 md:grid-cols-[minmax(0,1fr)_240px]">
-        <div className="min-h-0 overflow-y-auto">
+      <div className="grid min-h-0 flex-1 gap-3 overflow-y-auto p-4 md:overflow-hidden md:grid-cols-[minmax(0,1fr)_280px]">
+        <div className="min-h-40 overflow-y-auto md:min-h-0">
           <ExplorerGallery
             status={list.galleryStatus}
             visible={list.visible}
@@ -143,7 +143,7 @@ function AssetExplorerBody({
             onPick={item => setPicked({ workspaceId: workspaceId || '', item })}
           />
         </div>
-        <aside className="flex min-h-[200px] flex-col rounded-lg border border-border bg-bg-tertiary p-2">
+        <aside className="flex min-h-[200px] flex-col overflow-y-auto rounded-lg border border-border bg-bg-tertiary p-2">
           <ExplorerPreview
             selected={selected}
             selectedStillVisible={selectedStillVisible}
@@ -176,7 +176,7 @@ export function AssetExplorerDialog({
       open={open}
       title={title}
       onClose={onClose}
-      className="fixed inset-0 z-[130] flex items-center justify-center bg-black/70 p-4"
+      className="fixed inset-0 z-[130] flex items-center justify-center bg-black/70 p-2 sm:p-4"
       onMouseDown={event => { if (event.target === event.currentTarget) onClose() }}
     >
       {open ? (
