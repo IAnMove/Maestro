@@ -38,6 +38,7 @@ import {
 import { storyDirectorSubmissionProvenance } from '../features/stories/provenance'
 import type { GenerationReceiptLike } from '../api/generationCommandClient'
 import { prepareStudioSubmission, studioUploadReference } from '../features/studio/studioSubmission'
+import { audioReferenceParams, restoreAudioReferences, stashAudioReferences, type AudioReferenceStash } from '../features/studio/audioReferenceState'
 
 const DASHBOARD_PIPELINE_PAGE_SIZE = 8
 const CIVIT_DOWNLOAD_POLL_MS = 2000
@@ -1343,6 +1344,7 @@ export interface AppState extends LlmSlice, StudioConfigurationSlice {
   clearEditVideo: () => void
   audioSubMode: import('../types').AudioSubMode
   setAudioSubMode: (mode: import('../types').AudioSubMode) => void
+  audioReferenceStash: AudioReferenceStash
   // Music mode (ACE-Step): describe + LLM writes, or type Style/Lyrics directly.
   musicDescription: string
   setMusicDescription: (s: string) => void
@@ -2641,6 +2643,7 @@ export const useStore = create<AppState>((set, get) => {
   musicInstrumental: false,
   setMusicInstrumental: (b) => set({ musicInstrumental: b }),
   audioSubMode: 'speech' as import('../types').AudioSubMode,
+  audioReferenceStash: {},
   selectedModelPerAudioSubMode: {} as Partial<Record<import('../types').AudioSubMode, string>>,
   setAudioSubMode: (subMode) => {
     const { audioSubMode: prevSub, params, models } = get()
@@ -2660,7 +2663,11 @@ export const useStore = create<AppState>((set, get) => {
     const targetModel = (saved && models.some(m => m.model_type === saved))
       ? saved
       : audioSubModeDefaults[subMode]
-    set({ audioSubMode: subMode, selectedModelPerAudioSubMode: savedModels })
+    const audioReferenceStash = stashAudioReferences(get())
+    set({
+      ...restoreAudioReferences(get(), subMode, audioReferenceStash),
+      audioSubMode: subMode, selectedModelPerAudioSubMode: savedModels, audioReferenceStash,
+    })
     if (targetModel && models.some(m => m.model_type === targetModel)) {
       get().selectModel(targetModel)
     }
@@ -2840,7 +2847,8 @@ export const useStore = create<AppState>((set, get) => {
     // (multi-voice only), but the user expects single-voice ("Peter: hello")
     // to populate voice slot 1 too. Voice-count gate covers both cases —
     // ttsVoiceCount > 0 means at least one voice clone is active.
-    if (key === 'prompt' && typeof value === 'string' && get().generationMode === 'audio' && get().ttsVoiceCount > 0) {
+    if (key === 'prompt' && typeof value === 'string' && get().generationMode === 'audio'
+        && get().audioSubMode === 'speech' && get().ttsVoiceCount > 0) {
       get()._autoParseSpkeakerNames(value)
     }
     // Handle sub-mode transitions (Frames / Multi-Shot / Extend / Blend)
@@ -6339,7 +6347,8 @@ export const useStore = create<AppState>((set, get) => {
       // would silently ignore).
       const newMaxVoiceCount = ((options as { max_voice_count?: number }).max_voice_count) ?? 6
       const currentVoiceCount = get().ttsVoiceCount
-      if (currentVoiceCount > newMaxVoiceCount) {
+      if (activeState.generationMode === 'audio' && activeState.audioSubMode === 'speech'
+          && currentVoiceCount > newMaxVoiceCount) {
         const trimmedVoices = get().ttsVoices.slice(0, newMaxVoiceCount)
         ttsDefaults.ttsVoiceCount = newMaxVoiceCount
         ttsDefaults.ttsVoices = trimmedVoices
@@ -8663,6 +8672,9 @@ export const useStore = create<AppState>((set, get) => {
     }
     const { models } = get()
     const p = selectedOutputMeta.params as Record<string, unknown>
+    if (get().generationMode === 'audio') {
+      set({ audioReferenceStash: stashAudioReferences(get()) })
+    }
     const finishWangpRestore = beginWangpRestore(p, get, set)
     const uploadFilenames = selectedOutputMeta.upload_filenames as Record<string, string> | undefined
     console.log('[LoadSettings] applying settings — model_type:', p.model_type, '| param keys:', Object.keys(p).length)
@@ -8790,6 +8802,7 @@ export const useStore = create<AppState>((set, get) => {
     }
 
     Object.assign(newParams, restoreWangpSettings(p))
+    if (get().generationMode === 'audio') Object.assign(newParams, audioReferenceParams(p))
     // Copy optional fields — explicitly clear when absent to prevent stale values leaking
     newParams.sliding_window_size = (p.sliding_window_size as number) ?? undefined
     newParams.sliding_window_overlap = (p.sliding_window_overlap as number) ?? undefined
