@@ -138,7 +138,7 @@ export function WorkspaceCollectionsPanel() {
         </nav>
       </aside>
       <div className="min-w-0 flex-1 overflow-y-auto p-4">
-        <CollectionRecovery onRecovered={openCollection} disabled={dirty} />
+        <CollectionRecovery onRecovered={openCollection} onBusyChange={setSaving} disabled={dirty} />
         <div className="mb-3 flex items-center justify-between gap-2">
           <div className="min-w-0"><h2 className="text-sm font-semibold text-text-primary">{draft?.name || tWs('collections.untitled')}</h2><p className="break-all text-[10px] text-text-muted">{draft?.id ? tWs('commands.identity', { id: draft.id, revision: draft.revision }) : tWs('collections.idsHint')}</p></div>
           <div className="flex gap-1"><button className={button} onClick={() => void load()} title={tCommon('actions.refresh')}><RefreshCw size={13} className={loading ? 'animate-spin' : ''} /></button>{draft && <><button className={button} disabled={!dirty || saving} onClick={() => void save()}><Save size={13} /> {tCommon('actions.save')}</button><button className={`${button} text-red-300`} disabled={saving} onClick={() => void remove()}><Trash2 size={13} /></button></>}</div>

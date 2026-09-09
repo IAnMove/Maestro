@@ -28,7 +28,7 @@ const { act, cleanup, fireEvent, render, screen, waitFor } = await import('@test
 const { WorkspaceCollectionsPanel } = await import('../src/features/workspaceCollections/WorkspaceCollectionsPanel.tsx')
 const { createWorkspaceCollectionAdapter } = await import('../src/features/agent/workspaceCollectionAdapter.ts')
 const { cancelCollectionPresentation } = await import('../src/features/workspaceCollections/collectionPresentation.ts')
-const { pendingCollectionCommands } = await import('../src/api/workspaceCommands.ts')
+const { pendingCollectionCommands, submitCollectionCommand } = await import('../src/api/workspaceCommands.ts')
 
 interface Collection {
   schema: 'hocuspocus.workspace-record'
@@ -166,6 +166,29 @@ test.afterEach(() => {
   cleanup()
   dom.window.localStorage.clear()
   globalThis.fetch = originalFetch
+})
+
+test('recovering a pending command locks the editor until its canonical result is applied', { concurrency: false }, async () => {
+  let completeRecovery: (response: Response) => void = () => { throw new Error('Recovery was not started') }
+  let submitted: Record<string, unknown> = {}
+  let attempts = 0
+  installFetch({ initial: [collection()], onCommand(body) {
+    attempts += 1
+    if (attempts === 1) return jsonResponse({ detail: 'Response lost after admission' }, 503)
+    submitted = body
+    return new Promise<Response>(resolve => { completeRecovery = resolve })
+  } })
+  await assert.rejects(submitCollectionCommand({ version: 1, operation: 'collections.create',
+    intent_id: 'recover-lock', input: { name: 'Recovered collection' } }))
+  render(<WorkspaceCollectionsPanel />)
+  await waitForPanel()
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Recover / retry this request' })) })
+  const fieldset = document.querySelector<HTMLFieldSetElement>('[data-collection-ready] > fieldset')!
+  assert.equal(fieldset.disabled, true, 'manual changes must not race a pending recovery response')
+  await act(async () => { completeRecovery(commandReceipt(submitted, { id: 'collection-recovered' })) })
+  await waitFor(() => assert.equal(document.querySelector('h2')?.textContent, 'Recovered collection'))
+  assert.equal(fieldset.disabled, false)
+  assert.deepEqual(pendingCollectionCommands(), [])
 })
 
 test('adapter presents values before POST, waits for command ACK, and opens the committed ID/revision in an editable panel', { concurrency: false }, async () => {

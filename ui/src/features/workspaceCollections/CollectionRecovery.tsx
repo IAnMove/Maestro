@@ -4,7 +4,11 @@ import { pendingCollectionCommands, submitCollectionCommand, subscribeCollection
 import type { WorkspaceCollection } from '../../api/workspaceCollections'
 import { useUiTranslation } from '../../i18n'
 
-export function CollectionRecovery({ onRecovered, disabled = false }: { onRecovered: (item: WorkspaceCollection) => void; disabled?: boolean }) {
+export function CollectionRecovery({ onRecovered, onBusyChange, disabled = false }: {
+  onRecovered: (item: WorkspaceCollection) => void
+  onBusyChange: (busy: boolean) => void
+  disabled?: boolean
+}) {
   const { t } = useUiTranslation('workspaces')
   const [pending, setPending] = useState<CollectionCommand[]>([])
   const [error, setError] = useState('')
@@ -17,12 +21,13 @@ export function CollectionRecovery({ onRecovered, disabled = false }: { onRecove
     return subscribeCollectionCommands(load)
   }, [])
   const retry = async (command: CollectionCommand) => {
+    onBusyChange(true)
     setBusy(command.intent_id); setError('')
     try {
       const receipt = await submitCollectionCommand(command)
       onRecovered(receipt.result)
     } catch (error) { setError(error instanceof Error ? error.message : String(error)) }
-    finally { setBusy('') }
+    finally { setBusy(''); onBusyChange(false) }
   }
   if (!pending.length && !error) return null
   return <div className="mb-3 rounded-md border border-amber-500/40 p-3 text-xs">
