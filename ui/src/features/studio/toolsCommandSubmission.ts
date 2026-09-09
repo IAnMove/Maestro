@@ -40,6 +40,7 @@ function toolsFormFingerprint(state: StudioState): string {
     toolsSourceWorkspace: state.toolsSourceWorkspace,
     toolsSourceKind: state.toolsSourceKind,
     toolsUpscaleMethod: state.toolsUpscaleMethod,
+    seed: state.params.seed,
     wangpProcessorSettings: state.params.wangp_processor_settings,
     settingsOpen: state.settingsOpen,
     dashboardOpen: state.dashboardOpen,

@@ -146,7 +146,7 @@ export function createToolsAdapter(navigate: Navigate): ToolsAdapter {
       const workspace = useStore.getState().activeWorkspace || 'default'
       const source = await resolveUpscaleSource(action, workspace)
       assertUpscaleWorkspace(workspace)
-      await showUpscaleSource(navigate, source, action)
+      await showUpscaleSource(navigate, source, action, workspace)
       assertUpscaleWorkspace(workspace)
       const state = useStore.getState()
       const { prepareStudioToolsUpscaleSubmission, toolsUpscaleParamsFromState } =
@@ -206,8 +206,13 @@ async function showUpscaleSource(
   navigate: Navigate,
   source: ResolvedSource,
   action: AgentUpscaleAction,
+  expectedWorkspace: string,
 ): Promise<void> {
   await navigate('studio')
+  // Navigation can suspend while the user changes workspace. Check before
+  // writing any Tools controls so a late adapter result cannot overwrite the
+  // newly selected workspace's form.
+  assertUpscaleWorkspace(expectedWorkspace)
   const state = useStore.getState()
   state.setGenerationMode('tools')
   state.setToolsTool('upscale')

@@ -197,6 +197,39 @@ test('Tools submission persists the exact snapshot before POST and validates its
   assert.deepEqual(pendingToolsUpscaleGenerationCommands(), [])
 })
 
+test('Tools rejects a seed change after the command snapshot and before presentation', { concurrency: false }, async () => {
+  const { prepareStudioToolsUpscaleSubmission } = await import('../src/features/studio/toolsCommandSubmission.ts')
+  const state = {
+    activeWorkspace: 'tools-test',
+    generationMode: 'tools',
+    toolsTool: 'upscale',
+    toolsSourcePath: 'source.png',
+    toolsSourceName: 'source.png',
+    toolsSourceUrl: '/api/v1/file/source.png?workspace=tools-test',
+    toolsSourceAssetId: null,
+    toolsSourceWorkspace: null,
+    toolsSourceKind: 'image',
+    toolsUpscaleMethod: 'lanczos2',
+    params: { seed: 17, wangp_processor_settings: null },
+    settingsOpen: false,
+    dashboardOpen: false,
+    sidebarMode: 'studio',
+  } as never
+  const current = { ...state, params: { ...state.params } } as never
+  let posts = 0
+  globalThis.fetch = async () => {
+    posts += 1
+    return response(queuedReceipt(command('seed-race')))
+  }
+  const submission = await prepareStudioToolsUpscaleSubmission(
+    params(), state, () => current, { actor: 'user', capability: 'tools.upscale' },
+  )
+  current.params.seed = 18
+  await assert.rejects(submission.submit(), /form changed|context changed/i)
+  assert.equal(posts, 0)
+  assert.deepEqual(pendingToolsUpscaleGenerationCommands(), [])
+})
+
 test('an uncertain Tools response retries the same intent and exact command', { concurrency: false }, async () => {
   const value = command('tools-retry')
   const bodies: unknown[] = []

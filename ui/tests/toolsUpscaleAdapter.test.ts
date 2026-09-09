@@ -109,6 +109,51 @@ test('upscale rejects an ambiguous asset instead of choosing an arbitrary source
   }
 })
 
+test('upscale does not overwrite the new workspace while navigation is suspended', { concurrency: false }, async () => {
+  let release!: () => void
+  const navigationHeld = new Promise<void>(resolve => { release = resolve })
+  globalThis.fetch = async input => {
+    assert.match(String(input), /\/api\/v1\/assets\/asset-race$/)
+    return new Response(JSON.stringify(asset()), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    })
+  }
+  const before = useStore.getState()
+  useStore.setState({
+    activeWorkspace: 'workspace-a', generationMode: 'image', toolsSourcePath: 'keep.png',
+    toolsSourceName: 'keep.png', toolsSourceUrl: '/api/v1/file/keep.png?workspace=workspace-a',
+    toolsSourceAssetId: null, toolsSourceWorkspace: null, toolsSourceKind: 'image',
+  })
+  const adapter = createToolsAdapter(async () => {
+    await navigationHeld
+    return { message: 'studio', target: { kind: 'tab', id: 'studio', title: 'Studio' } }
+  })
+  try {
+    const pending = adapter.upscale({
+      type: 'upscale', assetId: 'asset-race', sourceKind: 'image', method: 'lanczos2', confirm: true,
+    })
+    await new Promise<void>(resolve => setImmediate(resolve))
+    useStore.setState({ activeWorkspace: 'workspace-b' })
+    release()
+    await assert.rejects(pending, /active workspace changed/i)
+    assert.equal(useStore.getState().generationMode, 'image')
+    assert.equal(useStore.getState().toolsSourcePath, 'keep.png')
+    assert.equal(useStore.getState().toolsUpscaleMethod, before.toolsUpscaleMethod)
+  } finally {
+    useStore.setState({
+      activeWorkspace: before.activeWorkspace,
+      generationMode: before.generationMode,
+      toolsSourcePath: before.toolsSourcePath,
+      toolsSourceName: before.toolsSourceName,
+      toolsSourceUrl: before.toolsSourceUrl,
+      toolsSourceAssetId: before.toolsSourceAssetId,
+      toolsSourceWorkspace: before.toolsSourceWorkspace,
+      toolsSourceKind: before.toolsSourceKind,
+    })
+  }
+})
+
 test('upscale capability preserves an exact source workspace and rejects padded values', { concurrency: false }, async () => {
   const { registerToolCapabilities } = await import('../src/features/agent/toolCapabilities.ts')
   const definitions: Array<{ name: string; resolve: (raw: Record<string, unknown>) => unknown }> = []
