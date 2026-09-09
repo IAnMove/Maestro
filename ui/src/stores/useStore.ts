@@ -4121,6 +4121,9 @@ export const useStore = create<AppState>((set, get) => {
   isGenerating: false,
   startGeneration: async (scheduledPrompt, submissionContext) => {
     const initialState = get()
+    if (initialState.generationMode === 'audio' && initialState.audioSubMode === 'mixer') {
+      throw new Error(i18n.t('studio:commands.audioNotGenerative'))
+    }
 
     // Studio Prompt Scheduler: each non-empty line becomes its own normal
     // generation request. Submitting the requests one at a time preserves the

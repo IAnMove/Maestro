@@ -1,4 +1,5 @@
 import * as api from '../../api/client'
+import i18n from '../../i18n'
 
 type Preparation = typeof import('./imageCommandSubmission').prepareStudioSubmission
 type Inputs = Parameters<Preparation>
@@ -32,6 +33,11 @@ export async function prepareStudioSubmission(
     if (before.generationMode === 'audio' && before.audioSubMode === 'sfx') {
       const implementation = await import('./sfxCommandSubmission')
       return await implementation.prepareStudioSfxSubmission(params, before, current, context, referenceErrors)
+    }
+    if (before.generationMode === 'audio') {
+      // Mixer is ffmpeg-only. An unknown Audio tab must not inherit leftover
+      // Speech/Music/SFX params and POST them to the legacy GPU endpoint.
+      throw new Error(i18n.t('studio:commands.audioNotGenerative'))
     }
   } catch (error) {
     return { params, submit: () => Promise.reject(error) }

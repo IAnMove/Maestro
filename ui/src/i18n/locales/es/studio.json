@@ -939,7 +939,8 @@
     "panelUnavailable": "No se pudo mostrar la solicitud de imagen. Abre Studio y vuelve a intentarlo.",
     "pendingInvalid": "No se pudo leer la solicitud guardada. Se ha conservado para recuperarla.",
     "referenceFailed": "No se pudo preparar una referencia seleccionada. No se ha enviado ninguna imagen.",
-    "conflictingGuides": "Hay guías de imagen distintas seleccionadas. Elige una imagen de control y una máscara antes de generar."
+    "conflictingGuides": "Hay guías de imagen distintas seleccionadas. Elige una imagen de control y una máscara antes de generar.",
+    "audioNotGenerative": "Esta pestaña de Audio no inicia una generación. Usa Voz, Música o SFX, o Mezclar y guardar en el Mezclador."
   },
   "speechCommands": {
     "prepared": "Solicitud de voz preparada",

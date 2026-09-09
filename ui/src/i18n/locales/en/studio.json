@@ -939,7 +939,8 @@
     "panelUnavailable": "The image request could not be shown. Open Studio and try again.",
     "pendingInvalid": "The saved submission could not be read. It has been preserved for recovery.",
     "referenceFailed": "A selected reference could not be prepared. No image was submitted.",
-    "conflictingGuides": "Conflicting image guides are selected. Choose one control image and mask before generating."
+    "conflictingGuides": "Conflicting image guides are selected. Choose one control image and mask before generating.",
+    "audioNotGenerative": "This Audio tab does not start a generation. Use Speech, Music or SFX, or Mix & Save in Mixer."
   },
   "speechCommands": {
     "prepared": "Speech request ready",

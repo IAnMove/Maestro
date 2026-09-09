@@ -305,9 +305,11 @@ export function Sidebar() {
           <div className="flex-1 min-w-0">
             <ModelSelector />
           </div>
-          <div className="shrink-0">
-            <GenerateButton />
-          </div>
+          {!(isAudio && audioSubMode === 'mixer') && (
+            <div className="shrink-0">
+              <GenerateButton />
+            </div>
+          )}
         </div>
       </div>
       )}
