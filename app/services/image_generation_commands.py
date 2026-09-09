@@ -199,7 +199,14 @@ class ImageGenerationCommands:
     def _restore_recovery(self, workspaces):
         active = set(self.active_job_ids())
         for workspace in workspaces:
-            registry = self._registry(workspace)
+            try:
+                registry = self._registry(workspace)
+            except HTTPException as error:
+                # `_list_workspaces` includes every outputs/ subdirectory.
+                # A backup folder such as "old copy" must not 422 list/resume/discard.
+                if error.status_code == 422:
+                    continue
+                raise
             for entry in registry.command_recovery_candidates():
                 if entry["operation"] not in {"generation.image", *self.operations}:
                     # Another domain can share TaskRegistry without using

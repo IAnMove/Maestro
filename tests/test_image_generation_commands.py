@@ -442,6 +442,22 @@ def test_restart_marks_queued_task_interrupted_and_projects_recovery_without_sta
     assert receipt["task"]["status"] == "interrupted"
 
 
+@pytest.mark.parametrize("invalid", ["old copy", "backup.old", "café", "../outside"])
+def test_invalid_listed_workspace_does_not_block_recovery_restore(tmp_path, invalid):
+    native = FakeNative(tmp_path)
+    command = _command("listed-invalid-workspace")
+    first = _run(native.service().submit(command))
+    backend_id = first["receipt"]["result"]["job_id"]
+
+    restarted = FakeNative(tmp_path, interrupt_stale=True)
+    service = restarted.service()
+    service.restore_recovery([invalid, "workspace-a"])
+
+    assert restarted.dispatch_calls == []
+    assert restarted.persisted[backend_id]["status"] == "interrupted"
+    assert service.filter_recovery([restarted.persisted[backend_id]]) == [restarted.persisted[backend_id]]
+
+
 def _queue_record(job_id, workspace, *, capability, command_id=None, params=None):
     provenance = {"capability": capability}
     if command_id is not None:
@@ -496,15 +512,16 @@ def test_malformed_leftover_metadata_does_not_block_valid_legacy_rows(tmp_path, 
     service.discard_recovery([malformed, legacy])
 
 
-def _recovery_http_app(service, queue):
+def _recovery_http_app(service, queue, workspaces=None):
     """Execute the actual route so storage failure cannot fall through to discard."""
     source = Path(__file__).resolve().parents[1] / "app" / "_launch_runtime.py"
     tree = ast.parse(source.read_text(encoding="utf-8"))
     names = {"_recovery_job_summary", "get_generation_queue_recovery", "discard_generation_queue"}
     app = FastAPI()
+    listed = workspaces if workspaces is not None else [{"name": "workspace-a"}]
     namespace = {"api": app, "_queue_recovery_lock": threading.Lock(), "_jobs": {},
                  "_image_generation_commands": service, "_durable_generation_queue": queue,
-                 "_list_workspaces": lambda: [{"name": "workspace-a"}]}
+                 "_list_workspaces": lambda: listed}
     selected = ast.Module(body=[node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name in names],
                           type_ignores=[])
     exec(compile(selected, str(source), "exec"), namespace)
@@ -543,6 +560,29 @@ def test_recovery_http_storage_failure_preserves_queue_and_interrupted_task(tmp_
                 assert response.json()["detail"]["code"] == "storage_unavailable"
             assert queue.list() == before
             assert registry.get(accepted["receipt"]["taskIds"][0])["status"] == "interrupted"
+
+
+def test_recovery_http_skips_invalid_listed_workspaces_and_keeps_valid_leftovers(tmp_path):
+    from services.durable_generation_queue import DurableGenerationQueue
+
+    native = FakeNative(tmp_path)
+    accepted = _run(native.service().submit(_command("listed-folder-recovery")))
+    restarted = FakeNative(tmp_path, interrupt_stale=True)
+    service = restarted.service()
+    service.restore_recovery(["workspace-a"])
+    queue = DurableGenerationQueue(str(tmp_path / "queue.json"))
+    for record in restarted.persisted.values():
+        queue.upsert(record)
+    listed = [{"name": "old copy"}, {"name": "workspace-a"}, {"name": "backup.old"}]
+    with TestClient(_recovery_http_app(service, queue, listed)) as client:
+        response = client.get("/api/v1/jobs/recovery")
+        assert response.status_code == 200
+        assert response.json()["jobs"][0]["job_id"] == accepted["receipt"]["result"]["job_id"]
+        discarded = client.post("/api/v1/jobs/recovery/discard")
+        assert discarded.status_code == 200
+        assert discarded.json()["discarded"]
+        assert queue.list() == []
+        assert restarted.registry("workspace-a").get(accepted["receipt"]["taskIds"][0])["status"] == "cancelled"
 
 
 def test_queued_admission_is_not_a_recovery_candidate_while_dispatch_is_pending(tmp_path):
