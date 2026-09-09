@@ -708,9 +708,9 @@ destination workspace. Accepted image extensions are `.png`, `.jpg`, `.jpeg`,
 and `.webp` (narrower than Tools upscale). Use an exact `asset_id` from
 `GET /api/v1/assets?kind=image` whenever possible; `source` may be the exact
 filename, an `/api/v1/file/...` URL, or an absolute path already inside the
-selected uploads/workspace root. `source_workspace` is required when the
-source belongs to another output folder. Optional `instruction` (max 2 000
-chars) is stored on the job and sidecar; U2Net does not consume it. Poll
+selected uploads/workspace root. For a source in another output folder,
+preserve its file-URL `?workspace=` or provide `source_workspace`; an explicit
+scope must agree with the URL. Optional `instruction` (max 2 000 chars) is stored on the job and sidecar; U2Net does not consume it. Poll
 `GET /api/v1/status/{job_id}` and cancel with `POST /api/v1/cancel/{job_id}`.
 
 ```bash
@@ -731,20 +731,32 @@ transparent-PNG technical metadata.
 
 ## Tools upscale
 
-`POST /api/v1/tools/upscale` is one shared post-processing action for either a
-still image or a video. Send `{ "source": "image.png", "source_kind":
+Studio and Wizard upscale now submit version 2 `tools.upscale` through
+`POST /api/v1/generation/commands`; MCP exposes the same operation by name.
+The shared contract requires an explicit method, source kind, output workspace,
+and an asset ID or canonical local media URL as `input.params.source`.
+It rejects host paths and bare filenames. See the
+[shared command guide](../../docs/development/SHARED_NATIVE_COMMANDS.md) for
+the envelope, receipts and replay, and
+[Tools commands](../../docs/development/TOOLS_COMMANDS.md) for source identity.
+
+The native legacy `POST /api/v1/tools/upscale` handles either a still image
+or a video. Send `{ "source": "image.png", "source_kind":
 "image", "asset_id": "...", "source_workspace": "...", "method":
 "flashvsr2", "workspace": "default" }` for an image, or keep the legacy
-`video_path` field with `source_kind: "video"` for a clip. Methods are
-`flashvsr2` (default), `flashvsr3`, `flashvsr4`, `flashvsr2pass2`,
-`flashvsr2pass4`, `lanczos1.5`, and `lanczos2`. Conflicting `source` /
-`source_path` / `video_path` values return `409`. Supported image
+`video_path` field with `source_kind: "video"` for a clip. Built-in spatial
+methods include `flashvsr2` (native default), `flashvsr3`, `flashvsr4`,
+`flashvsr2pass2`, `flashvsr2pass4`, `lanczos1.5`, and `lanczos2`. Additional
+native processors have media/platform constraints; discover the current schema
+through `GET /api/v1/generation/commands` and processor availability in the
+Tools panel. Conflicting `source` / `source_path` / `video_path` values return
+`409`. Supported image
 formats are `.bmp`, `.gif`, `.jpeg`, `.jpg`, `.png`, `.tif`, `.tiff`, and
 `.webp`; supported video formats are `.avi`, `.m4v`, `.mkv`, `.mov`, `.mp4`,
 `.mpeg`, `.mpg`, `.webm`, and `.wmv`. The source must be an exact asset, upload, or
 file inside the selected workspace roots; path traversal and mismatched asset
 IDs/kinds are rejected. Images use the existing spatial upsampler in still
-mode and produce a new PNG beside the source. Videos retain the existing
+mode and produce a new PNG in the destination workspace. Videos retain the existing
 audio-preserving pipeline and produce a new video. Neither path overwrites its
 source. Poll the returned job with `GET /api/v1/status/{job_id}` and cancel it
 with `POST /api/v1/cancel/{job_id}`. Activity and the canonical asset manifest
@@ -756,8 +768,9 @@ retain the source lineage, method, workspace, provenance, and execution mode.
 SeedVC. Body: `{ "video_path": "take.mp4", "voice_ref_paths": ["ref.wav"],
 "mode": "single"|"two", "diffusion_steps": 25, "cfg_rate": 0.5,
 "workspace": "default" }`. At least one and at most two reference paths are
-required (audio or video). `mode` defaults to `single` and any other string
-is coerced to `single`. The worker copies the source to a new `_revoiced`
+required (audio or video). Supply two references for `mode: "two"`; with one,
+the worker falls back to single-voice conversion. `mode` defaults to `single`
+and any other string is coerced to `single`. The worker copies the source to a new `_revoiced`
 file, then converts the copy; the original clip is never mutated. Failure
 when the clip has no audio or SeedVC is unavailable. Same poll/cancel
 endpoints as the other Tools jobs. See
