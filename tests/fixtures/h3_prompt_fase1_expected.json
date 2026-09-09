@@ -1,0 +1,335 @@
+{
+  "provenance": {
+    "base_sha": "22f28c450add174a8e3ddc4dd116c26bd4054db5",
+    "generated_from": "HEAD before H3 prompt field/tag extraction",
+    "speech_matrix": "app/scripts/benchmark_h3_speech.py prepare_matrix; native; 243 frames at 24 fps",
+    "note": "Text/config only. Videos, weights and private LLM logs are not included."
+  },
+  "contracts": {
+    "writing_faithful": "WRITING MODE (takes precedence over generic expansion advice): FAITHFUL. Preserve the requested events and exact dialogue; do not add extra spoken lines when literal lines were supplied. Preserve exact actor/character portrayal, franchise, era, wardrobe and outcome. Never blend adaptations or invent powers. Every literal line is immutable, in its original language, and spoken once by its assigned person. If the user asks for speech without words, write actual short meaningful lines, not 'they discuss' or background chatter. Explicit silence and 'only these lines' override creative freedom. Visible signs/titles are not spoken dialogue. Budget the total speech across all speakers for the real duration. Do not add filler, repeated lines or meaningless chatter. Use stable speaker IDs in first-vocal-event order; never transfer a line to another person's mouth. Only literal words and [Language] go inside <d> tags. Camera, delivery and acting stay outside. After the last word, use concrete nonverbal action with mouths closed. Voiceover does not move on-screen lips.",
+    "writing_creative": "WRITING MODE (takes precedence over generic expansion advice): CREATIVE. Treat the prompt as a creative brief. Write natural character-specific supporting dialogue when characters interact. Exact quoted lines are immutable anchors; additional meaningful lines may surround them unless the user requests only those lines. This permission overrides generic faithful-only guidance. Preserve exact actor/character portrayal, franchise, era, wardrobe and outcome. Never blend adaptations or invent powers. Every literal line is immutable, in its original language, and spoken once by its assigned person. If the user asks for speech without words, write actual short meaningful lines, not 'they discuss' or background chatter. Explicit silence and 'only these lines' override creative freedom. Visible signs/titles are not spoken dialogue. Budget the total speech across all speakers for the real duration. Do not add filler, repeated lines or meaningless chatter. Use stable speaker IDs in first-vocal-event order; never transfer a line to another person's mouth. Only literal words and [Language] go inside <d> tags. Camera, delivery and acting stay outside. After the last word, use concrete nonverbal action with mouths closed. Voiceover does not move on-screen lips.",
+    "sound_native": "NATIVE AUDIO POLICY: Describe location ambience and synchronized physical effects in overall_soundscape, without dialogue, indistinct chatter or invented background voices. Use non_diegetic_music only for explicitly requested audience-only music, otherwise N/A. Preserve explicit silence. Schedule each tagged line once in a concrete interval. Before and after dialogue, people remain silent with mouths closed while the visible action and requested effects continue. Keep voice-reference timbre and delivery but not its source noise, room echo or microphone coloration.",
+    "sound_legacy": "LEGACY AUDIO POLICY: Keep only exact tagged speech. All other descriptions are visual; overall_soundscape and non_diegetic_music must be N/A. Do not describe sound or silence."
+  },
+  "speech_matrix": [
+    {
+      "id": "speech4-faithful-ambient-action",
+      "style": "faithful",
+      "soundscape": "ambient",
+      "ending": "action",
+      "source_prompt": "integrated_multimodal_description: [Shot 1] Live-action Seinfeld sitcom in Jerry Seinfeld's 1990s apartment. Fixed medium two-shot of George Costanza, played by Jason Alexander, wearing a beige cardigan over a light blue shirt, and Jerry Seinfeld wearing a gray sweater. George proudly holds an empty white coffee mug. Natural acting and dry comic timing. George Costanza (S1) <d>[Spanish] He dejado el café para ahorrar</d>. Jerry raises one eyebrow and replies: Jerry Seinfeld (S2) <d>[Spanish] Ahora solo te falta dejar de comprar tazas</d>. George lowers the mug and Jerry folds his arms. They exchange a deadpan look for the final comic beat.\noverall_soundscape: Quiet apartment room tone and distant city traffic.\nnon_diegetic_music: N/A",
+      "source_sha256": "f3aa0b49e5ac5ad5f07e5a1ebf5881302f030fdcbc2c1ac6473599bf204c3e3b",
+      "after_audio_policy": "integrated_multimodal_description: [Shot 1] Live-action Seinfeld sitcom in Jerry Seinfeld's 1990s apartment. Fixed medium two-shot of George Costanza, played by Jason Alexander, wearing a beige cardigan over a light blue shirt, and Jerry Seinfeld wearing a gray sweater. George proudly holds an empty white coffee mug. Natural acting and dry comic timing. George Costanza (S1) <d>[Spanish] He dejado el café para ahorrar</d>. Jerry raises one eyebrow and replies: Jerry Seinfeld (S2) <d>[Spanish] Ahora solo te falta dejar de comprar tazas</d>. George lowers the mug and Jerry folds his arms. They exchange a deadpan look for the final comic beat.\noverall_soundscape: Quiet apartment room tone and distant city traffic.\nnon_diegetic_music: N/A",
+      "after_audio_policy_sha256": "f3aa0b49e5ac5ad5f07e5a1ebf5881302f030fdcbc2c1ac6473599bf204c3e3b",
+      "after_vocal_timeline": "integrated_multimodal_description: [Shot 1] Live-action Seinfeld sitcom in Jerry Seinfeld's 1990s apartment. Fixed medium two-shot of George Costanza, played by Jason Alexander, wearing a beige cardigan over a light blue shirt, and Jerry Seinfeld wearing a gray sweater. George proudly holds an empty white coffee mug. Natural acting and dry comic timing. George Costanza (S1) <d>[Spanish] He dejado el café para ahorrar</d>. Jerry raises one eyebrow and replies: Jerry Seinfeld (S2) <d>[Spanish] Ahora solo te falta dejar de comprar tazas</d>. George lowers the mug and Jerry folds his arms. They exchange a deadpan look for the final comic beat.\noverall_soundscape: Quiet apartment room tone and distant city traffic.\nnon_diegetic_music: N/A",
+      "after_vocal_timeline_sha256": "f3aa0b49e5ac5ad5f07e5a1ebf5881302f030fdcbc2c1ac6473599bf204c3e3b"
+    },
+    {
+      "id": "speech4-faithful-ambient-silence",
+      "style": "faithful",
+      "soundscape": "ambient",
+      "ending": "silence",
+      "source_prompt": "integrated_multimodal_description: [Shot 1] Live-action Seinfeld sitcom in Jerry Seinfeld's 1990s apartment. Fixed medium two-shot of George Costanza, played by Jason Alexander, wearing a beige cardigan over a light blue shirt, and Jerry Seinfeld wearing a gray sweater. George proudly holds an empty white coffee mug. Natural acting and dry comic timing. George Costanza (S1) <d>[Spanish] He dejado el café para ahorrar</d>. Jerry raises one eyebrow and replies: Jerry Seinfeld (S2) <d>[Spanish] Ahora solo te falta dejar de comprar tazas</d>. After the last line, both stop speaking, keep their mouths closed and exchange a silent deadpan look through the end.\noverall_soundscape: Quiet apartment room tone and distant city traffic.\nnon_diegetic_music: N/A",
+      "source_sha256": "01869e4670d58f7d034c6cfc0e63f75a9cdb52451aede5cd40c0ce9fc89b9d62",
+      "after_audio_policy": "integrated_multimodal_description: [Shot 1] Live-action Seinfeld sitcom in Jerry Seinfeld's 1990s apartment. Fixed medium two-shot of George Costanza, played by Jason Alexander, wearing a beige cardigan over a light blue shirt, and Jerry Seinfeld wearing a gray sweater. George proudly holds an empty white coffee mug. Natural acting and dry comic timing. George Costanza (S1) <d>[Spanish] He dejado el café para ahorrar</d>. Jerry raises one eyebrow and replies: Jerry Seinfeld (S2) <d>[Spanish] Ahora solo te falta dejar de comprar tazas</d>. After the last line, both stop speaking, keep their mouths closed and exchange a silent deadpan look through the end.\noverall_soundscape: Quiet apartment room tone and distant city traffic.\nnon_diegetic_music: N/A",
+      "after_audio_policy_sha256": "01869e4670d58f7d034c6cfc0e63f75a9cdb52451aede5cd40c0ce9fc89b9d62",
+      "after_vocal_timeline": "integrated_multimodal_description: [Shot 1] Live-action Seinfeld sitcom in Jerry Seinfeld's 1990s apartment. Fixed medium two-shot of George Costanza, played by Jason Alexander, wearing a beige cardigan over a light blue shirt, and Jerry Seinfeld wearing a gray sweater. George proudly holds an empty white coffee mug. Natural acting and dry comic timing. George Costanza (S1) <d>[Spanish] He dejado el café para ahorrar</d>. Jerry raises one eyebrow and replies: Jerry Seinfeld (S2) <d>[Spanish] Ahora solo te falta dejar de comprar tazas</d>. After the last line, both stop speaking, keep their mouths closed and exchange a silent deadpan look through the end.\noverall_soundscape: Quiet apartment room tone and distant city traffic.\nnon_diegetic_music: N/A",
+      "after_vocal_timeline_sha256": "01869e4670d58f7d034c6cfc0e63f75a9cdb52451aede5cd40c0ce9fc89b9d62"
+    },
+    {
+      "id": "speech4-faithful-none-action",
+      "style": "faithful",
+      "soundscape": "none",
+      "ending": "action",
+      "source_prompt": "integrated_multimodal_description: [Shot 1] Live-action Seinfeld sitcom in Jerry Seinfeld's 1990s apartment. Fixed medium two-shot of George Costanza, played by Jason Alexander, wearing a beige cardigan over a light blue shirt, and Jerry Seinfeld wearing a gray sweater. George proudly holds an empty white coffee mug. Natural acting and dry comic timing. George Costanza (S1) <d>[Spanish] He dejado el café para ahorrar</d>. Jerry raises one eyebrow and replies: Jerry Seinfeld (S2) <d>[Spanish] Ahora solo te falta dejar de comprar tazas</d>. George lowers the mug and Jerry folds his arms. They exchange a deadpan look for the final comic beat.\noverall_soundscape: N/A\nnon_diegetic_music: N/A",
+      "source_sha256": "e27a2a5505d5d5a9a12f758fc56faaa6f682287118b7e30930cf6dd6506c2bb2",
+      "after_audio_policy": "integrated_multimodal_description: [Shot 1] Live-action Seinfeld sitcom in Jerry Seinfeld's 1990s apartment. Fixed medium two-shot of George Costanza, played by Jason Alexander, wearing a beige cardigan over a light blue shirt, and Jerry Seinfeld wearing a gray sweater. George proudly holds an empty white coffee mug. Natural acting and dry comic timing. George Costanza (S1) <d>[Spanish] He dejado el café para ahorrar</d>. Jerry raises one eyebrow and replies: Jerry Seinfeld (S2) <d>[Spanish] Ahora solo te falta dejar de comprar tazas</d>. George lowers the mug and Jerry folds his arms. They exchange a deadpan look for the final comic beat.\noverall_soundscape: N/A\nnon_diegetic_music: N/A",
+      "after_audio_policy_sha256": "e27a2a5505d5d5a9a12f758fc56faaa6f682287118b7e30930cf6dd6506c2bb2",
+      "after_vocal_timeline": "integrated_multimodal_description: [Shot 1] Live-action Seinfeld sitcom in Jerry Seinfeld's 1990s apartment. Fixed medium two-shot of George Costanza, played by Jason Alexander, wearing a beige cardigan over a light blue shirt, and Jerry Seinfeld wearing a gray sweater. George proudly holds an empty white coffee mug. Natural acting and dry comic timing. George Costanza (S1) <d>[Spanish] He dejado el café para ahorrar</d>. Jerry raises one eyebrow and replies: Jerry Seinfeld (S2) <d>[Spanish] Ahora solo te falta dejar de comprar tazas</d>. George lowers the mug and Jerry folds his arms. They exchange a deadpan look for the final comic beat.\noverall_soundscape: N/A\nnon_diegetic_music: N/A",
+      "after_vocal_timeline_sha256": "e27a2a5505d5d5a9a12f758fc56faaa6f682287118b7e30930cf6dd6506c2bb2"
+    },
+    {
+      "id": "speech4-faithful-none-silence",
+      "style": "faithful",
+      "soundscape": "none",
+      "ending": "silence",
+      "source_prompt": "integrated_multimodal_description: [Shot 1] Live-action Seinfeld sitcom in Jerry Seinfeld's 1990s apartment. Fixed medium two-shot of George Costanza, played by Jason Alexander, wearing a beige cardigan over a light blue shirt, and Jerry Seinfeld wearing a gray sweater. George proudly holds an empty white coffee mug. Natural acting and dry comic timing. George Costanza (S1) <d>[Spanish] He dejado el café para ahorrar</d>. Jerry raises one eyebrow and replies: Jerry Seinfeld (S2) <d>[Spanish] Ahora solo te falta dejar de comprar tazas</d>. After the last line, both stop speaking, keep their mouths closed and exchange a silent deadpan look through the end.\noverall_soundscape: N/A\nnon_diegetic_music: N/A",
+      "source_sha256": "09144f7f71542554138ced6d9d1a4c1c0afb760066e687cb2bbc9e51429171fb",
+      "after_audio_policy": "integrated_multimodal_description: [Shot 1] Live-action Seinfeld sitcom in Jerry Seinfeld's 1990s apartment. Fixed medium two-shot of George Costanza, played by Jason Alexander, wearing a beige cardigan over a light blue shirt, and Jerry Seinfeld wearing a gray sweater. George proudly holds an empty white coffee mug. Natural acting and dry comic timing. George Costanza (S1) <d>[Spanish] He dejado el café para ahorrar</d>. Jerry raises one eyebrow and replies: Jerry Seinfeld (S2) <d>[Spanish] Ahora solo te falta dejar de comprar tazas</d>. After the last line, both stop speaking, keep their mouths closed and exchange a silent deadpan look through the end.\noverall_soundscape: N/A\nnon_diegetic_music: N/A",
+      "after_audio_policy_sha256": "09144f7f71542554138ced6d9d1a4c1c0afb760066e687cb2bbc9e51429171fb",
+      "after_vocal_timeline": "integrated_multimodal_description: [Shot 1] Live-action Seinfeld sitcom in Jerry Seinfeld's 1990s apartment. Fixed medium two-shot of George Costanza, played by Jason Alexander, wearing a beige cardigan over a light blue shirt, and Jerry Seinfeld wearing a gray sweater. George proudly holds an empty white coffee mug. Natural acting and dry comic timing. George Costanza (S1) <d>[Spanish] He dejado el café para ahorrar</d>. Jerry raises one eyebrow and replies: Jerry Seinfeld (S2) <d>[Spanish] Ahora solo te falta dejar de comprar tazas</d>. After the last line, both stop speaking, keep their mouths closed and exchange a silent deadpan look through the end.\noverall_soundscape: N/A\nnon_diegetic_music: N/A",
+      "after_vocal_timeline_sha256": "09144f7f71542554138ced6d9d1a4c1c0afb760066e687cb2bbc9e51429171fb"
+    },
+    {
+      "id": "speech4-creative-ambient-action",
+      "style": "creative",
+      "soundscape": "ambient",
+      "ending": "action",
+      "source_prompt": "integrated_multimodal_description: [Shot 1] Live-action Seinfeld sitcom in Jerry Seinfeld's 1990s apartment. Fixed medium two-shot of George Costanza, played by Jason Alexander, wearing a beige cardigan over a light blue shirt, and Jerry Seinfeld wearing a gray sweater. George proudly holds an empty white coffee mug. Natural acting and dry comic timing. George Costanza (S1) <d>[Spanish] He dejado el café para ahorrar</d>. George points at the mug and adds: George Costanza (S1) <d>[Spanish] Estaba de oferta</d>. Jerry raises one eyebrow and replies: Jerry Seinfeld (S2) <d>[Spanish] Ahora solo te falta dejar de comprar tazas</d>. George lowers the mug and Jerry folds his arms. They exchange a deadpan look for the final comic beat.\noverall_soundscape: Quiet apartment room tone and distant city traffic.\nnon_diegetic_music: N/A",
+      "source_sha256": "36683f427ed521be36bc0d4088f36472276c7f7a8127f07e64ed0e2b214a9c40",
+      "after_audio_policy": "integrated_multimodal_description: [Shot 1] Live-action Seinfeld sitcom in Jerry Seinfeld's 1990s apartment. Fixed medium two-shot of George Costanza, played by Jason Alexander, wearing a beige cardigan over a light blue shirt, and Jerry Seinfeld wearing a gray sweater. George proudly holds an empty white coffee mug. Natural acting and dry comic timing. George Costanza (S1) <d>[Spanish] He dejado el café para ahorrar</d>. George points at the mug and adds: George Costanza (S1) <d>[Spanish] Estaba de oferta</d>. Jerry raises one eyebrow and replies: Jerry Seinfeld (S2) <d>[Spanish] Ahora solo te falta dejar de comprar tazas</d>. George lowers the mug and Jerry folds his arms. They exchange a deadpan look for the final comic beat.\noverall_soundscape: Quiet apartment room tone and distant city traffic.\nnon_diegetic_music: N/A",
+      "after_audio_policy_sha256": "36683f427ed521be36bc0d4088f36472276c7f7a8127f07e64ed0e2b214a9c40",
+      "after_vocal_timeline": "integrated_multimodal_description: [Shot 1] Live-action Seinfeld sitcom in Jerry Seinfeld's 1990s apartment. Fixed medium two-shot of George Costanza, played by Jason Alexander, wearing a beige cardigan over a light blue shirt, and Jerry Seinfeld wearing a gray sweater. George proudly holds an empty white coffee mug. Natural acting and dry comic timing. George Costanza (S1) <d>[Spanish] He dejado el café para ahorrar</d>. George points at the mug and adds: George Costanza (S1) <d>[Spanish] Estaba de oferta</d>. Jerry raises one eyebrow and replies: Jerry Seinfeld (S2) <d>[Spanish] Ahora solo te falta dejar de comprar tazas</d>. George lowers the mug and Jerry folds his arms. They exchange a deadpan look for the final comic beat.\noverall_soundscape: Quiet apartment room tone and distant city traffic.\nnon_diegetic_music: N/A",
+      "after_vocal_timeline_sha256": "36683f427ed521be36bc0d4088f36472276c7f7a8127f07e64ed0e2b214a9c40"
+    },
+    {
+      "id": "speech4-creative-ambient-silence",
+      "style": "creative",
+      "soundscape": "ambient",
+      "ending": "silence",
+      "source_prompt": "integrated_multimodal_description: [Shot 1] Live-action Seinfeld sitcom in Jerry Seinfeld's 1990s apartment. Fixed medium two-shot of George Costanza, played by Jason Alexander, wearing a beige cardigan over a light blue shirt, and Jerry Seinfeld wearing a gray sweater. George proudly holds an empty white coffee mug. Natural acting and dry comic timing. George Costanza (S1) <d>[Spanish] He dejado el café para ahorrar</d>. George points at the mug and adds: George Costanza (S1) <d>[Spanish] Estaba de oferta</d>. Jerry raises one eyebrow and replies: Jerry Seinfeld (S2) <d>[Spanish] Ahora solo te falta dejar de comprar tazas</d>. After the last line, both stop speaking, keep their mouths closed and exchange a silent deadpan look through the end.\noverall_soundscape: Quiet apartment room tone and distant city traffic.\nnon_diegetic_music: N/A",
+      "source_sha256": "8cacf0a21105a99e0b99d430a44827f1ca6671c0b04da5b94dd76c004cf054e5",
+      "after_audio_policy": "integrated_multimodal_description: [Shot 1] Live-action Seinfeld sitcom in Jerry Seinfeld's 1990s apartment. Fixed medium two-shot of George Costanza, played by Jason Alexander, wearing a beige cardigan over a light blue shirt, and Jerry Seinfeld wearing a gray sweater. George proudly holds an empty white coffee mug. Natural acting and dry comic timing. George Costanza (S1) <d>[Spanish] He dejado el café para ahorrar</d>. George points at the mug and adds: George Costanza (S1) <d>[Spanish] Estaba de oferta</d>. Jerry raises one eyebrow and replies: Jerry Seinfeld (S2) <d>[Spanish] Ahora solo te falta dejar de comprar tazas</d>. After the last line, both stop speaking, keep their mouths closed and exchange a silent deadpan look through the end.\noverall_soundscape: Quiet apartment room tone and distant city traffic.\nnon_diegetic_music: N/A",
+      "after_audio_policy_sha256": "8cacf0a21105a99e0b99d430a44827f1ca6671c0b04da5b94dd76c004cf054e5",
+      "after_vocal_timeline": "integrated_multimodal_description: [Shot 1] Live-action Seinfeld sitcom in Jerry Seinfeld's 1990s apartment. Fixed medium two-shot of George Costanza, played by Jason Alexander, wearing a beige cardigan over a light blue shirt, and Jerry Seinfeld wearing a gray sweater. George proudly holds an empty white coffee mug. Natural acting and dry comic timing. George Costanza (S1) <d>[Spanish] He dejado el café para ahorrar</d>. George points at the mug and adds: George Costanza (S1) <d>[Spanish] Estaba de oferta</d>. Jerry raises one eyebrow and replies: Jerry Seinfeld (S2) <d>[Spanish] Ahora solo te falta dejar de comprar tazas</d>. After the last line, both stop speaking, keep their mouths closed and exchange a silent deadpan look through the end.\noverall_soundscape: Quiet apartment room tone and distant city traffic.\nnon_diegetic_music: N/A",
+      "after_vocal_timeline_sha256": "8cacf0a21105a99e0b99d430a44827f1ca6671c0b04da5b94dd76c004cf054e5"
+    },
+    {
+      "id": "speech4-creative-none-action",
+      "style": "creative",
+      "soundscape": "none",
+      "ending": "action",
+      "source_prompt": "integrated_multimodal_description: [Shot 1] Live-action Seinfeld sitcom in Jerry Seinfeld's 1990s apartment. Fixed medium two-shot of George Costanza, played by Jason Alexander, wearing a beige cardigan over a light blue shirt, and Jerry Seinfeld wearing a gray sweater. George proudly holds an empty white coffee mug. Natural acting and dry comic timing. George Costanza (S1) <d>[Spanish] He dejado el café para ahorrar</d>. George points at the mug and adds: George Costanza (S1) <d>[Spanish] Estaba de oferta</d>. Jerry raises one eyebrow and replies: Jerry Seinfeld (S2) <d>[Spanish] Ahora solo te falta dejar de comprar tazas</d>. George lowers the mug and Jerry folds his arms. They exchange a deadpan look for the final comic beat.\noverall_soundscape: N/A\nnon_diegetic_music: N/A",
+      "source_sha256": "23d62401cf75abe785f095ef4f349ad5e035a3f292866504aa62ab8fad7194ff",
+      "after_audio_policy": "integrated_multimodal_description: [Shot 1] Live-action Seinfeld sitcom in Jerry Seinfeld's 1990s apartment. Fixed medium two-shot of George Costanza, played by Jason Alexander, wearing a beige cardigan over a light blue shirt, and Jerry Seinfeld wearing a gray sweater. George proudly holds an empty white coffee mug. Natural acting and dry comic timing. George Costanza (S1) <d>[Spanish] He dejado el café para ahorrar</d>. George points at the mug and adds: George Costanza (S1) <d>[Spanish] Estaba de oferta</d>. Jerry raises one eyebrow and replies: Jerry Seinfeld (S2) <d>[Spanish] Ahora solo te falta dejar de comprar tazas</d>. George lowers the mug and Jerry folds his arms. They exchange a deadpan look for the final comic beat.\noverall_soundscape: N/A\nnon_diegetic_music: N/A",
+      "after_audio_policy_sha256": "23d62401cf75abe785f095ef4f349ad5e035a3f292866504aa62ab8fad7194ff",
+      "after_vocal_timeline": "integrated_multimodal_description: [Shot 1] Live-action Seinfeld sitcom in Jerry Seinfeld's 1990s apartment. Fixed medium two-shot of George Costanza, played by Jason Alexander, wearing a beige cardigan over a light blue shirt, and Jerry Seinfeld wearing a gray sweater. George proudly holds an empty white coffee mug. Natural acting and dry comic timing. George Costanza (S1) <d>[Spanish] He dejado el café para ahorrar</d>. George points at the mug and adds: George Costanza (S1) <d>[Spanish] Estaba de oferta</d>. Jerry raises one eyebrow and replies: Jerry Seinfeld (S2) <d>[Spanish] Ahora solo te falta dejar de comprar tazas</d>. George lowers the mug and Jerry folds his arms. They exchange a deadpan look for the final comic beat.\noverall_soundscape: N/A\nnon_diegetic_music: N/A",
+      "after_vocal_timeline_sha256": "23d62401cf75abe785f095ef4f349ad5e035a3f292866504aa62ab8fad7194ff"
+    },
+    {
+      "id": "speech4-creative-none-silence",
+      "style": "creative",
+      "soundscape": "none",
+      "ending": "silence",
+      "source_prompt": "integrated_multimodal_description: [Shot 1] Live-action Seinfeld sitcom in Jerry Seinfeld's 1990s apartment. Fixed medium two-shot of George Costanza, played by Jason Alexander, wearing a beige cardigan over a light blue shirt, and Jerry Seinfeld wearing a gray sweater. George proudly holds an empty white coffee mug. Natural acting and dry comic timing. George Costanza (S1) <d>[Spanish] He dejado el café para ahorrar</d>. George points at the mug and adds: George Costanza (S1) <d>[Spanish] Estaba de oferta</d>. Jerry raises one eyebrow and replies: Jerry Seinfeld (S2) <d>[Spanish] Ahora solo te falta dejar de comprar tazas</d>. After the last line, both stop speaking, keep their mouths closed and exchange a silent deadpan look through the end.\noverall_soundscape: N/A\nnon_diegetic_music: N/A",
+      "source_sha256": "3840f413fae2e09899fcf63587e3d8c821892b2b264a0aa8b9bc221056858eb0",
+      "after_audio_policy": "integrated_multimodal_description: [Shot 1] Live-action Seinfeld sitcom in Jerry Seinfeld's 1990s apartment. Fixed medium two-shot of George Costanza, played by Jason Alexander, wearing a beige cardigan over a light blue shirt, and Jerry Seinfeld wearing a gray sweater. George proudly holds an empty white coffee mug. Natural acting and dry comic timing. George Costanza (S1) <d>[Spanish] He dejado el café para ahorrar</d>. George points at the mug and adds: George Costanza (S1) <d>[Spanish] Estaba de oferta</d>. Jerry raises one eyebrow and replies: Jerry Seinfeld (S2) <d>[Spanish] Ahora solo te falta dejar de comprar tazas</d>. After the last line, both stop speaking, keep their mouths closed and exchange a silent deadpan look through the end.\noverall_soundscape: N/A\nnon_diegetic_music: N/A",
+      "after_audio_policy_sha256": "3840f413fae2e09899fcf63587e3d8c821892b2b264a0aa8b9bc221056858eb0",
+      "after_vocal_timeline": "integrated_multimodal_description: [Shot 1] Live-action Seinfeld sitcom in Jerry Seinfeld's 1990s apartment. Fixed medium two-shot of George Costanza, played by Jason Alexander, wearing a beige cardigan over a light blue shirt, and Jerry Seinfeld wearing a gray sweater. George proudly holds an empty white coffee mug. Natural acting and dry comic timing. George Costanza (S1) <d>[Spanish] He dejado el café para ahorrar</d>. George points at the mug and adds: George Costanza (S1) <d>[Spanish] Estaba de oferta</d>. Jerry raises one eyebrow and replies: Jerry Seinfeld (S2) <d>[Spanish] Ahora solo te falta dejar de comprar tazas</d>. After the last line, both stop speaking, keep their mouths closed and exchange a silent deadpan look through the end.\noverall_soundscape: N/A\nnon_diegetic_music: N/A",
+      "after_vocal_timeline_sha256": "3840f413fae2e09899fcf63587e3d8c821892b2b264a0aa8b9bc221056858eb0"
+    }
+  ],
+  "dialect": {
+    "first_frame": "For the target video, at 0.00 seconds into the target video, <Picture 1> (from [Shot 1]) is fully referenced.\nintegrated_multimodal_description: The referenced picture is the exact opening frame. Its visible composition, identity, wardrobe, environment, colors and proportions are authoritative and must not be stretched or redesigned. Visible subjects: (S1) a copper service robot with one amber eye. Environment: a crystal desert at blue dawn. Visual treatment: cinematic retrofuturism. Lighting: cold sky with warm amber rim light. Chronological action: The robot kneels, opens one hand, and reveals the seed. (S1) Erio says <d>[Spanish] ¿Dónde está la semilla?</d>. The shot holds a medium shot, with one coherent subtle slow dolly in camera move. The shot ends on the amber eye reflected in the seed. Same faces and wardrobe throughout.\noverall_soundscape: a low desert wind. Synchronized effects: quiet servo movement.\nnon_diegetic_music: N/A",
+    "direct_structured": "integrated_multimodal_description: [Shot 1] A silent machine starts.\n\noverall_soundscape: Low mechanical hum. No human voices.\n\nnon_diegetic_music: N/A",
+    "references": "subject_definitions: (S1) a copper service robot with one amber eye\nsummary: [reference generation] Compose one new continuous shot from the supplied references.\nretention_analysis: Preserve each referenced subject's identity, proportions, wardrobe, materials and distinguishing features; preserve the referenced location's architecture, palette and spatial logic. Do not copy an arbitrary reference frame as the opening frame.\ndetailed_description: Visible subjects: (S1) a copper service robot with one amber eye. Environment: a crystal desert at blue dawn. Visual treatment: cinematic retrofuturism. Lighting: cold sky with warm amber rim light. Chronological action: The robot crosses the desert and stops beside a luminous tree. (S1) Erio says <d>[Spanish] ¿Dónde está la semilla?</d>. The shot holds a medium shot, with one coherent subtle slow dolly in camera move. The shot ends on the amber eye reflected in the seed. Same faces and wardrobe throughout.\noverall_soundscape: a low desert wind. Synchronized effects: quiet servo movement.\nnon_diegetic_music: N/A",
+    "first_frame_sha256": "5ef980a99bb5e281ff3ca2972f64bb03f186f39589b6c066c3bf5d15a44b67c3",
+    "direct_structured_sha256": "c5f369ef2ad598e6ceee3840fdf162fd7fb72a43543cc5be8d4cf9e362648a70",
+    "references_sha256": "35dd9186789fe05c6e82339a5bb597536e38c06458e61f7fca3736d539c124df"
+  },
+  "windows": [
+    "integrated_multimodal_description: [Shot 1] Clark Kent wears the same blue shirt and red jacket. Smallville main street in warm afternoon light. live-action television drama, steady tracking camera This is the opening window of one continuous shot. At 0.00 seconds, Clark walks screen-right on the sidewalk. From 0.00 to 5.17 seconds, Clark hears a runaway truck and turns toward it. The central outcome remains unresolved at this boundary. The window ends with Clark faces the approaching truck with one foot planted forward.\n\noverall_soundscape: light traffic, footsteps, and a soft Kansas breeze. a distant truck horn.\n\nnon_diegetic_music: N/A",
+    "For the target video, at 0.00 seconds into the target video, <Picture 1> is fully referenced.\n\nintegrated_multimodal_description: [Shot 1] Clark Kent wears the same blue shirt and red jacket. Smallville main street in warm afternoon light. live-action television drama, steady tracking camera Continue directly from the supplied previous frame; do not restart, recap, or repeat earlier action. At 0.00 seconds, Clark faces the approaching truck with one foot planted forward. From 0.00 to 5.12 seconds, Clark accelerates, reaches the truck, and braces both hands against its grille. Driver (S1) shouts urgently while gripping the wheel: <d>[English] Look out!</d>. Immediately after the line, the speaker closes their mouth. The central outcome remains unresolved at this boundary. The window ends with Clark holds the slowing truck while the driver grips the wheel.\n\noverall_soundscape: light traffic, footsteps, and a soft Kansas breeze. tires skid and metal groans.\n\nnon_diegetic_music: N/A",
+    "For the target video, at 0.00 seconds into the target video, <Picture 1> is fully referenced.\n\nintegrated_multimodal_description: [Shot 1] Clark Kent wears the same blue shirt and red jacket. Smallville main street in warm afternoon light. live-action television drama, steady tracking camera Continue directly from the supplied previous frame; do not restart, recap, or repeat earlier action. At 0.00 seconds, Clark holds the slowing truck while the driver grips the wheel. From 0.00 to 4.08 seconds, Clark stops the truck, checks the driver, and steps back into the crowd. Complete the requested outcome only in this final window. The window ends with the truck is safely stopped and Clark stands unnoticed among pedestrians.\n\noverall_soundscape: light traffic, footsteps, and a soft Kansas breeze. the engine settles to idle.\n\nnon_diegetic_music: N/A"
+  ],
+  "official": {
+    "i2va": "For the target video, at 0.00 seconds into the target video, <Picture 1> (from [Shot 1]) is fully referenced.\n\nintegrated_multimodal_description: [Shot 1] A person turns toward camera\n\noverall_soundscape: Room tone.\n\nnon_diegetic_music: N/A",
+    "fl2va": "How the reference pictures align with the target video — Picture 1 (from Shot 1) aligns with the 0.00-second mark of the target video; Picture 2 (from Shot 1) aligns with the 10.25-second mark of the target video.\n\nintegrated_multimodal_description: [Shot 1] A person turns toward camera\n\noverall_soundscape: Room tone.\n\nnon_diegetic_music: N/A",
+    "l2va": "How the reference pictures align with the target video — <Picture 1> (from [Shot 1]) aligns with the 9.50-second mark of the target video.\n\nintegrated_multimodal_description: [Shot 1] A person turns toward camera\n\noverall_soundscape: Room tone.\n\nnon_diegetic_music: N/A",
+    "ana_spanish": "integrated_multimodal_description: [Shot 1] Ana (S1) looks toward the door and says:<d>[Spanish] Ya están aquí.</d>\n\noverall_soundscape: Quiet room tone.\n\nnon_diegetic_music: N/A",
+    "i2va_errors": [],
+    "ana_errors": [],
+    "i2va_sha256": "8eb4c49a7fe5d285331280ae27157ac3fdc7f0bf5e289a9ddf6692870436c274",
+    "fl2va_sha256": "69772103c1180b47f69e2baa69a1b31ac8a2f19b859995970487726e72342372",
+    "l2va_sha256": "aa982e569d9c502be530cf99bed8609d1601092912c60b9c3058d8a5a0052657",
+    "ana_spanish_sha256": "75ae5a8e231b88256f12b5b5855058bc24a4e513b4b73429d1c69d8729437463"
+  },
+  "story": {
+    "titles": [
+      "Run!"
+    ],
+    "tagged_spanish": "George Costanza, interpretado por Jason Alexander, dice: George Costanza (S1) <d>[Spanish] He dejado el café para ahorrar</d>. Jerry Seinfeld responde: Jerry Seinfeld (S2) <d>[Spanish] Ahora solo te falta dejar de comprar tazas</d>. Diálogo en español de España.",
+    "repaired_spanish": "<d>[Spanish] He dejado el café para ahorrar</d>",
+    "bound_speakers": "A warmly lit room. Alice (S1) <d>[English] Hello.</d> Bob (S2) <d>[English] Welcome.</d>",
+    "faithful_drops_extra": "Alice (S1): <d>[English] Hello.</d> Bob (S2): ",
+    "creative_keeps_extra": "Alice (S1): <d>[English] Hello.</d> Bob (S2): <d>[English] Extra.</d>",
+    "silent_drops_tags": "Alice (S1):  Bob (S2): "
+  },
+  "enhance": [
+    {
+      "id": "studio-faithful-native",
+      "user": "Alice says \"Hello.\"",
+      "llm": "integrated_multimodal_description: [Shot 1] Alice (S1) <d>[English] Hello.</d> nods.\noverall_soundscape: Quiet room.\nnon_diegetic_music: N/A",
+      "kwargs": {
+        "mode": "video",
+        "model_type": "minimax_h3",
+        "planning_style": "faithful",
+        "h3_audio_policy": "native",
+        "duration_seconds": 8
+      },
+      "result": "integrated_multimodal_description: [Shot 1] Alice (S1) <d>[English] Hello.</d> nods.\noverall_soundscape: Quiet room.\nnon_diegetic_music: N/A",
+      "sha256": "ecc12db16af12c2a45985ca33942d2a03d6e800cdf263c48dadb2f1865d5daec"
+    },
+    {
+      "id": "studio-faithful-drops-extra",
+      "user": "Alice says \"Hello.\"",
+      "llm": "integrated_multimodal_description: [Shot 1] Alice (S1) <d>[English] Hello.</d> Bob (S2): <d>[English] Extra.</d>\noverall_soundscape: Quiet room.\nnon_diegetic_music: N/A",
+      "kwargs": {
+        "mode": "video",
+        "model_type": "minimax_h3",
+        "planning_style": "faithful",
+        "h3_audio_policy": "native",
+        "duration_seconds": 8
+      },
+      "result": "integrated_multimodal_description: [Shot 1] Alice (S1) <d>[English] Hello.</d> Bob (S2): \noverall_soundscape: Quiet room.\nnon_diegetic_music: N/A",
+      "sha256": "6714d09ac345ee907548343bc27d58ad257488916b1354031c78bb3e6cfa22ff"
+    },
+    {
+      "id": "studio-creative-keeps-extra",
+      "user": "Alice says \"Hello.\"",
+      "llm": "integrated_multimodal_description: [Shot 1] Alice (S1) <d>[English] Hello.</d> Bob (S2): <d>[English] Extra.</d>\noverall_soundscape: Quiet room.\nnon_diegetic_music: N/A",
+      "kwargs": {
+        "mode": "video",
+        "model_type": "minimax_h3",
+        "planning_style": "creative",
+        "h3_audio_policy": "native",
+        "duration_seconds": 8
+      },
+      "result": "integrated_multimodal_description: [Shot 1] Alice (S1) <d>[English] Hello.</d> Bob (S2): <d>[English] Extra.</d>\noverall_soundscape: Quiet room.\nnon_diegetic_music: N/A",
+      "sha256": "00f27a616f56641b291cff20ecb7533c9a61fc9611c7caaeea91f3bd27facfbc"
+    },
+    {
+      "id": "studio-legacy-sound",
+      "user": "Alice says \"Hello.\"",
+      "llm": "integrated_multimodal_description: [Shot 1] Alice (S1) <d>[English] Hello.</d> nods.\noverall_soundscape: Quiet room.\nnon_diegetic_music: N/A",
+      "kwargs": {
+        "mode": "video",
+        "model_type": "minimax_h3",
+        "planning_style": "faithful",
+        "h3_audio_policy": "legacy",
+        "duration_seconds": 8
+      },
+      "result": "integrated_multimodal_description: [Shot 1] Alice (S1) <d>[English] Hello.</d> nods.\n\noverall_soundscape: N/A\n\nnon_diegetic_music: N/A",
+      "sha256": "896deb860d6d73d95bad9f4a610adac9b977d706664801cc3ec708d5f8638197"
+    },
+    {
+      "id": "studio-spanish-repair",
+      "user": "George Costanza, interpretado por Jason Alexander, dice: «He dejado el café para ahorrar».",
+      "llm": "integrated_multimodal_description: [Shot 1] George Costanza (S1) <d>[English] He dejado el café para ahorrar.</d>\noverall_soundscape: Quiet apartment.\nnon_diegetic_music: N/A",
+      "kwargs": {
+        "mode": "video",
+        "model_type": "minimax_h3",
+        "planning_style": "faithful",
+        "h3_audio_policy": "native",
+        "duration_seconds": 8
+      },
+      "result": "integrated_multimodal_description: [Shot 1] George Costanza (S1) <d>[Spanish] He dejado el café para ahorrar</d>\noverall_soundscape: Quiet apartment.\nnon_diegetic_music: N/A",
+      "sha256": "b1dd018cf10195d3341b693281882ffaea45ed64da64cef5d528c9b30e434ba2"
+    },
+    {
+      "id": "studio-title-not-speech",
+      "user": "Dwight from \"The Office\" reads a sign \"EXIT\". Alice says \"Run!\"",
+      "llm": "integrated_multimodal_description: [Shot 1] Dwight from \"The Office\" reads a sign \"EXIT\". Alice (S1) <d>[English] Run!</d>\noverall_soundscape: N/A\nnon_diegetic_music: N/A",
+      "kwargs": {
+        "mode": "video",
+        "model_type": "minimax_h3",
+        "planning_style": "faithful",
+        "h3_audio_policy": "native",
+        "duration_seconds": 8
+      },
+      "result": "integrated_multimodal_description: [Shot 1] Dwight from \"The Office\" reads a sign \"EXIT\". Alice (S1) <d>[English] Run!</d>\noverall_soundscape: N/A\nnon_diegetic_music: N/A",
+      "sha256": "f9a2548f770798b8ba8c5e6bce704d64861df4a957dbb7cfe8175fe10784a12c"
+    },
+    {
+      "id": "studio-silencio-in-dialogue",
+      "user": "Ana dice \"Qué silencio.\"",
+      "llm": "integrated_multimodal_description: [Shot 1] Ana (S1) <d>[Spanish] Qué silencio.</d>\noverall_soundscape: N/A\nnon_diegetic_music: N/A",
+      "kwargs": {
+        "mode": "video",
+        "model_type": "minimax_h3",
+        "planning_style": "faithful",
+        "h3_audio_policy": "native",
+        "duration_seconds": 8
+      },
+      "result": "integrated_multimodal_description: [Shot 1] Ana (S1) <d>[Spanish] Qué silencio.</d>\noverall_soundscape: N/A\nnon_diegetic_music: N/A",
+      "sha256": "c91ca48ba1deae3681867f048fb044d54484aec6435f9919d030db4dc23160a1"
+    },
+    {
+      "id": "studio-silent-scene",
+      "user": "A silent scene.",
+      "llm": "integrated_multimodal_description: [Shot 1] A silent room. Alice (S1) <d>[English] Hello.</d>\noverall_soundscape: N/A\nnon_diegetic_music: N/A",
+      "kwargs": {
+        "mode": "video",
+        "model_type": "minimax_h3",
+        "planning_style": "creative",
+        "h3_audio_policy": "native",
+        "duration_seconds": 8
+      },
+      "result": "integrated_multimodal_description: [Shot 1] A silent room. Alice (S1) \noverall_soundscape: N/A\nnon_diegetic_music: N/A",
+      "sha256": "71231adaff4685a9d7b3410e9e26aaec08b32d21660059c1b11182b8b75ca520"
+    },
+    {
+      "id": "studio-already-structured",
+      "user": "integrated_multimodal_description: [Shot 1] Alice (S1) <d>[English] Hello.</d>\noverall_soundscape: N/A\nnon_diegetic_music: N/A",
+      "llm": "integrated_multimodal_description: [Shot 1] Alice (S1) <d>[English] Hello.</d>\noverall_soundscape: N/A\nnon_diegetic_music: N/A",
+      "kwargs": {
+        "mode": "video",
+        "model_type": "minimax_h3",
+        "planning_style": "faithful",
+        "h3_audio_policy": "native",
+        "duration_seconds": 8
+      },
+      "result": "integrated_multimodal_description: [Shot 1] Alice (S1) <d>[English] Hello.</d>\noverall_soundscape: N/A\nnon_diegetic_music: N/A",
+      "sha256": "c55903d0eabaf61c90c69e3d3e343c93129ebf4913dcff6c6b99988cb7aeae6d"
+    },
+    {
+      "id": "studio-ref2va",
+      "user": "Alice says \"Hello.\"",
+      "llm": "subject_definitions: <Subject 1> (S1) from <Picture 1>. <Audio 1> voice for <Subject 1> (S1).\nsummary: Alice speaks.\nretention_analysis: <Picture 1> reference; <Audio 1> VOICE REFERENCE.\ndetailed_description: Alice (S1) <d>[English] Hello.</d>\noverall_soundscape: N/A\nnon_diegetic_music: N/A",
+      "kwargs": {
+        "mode": "video",
+        "model_type": "minimax_h3_ref2va",
+        "planning_style": "faithful",
+        "h3_audio_policy": "native",
+        "duration_seconds": 8,
+        "reference_context": "<Picture 1>: Alice\n<Audio 1>: intent=VOICE REFERENCE"
+      },
+      "result": "subject_definitions: <Subject 1> (S1) from <Picture 1>. <Audio 1> voice for <Subject 1> (S1).\nsummary: Alice speaks.\nretention_analysis: <Picture 1> reference; <Audio 1> VOICE REFERENCE.\ndetailed_description: Alice (S1) <d>[English] Hello.</d>\noverall_soundscape: N/A\nnon_diegetic_music: N/A",
+      "sha256": "0a7932ad9d51d6f1272fa266c3904922f196f85dd69f6c32fefefccad3d8087c"
+    },
+    {
+      "id": "wan-non-h3",
+      "user": "A cat walks across a sunlit kitchen.",
+      "llm": "A ginger cat walks slowly across a sunlit kitchen, tail high.",
+      "kwargs": {
+        "mode": "video",
+        "model_type": "wan_2_2"
+      },
+      "result": "A ginger cat walks slowly across a sunlit kitchen, tail high.",
+      "sha256": "82d29b7522f47710cb61e3a095abdbf15871a3db57759653bbf58e28ff3815e0"
+    },
+    {
+      "id": "system-override-skips-h3",
+      "user": "Alice says \"Hello.\"",
+      "llm": "refined without tags",
+      "kwargs": {
+        "mode": "video",
+        "model_type": "minimax_h3",
+        "system_override": "Refine only. Do not expand.",
+        "planning_style": "faithful",
+        "h3_audio_policy": "native"
+      },
+      "result": "refined without tags",
+      "sha256": "c6edbf9a895ea3be2b3b7ae83b3042fb89ba8abbaf5acb62d3ec25a5796c4f0f"
+    },
+    {
+      "id": "raw-enhancer-skips-h3",
+      "user": "Alice says \"Hello.\"",
+      "llm": "raw enhanced hello",
+      "kwargs": {
+        "mode": "video",
+        "model_type": "minimax_h3",
+        "raw_enhancer_mode": true,
+        "planning_style": "faithful",
+        "h3_audio_policy": "native"
+      },
+      "result": "raw enhanced hello",
+      "sha256": "a20ddbef0bae4502ba8049b465356a120aae7cb2178497f059f4f7d80c249202"
+    }
+  ],
+  "windows_sha256": [
+    "0425d076922cd6318561e61ff7f33f9f2ea8b215536ba3053989cf3fbc08e2a3",
+    "770e30c966e4164f361d314eda08a73ef57c6a51d878d97fe0cba053eb1173f8",
+    "5d2c3ac0fad8293eecdfd833135ba14164e2a6311899ca31cf17d19aac86ea1e"
+  ]
+}

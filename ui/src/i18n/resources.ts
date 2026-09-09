@@ -1,3 +1,7 @@
+import kineticTextEn from './locales/en/kineticText.json'
+import kineticTextEs from './locales/es/kineticText.json'
+import scene3dEditorEn from './locales/en/scene3dEditor.json'
+import scene3dEditorEs from './locales/es/scene3dEditor.json'
 import commonEn from './locales/en/common.json'
 import navigationEn from './locales/en/navigation.json'
 import settingsEn from './locales/en/settings.json'
@@ -37,7 +41,7 @@ import charactersEs from './locales/es/characters.json'
 import comicsEs from './locales/es/comics.json'
 import studioEs from './locales/es/studio.json'
 
-export const NAMESPACES = ['common', 'navigation', 'settings', 'wizard', 'activity', 'extraInfo', 'storyLab', 'director', 'seriesLab', 'videoEditor', 'workspaces', 'styleSheet', 'projects', 'auditDev', 'scene3d', 'shell', 'characters', 'comics', 'studio'] as const
+export const NAMESPACES = ['common', 'navigation', 'settings', 'wizard', 'activity', 'extraInfo', 'storyLab', 'director', 'seriesLab', 'videoEditor', 'workspaces', 'styleSheet', 'projects', 'auditDev', 'scene3d', 'scene3dEditor', 'kineticText', 'shell', 'characters', 'comics', 'studio'] as const
 export type I18nNamespace = (typeof NAMESPACES)[number]
 
 export const resources = {
@@ -57,6 +61,8 @@ export const resources = {
     projects: projectsEn,
     auditDev: auditDevEn,
     scene3d: scene3dEn,
+    scene3dEditor: scene3dEditorEn,
+    kineticText: kineticTextEn,
     shell: shellEn,
     characters: charactersEn,
     comics: comicsEn,
@@ -78,6 +84,8 @@ export const resources = {
     projects: projectsEs,
     auditDev: auditDevEs,
     scene3d: scene3dEs,
+    scene3dEditor: scene3dEditorEs,
+    kineticText: kineticTextEs,
     shell: shellEs,
     characters: charactersEs,
     comics: comicsEs,

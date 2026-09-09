@@ -83,6 +83,13 @@ export interface Resolution {
 }
 
 export interface GenerateParams {
+  viggle_audio_mode?: 'source' | 'generated'
+  switch_threshold?: number
+  video_mask?: string
+  denoising_strength?: number
+  video_guide_outpainting?: string
+  temporal_upsampling?: string
+  wangp_processor_settings?: Record<string, unknown>
   prompt: string
   /** ACE-Step "Music Caption" — style/genre/instruments/mood (music mode). */
   alt_prompt?: string
@@ -198,6 +205,15 @@ export interface GenerateParams {
   minimax_h3_text_encoder?: 'nvfp4_awq' | 'gguf_q2_k' | 'gguf_q4_k_m' | 'int8' | 'bf16'
   /** One-click managed H3 Turbo recipe for Full or Pruned H3. */
   minimax_h3_turbo_mode?: boolean
+  override_attention?: string
+  minimax_h3_turbo_preset?: string
+  minimax_h3_planning_style?: 'faithful' | 'creative'
+  minimax_h3_audio_policy?: 'native' | 'legacy'
+  minimax_h3_reference_sequence?: boolean
+  minimax_h3_semantic_bridge_alpha?: number
+  minimax_h3_semantic_bridge_magnitude?: 'per_token' | 'global' | 'none'
+  minimax_h3_multi_window?: boolean
+  h3_reference_context?: string
   /** Automatically expand one long H3 concept into window-local prompts. */
   minimax_h3_window_storyboard?: boolean
   /** Compiled Context-IR prompts, one per continuation pass. */
@@ -238,6 +254,10 @@ export interface H3WindowPlanWindow {
 }
 
 export interface H3WindowPlan {
+  planning_style?: 'faithful' | 'creative'
+  audio_policy?: 'native' | 'legacy'
+  reference_context?: string
+  dialogue_ledger?: Array<{ id: string; text: string; speaker: string; speaker_id: string; language: string; window: number; locked: boolean; start_seconds: number; end_seconds: number }>
   source_prompt: string
   signature: string
   planned_by: 'llm' | 'deterministic_fallback' | 'not_needed'
@@ -420,6 +440,7 @@ export interface SceneAnimationEvent {
 }
 
 export interface SceneLayer {
+  characterKitRef?: import('../lib/characterVoice').CharacterKitRef
   id: string
   name: string
   type: SceneLayerType
@@ -562,8 +583,12 @@ export interface SceneLayer {
 }
 
 export interface Scene {
+  texts?: import('../lib/kineticText').KineticText[]
   version: 1
   name: string
+  /** Recipe asset-job restriction, retained through save/reload. Not a global
+   * permission system for unrelated Wizard/Studio commands. */
+  generationPolicy?: import('../lib/sceneGenerationPolicy').SceneGenerationPolicy
   width: number
   height: number
   /** Preview, timeline and browser capture sampling rate. Defaults to 30 for legacy scenes. */
@@ -623,14 +648,28 @@ export interface Scene {
     referenceMotion?: string
     evaluationCues?: string[]
     /** The exact existing assets assigned when the template was mounted. */
-    assets?: Array<{ slot: string; source: string; name?: string; type?: SceneLayerType }>
+    assets?: Array<{ slot: string; source: string; name?: string; type?: SceneLayerType; catalogAtAssignment?: SceneCatalogAssetReference }>
     /** Deterministic human-readable direction used to compile this template. */
     prompt?: string
   }
 }
 
+/** Catalog identity at template assignment, not a claim that a later edited layer
+ * still uses the same bytes. The canonical manifest stays in the asset catalog. */
+export interface SceneCatalogAssetReference {
+  assetId: string
+  workspaceId: string
+  filename: string
+  metadataStatus: 'canonical'
+  originTool: string
+  provider?: string | null
+  modelId?: string | null
+  runId?: string | null
+  taskId?: string | null
+}
+
 export type VideoResultKind = 'music_video' | 'trailer' | 'series_episode' | 'chapter'
-export type MediaFilter = 'all' | 'assets' | 'projects' | 'runs' | 'images' | 'videos' | 'audio' | 'model3d' | 'scenes' | 'stories' | 'series' | 'styles' | 'comics' | 'videoeditor' | 'scene3d' | 'animate3d' | 'avatars' | 'multiclip' | 'favorites' | 'workspaces' | 'characters' | 'videoclips' | 'trailers' | 'series_episodes' | 'auditdev'
+export type MediaFilter = 'all' | 'assets' | 'projects' | 'runs' | 'images' | 'videos' | 'audio' | 'model3d' | 'scenes' | 'stories' | 'series' | 'styles' | 'comics' | 'videoeditor' | 'scene3d' | 'world3d' | 'animate3d' | 'character-replacement' | 'avatars' | 'multiclip' | 'favorites' | 'workspaces' | 'characters' | 'videoclips' | 'trailers' | 'series_episodes' | 'auditdev'
 export type AspectRatio = 'auto' | '21:9' | '16:9' | '9:16' | '1:1' | '4:3' | '3:4'
 export type ResolutionPreset = 'auto' | '480p' | '540p' | '720p' | '768p' | '1080p'
 export type ScailResolutionProfile = '480p' | '512p' | '704p'
@@ -690,6 +729,8 @@ export interface SlidingWindowMemoryPolicy {
 }
 
 export interface ModelOptions {
+  wangp_1272?: boolean
+  wangp_1272_capabilities?: { viggle: boolean; two_phase: boolean; grouped_mask: boolean; audio_refinement: boolean; vdn: boolean }
   model_type: string
   architecture: string
   guidance_max_phases: number
@@ -707,6 +748,8 @@ export interface ModelOptions {
   returns_audio: boolean
   any_audio_prompt: boolean
   audio_scale_name: string
+  inference_steps_min?: number
+  inference_steps_max?: number
   lock_inference_steps: boolean
   lock_guidance_scale: boolean
   no_negative_prompt: boolean
@@ -733,7 +776,11 @@ export interface ModelOptions {
     recommended?: boolean
   }[] | null
   minimax_h3_text_encoder_default?: string
+  minimax_h3_semantic_bridge?: boolean
+  minimax_h3_fused_turbo?: boolean
   minimax_h3_turbo?: {
+    preset_id?: string
+    presets?: Array<{ id: string; label: string; filename: string; steps: number; weight: number; description: string; runtime: string; workflow: string }>
     filename: string
     label: string
     experimental: boolean
@@ -809,7 +856,7 @@ export interface ModelOptions {
   duration_slider: { label: string; min: number; max: number; increment: number; default: number } | null
   pause_between_sentences: boolean
   temperature_enabled: boolean
-  custom_settings_def: { id: string; label: string; name: string; type: string }[] | null
+  custom_settings_def: { id: string; label: string; name: string; type: string; default?: unknown; choices?: [string, string | number][] }[] | null
   h3_reference_inputs?: boolean
 }
 
@@ -1567,6 +1614,8 @@ export interface DirectorV2PlanRequest {
   video_model?: string
   h3_reference_mode?: 'first_frame' | 'references'
   h3_audio_prompt?: string
+  h3_audio_policy?: 'native' | 'legacy'
+  minimax_h3_audio_policy?: 'native' | 'legacy'
   seamless?: boolean
   multishot_lora_mode?: boolean
   music_video_treatment?: MusicVideoTreatment
@@ -1718,6 +1767,7 @@ export interface PlannedDirectorClip {
   section_label?: string
   suggested_prompt_hint?: string
   _director_h3_source_prompt?: string
+  _director_h3_compiled_prompt?: string
   _director_audio_plan?: Record<string, unknown>
   _director_dialogue_beats?: Array<Record<string, unknown>>
   _director_subjects_on_screen?: Array<Record<string, unknown>>

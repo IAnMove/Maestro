@@ -10,6 +10,7 @@ from pathlib import Path
 from app.services.story_library import (
     MAX_STORY_PROJECTS,
     StoryLibraryRevisionConflict,
+    StorySongAttachConflict,
     attach_story_song_candidate,
     normalize_story_library,
     delete_story_project,
@@ -147,6 +148,128 @@ class TestStoryLibrary(unittest.TestCase):
             self.assertEqual(candidate["status"], "ready")
             self.assertEqual(candidate["name"], "theme.wav")
             self.assertEqual(candidate["provenance"]["candidateId"], "song-a")
+            self.assertEqual(
+                saved["projects"]["story-a"]["music"]["cues"][0]["selectedCandidateId"],
+                "song-a",
+            )
+
+    def test_attach_story_song_candidate_can_leave_selection_untouched(self):
+        with tempfile.TemporaryDirectory() as directory:
+            initial = write_story_library(directory, {
+                "projects": {
+                    "story-a": {
+                        "id": "story-a",
+                        "music": {
+                            "cues": [{
+                                "id": "cue-a",
+                                "selectedCandidateId": "song-keep",
+                                "candidates": [
+                                    {"id": "song-keep", "status": "ready"},
+                                    {"id": "song-a", "status": "pending"},
+                                ],
+                            }],
+                        },
+                    },
+                },
+            }, base_revision=0)
+            saved = attach_story_song_candidate(
+                directory,
+                project_id="story-a",
+                cue_id="cue-a",
+                candidate_id="song-a",
+                source="/api/v1/file/theme.wav",
+                filename="theme.wav",
+                status="ready",
+                base_revision=initial["revision"],
+                update_selection=False,
+            )
+            cue = saved["projects"]["story-a"]["music"]["cues"][0]
+            self.assertEqual(cue["selectedCandidateId"], "song-keep")
+            self.assertEqual(cue["candidates"][1]["status"], "ready")
+
+    def test_attach_refuses_to_replace_ready_row_from_another_job(self):
+        with tempfile.TemporaryDirectory() as directory:
+            initial = write_story_library(directory, {
+                "projects": {
+                    "story-a": {
+                        "id": "story-a",
+                        "music": {
+                            "cues": [{
+                                "id": "cue-a",
+                                "candidates": [{
+                                    "id": "song-a",
+                                    "status": "pending",
+                                    "source": "",
+                                    "name": "",
+                                }],
+                            }],
+                        },
+                    },
+                },
+            }, base_revision=0)
+            first = attach_story_song_candidate(
+                directory,
+                project_id="story-a",
+                cue_id="cue-a",
+                candidate_id="song-a",
+                source="/api/v1/file/first.wav",
+                filename="first.wav",
+                base_revision=initial["revision"],
+                job_id="job-first",
+            )
+            with self.assertRaises(StorySongAttachConflict):
+                attach_story_song_candidate(
+                    directory,
+                    project_id="story-a",
+                    cue_id="cue-a",
+                    candidate_id="song-a",
+                    source="/api/v1/file/second.wav",
+                    filename="second.wav",
+                    base_revision=first["revision"],
+                    job_id="job-second",
+                )
+            candidate = read_story_library(directory)["projects"]["story-a"]["music"]["cues"][0]["candidates"][0]
+            self.assertEqual(candidate["name"], "first.wav")
+            self.assertEqual(candidate["provenance"]["jobId"], "job-first")
+
+    def test_attach_same_job_can_republish_ready_row(self):
+        with tempfile.TemporaryDirectory() as directory:
+            initial = write_story_library(directory, {
+                "projects": {
+                    "story-a": {
+                        "id": "story-a",
+                        "music": {
+                            "cues": [{
+                                "id": "cue-a",
+                                "candidates": [{"id": "song-a", "status": "pending", "source": ""}],
+                            }],
+                        },
+                    },
+                },
+            }, base_revision=0)
+            first = attach_story_song_candidate(
+                directory,
+                project_id="story-a",
+                cue_id="cue-a",
+                candidate_id="song-a",
+                source="/api/v1/file/theme.wav",
+                filename="theme.wav",
+                base_revision=initial["revision"],
+                job_id="job-same",
+            )
+            saved = attach_story_song_candidate(
+                directory,
+                project_id="story-a",
+                cue_id="cue-a",
+                candidate_id="song-a",
+                source="/api/v1/file/theme.wav",
+                filename="theme.wav",
+                base_revision=first["revision"],
+                job_id="job-same",
+            )
+            candidate = saved["projects"]["story-a"]["music"]["cues"][0]["candidates"][0]
+            self.assertEqual(candidate["name"], "theme.wav")
+            self.assertEqual(candidate["provenance"]["jobId"], "job-same")
 
     def test_attach_story_song_candidate_cas_conflict_keeps_pending_row(self):
         with tempfile.TemporaryDirectory() as directory:

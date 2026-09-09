@@ -1,6 +1,7 @@
 import { Film, ImagePlus, Music } from 'lucide-react'
 import { useUiTranslation } from '../../i18n'
 import { button, panel, type StoryGenerationOptions, type StoryLabTab } from './storyLabChrome'
+import { resolveStoryLabNavigation } from './labNavigation'
 import { CompactCastArticle } from './CompactCastArticle'
 import { CompactSequenceArticle } from './CompactSequenceArticle'
 import { CompactWorldArticle } from './CompactWorldArticle'
@@ -48,9 +49,15 @@ export function CompactVideoWorkspace({
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button className={button} onClick={() => navigate('assets')}><ImagePlus size={13} /> {t('compact.importImages')}</button>
+          <button className={button} onClick={() => {
+            const resolved = resolveStoryLabNavigation('assets', project.projectType)
+            if (resolved.ok) navigate(resolved.tab)
+          }}><ImagePlus size={13} /> {t('compact.importImages')}</button>
           {isMusicVideo && <button className={button} onClick={() => navigate('music')}><Music size={13} /> {t('compact.editSong')}</button>}
-          <button className={`${button} border-accent-blue/60 text-accent-blue`} onClick={() => navigate(isTrailer ? 'trailer' : 'productions')}><Film size={13} /> {isTrailer ? t('compact.createTrailer') : t('compact.goGenerate')}</button>
+          <button className={`${button} border-accent-blue/60 text-accent-blue`} onClick={() => {
+            const resolved = resolveStoryLabNavigation(isTrailer ? 'trailer' : 'productions', project.projectType)
+            if (resolved.ok) navigate(resolved.tab)
+          }}><Film size={13} /> {isTrailer ? t('compact.createTrailer') : t('compact.goGenerate')}</button>
         </div>
       </div>
 

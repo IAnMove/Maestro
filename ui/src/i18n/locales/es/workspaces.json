@@ -72,6 +72,25 @@
     "historical": "histórica",
     "seed": "seed {{seed}}"
   },
+  "commands": {
+    "pendingInvalid": "No se pudo leer el registro local de recuperación. No se envió ningún comando.",
+    "intentConflict": "Este identificador pertenece a otra petición pendiente. Recupera primero esa petición.",
+    "failed": "Falló el comando de la colección.",
+    "failedWithIntent": "{{message}} Petición: {{id}}.",
+    "invalidReceipt": "No se pudo verificar el resultado. Recupera la petición {{id}} antes de crear otra.",
+    "panelUnavailable": "El editor de colecciones no confirmó la vista solicitada.",
+    "contextChanged": "La colección o el editor cambió durante la preparación. No se envió un nuevo comando.",
+    "unsavedChanges": "El editor de colecciones está ocupado o tiene cambios sin guardar. Termina esos cambios antes de pedir al Wizard que modifique una colección.",
+    "saved": "Se ha guardado “{{name}}”, revisión {{revision}}.",
+    "savedButNotVisible": "La colección está guardada, pero no se pudo abrir su editor. Puedes recuperarla por su ID: {{id}}.",
+    "revisionConflict": "La colección cambió de la revisión {{expected}} a la {{current}}. Vuelve a consultarla antes de editar.",
+    "pendingTitle": "Peticiones pendientes de un resultado confirmado",
+    "pendingHint": "El reintento conserva el identificador original. Si la colección está guardada, se recuperará sin crear otra.",
+    "recover": "Recuperar / reintentar esta petición",
+    "recovering": "Recuperando…",
+    "identity": "{{id}} · Revisión {{revision}}",
+    "referenceOutsidePage": "Fuera de la página del catálogo cargada"
+  },
   "collections": {
     "aria": "Colecciones de Workspace",
     "savedAria": "Workspaces guardados",

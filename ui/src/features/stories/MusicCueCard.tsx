@@ -1,10 +1,14 @@
-import { Copy, ExternalLink, Film, Languages, Loader2, Music, Palette, RefreshCcw, Sparkles, Upload } from 'lucide-react'
+import { Copy, ExternalLink, Film, Languages, Loader2, Music, Palette, RefreshCcw, Sparkles } from 'lucide-react'
+import { StoryAudioPicker } from './StoryAudioPicker'
 import * as api from '../../api/client'
 import { useUiTranslation } from '../../i18n'
 import { button, completeGenerationButton, input, panel, Field } from './storyLabChrome'
 import { clampStoryMusicDuration, storyMusicDurationMax, storyMusicGenerationReady } from './musicModel'
-import { MINIMAX_LYRIC_SECTION, miniMaxCuePayload, musicCandidateDisplayName } from './storyLabMusic'
-import type { StoryMusicCue } from './types'
+import {
+  MINIMAX_LYRIC_SECTION, miniMaxCuePayload, musicCandidateDisplayName, musicCueBlock,
+  musicPromptLimit, musicRequestTitleKey, musicRequiresLyricSections,
+} from './storyLabMusic'
+import type { StoryMusicCandidate, StoryMusicCue } from './types'
 import type { StoryMusicTabProps } from './StoryMusicTab'
 
 export function MusicCueCard({
@@ -24,6 +28,13 @@ export function MusicCueCard({
   const versioning = musicCueBusy === `version:${cue.id}`
   const queued = musicQueue?.ids.includes(cue.id)
   const cueBusy = Boolean(musicCueBusy || musicQueue)
+  const promptLimit = musicPromptLimit(project.music.model)
+  const promptLength = cue.style.trim().length
+  const blocked = musicCueBlock(cue, project.music.model)
+  const showLyricTagWarning = Boolean(
+    !cue.instrumental && cue.lyrics.trim() && musicRequiresLyricSections(project.music.model)
+    && !MINIMAX_LYRIC_SECTION.test(cue.lyrics),
+  )
   return (
     <article className={`${panel} space-y-3 ${generatingAudio ? 'border-pink-500/60' : ''}`}>
       <div className="flex items-start justify-between gap-2">
@@ -82,14 +93,19 @@ export function MusicCueCard({
           <div className="space-y-2.5 rounded-lg border border-pink-500/30 bg-pink-500/5 p-3">
             <div className="flex items-start justify-between gap-2">
               <div>
-                <h4 className="text-xs font-semibold text-pink-200">{t('music.minimaxRequest')}</h4>
-                <p className="mt-0.5 text-[9px] text-text-muted">{t('music.minimaxRequestHint')}</p>
+                <h4 className="text-xs font-semibold text-pink-200">{t(musicRequestTitleKey(project.music.model))}</h4>
+                <p className="mt-0.5 text-[9px] text-text-muted">{t('music.requestHint')}</p>
               </div>
               <span className="shrink-0 rounded border border-pink-500/30 px-2 py-1 text-[9px] text-pink-200">{project.music.model}</span>
             </div>
-            <Field required label={t('music.promptChars', { count: cue.style.trim().length })} value={cue.style}
+            <Field required label={t('music.promptChars', { count: promptLength, limit: promptLimit })} value={cue.style}
               onChange={style => patchMusicCue(cue.id, { style })} rows={3} />
-            <p className="text-[9px] text-text-muted">{t('music.promptHint')}</p>
+            <p className="text-[9px] text-text-muted">{t('music.promptHint', { limit: promptLimit })}</p>
+            {promptLength > promptLimit && (
+              <p className="rounded border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-[9px] text-amber-200">
+                {t('music.promptOverLimit', { count: promptLength, limit: promptLimit, title: cue.title })}
+              </p>
+            )}
             {!cue.instrumental && <Field required label={t('music.lyricsStructured')} value={cue.lyrics}
               onChange={lyrics => patchMusicCue(cue.id, { lyrics })} rows={10} />}
             {!cue.instrumental && (
@@ -106,7 +122,7 @@ export function MusicCueCard({
               </div>
             )}
             {!cue.instrumental && <p className="text-[9px] text-text-muted">{t('music.translateHint')}</p>}
-            {!cue.instrumental && cue.lyrics.trim() && !MINIMAX_LYRIC_SECTION.test(cue.lyrics) && (
+            {showLyricTagWarning && (
               <p className="rounded border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-[9px] text-amber-200">
                 {t('music.missingTags')}
               </p>
@@ -121,13 +137,18 @@ export function MusicCueCard({
                 onCopied(t('music.payloadCopied', { title: cue.title }))
               }}><Copy size={12} /> {t('music.copyPayload')}</button>
               <button className={`${button} ${completeGenerationButton}`}
-                disabled={cueBusy || !storyMusicGenerationReady(project.music.model, minimaxConfigured) || !cue.style.trim() || (!cue.instrumental && (!cue.lyrics.trim() || !MINIMAX_LYRIC_SECTION.test(cue.lyrics)))}
+                disabled={cueBusy || !storyMusicGenerationReady(project.music.model, minimaxConfigured) || Boolean(blocked)}
                 onClick={() => void generateMusicCueAudio(cue.id)}>
                 {generatingAudio ? <Loader2 size={13} className="animate-spin" /> : <Music size={13} />} {t('music.generateTrack')}
               </button>
-              <button className={button} disabled={cueBusy} onClick={() => onImportCustomMp3(cue.id)}>
-                <Upload size={12} /> {t('music.importCustomMp3')}
-              </button>
+              <StoryAudioPicker
+                workspace={workspace}
+                projectId={`${project.id}:${cue.id}:custom`}
+                label={t('music.importCustomMp3')}
+                accept=".mp3,audio/mpeg"
+                disabled={cueBusy}
+                onChoose={item => { if (item) onImportCustomMp3(cue.id, item) }}
+              />
             </div>
           </div>
           <div className="space-y-2.5 rounded-lg border border-blue-500/30 bg-blue-500/5 p-3">
@@ -155,35 +176,90 @@ export function MusicCueCard({
                 target="_blank" rel="noreferrer">
                 <ExternalLink size={12} /> {t('music.openLyria')}
               </a>
-              <button className={button} disabled={cueBusy} onClick={() => onImportLyria(cue.id)}>
-                <Upload size={12} /> {t('music.importGenerated')}
-              </button>
+              <StoryAudioPicker
+                workspace={workspace}
+                projectId={`${project.id}:${cue.id}:lyria`}
+                label={t('music.importGenerated')}
+                accept="audio/*"
+                disabled={cueBusy}
+                onChoose={item => { if (item) onImportLyria(cue.id, item) }}
+              />
             </div>
           </div>
         </div>
       </div>
       {cue.candidates.length > 0 && (
         <div className="space-y-2 border-t border-border pt-2">
-          {cue.candidates.map(candidate => {
-            const selected = cue.selectedCandidateId === candidate.id
-            const label = musicCandidateDisplayName(candidate, cue.title, cue.lyricsLanguage || project.language, cue.candidates.indexOf(candidate) + 1)
-            return (
-              <div key={candidate.id} className={`rounded border p-2 space-y-1.5 ${selected ? 'border-pink-400 bg-pink-500/5' : 'border-border'}`}>
-                <button type="button" className="w-full flex items-center justify-between gap-2 text-left text-[10px]"
-                  onClick={() => patchMusicCue(cue.id, { selectedCandidateId: candidate.id })}>
-                  <span className="text-text-primary">{label} · {candidate.model}</span>
-                  <span className="text-text-muted">{candidate.durationSeconds ? `${candidate.durationSeconds.toFixed(1)}s` : t('music.durationOnPlayback')}</span>
-                </button>
-                <audio src={api.getPlayableFileUrl(candidate.source, candidate.name, workspace)} controls preload="metadata" className="w-full h-8" />
-                <button className={`${button} w-full`} disabled={cueBusy || !storyVideoConfigurationReady}
-                  onClick={() => void openMusicalTrailer(candidate.id)}>
-                  <Film size={12} /> {t('music.useInTrailer')}
-                </button>
-              </div>
-            )
-          })}
+          {cue.candidates.map(candidate => (
+            <CueCandidateRow
+              key={candidate.id}
+              candidate={candidate}
+              selected={cue.selectedCandidateId === candidate.id}
+              label={musicCandidateDisplayName(
+                candidate,
+                cue.title,
+                cue.lyricsLanguage || project.language,
+                cue.candidates.indexOf(candidate) + 1,
+              )}
+              workspace={workspace}
+              cueBusy={cueBusy}
+              storyVideoConfigurationReady={storyVideoConfigurationReady}
+              onSelect={() => patchMusicCue(cue.id, { selectedCandidateId: candidate.id })}
+              onTrailer={() => void openMusicalTrailer(candidate.id)}
+            />
+          ))}
         </div>
       )}
     </article>
+  )
+}
+
+function CueCandidateRow({
+  candidate,
+  selected,
+  label,
+  workspace,
+  cueBusy,
+  storyVideoConfigurationReady,
+  onSelect,
+  onTrailer,
+}: {
+  candidate: StoryMusicCandidate
+  selected: boolean
+  label: string
+  workspace: string
+  cueBusy: boolean
+  storyVideoConfigurationReady: boolean
+  onSelect: () => void
+  onTrailer: () => void
+}) {
+  const { t } = useUiTranslation('storyLab')
+  const playable = Boolean(candidate.source.trim())
+  const phase = candidate.executionPhase
+  const phaseLabel = candidate.status === 'failed'
+    ? t('music.candidateFailed')
+    : t(`music.executionPhase.${phase || 'prepared'}`)
+  const meta = playable && candidate.durationSeconds
+    ? `${candidate.durationSeconds.toFixed(1)}s`
+    : (playable ? t('music.durationOnPlayback') : phaseLabel)
+  return (
+    <div className={`rounded border p-2 space-y-1.5 ${selected ? 'border-pink-400 bg-pink-500/5' : 'border-border'}`}>
+      <button type="button" className="w-full flex items-center justify-between gap-2 text-left text-[10px]"
+        onClick={onSelect}>
+        <span className="text-text-primary">{label} · {candidate.model}</span>
+        <span className="text-text-muted">{meta}</span>
+      </button>
+      {playable ? (
+        <audio src={api.getPlayableFileUrl(candidate.source, candidate.name, workspace)} controls preload="metadata" className="w-full h-8" />
+      ) : (
+        <p className="text-[9px] text-text-muted">{phaseLabel}</p>
+      )}
+      {playable ? (
+        <button className={`${button} w-full`} disabled={cueBusy || !storyVideoConfigurationReady}
+          onClick={onTrailer}>
+          <Film size={12} /> {t('music.useInTrailer')}
+        </button>
+      ) : null}
+    </div>
   )
 }

@@ -1,5 +1,5 @@
 import {
-  BookOpen, Boxes, ChevronRight, Film, ImagePlus, Music, Network, Play, Sparkles, Users,
+  BookOpen, Boxes, ChevronRight, Film, ImagePlus, Music, Play, Sparkles,
   type LucideIcon,
 } from 'lucide-react'
 import type { TFunction } from 'i18next'
@@ -15,7 +15,9 @@ type TabLabelKey =
   | 'tabs.story' | 'tabs.assets' | 'tabs.images' | 'tabs.world' | 'tabs.characters'
   | 'tabs.music' | 'tabs.song' | 'tabs.relationships' | 'tabs.structure' | 'tabs.trailer'
   | 'tabs.createTrailer' | 'tabs.productions' | 'tabs.generate' | 'tabs.assembly'
-  | 'tabs.musicVideo' | 'tabs.quickVideo'
+  | 'tabs.musicVideo' | 'tabs.quickVideo' | 'tabs.universe' | 'tabs.script' | 'tabs.audio'
+  | 'tabs.results' | 'tabs.ideaAndRefs' | 'tabs.concept' | 'tabs.references'
+  | 'tabs.ideaAndDialogue'
 type TabSpec = { id: StoryLabTab; labelKey: TabLabelKey; icon: LucideIcon }
 
 const PROJECT_TYPE_COPY: Record<StoryProjectType, {
@@ -30,39 +32,31 @@ const PROJECT_TYPE_COPY: Record<StoryProjectType, {
 
 const FULL_STORY_TABS: TabSpec[] = [
   { id: 'overview', labelKey: 'tabs.story', icon: BookOpen },
-  { id: 'assets', labelKey: 'tabs.assets', icon: ImagePlus },
-  { id: 'world', labelKey: 'tabs.world', icon: Boxes },
-  { id: 'characters', labelKey: 'tabs.characters', icon: Users },
-  { id: 'music', labelKey: 'tabs.music', icon: Music },
-  { id: 'relationships', labelKey: 'tabs.relationships', icon: Network },
-  { id: 'structure', labelKey: 'tabs.structure', icon: ChevronRight },
-  { id: 'trailer', labelKey: 'tabs.trailer', icon: Film },
-  { id: 'productions', labelKey: 'tabs.productions', icon: Film },
-  { id: 'assembly', labelKey: 'tabs.assembly', icon: Play },
+  { id: 'world', labelKey: 'tabs.universe', icon: Boxes },
+  { id: 'structure', labelKey: 'tabs.script', icon: ChevronRight },
+  { id: 'music', labelKey: 'tabs.audio', icon: Music },
+  { id: 'productions', labelKey: 'tabs.generate', icon: Sparkles },
+  { id: 'assembly', labelKey: 'tabs.results', icon: Play },
 ]
 
 const MUSIC_VIDEO_TABS: TabSpec[] = [
-  { id: 'overview', labelKey: 'tabs.musicVideo', icon: Film },
-  { id: 'assets', labelKey: 'tabs.images', icon: ImagePlus },
+  { id: 'overview', labelKey: 'tabs.ideaAndRefs', icon: Film },
   { id: 'music', labelKey: 'tabs.song', icon: Music },
-  { id: 'trailer', labelKey: 'tabs.trailer', icon: Film },
   { id: 'productions', labelKey: 'tabs.generate', icon: Sparkles },
-  { id: 'assembly', labelKey: 'tabs.assembly', icon: Play },
+  { id: 'assembly', labelKey: 'tabs.results', icon: Play },
 ]
 
 const TRAILER_TABS: TabSpec[] = [
-  { id: 'overview', labelKey: 'tabs.trailer', icon: Film },
-  { id: 'assets', labelKey: 'tabs.images', icon: ImagePlus },
-  { id: 'trailer', labelKey: 'tabs.createTrailer', icon: Sparkles },
-  { id: 'assembly', labelKey: 'tabs.assembly', icon: Play },
+  { id: 'overview', labelKey: 'tabs.concept', icon: Film },
+  { id: 'assets', labelKey: 'tabs.references', icon: ImagePlus },
+  { id: 'trailer', labelKey: 'tabs.generate', icon: Sparkles },
+  { id: 'assembly', labelKey: 'tabs.results', icon: Play },
 ]
 
 const QUICK_VIDEO_TABS: TabSpec[] = [
-  { id: 'overview', labelKey: 'tabs.quickVideo', icon: Film },
-  { id: 'assets', labelKey: 'tabs.images', icon: ImagePlus },
-  { id: 'trailer', labelKey: 'tabs.trailer', icon: Film },
+  { id: 'overview', labelKey: 'tabs.ideaAndDialogue', icon: Film },
   { id: 'productions', labelKey: 'tabs.generate', icon: Sparkles },
-  { id: 'assembly', labelKey: 'tabs.assembly', icon: Play },
+  { id: 'assembly', labelKey: 'tabs.results', icon: Play },
 ]
 
 const TABS_BY_TYPE: Record<StoryProjectType, TabSpec[]> = {
@@ -82,6 +76,10 @@ export function storyProjectTypes(t: StoryLabT): Array<{
     label: t(PROJECT_TYPE_COPY[id].label),
     description: t(PROJECT_TYPE_COPY[id].description),
   }))
+}
+
+export function storyLabTabIds(projectType: StoryProjectType): StoryLabTab[] {
+  return (TABS_BY_TYPE[projectType] || TABS_BY_TYPE.full_story).map(item => item.id)
 }
 
 export function storyLabTabs(

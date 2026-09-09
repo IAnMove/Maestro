@@ -359,6 +359,7 @@ function exactCatalog(): Record<string, ReturnType<typeof json> | { sse: true }>
       provider: 'local',
     }),
     'GET /api/v1/llm/models': json({ models: [] }),
+    'GET /api/v1/wangp/capabilities': json({ processors: [] }),
     'GET /api/v1/jobs': json({ jobs: [] }),
     'GET /api/v1/jobs/recovery': json({ jobs: [] }),
     'GET /api/v1/director/pipelines': json({ pipelines: [], total: 0 }),
@@ -374,6 +375,7 @@ function exactCatalog(): Record<string, ReturnType<typeof json> | { sse: true }>
     'GET /api/v1/wizard/workflows': json(EMPTY_WIZARD_WORKFLOWS),
     'PUT /api/v1/wizard/workflows': json(EMPTY_WIZARD_WORKFLOWS),
     'GET /api/v1/stories/library': json(EMPTY_STORY_LIBRARY),
+    'GET /api/v1/character-kits/library': json({ version: 1, revision: 0, activeId: '', kits: {} }),
     'PUT /api/v1/stories/library': json(EMPTY_STORY_LIBRARY),
     'GET /api/v1/resolutions': json({ resolutions: [] }),
     'GET /api/v1/recipes': json({ recipes: [] }),
@@ -539,14 +541,33 @@ export async function installApiRoutes(page: Page, options: ApiRouteOptions = {}
       }))
       return
     }
-    if (method === 'POST' && pathname === '/api/v1/tools/upscale') {
+    if (method === 'POST' && pathname === '/api/v1/generation/commands') {
+      const body = JSON.parse(request.postData() || '{}') as Record<string, unknown>
       upscaleSubmitted = true
       upscaleStatusCalls = 0
       upscaleCancelRequested = false
       await route.fulfill(json({
-        job_id: 'tool-upscale-e2e',
-        task_id: 'task-generation-tool-upscale-e2e',
-        root_task_id: 'task-generation-tool-upscale-e2e',
+        receipt: {
+          version: 1,
+          commandId: body.intent_id,
+          operation: 'tools.upscale',
+          status: 'queued',
+          entities: [],
+          artifacts: [],
+          taskIds: ['task-generation-tool-upscale-e2e'],
+          pipelineIds: [],
+          result: {
+            job_id: 'tool-upscale-e2e',
+            task_id: 'task-generation-tool-upscale-e2e',
+            root_task_id: 'task-generation-tool-upscale-e2e',
+            workspace: 'default',
+            status: 'queued',
+          },
+          commandVersion: 2,
+          contentFingerprint: 'a'.repeat(64),
+          fingerprintVersion: 2,
+        },
+        replayed: false,
       }))
       return
     }

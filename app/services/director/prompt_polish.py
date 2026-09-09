@@ -1008,29 +1008,7 @@ def sanitize_image_prompt(
 
 
 
-# Map architecture prefixes to guide filenames (mirrors enhance_guides.py)
-_VIDEO_ARCH_MAP = {
-    "minimax_h3_ref2va": "minimax_h3_ref2va_video",
-    "minimax_h3": "minimax_h3_video",
-    "ltx2": "ltx2_video",
-    "ltxv": "ltx2_video",
-    "t2v": "wan_video",
-    "i2v": "wan_video",
-    "ti2v": "wan_video",
-    "animate": "wan_video",
-    "wanmove": "wan_video",
-    "ovi": "wan_video",
-    "lucy": "wan_video",
-    "multitalk": "wan_video",
-    "phantom": "wan_video",
-    "fun_inp": "wan_video",
-    "alpha": "wan_video",
-    "fantasy": "wan_video",
-    "chrono": "wan_video",
-    "flf2v": "wan_video",
-    "hunyuan": "wan_video",
-    "heartmula": "wan_video",
-}
+# Image prefixes stay Director-local. Video stems: guide_resolution.VIDEO_GUIDE_STEMS.
 
 _IMAGE_ARCH_MAP = {
     "qwen_image_edit": "qwen_image_edit",
@@ -1043,12 +1021,8 @@ _IMAGE_ARCH_MAP = {
 
 def _match_arch(model_type: str, arch_map: dict) -> str:
     """Find the longest matching architecture prefix."""
-    model_lower = model_type.lower()
-    best_key = ""
-    for prefix in arch_map:
-        if model_lower.startswith(prefix) and len(prefix) > len(best_key):
-            best_key = prefix
-    return arch_map.get(best_key, "")
+    from ..guide_resolution import match_guide_stem
+    return match_guide_stem(model_type, arch_map)
 
 
 def _load_file(filepath: str) -> Optional[str]:
@@ -1068,7 +1042,8 @@ def get_video_guide(video_model: str, mode: str = "full") -> str:
     Returns:
         Guide text or empty string.
     """
-    base = _match_arch(video_model, _VIDEO_ARCH_MAP) or "generic_video"
+    from ..guide_resolution import match_guide_stem
+    base = match_guide_stem(video_model) or "generic_video"
     if mode == "full":
         guide = _load_file(os.path.join(_ENHANCE_DIR, f"{base}.md"))
     else:

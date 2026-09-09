@@ -1,9 +1,13 @@
 import copy
+from pathlib import Path
 
 import pytest
 
+from services.series_library import append_shot_render_attempt
 from services.series_render import (
+    apply_series_h3_model_settings,
     build_h3_generation_params,
+    model_for_manifest,
     normalize_series_resolution,
     normalize_series_shot_duration,
     plan_series_shot_duration,
@@ -323,3 +327,100 @@ def test_legacy_reference_strategy_uses_legacy_media_inputs_and_fixed_recipe():
     assert params["num_inference_steps"] == 20
     assert params["flow_shift"] == 12.0
     assert params["h3_audio_shift"] == 3.0
+
+
+def test_model_for_manifest_resolves_family_variant_and_strategy():
+    assert model_for_manifest("minimax_h3_fused_turbo", {"strategy": "direct"}) == (
+        "minimax_h3_fused_turbo"
+    )
+    assert model_for_manifest("minimax_h3_fused_turbo", {"strategy": "references"}) == (
+        "minimax_h3_ref2va_fused_turbo"
+    )
+    assert model_for_manifest("minimax_h3_ref2va_fused_turbo", {"strategy": "direct"}) == (
+        "minimax_h3_fused_turbo"
+    )
+    assert model_for_manifest("minimax_h3_ref2va_fused_turbo", {"strategy": "first_frame"}) == (
+        "minimax_h3_fused_turbo"
+    )
+    assert model_for_manifest("minimax_h3_full", {"strategy": "references"}) == (
+        "minimax_h3_ref2va_full"
+    )
+    assert model_for_manifest("minimax_h3_ref2va_full", {"strategy": "direct"}) == (
+        "minimax_h3_full"
+    )
+    assert model_for_manifest("minimax_h3", {"strategy": "references"}) == "minimax_h3_ref2va"
+    assert model_for_manifest("minimax-h3", {"strategy": "direct"}) == "minimax_h3"
+    assert model_for_manifest("minimax_h3_legacy", {"strategy": "references"}) == (
+        "minimax_h3_legacy"
+    )
+    assert model_for_manifest("unknown_video_model", {"strategy": "references"}) == (
+        "unknown_video_model"
+    )
+    assert model_for_manifest("minimax_h3_mystery", {"strategy": "direct"}) == (
+        "minimax_h3_mystery"
+    )
+
+
+def test_fused_settings_keep_valid_steps_and_do_not_rewrite_shifts():
+    kept = apply_series_h3_model_settings("minimax_h3_fused_turbo", {
+        "numInferenceSteps": 6, "flowShift": 7, "audioShift": 1,
+    })
+    assert kept["numInferenceSteps"] == 6
+    assert kept["flowShift"] == 7
+    assert kept["audioShift"] == 1
+    leftover = apply_series_h3_model_settings("minimax_h3_fused_turbo", {
+        "numInferenceSteps": 20, "flowShift": 7,
+    })
+    assert leftover["numInferenceSteps"] == 4
+    assert leftover["flowShift"] == 7
+    pruned = apply_series_h3_model_settings("minimax_h3", {"numInferenceSteps": 20})
+    assert pruned["numInferenceSteps"] == 20
+
+
+def test_fused_queued_payload_keeps_model_steps_and_literal_prompt():
+    series, shot, attempt = inputs("direct")
+    literal = (
+        "George Costanza (S1) <d>[Spanish] He dejado el café para ahorrar</d>."
+    )
+    attempt["model"] = "minimax_h3_fused_turbo"
+    attempt["prompt"] = literal
+    attempt["settings"]["numInferenceSteps"] = 20
+    attempt["settings"]["flowShift"] = 7
+    model = model_for_manifest(attempt["model"], attempt["referenceManifest"])
+    settings = apply_series_h3_model_settings(model, attempt["settings"])
+    _shot, queued = append_shot_render_attempt(
+        shot,
+        manifest=attempt["referenceManifest"],
+        model=model,
+        settings=settings,
+        seed=42,
+        prompt=literal,
+    )
+    assert queued["model"] == "minimax_h3_fused_turbo"
+    assert queued["settings"]["numInferenceSteps"] == 4
+    assert queued["settings"]["flowShift"] == 7
+    assert queued["prompt"] == literal
+    params = build_h3_generation_params(series, shot, queued, {})
+    assert params["model_type"] == "minimax_h3_fused_turbo"
+    assert params["num_inference_steps"] == 4
+    assert params["prompt"] == literal
+    assert params["flow_shift"] == 7
+
+
+def test_fused_reference_strategy_queues_fused_ref2va():
+    series, shot, attempt = inputs("references")
+    attempt["model"] = "minimax_h3_fused_turbo"
+    attempt["settings"]["numInferenceSteps"] = 4
+    params = build_h3_generation_params(
+        series, shot, attempt, {"asset_a": "/safe/ada.png"},
+    )
+    assert params["model_type"] == "minimax_h3_ref2va_fused_turbo"
+    assert params["num_inference_steps"] == 4
+    assert [item["path"] for item in params["minimax_h3_references"]] == ["/safe/ada.png"]
+
+
+def test_series_render_start_applies_fused_settings_before_queue():
+    source = (
+        Path(__file__).resolve().parents[1] / "app" / "_launch_runtime.py"
+    ).read_text(encoding="utf-8")
+    assert "shot_settings = apply_series_h3_model_settings(model, {" in source

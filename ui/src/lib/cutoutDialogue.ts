@@ -24,7 +24,7 @@ const isMouthState = (layer: SceneLayer, state: CutoutViseme | 'open') => {
   return label.includes('mouth') && new RegExp(`(?:mouth[ _-]*${state}|${state}[ _-]*mouth)`, 'i').test(label)
 }
 
-const FACE_STATES: SceneFaceBindingState[] = ['closed', 'small', 'wide', 'round', 'blink']
+const FACE_STATES: SceneFaceBindingState[] = ['closed', 'small', 'wide', 'round', 'blink', 'open']
 
 /** Parse the additive facial metadata while keeping malformed imported data inert. */
 export function normalizeFaceBinding(value: unknown): SceneFaceBinding | undefined {
@@ -269,8 +269,10 @@ export function ensureCutoutFacePlayback(
   if (mouths.length >= 2 && !mouths.some(layerChangesOpacity)) {
     if (dialogueBeats.length) {
       next = rebuildCutoutDialogueLayers(next, dialogueBeats, fps, duration)
-    } else {
-      const line = spokenLine.trim() || 'Hola, hola, hola.'
+    } else if (spokenLine.trim()) {
+      // An idle character is not evidence of speech. Only an explicitly
+      // authored line may create talking keyframes; silent shots stay silent.
+      const line = spokenLine.trim()
       const plan = planCutoutDialogue(line, .2, Math.max(1.4, duration - .2), fps)
       const frames = applyCutoutDialogue(findCutoutMouthLayers(next), plan)
       next = next.map(layer => frames[layer.id]

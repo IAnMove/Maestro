@@ -13,25 +13,13 @@ import re
 from typing import Any
 
 from .spoken_language import infer_h3_spoken_language
+from ..h3_prompt_finalization import finalize_h3_prompt
+from ..h3_prompt_policy import audio_policy, h3_field_labels, tagged_dialogue
 
 
 FIRST_FRAME_REFERENCE = (
     "For the target video, at 0.00 seconds into the target video, <Picture 1> "
     "(from [Shot 1]) is fully referenced."
-)
-
-_FIRST_FRAME_FIELDS = (
-    "integrated_multimodal_description:",
-    "overall_soundscape:",
-    "non_diegetic_music:",
-)
-_REFERENCE_FIELDS = (
-    "subject_definitions:",
-    "summary:",
-    "retention_analysis:",
-    "detailed_description:",
-    "overall_soundscape:",
-    "non_diegetic_music:",
 )
 
 
@@ -51,7 +39,7 @@ def normalize_reference_mode(value: str | None) -> str:
 def is_structured_h3_prompt(prompt: str, reference_mode: str | None = None) -> bool:
     text = str(prompt or "")
     mode = normalize_reference_mode(reference_mode)
-    fields = _REFERENCE_FIELDS if mode == "references" else _FIRST_FRAME_FIELDS
+    fields = h3_field_labels("references" if mode == "references" else "context")
     if mode == "first_frame" and FIRST_FRAME_REFERENCE not in text:
         return False
     if mode == "direct" and FIRST_FRAME_REFERENCE in text:
@@ -163,7 +151,7 @@ def _dialogue_sentences(plan: dict, subject_ids: list[str]) -> list[str]:
         cue = f"({speaker_id})"
         if speaker:
             cue += f" {speaker}"
-        cue += f" says <d>[{infer_h3_spoken_language(spoken)}] {spoken}</d>"
+        cue += f" says {tagged_dialogue(infer_h3_spoken_language(spoken), spoken)}"
         sentences.append(cue + ".")
     return sentences
 
@@ -237,7 +225,7 @@ def _sound_fields(plan: dict, audio_direction: str) -> tuple[str, str]:
         soundscape_parts.append(direction)
     # Temporary: never describe ambience, effects, silence, or music. H3
     # treats those sentences as audible events. Dialogue lives only in <d>.
-    return "N/A", "N/A"
+    return ". ".join(soundscape_parts) or "N/A", _clean(audio.get("music")) or "N/A"
 
 
 def format_minimax_h3_prompt(
@@ -246,6 +234,8 @@ def format_minimax_h3_prompt(
     *,
     reference_mode: str = "first_frame",
     audio_direction: str = "",
+    h3_audio_policy: str = "native",
+    duration_seconds: float = 0,
 ) -> str:
     """Format one final segment prompt for FL2VA or Ref2VA.
 
@@ -255,8 +245,9 @@ def format_minimax_h3_prompt(
     mode = normalize_reference_mode(reference_mode)
     text = str(prompt or "").strip()
     if is_structured_h3_prompt(text, mode):
-        from .h3_dialogue import apply_h3_no_sound_description
-        return apply_h3_no_sound_description(text)
+        return finalize_h3_prompt(
+            text, policy=h3_audio_policy, duration_seconds=duration_seconds,
+        )
 
     shot = dict(plan or {})
     description = _integrated_description(shot, text)
@@ -268,8 +259,7 @@ def format_minimax_h3_prompt(
             "(S1) the principal subject from the supplied references; "
             "(E1) the referenced environment and its stable visual design"
         )
-        from .h3_dialogue import apply_h3_no_sound_description
-        return apply_h3_no_sound_description("\n".join((
+        compiled = "\n".join((
             f"subject_definitions: {defined}",
             "summary: [reference generation] Compose one new continuous shot from the supplied references.",
             (
@@ -280,7 +270,10 @@ def format_minimax_h3_prompt(
             f"detailed_description: {description}",
             f"overall_soundscape: {soundscape}.",
             f"non_diegetic_music: {music}",
-        )))
+        ))
+        return finalize_h3_prompt(
+            compiled, policy=h3_audio_policy, duration_seconds=duration_seconds,
+        )
 
     integrated = (
         description
@@ -296,14 +289,56 @@ def format_minimax_h3_prompt(
         f"overall_soundscape: {soundscape}.",
         f"non_diegetic_music: {music}",
     )
-    from .h3_dialogue import apply_h3_no_sound_description
-
-    if mode == "direct":
-        return apply_h3_no_sound_description("\n".join(fields))
-    return apply_h3_no_sound_description("\n".join((
+    compiled = "\n".join(fields) if mode == "direct" else "\n".join((
         FIRST_FRAME_REFERENCE,
         *fields,
-    )))
+    ))
+    return finalize_h3_prompt(
+        compiled, policy=h3_audio_policy, duration_seconds=duration_seconds,
+    )
+
+
+def h3_audio_policy_from_payload(payload: dict | None) -> str:
+    """Read the effective audio policy; omitted or invalid values stay native."""
+    data = payload or {}
+    raw = data.get("h3_audio_policy")
+    if raw in (None, ""):
+        raw = data.get("minimax_h3_audio_policy")
+    if raw in (None, ""):
+        return "native"
+    try:
+        return audio_policy(raw)
+    except ValueError:
+        return "native"
+
+
+def _format_adapted_prompt(
+    shot: dict,
+    text: str,
+    *,
+    reference_mode: str,
+    audio_direction: str,
+    h3_audio_policy: str,
+    duration_seconds: float,
+) -> str:
+    return format_minimax_h3_prompt(
+        shot,
+        text,
+        reference_mode=reference_mode,
+        audio_direction=audio_direction,
+        h3_audio_policy=h3_audio_policy,
+        duration_seconds=duration_seconds,
+    )
+
+
+def _record_h3_prompt_trace(clip: dict, source: str, final: str, policy: str) -> None:
+    """Keep plan vs send on existing Director provenance fields."""
+    if not clip.get("_director_h3_source_prompt"):
+        clip["_director_h3_source_prompt"] = source
+    clip["_director_h3_compiled_prompt"] = final
+    audio_plan = dict(clip.get("_director_audio_plan") or {})
+    audio_plan["h3_audio_policy"] = policy
+    clip["_director_audio_plan"] = audio_plan
 
 
 def adapt_clip_plans_for_h3(
@@ -312,17 +347,25 @@ def adapt_clip_plans_for_h3(
     *,
     reference_mode: str = "first_frame",
     audio_direction: str = "",
+    h3_audio_policy: str = "native",
+    duration_seconds: float = 0,
 ) -> list[dict]:
     """Adapt all rendered Director plans without changing image prompts."""
     shots = shots or []
+    policy = h3_audio_policy_from_payload({"h3_audio_policy": h3_audio_policy})
     for index, clip in enumerate(clip_plans):
         shot = shots[index] if index < len(shots) and isinstance(shots[index], dict) else clip
-        clip["video_prompt"] = format_minimax_h3_prompt(
+        source = str(clip.get("video_prompt") or "")
+        final = _format_adapted_prompt(
             shot,
-            str(clip.get("video_prompt") or ""),
+            source,
             reference_mode=reference_mode,
             audio_direction=audio_direction,
+            h3_audio_policy=policy,
+            duration_seconds=duration_seconds,
         )
+        clip["video_prompt"] = final
+        _record_h3_prompt_trace(clip, source, final, policy)
         windows = clip.get("window_prompts")
         if isinstance(windows, list):
             adapted: list[Any] = []
@@ -330,19 +373,23 @@ def adapt_clip_plans_for_h3(
                 if isinstance(window, dict):
                     updated = dict(window)
                     key = "prompt" if "prompt" in updated else "text"
-                    updated[key] = format_minimax_h3_prompt(
+                    updated[key] = _format_adapted_prompt(
                         shot,
                         str(updated.get(key) or ""),
                         reference_mode=reference_mode,
                         audio_direction=audio_direction,
+                        h3_audio_policy=policy,
+                        duration_seconds=duration_seconds,
                     )
                     adapted.append(updated)
                 else:
-                    adapted.append(format_minimax_h3_prompt(
+                    adapted.append(_format_adapted_prompt(
                         shot,
                         str(window),
                         reference_mode=reference_mode,
                         audio_direction=audio_direction,
+                        h3_audio_policy=policy,
+                        duration_seconds=duration_seconds,
                     ))
             clip["window_prompts"] = adapted
     return clip_plans

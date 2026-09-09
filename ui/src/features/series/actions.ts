@@ -22,6 +22,13 @@ import type {
   StageSeriesComicCommand,
   UpdateSeriesEpisodeCommand,
 } from './commands'
+import { shouldApproveCanonForExplicitEpisodeCreate } from './canonPolicy'
+import {
+  bulkApproveSelections,
+  explicitAttemptSelection,
+  missingAssemblyShotOrders,
+  requireSingleShotForAttempt,
+} from './shotReviewPolicy'
 
 function seriesEpisodeResult(
   workspaceId: string,
@@ -103,6 +110,9 @@ export async function createFilledSeriesEpisode(action: CreateSeriesEpisodeComma
     if (!action.createIfMissing) throw new Error(`No existe la serie “${action.seriesTitle}” y la orden no autorizó crearla.`)
     series = await api.createSeriesProject(workspace, action.seriesTitle || 'Nueva serie')
   }
+  const previousApproval = series.canon.approval
+  const previousWorldSummary = series.canon.worldSummary.trim()
+  const previousCharacterCount = series.characters.length
 
   const existingEpisode = Object.values(series.episodesById).find(episode => (
     normalizeName(episode.title) === normalizeName(action.episodeTitle)
@@ -189,6 +199,13 @@ export async function createFilledSeriesEpisode(action: CreateSeriesEpisodeComma
   }
   let approvedCanon = false
   if (series.canon.approval !== 'approved') {
+    const decision = shouldApproveCanonForExplicitEpisodeCreate({
+      createdSeries,
+      previousApproval,
+      previousWorldSummary,
+      previousCharacterCount,
+    })
+    if (!decision.approve) throw new Error(decision.reason)
     series = await api.approveSeriesCanon(workspace, series.id, series.canon.revision)
     approvedCanon = true
   }
@@ -529,6 +546,15 @@ export async function renderSeriesShots(action: RenderSeriesShotsCommand): Promi
     ? `No existe el episodio “${action.targetEpisodeTitle}” en “${series.title}”.`
     : `“${series.title}” necesita un episodio activo o único.`)
   if (!episode.shots.length) throw new Error(`“${episode.title}” no tiene shots; genera y aplica un plan complete primero.`)
+  const staleShots = episode.shots.filter(shot => (
+    (action.mode !== 'selected' || action.shotIds.includes(shot.id))
+    && (shot.scriptDialogueStatus === 'stale' || shot.scriptDialogueStatus === 'manual_conflict')
+  ))
+  if (staleShots.length) {
+    throw new Error(
+      `El diálogo del guion y de ${staleShots.length} plano(s) no coincide. Sincroniza los planos en Episodio antes de renderizar.`,
+    )
+  }
   if (episode.shots.some(shot => shot.dialogueBeats.length > 0) && !series.bestEffortLipSyncAcknowledged) {
     throw new Error('Este episodio tiene diálogo. Marca primero “I understand lip sync is best-effort” en Series Lab; el Wizard no puede inferir ese consentimiento.')
   }
@@ -565,7 +591,7 @@ export async function renderSeriesShots(action: RenderSeriesShotsCommand): Promi
     workspace,
     episode,
     'review',
-    `He encolado ${eligible.length} shots de “${episode.title}” (${job.jobId}) en modo ${action.mode}. El progreso recuperable está abierto en Series Lab → Render & review.`,
+    `He encolado ${eligible.length} shots de “${episode.title}” (${job.jobId}) en modo ${action.mode}. El progreso recuperable está abierto en Series Lab → Resultados.`,
     { taskIds: [job.jobId], channel: 'series_render', job: job as unknown as Record<string, unknown> },
   )
 }
@@ -608,7 +634,7 @@ export async function reviewSeriesAttempts(action: ReviewSeriesAttemptsCommand):
     if (shotsByOrder.has(shot.order)) throw new Error(`El episodio tiene más de un shot con el número ${shot.order}; no se puede resolver de forma segura.`)
     shotsByOrder.set(shot.order, shot)
   }
-  const selectedShots = action.scope === 'all_latest'
+  const selectedShots = action.scope === 'all_latest' || action.scope === 'replace_latest'
     ? episode.shots
     : action.shotNumbers.map(number => {
         const shot = shotsByOrder.get(number)
@@ -617,27 +643,22 @@ export async function reviewSeriesAttempts(action: ReviewSeriesAttemptsCommand):
       })
 
   if (action.decision === 'approve') {
-    const selections = selectedShots.flatMap(shot => {
-      const attempt = action.attemptId
-        ? shot.attempts.find(item => item.id === action.attemptId)
-        : [...shot.attempts].reverse().find(item => (
-            item.status === 'completed'
-            && item.reviewDecision !== 'rejected'
-            && item.outputAssetIds.some(id => Boolean(series.assets[id]))
-          ))
-      if (!attempt) {
-        if (action.attemptId) throw new Error(`El intento ${action.attemptId} no pertenece al shot ${shot.order}.`)
-        if (action.scope === 'selected_latest') throw new Error(`El shot ${shot.order} no tiene un intento completado y reproducible que aprobar.`)
-        return []
+    const hasAsset = (assetId: string) => Boolean(series.assets[assetId])
+    const bulk = action.attemptId
+      ? null
+      : bulkApproveSelections(selectedShots, hasAsset, {
+        replaceFinals: action.scope === 'replace_latest' || action.scope === 'selected_latest',
+      })
+    const selections = action.attemptId
+      ? explicitAttemptSelection(selectedShots, action.attemptId, hasAsset)
+      : bulk?.selections ?? []
+    if (action.scope === 'selected_latest' && action.attemptId === '' && bulk) {
+      const missing = selectedShots.filter(shot => !bulk.selections.some(item => item.shotId === shot.id)
+        && !shot.approvedAttemptId)
+      if (missing.length) {
+        throw new Error(`El shot ${missing[0].order} no tiene un intento completado y reproducible que aprobar.`)
       }
-      if (attempt.status !== 'completed' || attempt.reviewDecision === 'rejected') {
-        throw new Error(`El intento ${attempt.id} del shot ${shot.order} no es aprobable.`)
-      }
-      if (!attempt.outputAssetIds.some(id => Boolean(series.assets[id]))) {
-        throw new Error(`El intento ${attempt.id} del shot ${shot.order} no tiene un asset reproducible.`)
-      }
-      return attempt.id === shot.approvedAttemptId ? [] : [{ shotId: shot.id, attemptId: attempt.id }]
-    })
+    }
     if (!selections.length) throw new Error('No hay nuevos intentos elegibles que aprobar; las tomas resueltas ya están aprobadas o no tienen vídeo válido.')
     const result = await api.approveSeriesAttemptsBulk(workspace, series.id, episode.id, selections)
     if (result.seriesId !== series.id || result.episodeId !== episode.id) {
@@ -654,7 +675,9 @@ export async function reviewSeriesAttempts(action: ReviewSeriesAttemptsCommand):
     )
   }
 
-  const shot = selectedShots[0]
+  const shot = action.attemptId
+    ? requireSingleShotForAttempt(selectedShots, action.attemptId)
+    : selectedShots[0]
   const attempt = action.attemptId
     ? shot.attempts.find(item => item.id === action.attemptId)
     : [...shot.attempts].reverse().find(item => item.status === 'completed' && item.reviewDecision !== 'rejected')
@@ -716,13 +739,12 @@ export async function assembleSeriesEpisode(action: AssembleSeriesEpisodeCommand
     ? `No existe el episodio “${action.targetEpisodeTitle}” en “${series.title}”.`
     : `“${series.title}” necesita un episodio activo o único.`)
   if (!episode.shots.length) throw new Error(`“${episode.title}” no tiene shots que ensamblar.`)
-  const incomplete = episode.shots.filter(shot => {
-    const approved = shot.attempts.find(attempt => attempt.id === shot.approvedAttemptId)
-    return !approved || approved.status !== 'completed'
-      || !approved.outputAssetIds.some(id => Boolean(series.assets[id]))
-  })
+  const incomplete = missingAssemblyShotOrders(
+    episode.shots,
+    id => Boolean(series.assets[id]),
+  )
   if (incomplete.length) {
-    throw new Error(`Aprueba primero un vídeo reproducible para todos los shots. Faltan: ${incomplete.map(shot => shot.order).join(', ')}.`)
+    throw new Error(`Aprueba primero un vídeo reproducible para todos los shots. Faltan: ${incomplete.join(', ')}.`)
   }
 
   await useSeriesStore.getState().openSeries(series.id)

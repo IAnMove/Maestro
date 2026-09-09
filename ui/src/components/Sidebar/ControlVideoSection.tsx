@@ -2,8 +2,9 @@ import { useState } from 'react'
 import { useStore } from '../../stores/useStore'
 import { useUiTranslation } from '../../i18n'
 import { ChoiceControl } from '../shared/ChoiceControl'
-import { FileUploadZone } from '../shared/FileUploadZone'
-import * as api from '../../api/client'
+import type { ApiOutput } from '../../api/outputs'
+import { AssetInput } from '../../features/asset-picker/AssetInput.tsx'
+import { studioMediaPath, useWorkspaceOutputs } from '../../lib/studioAssetPick.ts'
 
 // Control-media guide: the video/image "process" selector (depth / pose / etc.)
 // plus the control-media upload.
@@ -19,7 +20,9 @@ export function ControlVideoSection() {
   const setParam = useStore(s => s.setParam)
   const generationMode = useStore(s => s.generationMode)
   const [guideFilename, setGuideFilename] = useState<string | null>(null)
-  const [uploading, setUploading] = useState(false)
+  const activeWorkspace = useStore(s => s.activeWorkspace)
+  const videoItems = useWorkspaceOutputs(activeWorkspace, 'video')
+  const imageItems = useWorkspaceOutputs(activeWorkspace, 'image')
 
   if (!modelOptions) return null
 
@@ -44,17 +47,9 @@ export function ControlVideoSection() {
   const isFramesInjection = currentValue.includes('KFI')
   const showUpload = !isFramesInjection && modelOptions.guide_preprocessing != null && currentValue !== ''
 
-  const handleUpload = async (file: File) => {
-    setUploading(true)
-    try {
-      const result = await api.uploadImage(file)
-      setParam('video_guide', result.path)
-      setGuideFilename(file.name)
-    } catch (e) {
-      console.error('Upload failed:', e)
-    } finally {
-      setUploading(false)
-    }
+  const handleChoose = (item: ApiOutput) => {
+    setParam('video_guide', studioMediaPath(item))
+    setGuideFilename(item.name)
   }
 
   return (
@@ -83,14 +78,21 @@ export function ControlVideoSection() {
           <label className="text-[11px] text-text-muted uppercase tracking-wider mb-1.5 block">
             {isImageMode ? t('control.controlImage') : t('control.controlVideo')}
           </label>
-          <FileUploadZone
-            label={uploading ? t('chrome.uploading') : isImageMode ? t('control.dropImage') : t('control.dropVideo')}
-            accept={isImageMode ? '.png,.jpg,.jpeg,.webp,.bmp' : '.mp4,.webm,.avi,.mov'}
-            filename={guideFilename}
-            onFile={handleUpload}
-            onClear={() => {
-              setParam('video_guide', undefined)
-              setGuideFilename(null)
+          <AssetInput
+            label={isImageMode ? t('control.dropImage') : t('control.dropVideo')}
+            placeholder={isImageMode ? t('control.dropImage') : t('control.dropVideo')}
+            items={isImageMode ? imageItems : videoItems}
+            accept={isImageMode ? '.png,.jpg,.jpeg,.webp,.bmp,image/*' : '.mp4,.webm,.avi,.mov,video/*'}
+            workspaceId={activeWorkspace}
+            optional={Boolean(guideFilename)}
+            constraints={{ kinds: isImageMode ? ['image'] : ['video'], maxCount: 1, optional: true }}
+            onChoose={item => {
+              if (!item) {
+                setParam('video_guide', undefined)
+                setGuideFilename(null)
+                return
+              }
+              handleChoose(item)
             }}
           />
         </div>

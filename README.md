@@ -484,3 +484,37 @@ Third-party models, weights, and components keep their own licenses — review t
 ## Issues
 
 Bug reports and feature requests: [github.com/IAnMove/hocuspocus/issues](https://github.com/IAnMove/hocuspocus/issues).
+
+### Experimental H3 acceleration and dialogue modes
+
+The Studio H3 controls offer **AI Faithful** and **AI Creative** for one shot or a
+window storyboard. Both preserve authored dialogue; Creative may add meaningful
+lines when the request permits it. Names, film/series portrayals and voice roles
+remain explicit. Native audio keeps ambience and requests dialogue within timed
+intervals; **Legacy audio** retains the previous sanitizer for comparisons.
+These are prompting controls, not a guarantee that a model never babbles.
+
+Turbo now offers pinned Legacy v1-500, v4-600 EMA and workflow-specific Alibaba
+PAI 8-step PDD adapters. The two **Fused 4-Step** models contain their adapters
+already and accept 4–8 evaluations, with no additional LoRAs. Downloads happen
+on first use. SLA/Sol are scoped to compatible H3 models and fall back to dense
+attention when unavailable. Sol needs Triton 3.6+ and supported NVIDIA hardware;
+the existing compatibility runtime continues to work without it.
+
+For API use, send `minimax_h3_planning_style` (`faithful`/`creative`),
+`minimax_h3_audio_policy` (`native`/`legacy`), `minimax_h3_turbo_preset`, and
+`override_attention` with `/api/v1/generate`. The enhancement and planning APIs
+use `planning_style` and `h3_audio_policy`. Enable
+`minimax_h3_reference_sequence` for reference-based continuation. The benchmark
+client in `app/scripts/benchmark_h3.py` records exact requests and status history
+against a separately running instance; it never starts or changes the main app.
+
+The benchmark accepts `--paired` for consecutive Seinfeld/Futurama clips and
+`--server-pid <local-server-pid>` for sampled process/system RAM, swap and NVIDIA
+VRAM peaks (psutil and nvidia-ml-py required in the client environment). Results
+include raw memory samples, cold/warm phase timings and a standalone HTML
+comparison rendered by `app/scripts/benchmark_h3_report.py`. Sampled consumption
+is not a guaranteed minimum hardware requirement; system values include other
+applications. `benchmark_h3_review.py --transcribe` extracts frames and requests
+ASR through the app API; run it after generation so it does not compete for GPU
+memory. ASR output complements listening, without deciding speech quality alone.

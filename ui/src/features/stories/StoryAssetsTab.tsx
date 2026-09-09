@@ -44,7 +44,7 @@ export function StoryAssetsTab(props: {
   visualAssetsNewestFirst: StoryVisualAsset[]
 }) {
   return (
-    <>
+    <div id="story-review-assets" className="scroll-mt-4 space-y-4">
       <StoryAssetsImporter
         project={props.project}
         smartAssetBusy={props.smartAssetBusy}
@@ -89,6 +89,6 @@ export function StoryAssetsTab(props: {
         patchVisualAsset={props.patchVisualAsset}
         visualAssetsNewestFirst={props.visualAssetsNewestFirst}
       />
-    </>
+    </div>
   )
 }

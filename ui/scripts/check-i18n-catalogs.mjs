@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
-const NAMESPACES = ['common', 'navigation', 'settings', 'wizard', 'activity', 'extraInfo', 'storyLab', 'director', 'seriesLab', 'videoEditor', 'workspaces', 'styleSheet', 'projects', 'auditDev', 'scene3d', 'shell', 'characters', 'comics', 'studio']
+const NAMESPACES = ['common', 'navigation', 'settings', 'wizard', 'activity', 'extraInfo', 'storyLab', 'director', 'seriesLab', 'videoEditor', 'workspaces', 'styleSheet', 'projects', 'auditDev', 'scene3d', 'scene3dEditor', 'shell', 'characters', 'comics', 'studio']
 const LANGUAGES = ['en', 'es']
 
 function load(language, namespace) {
@@ -91,7 +91,6 @@ const PILOT_FILES = [
   'src/features/stories/StoryMusicProductionGuide.tsx',
   'src/features/stories/StoryMusicProductionModels.tsx',
   'src/features/stories/StoryMusicProductionLaunch.tsx',
-  'src/features/stories/StoryMusicProductionLegacyDrawer.tsx',
   'src/features/stories/CompactVideoWorkspace.tsx',
   'src/features/stories/CompactPrepStatus.tsx',
   'src/features/stories/CompactWorldArticle.tsx',
@@ -107,6 +106,11 @@ const PILOT_FILES = [
   'src/features/styles/StyleSheetPanel.tsx',
   'src/features/projects/ProjectsPanel.tsx',
   'src/features/auditdev/AuditDevPanel.tsx',
+  'src/components/Sidebar/SceneAnimatorPanel.tsx',
+  'src/features/scene3d/exportFlow.ts',
+  'src/features/scene3d/exportMp4.ts',
+  'src/features/sceneTemplates/TemplateComposerDialog.tsx',
+  'src/features/sceneTemplates/TemplateAssetPicker.tsx',
 ]
 
 const FORBIDDEN = [
@@ -135,6 +139,11 @@ const FORBIDDEN = [
   'Montaje ordenado',
   'Usar en Montaje',
   'Hay una cola de generación por recuperar',
+  'Generate missing',
+  'Play all',
+  'Join clips',
+  'Edit & regenerate',
+  'Durable render queue',
   'Export MP4',
   'From HocusPocus',
   'Drop videos here or click to import',
@@ -143,6 +152,14 @@ const FORBIDDEN = [
   'Retry hand-off',
   'Add HocusPocus videos',
   'Rehacer en Creación de vídeo',
+  'Operación 3D no reconocida.',
+  'Plantillas · crear con mis assets de Library',
+  'Laboratorio · catálogo de escenas candidatas y editables ↗',
+  'The 3D assets did not finish loading.',
+  'This browser cannot encode a deterministic H.264 MP4.',
+  'Crear escena desde Library',
+  'Crear y abrir en editor',
+  'Plantillas procedurales · Library',
   'Idioma hablado del vídeo',
   'Vídeo directo · T2V puro · sin imágenes',
   'Vídeo directo · text only, no images',

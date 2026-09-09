@@ -3928,7 +3928,7 @@ class TestMultiPersonRecast(unittest.TestCase):
         controls = _read(_RECAST_CONTROLS_PATH)
         studio = json.loads(_read(_STUDIO_EN_PATH))
         self.assertIn('body.get("model_type") or _RECAST_FAST_MODEL_TYPE', launch)
-        self.assertIn("? 'scail2_14B_recast_fast'", store)
+        self.assertIn("wantsViggle ? 'viggle_animate' : 'scail2_14B_recast_fast'", store)
         self.assertIn("t('recast.aboutText')", controls)
         self.assertIn("Fast is recommended (8 steps)", studio["recast"]["aboutText"])
         self.assertIn("HQ uses the full 40-step schedule", studio["recast"]["aboutText"])

@@ -6,9 +6,11 @@ and JavaScript. Markdown, JSON catalogs, tests and vendored models are
 excluded. Test LOC is reported separately because adding tests is not a
 production-code regression.
 
-CI prints a table in the job summary and upserts the same table as a PR
-comment (`<!-- code-health-report -->`) so every pull request shows the
-current hotspots and the delta versus the committed baseline.
+CI prints a table in the job summary and a separate write-only job upserts
+the same table as a PR comment (`<!-- code-health-report -->`) so every
+pull request shows the current hotspots, the 0–100 quality score and the
+delta versus the PR base. The job that runs the ratchet does not get
+comment permissions.
 
 The PR table starts with a transparent quality score from 0 to 100 and its
 change against the PR's exact base commit. Higher is better. The score combines
@@ -95,3 +97,13 @@ should be reviewed rather than used to reset the baseline casually.
 The aggregate score is also not a quality certificate and never replaces the
 ratchet. It deliberately excludes test volume and coverage, which need their
 own evidence and are too easy to game as a maintainability score.
+
+`--check` fails closed when a required measurement is missing (including UI
+complexity), when the baseline summary is incomplete, when product files are
+silently excluded while they still exist, or when the policy dict changes
+without review. A higher quality score cannot hide those local failures.
+Reports record `policy_version`, HEAD and base SHAs, and whether UI metrics
+were complete. Exceptions live in `scripts/code_health_exceptions.json` and
+must include path, rule, reason, owner, issue and expiry; there is no global
+hotspot waiver. New-function complexity caps are not enabled until current
+symbols are measured separately.

@@ -1,8 +1,13 @@
-import { useState, useMemo, useRef } from 'react'
-import { ChevronDown, ChevronRight, X, Mic } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { ChevronDown, ChevronRight, Mic } from 'lucide-react'
 import { useStore } from '../../stores/useStore'
 import { useUiTranslation } from '../../i18n'
 import * as api from '../../api/client'
+import type { ApiOutput } from '../../api/outputs'
+import { catalogItemToOutput, voiceRefFromOutput } from '../../features/asset-picker'
+import { useWangpProcessors } from './useWangpProcessors'
+import { WangpProcessorOptions } from './WangpProcessorOptions'
+import { AssetInput } from '../../features/asset-picker/AssetInput.tsx'
 
 const baseOptions = [
   { value: '', label: 'None' },
@@ -30,6 +35,9 @@ const flashvsrOptions = [
 export function PostProcessing() {
   const { t } = useUiTranslation('studio')
   const [open, setOpen] = useState(false)
+  const processors = useWangpProcessors()
+  const temporal = useStore(s => s.params.temporal_upsampling || '')
+  const setParam = useStore(s => s.setParam)
   const spatialUpsampling = useStore(s => s.spatialUpsampling)
   const setSpatialUpsampling = useStore(s => s.setSpatialUpsampling)
   const filmGrainIntensity = useStore(s => s.filmGrainIntensity)
@@ -47,21 +55,28 @@ export function PostProcessing() {
   const voiceCloneRefs = useStore(s => s.voiceCloneRefs)
   const setVoiceCloneRef = useStore(s => s.setVoiceCloneRef)
   const generationMode = useStore(s => s.generationMode)
+  const activeWorkspace = useStore(s => s.activeWorkspace)
   const showVoiceClone = generationMode === 'video' || generationMode === 'avatar'
-  const [vcUploading, setVcUploading] = useState<number | null>(null)
-  const vcFileRefs = [useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null)]
+  const [voiceItems, setVoiceItems] = useState<ApiOutput[]>([])
 
-  const handleVcUpload = async (index: number, file: File) => {
-    setVcUploading(index)
-    try {
-      const result = await api.uploadAudio(file)
-      setVoiceCloneRef(index, { filename: file.name, path: result.path })
-    } catch (e) {
-      console.error('Voice ref upload failed:', e)
-    } finally {
-      setVcUploading(null)
-    }
-  }
+  useEffect(() => {
+    if (!showVoiceClone || !voiceCloneEnabled) return
+    const controller = new AbortController()
+    api.fetchAssets({ workspace: activeWorkspace, limit: 100, signal: controller.signal })
+      .then(result => {
+        if (controller.signal.aborted) return
+        setVoiceItems(
+          result.assets
+            .filter(asset => asset.kind === 'audio' || asset.kind === 'video')
+            .map(asset => catalogItemToOutput(asset, activeWorkspace))
+            .filter((item): item is ApiOutput => Boolean(item)),
+        )
+      })
+      .catch(error => {
+        if (!controller.signal.aborted) console.error('Voice catalog failed:', error)
+      })
+    return () => controller.abort()
+  }, [showVoiceClone, voiceCloneEnabled, activeWorkspace])
   // Compute showVae as a primitive boolean directly in the selector to avoid
   // unstable array references that cause infinite re-renders (React error #185)
   const showVae = useStore(s => {
@@ -77,7 +92,7 @@ export function PostProcessing() {
   )
 
   const hasVoiceClone = voiceCloneEnabled && voiceCloneRefs.some(r => r && r.path)
-  const hasAny = spatialUpsampling !== '' || filmGrainIntensity > 0 || hasVoiceClone
+  const hasAny = spatialUpsampling !== '' || temporal !== '' || filmGrainIntensity > 0 || hasVoiceClone
 
   return (
     <div>
@@ -92,6 +107,12 @@ export function PostProcessing() {
 
       {open && (
         <div className="mt-3 space-y-4">
+          {generationMode !== 'image' && <label className="block text-xs">{t('wangp.interpolation')}
+            <select className="w-full bg-bg-tertiary rounded-lg p-2" value={temporal} onChange={event => setParam('temporal_upsampling', event.target.value)}>
+              <option value="">{t('chrome.none')}</option>
+              {processors.filter(option => option.kind === 'temporal').map(option => <option key={option.value} value={option.value} disabled={!option.enabled}>{option.label}{option.reason ? ` (${option.reason})` : ''}</option>)}
+            </select>
+          </label>}
           {/* Spatial Upsampling */}
           <div>
             <label className="text-[11px] text-text-muted uppercase tracking-wider mb-1.5 block">
@@ -102,12 +123,14 @@ export function PostProcessing() {
               onChange={e => setSpatialUpsampling(e.target.value)}
               className="w-full bg-bg-tertiary border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-accent-blue"
             >
+              {processors.filter(option => option.kind === 'spatial' && option.media.includes(generationMode === 'image' ? 'image' : 'video')).map(option => <option key={option.value} value={option.value} disabled={!option.enabled}>{option.label}{option.reason ? ` (${option.reason})` : ''}</option>)}
               {upsamplingOptions.map(opt => (
                 <option key={opt.value} value={opt.value}>{opt.value === '' ? t('chrome.none') : opt.label}</option>
               ))}
             </select>
           </div>
 
+          <WangpProcessorOptions processor={processors.find(option => option.value === spatialUpsampling)} />
           {/* Film Grain Intensity */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
@@ -198,37 +221,25 @@ export function PostProcessing() {
                   {[0, ...(voiceCloneMode === 'two' ? [1] : [])].map(idx => {
                     const ref = voiceCloneRefs[idx]
                     const label = voiceCloneMode === 'two' ? (idx === 0 ? t('tools.voiceA') : t('tools.voiceB')) : t('tools.referenceVoice')
+                    const value = ref?.path
+                      ? { name: ref.filename, type: 'audio' as const, mode: null, size: 0, created_at: 0, url: '', thumbnail_url: '' }
+                      : undefined
                     return (
                       <div key={idx}>
-                        <label className="text-[10px] text-text-muted uppercase tracking-wider mb-1 block">{label}</label>
-                        {!ref || !ref.path ? (
-                          <div
-                            onClick={() => vcFileRefs[idx].current?.click()}
-                            className={`border-2 border-dashed border-border rounded-lg p-2 text-center cursor-pointer hover:border-accent-blue transition-colors ${
-                              vcUploading === idx ? 'opacity-50 pointer-events-none' : ''
-                            }`}
-                          >
-                            <p className="text-[11px] text-text-secondary">
-                              {vcUploading === idx ? t('chrome.uploading') : t('tools.uploadSample', { label: label.toLowerCase() })}
-                            </p>
-                            <input
-                              ref={vcFileRefs[idx]}
-                              type="file"
-                              accept="audio/*,video/*"
-                              className="hidden"
-                              onChange={e => { const f = e.target.files?.[0]; if (f) handleVcUpload(idx, f) }}
-                            />
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-2 bg-bg-tertiary border border-border rounded-lg px-2 py-1.5">
+                        <AssetInput
+                          label={label}
+                          placeholder={t('tools.uploadSample', { label: label.toLowerCase() })}
+                          items={voiceItems}
+                          value={value}
+                          accept="audio/*,video/*"
+                          optional
+                          constraints={{ kinds: ['audio', 'video'], maxCount: 1, optional: true }}
+                          onChoose={item => setVoiceCloneRef(idx, item ? voiceRefFromOutput(item, activeWorkspace) : null)}
+                        />
+                        {ref?.path && (
+                          <div className="mt-1 flex items-center gap-2 bg-bg-tertiary border border-border rounded-lg px-2 py-1.5">
                             <Mic size={12} className="text-accent-blue shrink-0" />
                             <span className="flex-1 min-w-0 truncate text-[11px] text-text-primary">{ref.filename}</span>
-                            <button
-                              onClick={() => setVoiceCloneRef(idx, null)}
-                              className="p-0.5 text-text-muted hover:text-red-400 transition-colors"
-                            >
-                              <X size={12} />
-                            </button>
                           </div>
                         )}
                       </div>

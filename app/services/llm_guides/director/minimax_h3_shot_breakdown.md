@@ -47,26 +47,15 @@ CONTEXT-IR FORMAT:
   action only.
 - After the last spoken line, continue with visible reactions or motion.
 
-AUDIO POLICY (temporary, highest priority):
-MiniMax H3 treats any written audio note as something to perform, including
-negative conditions and silence. Until native audio is reliable, the prompt
-must contain zero sound description.
-- The only allowed audio content is exact spoken dialogue, written solely as
-  <d>[Language] exact words</d> when someone actually speaks.
-- If there is no dialogue, omit <d> tags entirely and keep describing picture.
-- A mute shot of a known talking character still makes H3 invent speech unless
-  the picture fills the duration with physical action and closed lips. Closed
-  lips are visible acting, not an audio note. Do not assign speaker IDs unless
-  that person has a <d> line. Do not write stills, freeze-frames, or leftover
-  quiet time.
-- Do not describe sound in any form: not ambience, room tone, foley, practical
-  effects, music, voices, vocal performance, or the audible result of a visible
-  action.
-- Do not describe silence or the absence of sound. Do not write negative audio
-  conditions of any kind. Do not mention leftover duration as quiet time.
-- overall_soundscape must be exactly N/A.
-- non_diegetic_music must be exactly N/A.
-- These two labels are required schema, not permission to invent audio.
+AUDIO POLICY (native):
+- Keep literal speech exclusively in <d>[Language] words</d> tags, once per line.
+- Describe scene ambience and synchronized physical effects in overall_soundscape;
+  never use indistinct chatter or extra voices as background texture.
+- Schedule dialogue within the actual shot. Before and after speech, continue
+  visible nonverbal action with mouths closed; preserve explicitly requested silence.
+- Use non_diegetic_music only for explicitly requested music, otherwise N/A.
+- Voice references supply identity and delivery, not source words or room acoustics.
+- The explicit legacy audio setting overrides this policy and clears non-dialogue audio.
 
 TIMING:
 - Keep actions and dialogue realistic for the requested duration. Spoken text

@@ -1,0 +1,13 @@
+# Optional Semantic Bridge integration plan
+
+User requested evaluation after the main benchmark. Adapter code and hooks are implemented but validation and video A/B tests remain pending. The backend capability flag is false and the UI remains hidden; none of the completed videos used the bridge. Fused is excluded, including the current four-step speech experiment.
+
+Primary source: https://huggingface.co/speach1sdef178/MiniMax-H3-Semantic-Bridge at revision `8c2d9b0edb844d6002864a9addd61458dbe81c22`. The published ComfyUI node was inspected as source, not installed/executed. Adapter: `MiniMaxH3_SemanticBridge_v1.safetensors`, 11,023,032 bytes, SHA256 `ac0dc8ac05f545ebdee12e2fcebe4515b049f9cfd9558eb4887a9bf3fd6d562e`.
+
+Scope: standard FL2VA Pruned/Full only; default off. Explicitly reject enabled Ref2VA and Legacy requests. Keep Fused disabled conservatively: its conditioning compatibility is not established by the author's tests. No SenseNova download/inference needed. Author reports embedding alignment and a small number of illustrative video comparisons, not a broad video-quality guarantee.
+
+Architecture: native `[B,T,5120]` layer-49 conditioning before Qwen final normalization. Convert to float32, normalize by token RMS with epsilon 1e-6, run Linear 5120→512 + SiLU, Linear 512→512 + SiLU, Linear 512→5120. Match projected RMS to native per token (recommended), globally, or not at all, using epsilon 1e-8. Blend `H + alpha * (projected - H)`, restore native dtype. Alpha zero returns the original tensor without loading/downloading. Suggested default enabled strength 0.10; optional comparison 0.15. Published weights are fp16 (~11 MB), float32 inference copies occupy more memory.
+
+Integration boundary after benchmark: new isolated `models/minimax_h3/semantic_bridge.py`; validate settings in `h3_runtime_policy.normalize_h3_runtime_request`; carry strength/magnitude settings through wgp's generation signature/kwargs and metadata. Apply only after `self.conditioner(...)` on the non-omni branch in `minimax_h3_main.py`, preserving text tags. Add a separate small UI control, persisted generation parameters and reload handling. Clear incompatible strength when changing models. No edits to running original app or Grok's checkout.
+
+Verification: disabled identity/no-download, strict weight keys/shapes/hash, dtype/shape preservation, exact RMS and blend formula, invalid/non-finite strength rejection, Ref/Fused/Legacy exclusion, UI/persistence replay. Then one or two same-prompt/same-seed Pruned PDD/Sol A/B clips against the completed baseline. Report potential and actual observed differences separately.

@@ -1,8 +1,14 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { TFunction } from 'i18next'
-import { Box, FileJson, Image as ImageIcon, Loader2, Play, Sparkles, Square, Upload, Video, X } from 'lucide-react'
-import { fetchOutputMetadata, generateLlmText, getFileUrl, getOutputThumbnailUrl, uploadImage, type ApiOutput } from '../../api/client'
+import { Box, FileJson, Image as ImageIcon, Loader2, Play, Sparkles, Square, Video, X } from 'lucide-react'
+import { fetchOutputMetadata, generateLlmText, getFileUrl, getOutputThumbnailUrl, type ApiOutput } from '../../api/client'
+import {
+  listenForProgrammaticVideoPreparation,
+  type ProgrammaticVideoPreparation,
+  type ProgrammaticVideoPreparationAck,
+} from '../../features/agent/programmaticVideoHandoff'
 import { useUiTranslation } from '../../i18n'
+import { AssetInput } from '../../features/asset-picker/AssetInput.tsx'
 import { useStore } from '../../stores/useStore'
 import {
   EXAMPLE_SAUCER_CRUISE_RECIPE,
@@ -22,6 +28,12 @@ import {
   type SceneRecipeShot,
 } from '../../lib/sceneRecipe'
 import { resolveRecipeAssets } from '../../lib/sceneRecipeAssets'
+import {
+  effectiveSceneGenerationPolicy,
+  SceneGenerationPolicyError,
+  withSceneGenerationPolicy,
+  type SceneGenerationPolicy,
+} from '../../lib/sceneGenerationPolicy'
 import { characterKitRecipeInventory, type CharacterKitLibrary } from '../../lib/characterKit'
 import type { Scene } from '../../types'
 
@@ -37,8 +49,6 @@ type LoadedAsset = {
   seamlessHorizontal?: boolean
 }
 
-type PickerKind = 'image' | 'model3d'
-
 const INTENT_EXAMPLES = [
   {
     key: 'entrance' as const,
@@ -53,6 +63,15 @@ const INTENT_EXAMPLES = [
     text: 'A premium red sneaker rotates slowly at the center on a clean warm studio background. Fixed camera, 6 seconds, product reveal.',
   },
 ] as const
+
+const DEFAULT_INTENT = 'Same saucer: first it rises behind the ridge, then it cruises left to right.'
+
+type PendingProgrammaticPreparationAck = {
+  request: ProgrammaticVideoPreparation
+  selectedSources: string[]
+  resolve: (ack: ProgrammaticVideoPreparationAck) => void
+  reject: (error: Error) => void
+}
 
 function assetKindLabel(kind: RecipeAssetKind, t: TFunction<'scene3d'>) {
   return kind === 'model3d' ? t('recipe.typeModel') : kind === 'video' ? t('recipe.typeVideo') : t('recipe.typeStill')
@@ -72,6 +91,50 @@ function shotPlanLabel(shot: SceneRecipeShot, t: TFunction<'scene3d'>): string {
     .map(layer => layer.motion || layer.asset || layer.id)
     .join(' · ')
   return `${camera}${action ? ` · ${action}` : ''}`
+}
+
+function callerGenerationPolicy(
+  mode: 'manual' | 'auto',
+  noVideoGeneration: boolean,
+  trustedPolicy?: ProgrammaticVideoPreparation['generationPolicy'],
+): SceneGenerationPolicy {
+  const selectedPolicy = mode === 'manual' ? 'provided_only' : noVideoGeneration ? 'no_video_generation' : 'auto'
+  return effectiveSceneGenerationPolicy(
+    trustedPolicy,
+    selectedPolicy,
+  )
+}
+
+function generationPolicyInstructions(policy: SceneGenerationPolicy): string {
+  if (policy === 'provided_only') {
+    return `TRUSTED CALLER GENERATION POLICY: provided_only.
+- Use every supplied image, video, 3D model and audio source exactly as provided.
+- Never emit a prompt-only asset or audio track, and never request an image, audio, video, model or rig generation job.
+- Preserve the user's requested story and shot order; change only unsupported generated resources into a clear missing-source validation failure.`
+  }
+  if (policy === 'no_video_generation') {
+    return `TRUSTED CALLER GENERATION POLICY: no_video_generation.
+- Never request or create a generated video asset. An existing supplied video source is allowed and must be copied exactly.
+- Images, audio and 3D assets may still be generated when they are missing and the normal mode permits it.
+- Preserve the user's requested story and shot order; do not translate or rewrite the user's intent.`
+  }
+  return `TRUSTED CALLER GENERATION POLICY: auto.
+- Missing assets may be generated according to the normal mode rules.
+- Do not weaken or override a more restrictive policy that may already be present in the recipe JSON.`
+}
+
+function recipeErrorMessage(reason: unknown, t: TFunction<'scene3d'>): string {
+  if (reason instanceof SceneGenerationPolicyError) {
+    if (reason.code === 'generation_forbidden') {
+      return t('recipe.policyError.generationForbidden', {
+        policy: reason.policy,
+        assetId: reason.assetId,
+        kind: reason.kind === 'audio' ? t('recipe.typeAudio') : assetKindLabel(reason.kind as RecipeAssetKind, t),
+      })
+    }
+    return t('recipe.policyError.unknown')
+  }
+  return reason instanceof Error ? reason.message : String(reason)
 }
 
 function previewForOutput(item: ApiOutput): string {
@@ -172,14 +235,15 @@ export function SceneRecipePanel({
 }) {
   const { t } = useUiTranslation('scene3d')
   const workspace = useStore(s => s.activeWorkspace)
-  const loadOutputs = useStore(s => s.loadOutputs)
   // A natural-language request should work without first understanding the
   // asset picker. Manual remains available for deterministic compositions.
   const [mode, setMode] = useState<'manual' | 'auto'>('auto')
-  const [intent, setIntent] = useState('Same saucer: first it rises behind the ridge, then it cruises left to right.')
+  const [noVideoGeneration, setNoVideoGeneration] = useState(false)
+  const [intent, setIntent] = useState(DEFAULT_INTENT)
   const [recipeText, setRecipeText] = useState(JSON.stringify(EXAMPLE_SAUCER_CRUISE_RECIPE, null, 2))
   const [selected, setSelected] = useState<LoadedAsset[]>([])
-  const [picker, setPicker] = useState<PickerKind | null>(null)
+  const [programmaticPreparation, setProgrammaticPreparation] = useState<ProgrammaticVideoPreparation | null>(null)
+
   const [busy, setBusy] = useState<'write' | 'run' | 'upload' | null>(null)
   const [status, setStatus] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -187,21 +251,164 @@ export function SceneRecipePanel({
   const [plannedRecipe, setPlannedRecipe] = useState<SceneRecipe | null>(null)
   const [activeShot, setActiveShot] = useState(0)
   const abortRef = useRef<AbortController | null>(null)
-  const recipeRef = useRef<SceneRecipe | null>(null)
-  const resolvedRef = useRef<Record<string, string>>({})
-  const imageInputRef = useRef<HTMLInputElement>(null)
-  const modelInputRef = useRef<HTMLInputElement>(null)
+  const workspaceRef = useRef(workspace)
+  const outputsRef = useRef(outputs)
+  const pendingPreparationAckRef = useRef<PendingProgrammaticPreparationAck | null>(null)
+  const busyRef = useRef(busy)
+  const disabledRef = useRef(Boolean(disabled))
+  const translationRef = useRef(t)
+  workspaceRef.current = workspace
+  outputsRef.current = outputs
+  busyRef.current = busy
+  disabledRef.current = Boolean(disabled)
+  translationRef.current = t
 
   const gallery = useMemo(() => {
     const images = outputs.filter(item => item.type === 'image' || item.type === 'video')
     const models = outputs.filter(item => item.type === 'model3d' && /\.glb$/i.test(item.name))
     return { images, models }
   }, [outputs])
-  const pickerItems = picker === 'model3d' ? gallery.models : picker === 'image' ? gallery.images : []
+
+
+  useEffect(() => {
+    const unsubscribe = listenForProgrammaticVideoPreparation(async request => {
+      if (disabledRef.current) {
+        throw new Error(translationRef.current('recipe.wizardPreparationDisabled'))
+      }
+      if (busyRef.current) {
+        throw new Error(translationRef.current('recipe.wizardPreparationBusy'))
+      }
+      const currentWorkspace = workspaceRef.current
+      if (currentWorkspace !== request.workspace) {
+        throw new Error(translationRef.current('recipe.wizardPreparationWorkspaceMismatch', {
+          expected: request.workspace,
+          current: currentWorkspace,
+        }))
+      }
+      if (pendingPreparationAckRef.current) {
+        const stale = pendingPreparationAckRef.current
+        pendingPreparationAckRef.current = null
+        stale.reject(new Error(translationRef.current('recipe.wizardPreparationSuperseded')))
+      }
+
+      const selectedSources = [...request.outputNames]
+      const loaded = selectedSources.map(name => {
+        const matches = outputsRef.current.filter(output => output.name === name)
+        if (!matches.length) {
+          throw new Error(translationRef.current('recipe.wizardOutputMissing', { name }))
+        }
+        if (matches.length !== 1) {
+          throw new Error(translationRef.current('recipe.wizardOutputAmbiguous', { name }))
+        }
+        const output = matches[0]
+        if (output.type !== 'image' && output.type !== 'video' && output.type !== 'model3d') {
+          throw new Error(translationRef.current('recipe.wizardOutputNonVisual', { name }))
+        }
+        return {
+          key: output.name,
+          name: output.name,
+          kind: kindForOutput(output),
+          source: output.name,
+          previewUrl: previewForOutput(output),
+        } satisfies LoadedAsset
+      })
+      if (workspaceRef.current !== request.workspace) {
+        throw new Error(translationRef.current('recipe.wizardPreparationWorkspaceRejected'))
+      }
+
+      const accepted: ProgrammaticVideoPreparation = {
+        ...request,
+        intent: request.intent,
+        outputNames: loaded.map(asset => asset.source),
+      }
+      const reflected = new Promise<ProgrammaticVideoPreparationAck>((resolve, reject) => {
+        pendingPreparationAckRef.current = {
+          request: accepted,
+          selectedSources: accepted.outputNames,
+          resolve,
+          reject,
+        }
+      })
+      setProgrammaticPreparation(accepted)
+      setMode(accepted.generationPolicy === 'provided_only' ? 'manual' : 'auto')
+      setNoVideoGeneration(accepted.generationPolicy === 'no_video_generation')
+      setIntent(accepted.intent)
+      setSelected(loaded)
+      setRecipeText('')
+      setPlannedRecipe(null)
+      setShots([])
+      setActiveShot(0)
+      setError(null)
+      setStatus(translationRef.current('recipe.wizardPreparationLoaded', { policy: accepted.generationPolicy }))
+      return reflected
+    })
+    return () => {
+      const pending = pendingPreparationAckRef.current
+      pendingPreparationAckRef.current = null
+      pending?.reject(new Error(translationRef.current('recipe.wizardPreparationUnmounted')))
+      unsubscribe()
+    }
+  }, [])
+
+  useEffect(() => {
+    const pending = pendingPreparationAckRef.current
+    const active = programmaticPreparation
+    if (!pending || !active) return
+    if (pending.request !== active) return
+    if (workspace !== pending.request.workspace) {
+      pendingPreparationAckRef.current = null
+      pending.reject(new Error(translationRef.current('recipe.wizardPreparationWorkspaceRejected')))
+      setProgrammaticPreparation(null)
+      setSelected([])
+      setError(translationRef.current('recipe.wizardPreparationWorkspaceRejected'))
+      return
+    }
+    const reflectedSources = selected.map(asset => asset.source)
+    const sourcesMatch = reflectedSources.length === pending.selectedSources.length
+      && reflectedSources.every((source, index) => source === pending.selectedSources[index])
+    if (intent !== pending.request.intent || !sourcesMatch) return
+    pendingPreparationAckRef.current = null
+    pending.resolve({
+      message: translationRef.current('recipe.wizardPreparationReady', { policy: active.generationPolicy }),
+      policy: active.generationPolicy,
+    })
+  }, [intent, programmaticPreparation, selected, workspace])
+
+  useEffect(() => {
+    if (!programmaticPreparation || programmaticPreparation.workspace === workspace) return
+    setProgrammaticPreparation(null)
+    setSelected([])
+    setError(translationRef.current('recipe.wizardPreparationWorkspaceCleared'))
+  }, [programmaticPreparation, workspace])
+
+  const resetProgrammaticPreparation = () => {
+    const pending = pendingPreparationAckRef.current
+    pendingPreparationAckRef.current = null
+    pending?.reject(new Error(t('recipe.wizardPreparationReset')))
+    setProgrammaticPreparation(null)
+    setMode('auto')
+    setNoVideoGeneration(false)
+    setIntent(DEFAULT_INTENT)
+    setSelected([])
+    setRecipeText(JSON.stringify(EXAMPLE_SAUCER_CRUISE_RECIPE, null, 2))
+    setPlannedRecipe(null)
+    setShots([])
+    setActiveShot(0)
+    setStatus(t('recipe.wizardPreparationReset'))
+    setError(null)
+  }
+
+  const trustedPolicy = programmaticPreparation?.generationPolicy
 
   const applyShot = async (recipe: SceneRecipe, shot: SceneRecipeShot, resolved: Record<string, string>) => {
-    const scene = compileRecipeShot(recipe, shot, resolved, filename => getFileUrl(filename, workspace))
-    await onApply({ ...recipe, record: false, save: false }, scene, setStatus, intent.trim())
+    const storedRecipe = withSceneGenerationPolicy(recipe, recipe.generationPolicy)
+    const scene = compileRecipeShot(storedRecipe, shot, resolved, filename => getFileUrl(filename, workspace))
+    await onApply({ ...storedRecipe, record: false, save: false }, scene, setStatus, intent.trim())
+  }
+
+  const setPanelBusy = (next: typeof busy) => {
+    busyRef.current = next
+    setBusy(next)
   }
 
   const addOutput = async (item: ApiOutput) => {
@@ -233,39 +440,11 @@ export function SceneRecipePanel({
     }
   }
 
-  const importFiles = async (files: File[], kind: PickerKind) => {
-    if (!files.length) return
-    setBusy('upload')
-    setError(null)
-    try {
-      const next: LoadedAsset[] = []
-      for (const file of files) {
-        const uploaded = await uploadImage(file)
-        const resolvedKind: RecipeAssetKind = kind === 'model3d' ? 'model3d' : file.type.startsWith('video/') ? 'video' : 'image'
-        next.push({
-          key: uploaded.filename,
-          name: uploaded.filename,
-          kind: resolvedKind,
-          source: uploaded.filename,
-          previewUrl: resolvedKind === 'model3d' ? getOutputThumbnailUrl(uploaded.filename) : uploaded.url,
-        })
-      }
-      setSelected(current => {
-        const seen = new Set(current.map(asset => asset.source))
-        return [...current, ...next.filter(asset => !seen.has(asset.source))]
-      })
-      await loadOutputs()
-      setStatus(t('recipe.addedFiles', { count: next.length }))
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : t('recipe.uploadFailed'))
-    } finally {
-      setBusy(null)
-    }
-  }
-
   const writeRecipe = async () => {
     if (!intent.trim()) return
-    setBusy('write')
+    const callerPolicy = callerGenerationPolicy(mode, noVideoGeneration, trustedPolicy)
+    const policyInstructions = generationPolicyInstructions(callerPolicy)
+    setPanelBusy('write')
     setError(null)
     setStatus(t('recipe.interpreting'))
     try {
@@ -280,7 +459,7 @@ export function SceneRecipePanel({
       }))
       const kitInventory = characterKits ? characterKitRecipeInventory(characterKits) : []
       const fullInventory = [...loaded, ...kitInventory.filter(item => !loaded.some(selectedItem => selectedItem.source === item.source))]
-      const systemPrompt = buildRecipeSystemPrompt({ mode, inventory: fullInventory })
+      const systemPrompt = `${buildRecipeSystemPrompt({ mode, inventory: fullInventory })}\n\n${policyInstructions}`
       let text = await generateLlmText({
         prompt: intent.trim(),
         system_prompt: systemPrompt,
@@ -299,7 +478,7 @@ export function SceneRecipePanel({
           const validationMessage = validationError instanceof Error ? validationError.message : String(validationError)
           setStatus(t('recipe.repairing', { attempt: attempt + 1, message: validationMessage }))
           text = await generateLlmText({
-            prompt: `Repair your previous recipe without changing the user's intent. Preserve every valid requested subject and action, fix the validation error, and return one complete replacement JSON object.\n\nUSER INTENT:\n${intent.trim()}\n\nVALIDATION ERROR:\n${validationMessage}\n\nPREVIOUS RECIPE:\n${text.slice(0, 16_000)}`,
+            prompt: `Repair your previous recipe without changing the user's intent. Preserve every valid requested subject and action, fix the validation error, and return one complete replacement JSON object.\n\n${policyInstructions}\n\nUSER INTENT:\n${intent.trim()}\n\nVALIDATION ERROR:\n${validationMessage}\n\nPREVIOUS RECIPE:\n${text.slice(0, 16_000)}`,
             system_prompt: systemPrompt,
             max_new_tokens: 4000,
             temperature: 0.05,
@@ -312,84 +491,104 @@ export function SceneRecipePanel({
       if (mode === 'manual') {
         recipe = constrainManualRecipeToInventory(recipe, fullInventory)
       }
+      recipe = withSceneGenerationPolicy(recipe, callerPolicy)
       setRecipeText(JSON.stringify(recipe, null, 2))
       setPlannedRecipe(recipe)
       setShots(listRecipeShots(recipe))
       setActiveShot(0)
       setStatus(t('recipe.ready', { name: recipe.name, count: listRecipeShots(recipe).length }))
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : String(reason))
+      setError(recipeErrorMessage(reason, t))
     } finally {
-      setBusy(null)
+      setPanelBusy(null)
     }
   }
 
   const runRecipe = async () => {
+    const callerPolicy = callerGenerationPolicy(mode, noVideoGeneration, trustedPolicy)
     abortRef.current?.abort()
     const abort = new AbortController()
     abortRef.current = abort
-    setBusy('run')
+    setPanelBusy('run')
     setError(null)
     try {
-      const recipe = parseSceneRecipeText(recipeText)
+      const recipe = withSceneGenerationPolicy(parseSceneRecipeText(recipeText), callerPolicy)
       setStatus(mode === 'manual' ? t('recipe.usingLoaded') : t('recipe.resolving'))
       const resolved = await resolveRecipeAssets(recipe, {
         workspace,
         onStatus: setStatus,
         signal: abort.signal,
         generateMissing: mode === 'auto',
+        policy: callerPolicy,
       })
-      const stored = withResolvedSources(recipe, resolved)
+      const stored = withSceneGenerationPolicy(withResolvedSources(recipe, resolved), callerPolicy)
       setRecipeText(JSON.stringify(stored, null, 2))
-      recipeRef.current = stored
-      resolvedRef.current = resolved
+      setPlannedRecipe(stored)
       const nextShots = listRecipeShots(stored)
       setShots(nextShots)
       setActiveShot(0)
       await applyShot(stored, nextShots[0], resolved)
       setStatus(t('recipe.mounted', { name: nextShots[0].name }))
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : String(reason))
+      setError(recipeErrorMessage(reason, t))
     } finally {
       if (abortRef.current === abort) abortRef.current = null
-      setBusy(null)
+      setPanelBusy(null)
     }
   }
 
   const mountShot = async (index: number) => {
-    const recipe = recipeRef.current || parseSceneRecipeText(recipeText)
-    const resolved = Object.keys(resolvedRef.current).length
-      ? resolvedRef.current
-      : Object.fromEntries(recipe.assets.filter(asset => asset.source).map(asset => [asset.id, asset.source as string]))
-    const nextShots = listRecipeShots(recipe)
-    const shot = nextShots[index]
-    if (!shot) return
-    setActiveShot(index)
-    setBusy('run')
+    const callerPolicy = callerGenerationPolicy(mode, noVideoGeneration, trustedPolicy)
+    setPanelBusy('run')
     setError(null)
     try {
+      // Resolved sources already live in the editable JSON. Keeping a second
+      // cached recipe/map can restore an earlier run after planning or editing.
+      const recipe = withSceneGenerationPolicy(parseSceneRecipeText(recipeText), callerPolicy)
+      const resolved = Object.fromEntries(recipe.assets.filter(asset => asset.source).map(asset => [asset.id, asset.source as string]))
+      const nextShots = listRecipeShots(recipe)
+      const shot = nextShots[index]
+      if (!shot) return
+      setActiveShot(index)
       await applyShot(recipe, shot, resolved)
+      setRecipeText(JSON.stringify(recipe, null, 2))
+      setPlannedRecipe(recipe)
+      setShots(nextShots)
       setStatus(t('recipe.mountedEdit', { name: shot.name }))
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : String(reason))
+      setError(recipeErrorMessage(reason, t))
     } finally {
-      setBusy(null)
+      setPanelBusy(null)
     }
   }
 
   const locked = Boolean(busy) || disabled
+  const wizardPolicyLocked = Boolean(programmaticPreparation)
 
   return (
     <div className="space-y-2 rounded border border-cyan-400/30 bg-cyan-400/[.04] p-2">
       <div className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-cyan-200">
         <Sparkles size={12} /> {t('recipe.title')}
       </div>
+      {programmaticPreparation && (
+        <div role="status" className="space-y-1 rounded border border-amber-300/40 bg-amber-300/[.08] px-2 py-1.5 text-[9px] text-amber-100">
+          <p>{t('recipe.wizardPolicyLocked', { policy: programmaticPreparation.generationPolicy })}</p>
+          <button
+            type="button"
+            disabled={locked}
+            onClick={resetProgrammaticPreparation}
+            className="rounded border border-amber-200/40 px-1.5 py-0.5 text-[8px] text-amber-100 hover:bg-amber-300/10 disabled:opacity-40"
+          >
+            {t('recipe.resetWizardSession')}
+          </button>
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-1">
         {(['manual', 'auto'] as const).map(value => (
           <button
             key={value}
             type="button"
-            disabled={locked}
+            disabled={locked || wizardPolicyLocked}
             onClick={() => setMode(value)}
             className={`rounded border px-2 py-1 text-[10px] ${
               mode === value ? 'border-cyan-300 bg-cyan-400/15 text-cyan-100' : 'border-border text-text-muted'
@@ -402,6 +601,21 @@ export function SceneRecipePanel({
       <p className="text-[8px] text-text-muted">
         {mode === 'manual' ? t('recipe.manualHelp') : t('recipe.autoHelp')}
       </p>
+      {mode === 'auto' && (
+        <div className="rounded border border-border bg-bg-primary/30 px-2 py-1.5">
+          <label className="flex items-start gap-1.5 text-[10px] text-text-secondary">
+            <input
+              type="checkbox"
+              checked={noVideoGeneration}
+              disabled={locked || wizardPolicyLocked}
+              onChange={event => setNoVideoGeneration(event.currentTarget.checked)}
+              className="mt-0.5 accent-cyan-400"
+            />
+            <span>{t('recipe.noVideoGeneration')}</span>
+          </label>
+          <p className="mt-1 pl-5 text-[8px] leading-relaxed text-text-muted">{t('recipe.noVideoGenerationHelp')}</p>
+        </div>
+      )}
 
       <details className="rounded border border-border bg-bg-primary/45 px-2 py-1.5 text-[9px] text-text-muted">
         <summary className="cursor-pointer font-medium text-text-secondary">{t('recipe.howTitle')}</summary>
@@ -410,29 +624,24 @@ export function SceneRecipePanel({
 
       {mode === 'manual' && (
         <div className="space-y-2">
-          <div className="flex gap-1">
-            <button
-              type="button"
-              disabled={locked}
-              onClick={() => setPicker(current => current === 'image' ? null : 'image')}
-              className={`flex flex-1 items-center justify-center gap-1 rounded border px-2 py-1.5 text-[10px] ${
-                picker === 'image' ? 'border-cyan-300 bg-cyan-400/15 text-cyan-100' : 'border-border text-text-secondary'
-              }`}
-            >
-              <ImageIcon size={12} /> {t('recipe.images')}
-            </button>
-            <button
-              type="button"
-              disabled={locked}
-              onClick={() => setPicker(current => current === 'model3d' ? null : 'model3d')}
-              className={`flex flex-1 items-center justify-center gap-1 rounded border px-2 py-1.5 text-[10px] ${
-                picker === 'model3d' ? 'border-cyan-300 bg-cyan-400/15 text-cyan-100' : 'border-border text-text-secondary'
-              }`}
-            >
-              <Box size={12} /> {t('recipe.models')}
-            </button>
-          </div>
-
+          <AssetInput
+            label={t('recipe.imagesFromApp')}
+            placeholder={t('recipe.images')}
+            items={gallery.images}
+            accept="image/*,video/*"
+            disabled={locked}
+            constraints={{ kinds: ['image', 'video'], maxCount: 1, optional: true }}
+            onChoose={item => { if (item) void addOutput(item) }}
+          />
+          <AssetInput
+            label={t('recipe.glbFromApp')}
+            placeholder={t('recipe.models')}
+            items={gallery.models}
+            accept=".glb,model/gltf-binary"
+            disabled={locked}
+            constraints={{ kinds: ['model3d'], maxCount: 1, optional: true }}
+            onChoose={item => { if (item) void addOutput(item) }}
+          />
           {selected.length > 0 && (
             <div>
               <div className="mb-1 text-[9px] uppercase tracking-wider text-text-muted">{t('recipe.selectedCount', { count: selected.length })}</div>
@@ -451,67 +660,6 @@ export function SceneRecipePanel({
               </div>
             </div>
           )}
-
-          {picker && (
-            <div className="rounded border border-border bg-bg-primary p-2">
-              <div className="mb-1.5 flex items-center justify-between gap-1">
-                <span className="text-[10px] text-text-muted">
-                  {picker === 'model3d' ? t('recipe.glbFromApp') : t('recipe.imagesFromApp')}
-                </span>
-                <button type="button" onClick={() => setPicker(null)} className="text-text-muted hover:text-text-primary"><X size={12} /></button>
-              </div>
-              <button
-                type="button"
-                disabled={locked}
-                onClick={() => (picker === 'model3d' ? modelInputRef : imageInputRef).current?.click()}
-                className="mb-2 flex w-full items-center justify-center gap-1 rounded border border-dashed border-cyan-400/40 py-1.5 text-[10px] text-cyan-200 hover:bg-cyan-400/10 disabled:opacity-40"
-              >
-                {busy === 'upload' ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
-                {picker === 'model3d' ? t('recipe.importGlb') : t('recipe.importImage')}
-              </button>
-              {pickerItems.length ? (
-                <div className="grid max-h-52 grid-cols-3 gap-1.5 overflow-y-auto">
-                  {pickerItems.map(item => (
-                    <AssetThumb
-                      key={item.name}
-                      name={item.name}
-                      kind={kindForOutput(item)}
-                      previewUrl={previewForOutput(item)}
-                      selected={selected.some(asset => asset.source === item.name)}
-                      disabled={locked}
-                      onClick={() => void addOutput(item)}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <p className="text-[9px] text-text-muted">
-                  {picker === 'model3d' ? t('recipe.emptyGlbs') : t('recipe.emptyImages')}
-                </p>
-              )}
-            </div>
-          )}
-          <input
-            ref={imageInputRef}
-            type="file"
-            accept="image/*,video/*"
-            multiple
-            className="hidden"
-            onChange={event => {
-              void importFiles(Array.from(event.target.files || []), 'image')
-              event.currentTarget.value = ''
-            }}
-          />
-          <input
-            ref={modelInputRef}
-            type="file"
-            accept=".glb,model/gltf-binary"
-            multiple
-            className="hidden"
-            onChange={event => {
-              void importFiles(Array.from(event.target.files || []), 'model3d')
-              event.currentTarget.value = ''
-            }}
-          />
         </div>
       )}
 
@@ -555,6 +703,7 @@ export function SceneRecipePanel({
             setRecipeText(JSON.stringify(EXAMPLE_SAUCER_CRUISE_RECIPE, null, 2))
             setShots(listRecipeShots(EXAMPLE_SAUCER_CRUISE_RECIPE))
             setPlannedRecipe(EXAMPLE_SAUCER_CRUISE_RECIPE)
+            setActiveShot(0)
           }}
           className="flex items-center justify-center gap-1 rounded border border-border bg-bg-primary px-2 py-1.5 text-[10px] disabled:opacity-40"
         >
@@ -583,7 +732,7 @@ export function SceneRecipePanel({
           rows={8}
           value={recipeText}
           disabled={locked}
-          onChange={event => { setRecipeText(event.target.value); setPlannedRecipe(null) }}
+          onChange={event => { setRecipeText(event.target.value); setPlannedRecipe(null); setShots([]); setActiveShot(0) }}
           spellCheck={false}
           className="mt-1 w-full resize-y rounded border border-border bg-bg-primary px-2 py-1.5 font-mono text-[9px] text-text-primary"
         />

@@ -10,6 +10,7 @@ from tests.api_client_source import api_client_source
 ROOT = Path(__file__).resolve().parents[1]
 STORIES = ROOT / "ui" / "src" / "features" / "stories"
 STORY = STORIES / "StoryLabPanel.tsx"
+STORY_AUDIO_PICK = STORIES / "storyAudioPick.ts"
 STORY_MUSIC = STORIES / "StoryMusicTab.tsx"
 STORY_PRODUCTIONS = STORIES / "StoryProductionsTab.tsx"
 STORY_PRODUCTIONS_MUSIC = STORIES / "StoryProductionsMusicPanel.tsx"
@@ -56,11 +57,12 @@ def test_lyria_prompt_does_not_require_an_optional_reference_song():
 def test_custom_mp3_can_be_imported_and_selected_as_story_music():
     source = STORY.read_text(encoding="utf-8")
     music = stories_ui()
+    pick = STORY_AUDIO_PICK.read_text(encoding="utf-8")
 
     assert "const uploadCustomMusic" in source
-    assert "custom-audio-upload" in source
+    assert "custom-audio-upload" in pick
     assert "music.importCustomMp3" in music
-    assert 'accept=".mp3,audio/mpeg,audio/*"' in source
+    assert 'accept=".mp3,audio/mpeg"' in music
     assert "setMusicProductionCandidateId(candidate.id)" in source
 
 
@@ -112,7 +114,7 @@ def test_story_lab_hands_backend_jobs_to_the_durable_registry():
 def test_story_lab_refresh_recovers_the_backend_job_without_opening_a_client_root():
     source = STORY.read_text(encoding="utf-8")
     refresh = source.split("const savedJobId = window.localStorage.getItem", 1)[1].split(
-        "useEffect(() => {\n    if (project.projectType === 'quick_video')", 1,
+        "const openStorySection", 1,
     )[0]
 
     assert "api.getStoryGenerationStatus(savedJobId)" in refresh

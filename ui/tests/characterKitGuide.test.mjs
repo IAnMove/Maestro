@@ -38,7 +38,7 @@ test('a kit with an approved body opens on mouths, not the advanced layer mapper
   assert.match(next.detail, /Wipe mouth area/)
 })
 
-test('after wipe and lock the next action is to put the character on the scene', () => {
+test('after wipe and lock the changed pose must be reviewed before putting it on the scene', () => {
   let kit = {
     ...createCharacterKit('Luma'),
     base: approved('luma-base', '/api/v1/file/luma.png'),
@@ -49,6 +49,9 @@ test('after wipe and lock the next action is to put the character on the scene',
   }
   kit = registerWipedKitPose(kit, 'base', { ...kit.base, source: '/api/v1/file/luma-mouthless.png' })
   kit = lockFaceRigMouthPlacement(kit, 'base', { offsetX: 0, offsetY: -16, scale: .07, rotation: 0 })
+  assert.equal(kit.base.reviewState, 'pending')
+  assert.equal(characterKitNextStep(kit, 'base').id, 'add-body')
+  kit = { ...kit, base: { ...kit.base, reviewState: 'approved' } }
   const next = characterKitNextStep(kit, 'base')
   assert.equal(next.id, 'put-on-scene')
   assert.match(next.title, /scene/i)

@@ -4,6 +4,9 @@ import { Check, Loader2 } from 'lucide-react'
 import * as api from '../../api/client'
 import { getModelMode, resolveResolution, useStore } from '../../stores/useStore'
 import { useUiTranslation } from '../../i18n'
+import { AssetInput } from '../asset-picker/AssetInput.tsx'
+import { useWorkspaceImageOutputs } from '../../lib/labsImagePick'
+import type { ApiOutput } from '../../api/outputs'
 
 import { generateImageAsset } from '../../lib/imageGeneration'
 import { MINIMAX_IMAGE_API_MODEL } from '../../lib/externalModels'
@@ -20,7 +23,9 @@ import { CompactVideoWorkspace } from './CompactVideoWorkspace'
 import { StoryOverviewTab } from './StoryOverviewTab'
 import { StoryAssetsTab } from './StoryAssetsTab'
 import { StoryAssemblyTab } from './StoryAssemblyTab'
+import { StoryUniverseTab } from './StoryUniverseTab'
 import { StoryLabLibraryChrome } from './StoryLabLibraryChrome'
+import { resolveStoryLabNavigation } from './labNavigation'
 import { storyLabTabs } from './storyLabTabs'
 import type { PendingSmartAsset } from './storyLabAssets'
 import { StoryLabVisualsProvider } from './StoryLabVisualsProvider'
@@ -33,23 +38,34 @@ import {
   STORY_VIDEO_ASPECTS, savedStoryVideoAspect, savedStoryVideoResolution,
 } from './storyLabVideoFormat'
 import {
-  MINIMAX_LYRIC_SECTION, musicCandidateDisplayName, nextMusicCandidateVersion, storyProjectPremise, storySongBrief,
+  musicCandidateDisplayName, musicCueBlock, nextMusicCandidateVersion, storyProjectPremise, storySongBrief,
 } from './storyLabMusic'
 import { readDirectorClipReplacementResult } from './directorClipHandoff'
 import { createStoryActivityLifecycle } from './activityLifecycle'
 import { useComicStore } from '../comics/store'
 import type { ComicProject } from '../comics/types'
-import { syncTrailerDuration, trailerDurationForProject } from './trailerDefaults'
 import { resolveStoryWritingProvider } from './provider'
+import { collectStoryProductionIssues } from './storyProductionIssues'
+import {
+  filmDirectionOf,
+  filmDurationOf,
+  patchFilmDirection,
+  patchFilmDuration,
+  patchStoryRecipe,
+  patchTrailerDuration,
+  trailerDurationOf,
+} from './storyProductionRecipe'
+import {
+  storyRecipeRequiresVisualIdentities,
+  storyVisualGuidanceMode,
+} from './storyVisualGuidance'
 import {
   buildComicAdaptation,
-  DEFAULT_COMIC_CHAPTER_DIRECTION,
   DEFAULT_SHORT_FILM_DIRECTION,
   DEFAULT_TRAILER_DIRECTION,
 } from './adaptations'
 import type { TrailerAdaptationOptions } from './adaptations'
 import { normalizeStoryProject, storyId, useStoryStore } from './store'
-import { musicVideoShouldUseDirectVideo } from './musicVideoLook'
 import {
   loadStoryFilmProduction,
   loadStoryMusicVideoProduction,
@@ -67,10 +83,15 @@ import {
 import type {
   StoryBeat, StoryGenerationScope, StoryLocation, StoryProject,
   StoryImageProvider, StoryMusicCandidate, StoryMusicCue, StoryProjectType, StoryRelationship, StoryVisualAsset,
-  StoryTrailerFormat, StoryTrailerIntensity, StoryTrailerNarration, StoryTrailerSpoiler, StoryWritingProvider,
+  StoryProductionRecipe, StoryWritingProvider,
 } from './types'
 import type { AspectRatio, ModelOptions, ResolutionPreset } from '../../types'
 import { clampStoryMusicDuration, isAceStepMusicModel, isLocalMusicModel, songWriteTarget } from './musicModel'
+import {
+  commitStoryAudioChoice,
+  coverPatchFromOutput,
+  cueCandidateFromOutput,
+} from './storyAudioPick'
 import { listenForAgentStoryDraft, listenForAgentStorySection, listenForAgentStoryVisualGeneration } from '../../lib/uiBus'
 
 const storyLookupName = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9]+/g, ' ').trim().toLowerCase()
@@ -357,7 +378,12 @@ export function StoryLabPanel() {
   const [tab, setTab] = useState<StoryTab>(() => (
     readDirectorClipReplacementResult() ? 'assembly' : 'overview'
   ))
-  useEffect(() => listenForAgentStorySection(setTab), [])
+  const projectTypeRef = useRef(project.projectType)
+  projectTypeRef.current = project.projectType
+  useEffect(() => listenForAgentStorySection(section => {
+    const resolved = resolveStoryLabNavigation(section, projectTypeRef.current)
+    if (resolved.ok) setTab(resolved.tab)
+  }), [])
   const [busy, setBusy] = useState<StoryGenerationScope | null>(null)
   const [agentDraftRevision, setAgentDraftRevision] = useState(0)
   useEffect(() => listenForAgentStoryDraft(projectId => {
@@ -375,30 +401,48 @@ export function StoryLabPanel() {
   const [musicVersionStyle, setMusicVersionStyle] = useState<Record<string, string>>({})
   const [musicVersionLanguage, setMusicVersionLanguage] = useState<Record<string, string>>({})
   const [instruction, setInstruction] = useState('')
-  const [comicDirection, setComicDirection] = useState(DEFAULT_COMIC_CHAPTER_DIRECTION)
-  const [comicPageCount, setComicPageCount] = useState(4)
-  const [comicPanelsPerPage, setComicPanelsPerPage] = useState(4)
-  const [filmDirection, setFilmDirection] = useState(DEFAULT_SHORT_FILM_DIRECTION)
-  const [filmDuration, setFilmDuration] = useState(45)
-  const [filmPreserveVisualStyle, setFilmPreserveVisualStyle] = useState(true)
-  const [trailerDirection, setTrailerDirection] = useState(DEFAULT_TRAILER_DIRECTION)
-  const [trailerDuration, setTrailerDuration] = useState(60)
-  const [trailerFormat, setTrailerFormat] = useState<StoryTrailerFormat>('theatrical')
-  const [trailerNarration, setTrailerNarration] = useState<StoryTrailerNarration>('hybrid')
-  const [trailerSpoiler, setTrailerSpoiler] = useState<StoryTrailerSpoiler>('balanced')
-  const [trailerIntensity, setTrailerIntensity] = useState<StoryTrailerIntensity>('rising')
-  const [trailerTagline, setTrailerTagline] = useState('')
-  const [trailerTitleCards, setTrailerTitleCards] = useState(false)
-  const [trailerPreserveVisualStyle, setTrailerPreserveVisualStyle] = useState(true)
-  const [trailerTouched, setTrailerTouched] = useState(false)
-  const markTrailerTouched = () => setTrailerTouched(true)
+  const recipe = project.productionRecipe
+  const comicDirection = recipe.comicDirection
+  const comicPageCount = recipe.comicPageCount
+  const comicPanelsPerPage = recipe.comicPanelsPerPage
+  const filmDirection = filmDirectionOf(project)
+  const filmDuration = filmDurationOf(project)
+  const filmPreserveVisualStyle = recipe.filmPreserveVisualStyle
+  const trailerDirection = recipe.trailerDirection
+  const trailerDuration = trailerDurationOf(project)
+  const trailerFormat = recipe.trailerFormat
+  const trailerNarration = recipe.trailerNarration
+  const trailerSpoiler = recipe.trailerSpoiler
+  const trailerIntensity = recipe.trailerIntensity
+  const trailerTagline = recipe.trailerTagline
+  const trailerTitleCards = recipe.trailerTitleCards
+  const trailerPreserveVisualStyle = recipe.trailerPreserveVisualStyle
+  const markTrailerTouched = () => undefined
+  const patchRecipe = (value: Partial<StoryProductionRecipe>) => patch(patchStoryRecipe(project, value))
+  const setComicDirection = (value: string) => patchRecipe({ comicDirection: value })
+  const setComicPageCount = (value: number) => patchRecipe({ comicPageCount: value })
+  const setComicPanelsPerPage = (value: number) => patchRecipe({ comicPanelsPerPage: value })
+  const setFilmDirection = (value: string) => patch(patchFilmDirection(project, value))
+  const setFilmDuration = (value: number) => patch(patchFilmDuration(project, value))
+  const setFilmPreserveVisualStyle = (value: boolean) => patchRecipe({ filmPreserveVisualStyle: value })
+  const setTrailerDirection = (value: string) => patchRecipe({ trailerDirection: value })
+  const setTrailerDuration = (value: number) => patch(patchTrailerDuration(project, value))
+  const setTrailerFormat = (value: StoryProductionRecipe['trailerFormat']) => patchRecipe({ trailerFormat: value })
+  const setTrailerNarration = (value: StoryProductionRecipe['trailerNarration']) => patchRecipe({ trailerNarration: value })
+  const setTrailerSpoiler = (value: StoryProductionRecipe['trailerSpoiler']) => patchRecipe({ trailerSpoiler: value })
+  const setTrailerIntensity = (value: StoryProductionRecipe['trailerIntensity']) => patchRecipe({ trailerIntensity: value })
+  const setTrailerTagline = (value: string) => patchRecipe({ trailerTagline: value })
+  const setTrailerTitleCards = (value: boolean) => patchRecipe({ trailerTitleCards: value })
+  const setTrailerPreserveVisualStyle = (value: boolean) => patchRecipe({ trailerPreserveVisualStyle: value })
   const [musicProductionCandidateId, setMusicProductionCandidateId] = useState(
     project.music.selectedCandidateId
       || project.music.cues.find(cue => cue.selectedCandidateId)?.selectedCandidateId
       || '',
   )
-  const [musicProductionPacing, setMusicProductionPacing] = useState<'cinematic' | 'balanced' | 'rhythmic'>('balanced')
-  const [musicProductionMode, setMusicProductionMode] = useState<'full' | 'trailer'>('full')
+  const musicProductionPacing = recipe.musicProductionPacing
+  const musicProductionMode = recipe.musicProductionMode
+  const setMusicProductionPacing = (value: StoryProductionRecipe['musicProductionPacing']) => patchRecipe({ musicProductionPacing: value })
+  const setMusicProductionMode = (value: StoryProductionRecipe['musicProductionMode']) => patchRecipe({ musicProductionMode: value })
   const [musicTrailerRange, setMusicTrailerRange] = useState({ start: 0, end: 0, duration: 0 })
   const [jobProgress, setJobProgress] = useState('')
   const [recoveryJobId, setRecoveryJobId] = useState(() =>
@@ -429,17 +473,12 @@ export function StoryLabPanel() {
   const [styleModelDownloading, setStyleModelDownloading] = useState('')
   const [styleModelDownloadError, setStyleModelDownloadError] = useState('')
   const smartAssetRef = useRef<HTMLInputElement>(null)
-  const uploadRef = useRef<HTMLInputElement>(null)
-  const musicCoverRef = useRef<HTMLInputElement>(null)
-  const lyriaUploadRef = useRef<HTMLInputElement>(null)
-  const lyriaUploadCueId = useRef('')
-  const customMusicUploadRef = useRef<HTMLInputElement>(null)
-  const customMusicUploadCueId = useRef('')
   const musicQueueCancelRequested = useRef(false)
   const activeMusicJobId = useRef('')
   const styleConversionCancelRequested = useRef(false)
   const generationAbortRef = useRef<AbortController | null>(null)
   const [uploadTarget, setUploadTarget] = useState<{ kind: 'world' | 'character' | 'location'; id?: string } | null>(null)
+  const imageItems = useWorkspaceImageOutputs(activeWorkspace)
   const projectOperationBusy = Boolean(activeProjectOperations[project.id])
   const musicCandidateOptions = useMemo(() => {
     const seen = new Set<string>()
@@ -685,12 +724,10 @@ export function StoryLabPanel() {
   const selectedFilmImageModel = videoModels.find(model => model.model_type === filmImageModel)
   const selectedFilmVideoModel = videoModels.find(model => model.model_type === filmVideoModel)
   const filmImageReady = filmImageModel !== MINIMAX_IMAGE_API_MODEL || Boolean(servicesConfig?.minimax_api_key_set)
-  const effectiveMusicVideoMode = musicVideoShouldUseDirectVideo(project)
-    ? 'direct_video'
-    : project.musicVideoGenerationMode
-  const directVideo = effectiveMusicVideoMode === 'direct_video'
+  const visualMode = storyVisualGuidanceMode(project)
+  const directVideo = visualMode === 'direct_video'
   const directMusicVideo = directVideo
-  const directReferenceVideo = project.musicVideoGenerationMode === 'direct_references'
+  const directReferenceVideo = visualMode === 'direct_references'
   const promptHealthWarnings = useMemo(() => analyzeStoryPromptHealth(project), [project])
   const protagonist = project.characters.find(character => character.id === project.protagonistCharacterId)
   const protagonistReferenceReady = !project.protagonistConsistency || Boolean(
@@ -743,11 +780,6 @@ export function StoryLabPanel() {
   useEffect(() => {
     const savedJobId = window.localStorage.getItem(storyJobKey(activeWorkspace, project.id)) || ''
     setRecoveryJobId(savedJobId)
-    setComicDirection(DEFAULT_COMIC_CHAPTER_DIRECTION)
-    setComicPageCount(4)
-    setComicPanelsPerPage(4)
-    setFilmDirection(DEFAULT_SHORT_FILM_DIRECTION)
-    setFilmDuration(45)
     let hasLocalResult = false
     let savedScope: StoryGenerationScope = 'all'
     let generateImagesAfterApply = false
@@ -797,40 +829,9 @@ export function StoryLabPanel() {
     return () => { disposed = true }
   }, [activeWorkspace, agentDraftRevision, project.id, t])
 
-  useEffect(() => {
-    if (project.projectType === 'quick_video') {
-      setFilmDuration(project.creativeBrief.durationSeconds)
-      setFilmDirection(project.creativeBrief.action || 'Create the complete quick video described by this Story Lab project.')
-    }
-  }, [project.creativeBrief.action, project.creativeBrief.durationSeconds, project.projectType])
-
-  useEffect(() => {
-    const currentProject = useStoryStore.getState().project
-    setTrailerDirection(DEFAULT_TRAILER_DIRECTION)
-    setTrailerDuration(trailerDurationForProject(currentProject.projectType, currentProject.creativeBrief.durationSeconds))
-    setTrailerFormat('theatrical')
-    setTrailerNarration('hybrid')
-    setTrailerSpoiler('balanced')
-    setTrailerIntensity('rising')
-    setTrailerTagline('')
-    setTrailerTitleCards(false)
-    setTrailerPreserveVisualStyle(true)
-    setTrailerTouched(false)
-  }, [project.id]) // Each Story starts with a clean trailer treatment.
-
-  useEffect(() => {
-    setTrailerDuration(current => syncTrailerDuration(
-      current,
-      project.projectType,
-      project.creativeBrief.durationSeconds,
-      trailerTouched,
-    ))
-  }, [project.creativeBrief.durationSeconds, project.projectType, trailerTouched])
-
   const openStorySection = (target: StoryTab) => {
-    const compactSection = project.projectType !== 'full_story'
-      && ['world', 'characters', 'relationships', 'structure'].includes(target)
-    setTab(compactSection ? 'overview' : target)
+    const resolved = resolveStoryLabNavigation(target, project.projectType)
+    if (resolved.ok) setTab(resolved.tab)
   }
 
   const openProductionReviewIssue = (issue: ProductionReviewIssue) => {
@@ -852,7 +853,7 @@ export function StoryLabPanel() {
       return
     }
     if (key === 'characters') {
-      const requiresVisualIdentities = !directVideo
+      const requiresVisualIdentities = storyRecipeRequiresVisualIdentities(visualMode)
       const incomplete = project.characters.flatMap(character => {
         const reasons = [
           character.approval !== 'approved' ? t('notice.reasonStillDraft') : '',
@@ -1627,7 +1628,8 @@ export function StoryLabPanel() {
       if (!ok) throw new Error(`${completed}/${targets.length} referencias terminadas. Falló “${item.label}”: ${failure || 'error de generación desconocido'}.`)
       completed += 1
     }
-    setTab('assets')
+    const assetsNav = resolveStoryLabNavigation('assets', current.projectType)
+    if (assetsNav.ok) setTab(assetsNav.tab)
     const message = `He generado y adjuntado ${completed} referencia${completed === 1 ? '' : 's'} visual${completed === 1 ? '' : 'es'} en “${current.title}”. Quedan en Draft dentro de Story Lab → Assets para que las revises y apruebes.`
     const latest = useStoryStore.getState().projects[request.projectId]
     const assetIds = latest ? Object.keys(latest.assets).filter(id => !assetIdsBefore.has(id)) : []
@@ -1690,33 +1692,31 @@ export function StoryLabPanel() {
     })
     setStyleConversion(storyRenderStyle(current))
     setStyleAssetIds(ids)
-    setTab('assets')
+    openStorySection('assets')
     setNotice({
       kind: 'ok',
       text: t('notice.referencesSelectedForConversion', { count: ids.length }),
     })
   }
 
-  const uploadVisual = async (files: FileList | null) => {
-    if (!files?.length || !uploadTarget) return
+  const applyPickedVisual = async (item: ApiOutput) => {
+    if (!uploadTarget) return
     const sourceProjectId = project.id
+    const target = uploadTarget
     beginProjectOperation(sourceProjectId)
     setImageBusy('upload')
     try {
-      for (const file of Array.from(files)) {
-        const uploaded = await api.uploadImage(file)
-        addAsset({
-          id: storyId('asset'), name: file.name, source: uploaded.url, prompt: '',
-          provider: 'upload', createdAt: new Date().toISOString(),
-          approval: 'draft', variantKind: 'original',
-        }, uploadTarget, false, sourceProjectId)
-      }
+      addAsset({
+        id: storyId('asset'), name: item.name, source: item.url, prompt: '',
+        provider: 'upload', createdAt: new Date().toISOString(),
+        approval: 'draft', variantKind: 'original',
+      }, target, false, sourceProjectId)
+      setUploadTarget(null)
     } catch (error) {
       setNotice({ kind: 'error', text: (error as Error).message })
     } finally {
       setImageBusy('')
       endProjectOperation(sourceProjectId)
-      if (uploadRef.current) uploadRef.current.value = ''
     }
   }
 
@@ -1733,7 +1733,7 @@ export function StoryLabPanel() {
       'uploading_assets', `Uploading 0/${images.length} assets…`, images.length + 1,
     )
     setSmartAssetBusy(true)
-    setTab('assets')
+    openStorySection('assets')
     try {
       const uploaded: Array<{ name: string; path: string; url: string }> = []
       for (let index = 0; index < images.length; index += 1) {
@@ -2578,35 +2578,25 @@ export function StoryLabPanel() {
     }
   }
 
-  const uploadCoverReference = async (file?: File) => {
-    if (!file) return
-    const sourceProjectId = project.id
-    if (file.size > 50 * 1024 * 1024) {
+  const uploadCoverReference = (item: ApiOutput) => {
+    const capture = { projectId: project.id }
+    const commit = commitStoryAudioChoice({ projectId: project.id }, capture, item)
+    if (commit.action !== 'apply') return
+    if (commit.item.size > 50 * 1024 * 1024) {
       setNotice({ kind: 'error', text: t('notice.coverTooLarge') })
       return
     }
-    const activity = beginStoryActivity('uploading_music_reference', `Uploading cover reference “${file.name}”…`, 1)
-    setProductionBusy('music')
-    try {
-      const uploaded = await api.uploadAudio(file)
-      updateProjectById(sourceProjectId, current => ({
-        ...current,
-        music: {
-          ...current.music,
-          mode: 'cover',
-          coverReferenceFilename: uploaded.filename,
-          coverReferenceName: file.name,
-        },
-      }))
-      setNotice({ kind: 'ok', text: t('notice.coverUploaded') })
-    } catch (error) {
-      activity.fail(error)
-      setNotice({ kind: 'error', text: t('notice.coverUploadFailed', { message: (error as Error).message }) })
-    } finally {
-      activity.finish()
-      setProductionBusy(null)
-      if (musicCoverRef.current) musicCoverRef.current.value = ''
-    }
+    const patch = coverPatchFromOutput(commit.item)
+    updateProjectById(capture.projectId, current => ({
+      ...current,
+      music: {
+        ...current.music,
+        mode: patch.mode,
+        coverReferenceFilename: patch.coverReferenceFilename,
+        coverReferenceName: patch.coverReferenceName,
+      },
+    }))
+    setNotice({ kind: 'ok', text: t('notice.coverUploaded') })
   }
 
   const generateMinimaxSongs = async () => {
@@ -3122,105 +3112,75 @@ export function StoryLabPanel() {
     }
   }
 
-  const uploadLyriaResult = async (file?: File) => {
-    const cueId = lyriaUploadCueId.current
-    if (!file || !cueId) return
-    const sourceProjectId = project.id
-    const cue = useStoryStore.getState().projects[sourceProjectId]?.music.cues.find(item => item.id === cueId)
-    if (!cue) return
-    const activity = beginStoryActivity('uploading_music', `Importing Google Lyria result “${file.name}”…`, 1)
-    setMusicCueBusy(`lyria-upload:${cueId}`)
-    try {
-      const uploaded = await api.uploadAudio(file)
-      const language = cue.lyricsLanguage || project.language
-      const version = nextMusicCandidateVersion(cue.candidates, language, project.language)
-      const candidate = {
-        id: storyId('song'),
-        displayName: `${cue.title} · ${language} · v${version}`,
-        title: cue.title,
-        language,
-        version,
-        name: file.name || uploaded.filename,
-        source: uploaded.url,
-        prompt: cue.lyriaPrompt,
-        lyrics: cue.lyrics,
-        provider: 'lyria' as const,
-        model: 'lyria-3-pro-preview',
-        durationSeconds: 0,
-        createdAt: new Date().toISOString(),
+  const uploadLyriaResult = (cueId: string, item: ApiOutput) => {
+    const capture = { projectId: project.id, cueId }
+    const live = useStoryStore.getState().projects[capture.projectId]
+    const cue = live?.music.cues.find(entry => entry.id === cueId)
+    const commit = commitStoryAudioChoice({ projectId: live?.id || '', cueId: cue?.id }, capture, item)
+    if (commit.action !== 'apply' || !live || !cue) return
+    const language = cue.lyricsLanguage || live.language
+    const version = nextMusicCandidateVersion(cue.candidates, language, live.language)
+    const candidate = cueCandidateFromOutput(commit.item, {
+      role: 'lyria',
+      id: storyId('song'),
+      title: cue.title,
+      language,
+      version,
+      prompt: cue.lyriaPrompt,
+      lyrics: cue.lyrics,
+    })
+    updateProjectById(capture.projectId, current => {
+      const target = current.music.cues.find(entry => entry.id === cueId)
+      if (target) {
+        target.candidates.push(candidate)
+        target.selectedCandidateId = candidate.id
       }
-      updateProjectById(sourceProjectId, current => {
-        const target = current.music.cues.find(item => item.id === cueId)
-        if (target) {
-          target.candidates.push(candidate)
-          target.selectedCandidateId = candidate.id
-        }
-        return current
-      })
-      setNotice({ kind: 'ok', text: t('notice.lyriaImported', { title: cue.title }) })
-    } catch (error) {
-      activity.fail(error, 'uploading_music')
-      setNotice({ kind: 'error', text: t('notice.lyriaImportFailed', { message: (error as Error).message }) })
-    } finally {
-      activity.finish()
-      setMusicCueBusy('')
-      lyriaUploadCueId.current = ''
-      if (lyriaUploadRef.current) lyriaUploadRef.current.value = ''
-    }
+      return current
+    })
+    setNotice({ kind: 'ok', text: t('notice.lyriaImported', { title: cue.title }) })
   }
 
-  const uploadCustomMusic = async (file?: File) => {
-    if (!file) return
-    const cueId = customMusicUploadCueId.current
-    const sourceProjectId = project.id
-    const current = useStoryStore.getState().projects[sourceProjectId]
+  const uploadCustomMusic = (cueId: string, item: ApiOutput) => {
+    const capture = { projectId: project.id, cueId }
+    const current = useStoryStore.getState().projects[capture.projectId]
     if (!current) return
-    const cue = current.music.cues.find(item => item.id === cueId)
-    const destination = cue?.title || current.title || 'Story music'
-    const activity = beginStoryActivity('uploading_music', `Importing custom audio “${file.name}”…`, 1)
-    setMusicCueBusy(`custom-upload:${cueId || 'story'}`)
-    try {
-      const uploaded = await api.uploadAudio(file)
-      const language = cue?.lyricsLanguage || current.music.lyricsLanguage || current.language
-      const existing = cue?.candidates || current.music.candidates
-      const version = nextMusicCandidateVersion(existing, language, current.language)
-      const candidate: StoryMusicCandidate = {
-        id: storyId('song'),
-        displayName: `${destination} · custom MP3 · v${version}`,
-        title: destination,
-        language,
-        version,
-        name: file.name || uploaded.filename,
-        source: uploaded.url,
-        prompt: cue?.style || current.music.style,
-        lyrics: cue?.lyrics || current.music.lyrics,
-        provider: 'local',
-        model: 'custom-audio-upload',
-        durationSeconds: 0,
-        createdAt: new Date().toISOString(),
-      }
-      updateProjectById(sourceProjectId, latest => {
-        const target = latest.music.cues.find(item => item.id === cueId)
-        if (target) {
-          target.candidates.push(candidate)
-          target.selectedCandidateId = candidate.id
-        } else {
-          latest.music.candidates.push(candidate)
-          latest.music.selectedCandidateId = candidate.id
-        }
-        return latest
-      })
-      setMusicProductionCandidateId(candidate.id)
-      setNotice({ kind: 'ok', text: t('notice.customAudioImported', { title: destination }) })
-    } catch (error) {
-      activity.fail(error, 'uploading_music')
-      setNotice({ kind: 'error', text: t('notice.customAudioFailed', { message: (error as Error).message }) })
-    } finally {
-      activity.finish()
-      setMusicCueBusy('')
-      customMusicUploadCueId.current = ''
-      if (customMusicUploadRef.current) customMusicUploadRef.current.value = ''
+    const cue = current.music.cues.find(entry => entry.id === cueId)
+    const commit = commitStoryAudioChoice(
+      { projectId: current.id, cueId: cue?.id || cueId },
+      capture,
+      item,
+      true,
+    )
+    if (commit.action !== 'apply') {
+      if (commit.action === 'reject') setNotice({ kind: 'error', text: t('notice.customAudioFailed', { message: 'mp3' }) })
+      return
     }
+    const destination = cue?.title || current.title || 'Story music'
+    const language = cue?.lyricsLanguage || current.music.lyricsLanguage || current.language
+    const existing = cue?.candidates || current.music.candidates
+    const version = nextMusicCandidateVersion(existing, language, current.language)
+    const candidate = cueCandidateFromOutput(commit.item, {
+      role: 'custom',
+      id: storyId('song'),
+      title: destination,
+      language,
+      version,
+      prompt: cue?.style || current.music.style,
+      lyrics: cue?.lyrics || current.music.lyrics,
+    })
+    updateProjectById(capture.projectId, latest => {
+      const target = latest.music.cues.find(entry => entry.id === cueId)
+      if (target) {
+        target.candidates.push(candidate)
+        target.selectedCandidateId = candidate.id
+      } else {
+        latest.music.candidates.push(candidate)
+        latest.music.selectedCandidateId = candidate.id
+      }
+      return latest
+    })
+    setMusicProductionCandidateId(candidate.id)
+    setNotice({ kind: 'ok', text: t('notice.customAudioImported', { title: destination }) })
   }
 
   const generateMusicCueAudio = async (
@@ -3238,15 +3198,9 @@ export function StoryLabPanel() {
     if (!current) return false
     const cue = current.music.cues.find(item => item.id === cueId)
     if (!cue) return false
-    if (!cue.style.trim() || (!cue.instrumental && !cue.lyrics.trim())) {
-      setNotice({ kind: 'error', text: cue.instrumental ? t('notice.reviewPromptFirst', { title: cue.title }) : t('notice.reviewPromptAndLyricsFirst', { title: cue.title }) })
-      return false
-    }
-    if (!cue.instrumental && !MINIMAX_LYRIC_SECTION.test(cue.lyrics)) {
-      setNotice({
-        kind: 'error',
-        text: t('notice.needsSectionTags', { title: cue.title }),
-      })
+    const blocked = musicCueBlock(cue, current.music.model)
+    if (blocked) {
+      setNotice({ kind: 'error', text: t(blocked.key, blocked.params) })
       return false
     }
     const usingAceStep = isAceStepMusicModel(current.music.model)
@@ -3455,7 +3409,7 @@ export function StoryLabPanel() {
         videoModel: filmVideoModel,
         resolution: storyVideoResolution,
         aspectRatio: storyVideoAspectRatio,
-        generationMode: effectiveMusicVideoMode,
+        generationMode: visualMode,
         directVideoMasterPrompt: project.directVideoMasterPrompt,
         writingProvider: project.provider.writingProvider,
         writingModel: project.provider.writingModel,
@@ -3812,72 +3766,60 @@ export function StoryLabPanel() {
   useEffect(() => {
     if (!visibleTabIds.includes(tab)) setTab('overview')
   }, [project.projectType, tab]) // eslint-disable-line react-hooks/exhaustive-deps
-  const collectProductionIssues = (requiresVisualIdentities: boolean): ProductionReviewIssue[] => {
-    if (project.workflowMode === 'automatic') return []
-    const required: Array<keyof StoryProject['approvals']> = [
-      'overview', 'world', 'characters', 'structure',
-    ]
-    if (project.projectType === 'full_story' && project.relationships.length) required.push('relationships')
-    const sectionLabels: Record<keyof StoryProject['approvals'], string> = {
-      overview: project.projectType === 'music_video'
-        ? t('issues.approveSongAndVisual')
-        : project.projectType === 'trailer' ? t('issues.approveTrailerConcept') : t('issues.approveConcept'),
-      world: project.projectType === 'music_video'
-        ? t('issues.approveMusicWorld')
-        : project.projectType === 'trailer' ? t('issues.approveTrailerWorld') : t('issues.approveWorld'),
-      characters: project.projectType === 'trailer' ? t('issues.approveLeads') : t('issues.approveCast'),
-      relationships: t('issues.approveRelationships'),
-      structure: project.projectType === 'music_video'
-        ? t('issues.approveVisualMoments')
-        : project.projectType === 'trailer' ? t('issues.approveTrailerArc') : t('issues.approveStructure'),
-    }
-    const issues: ProductionReviewIssue[] = required
-      .filter(section => section !== 'characters' && !isApproved(section))
-      .map(section => ({
-        id: `section:${section}`,
-        label: sectionLabels[section],
-        detail: t('issues.openSectionDetail'),
-        tab: section as StoryTab,
-        anchorId: `story-review-${section}`,
-      }))
-    const incompleteCharacters = project.characters.filter(character =>
-      character.approval !== 'approved'
-      || (requiresVisualIdentities && (
-        !character.primaryReferenceAssetId
-        || project.assets[character.primaryReferenceAssetId]?.approval !== 'approved'
-      )))
-    if (incompleteCharacters.length) {
-      const names = incompleteCharacters.map(character => character.name || t('issues.unnamed')).join(', ')
-      issues.push({
-        id: 'characters:items',
-        label: requiresVisualIdentities
-          ? t('issues.reviewIdentities', { names })
-          : t('issues.approveDescriptions', { names }),
-        detail: requiresVisualIdentities
-          ? t('issues.identitiesDetail')
-          : t('issues.descriptionsDetail'),
-        tab: 'characters',
-        anchorId: `story-review-character-${incompleteCharacters[0].id}`,
-      })
-    } else if (!isApproved('characters')) {
-      issues.push({
-        id: 'section:characters',
-        label: sectionLabels.characters,
-        detail: t('issues.confirmSetDetail'),
-        tab: 'characters',
-        anchorId: 'story-review-characters',
-      })
-    }
-    return issues
-  }
-  const productionIssues = collectProductionIssues(true)
-  const musicProductionIssues = collectProductionIssues(!directMusicVideo)
-  const trailerProductionIssues = collectProductionIssues(!directVideo)
-  const visibleProductionIssues = project.projectType === 'music_video'
-    ? musicProductionIssues
-    : project.projectType === 'trailer'
-      ? trailerProductionIssues
-      : productionIssues
+  const productionIssues = collectStoryProductionIssues(project, visualMode, t)
+  const musicProductionIssues = productionIssues
+  const trailerProductionIssues = productionIssues
+  const visibleProductionIssues = productionIssues
+  const trailerTab = (
+    <StoryTrailerTab
+      project={project}
+      patch={patch}
+      trailerDuration={trailerDuration}
+      setTrailerDuration={setTrailerDuration}
+      trailerDirection={trailerDirection}
+      setTrailerDirection={setTrailerDirection}
+      trailerTagline={trailerTagline}
+      setTrailerTagline={setTrailerTagline}
+      trailerFormat={trailerFormat}
+      setTrailerFormat={setTrailerFormat}
+      trailerNarration={trailerNarration}
+      setTrailerNarration={setTrailerNarration}
+      trailerSpoiler={trailerSpoiler}
+      setTrailerSpoiler={setTrailerSpoiler}
+      trailerIntensity={trailerIntensity}
+      setTrailerIntensity={setTrailerIntensity}
+      trailerTitleCards={trailerTitleCards}
+      setTrailerTitleCards={setTrailerTitleCards}
+      trailerPreserveVisualStyle={trailerPreserveVisualStyle}
+      setTrailerPreserveVisualStyle={setTrailerPreserveVisualStyle}
+      markTrailerTouched={markTrailerTouched}
+      directVideo={directVideo}
+      directReferenceVideo={directReferenceVideo}
+      approvedVisualReferenceCount={approvedVisualReferenceCount}
+      directReferenceVideoReady={directReferenceVideoReady}
+      directReferenceVideoSupported={directReferenceVideoSupported}
+      directVideoMasterReady={directVideoMasterReady}
+      filmImageModel={filmImageModel}
+      filmVideoModel={filmVideoModel}
+      selectableImageModels={selectableImageModels}
+      selectableVideoModels={selectableVideoModels}
+      selectedFilmImageModel={selectedFilmImageModel}
+      selectedFilmVideoModel={selectedFilmVideoModel}
+      selectDirectorImageModel={selectDirectorImageModel}
+      selectStoryVideoModel={selectStoryVideoModel}
+      storyVideoOptionsReady={storyVideoOptionsReady}
+      storyVideoConfigurationReady={storyVideoConfigurationReady}
+      storyVideoResolution={storyVideoResolution}
+      storyVideoAspectRatio={storyVideoAspectRatio}
+      storyVideoOptions={storyVideoOptions}
+      storyVideoAdjusted={storyVideoFormat.adjusted}
+      setStoryVideoFormat={setStoryVideoFormat}
+      trailerProductionIssues={trailerProductionIssues}
+      productionBusy={productionBusy}
+      filmGenerationImageReady={filmGenerationImageReady}
+      stageTrailer={stageTrailer}
+    />
+  )
 
   return (
     <StoryLabVisualsProvider value={{
@@ -3886,7 +3828,6 @@ export function StoryLabPanel() {
       generateVisual,
       requestUpload: target => {
         setUploadTarget(target)
-        uploadRef.current?.click()
       },
       removeReference,
     }}>
@@ -3922,7 +3863,7 @@ export function StoryLabPanel() {
         onExportStorypack={() => void exportStorypack()}
         onImport={file => void importStorypack(file)}
         onSmartAssets={() => {
-          setTab('assets')
+          openStorySection('assets')
           smartAssetRef.current?.click()
         }}
         onNewProject={newProject}
@@ -3933,6 +3874,21 @@ export function StoryLabPanel() {
       {notice && (
         <div className={`px-3 py-2 text-xs border-b border-border ${notice.kind === 'error' ? 'text-red-300 bg-red-500/10' : 'text-emerald-300 bg-emerald-500/10'}`}>
           {notice.text}
+        </div>
+      )}
+      {uploadTarget && (
+        <div className="border-b border-border px-3 py-2">
+          <AssetInput
+            label={t('world.addReference')}
+            placeholder={t('world.addReference')}
+            items={imageItems}
+            accept="image/*"
+            constraints={{ kinds: ['image'], maxCount: 1, optional: true }}
+            onChoose={item => {
+              if (!item) { setUploadTarget(null); return }
+              void applyPickedVisual(item)
+            }}
+          />
         </div>
       )}
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
@@ -4045,90 +4001,162 @@ export function StoryLabPanel() {
                     approveSection={approve}
                     isSectionApproved={isApproved}
                     navigate={setTab}
-                    requiresVisualIdentities={!directVideo}
+                    requiresVisualIdentities={storyRecipeRequiresVisualIdentities(visualMode)}
                   />
                 )}
               </>
             )}
 
-            {tab === 'assets' && (
-              <StoryAssetsTab
-                project={project}
-                smartAssetBusy={smartAssetBusy}
-                smartAssetDescription={smartAssetDescription}
-                setSmartAssetDescription={setSmartAssetDescription}
-                smartAssetRef={smartAssetRef}
-                pendingSmartAssets={pendingSmartAssets}
-                setPendingSmartAssets={setPendingSmartAssets}
-                analyzeSmartAssets={analyzeSmartAssets}
-                applySmartAssets={applySmartAssets}
-                patchPendingSmartAsset={patchPendingSmartAsset}
-                styleConversion={styleConversion}
-                setStyleConversion={setStyleConversion}
-                styleConversionModel={styleConversionModel}
-                setStyleConversionModel={setStyleConversionModel}
-                styleConversionBusy={styleConversionBusy}
-                styleModelDownloading={styleModelDownloading}
-                setStyleModelDownloadError={setStyleModelDownloadError}
-                styleModelDownloadError={styleModelDownloadError}
-                localStyleModels={localStyleModels}
-                qwenModel={QWEN_STYLE_EDIT_MODEL}
-                fluxModel={FLUX_STYLE_EDIT_MODEL}
-                styleAssetIds={styleAssetIds}
-                setStyleAssetIds={setStyleAssetIds}
-                styleUsesMiniMax={styleUsesMiniMax}
-                selectedStyleModel={selectedStyleModel}
-                styleModelReady={styleModelReady}
-                miniMaxIncompatibleSelection={miniMaxIncompatibleSelection}
-                installStyleConversionModel={installStyleConversionModel}
-                cancelStyleConversion={cancelStyleConversion}
-                convertSelectedAssetsToStyle={convertSelectedAssetsToStyle}
-                selectedDraftAssetIds={selectedDraftAssetIds}
-                deleteSelectedDraftAssets={deleteSelectedDraftAssets}
-                toggleStyleAsset={toggleStyleAsset}
-                patchVisualAsset={patchVisualAsset}
-                visualAssetsNewestFirst={visualAssetsNewestFirst}
-              />
-            )}
-
-            {tab === 'world' && (
-              <StoryWorldTab
-                project={project}
-                patch={patch}
-                update={update}
-                busy={busy}
-                instruction={instruction}
-                setInstruction={setInstruction}
-                generate={generate}
-                approve={approve}
-                isApproved={isApproved}
-              />
-            )}
-
-            {tab === 'characters' && (
-              <StoryCharactersTab
-                project={project}
-                update={update}
-                busy={busy}
-                instruction={instruction}
-                setInstruction={setInstruction}
-                generate={generate}
-                approve={approve}
-                isApproved={isApproved}
-              />
-            )}
-
-            {tab === 'relationships' && (
-              <StoryRelationshipsTab
-                project={project}
-                update={update}
-                busy={busy}
-                instruction={instruction}
-                setInstruction={setInstruction}
-                generate={generate}
-                approve={approve}
-                isApproved={isApproved}
-              />
+            {tab === 'world' && project.projectType === 'full_story' ? (
+              <StoryUniverseTab>
+                <StoryWorldTab
+                  project={project}
+                  patch={patch}
+                  update={update}
+                  busy={busy}
+                  instruction={instruction}
+                  setInstruction={setInstruction}
+                  generate={generate}
+                  approve={approve}
+                  isApproved={isApproved}
+                />
+                <StoryCharactersTab
+                  project={project}
+                  update={update}
+                  busy={busy}
+                  instruction={instruction}
+                  setInstruction={setInstruction}
+                  generate={generate}
+                  approve={approve}
+                  isApproved={isApproved}
+                />
+                <StoryRelationshipsTab
+                  project={project}
+                  update={update}
+                  busy={busy}
+                  instruction={instruction}
+                  setInstruction={setInstruction}
+                  generate={generate}
+                  approve={approve}
+                  isApproved={isApproved}
+                />
+                <StoryAssetsTab
+                  project={project}
+                  smartAssetBusy={smartAssetBusy}
+                  smartAssetDescription={smartAssetDescription}
+                  setSmartAssetDescription={setSmartAssetDescription}
+                  smartAssetRef={smartAssetRef}
+                  pendingSmartAssets={pendingSmartAssets}
+                  setPendingSmartAssets={setPendingSmartAssets}
+                  analyzeSmartAssets={analyzeSmartAssets}
+                  applySmartAssets={applySmartAssets}
+                  patchPendingSmartAsset={patchPendingSmartAsset}
+                  styleConversion={styleConversion}
+                  setStyleConversion={setStyleConversion}
+                  styleConversionModel={styleConversionModel}
+                  setStyleConversionModel={setStyleConversionModel}
+                  styleConversionBusy={styleConversionBusy}
+                  styleModelDownloading={styleModelDownloading}
+                  setStyleModelDownloadError={setStyleModelDownloadError}
+                  styleModelDownloadError={styleModelDownloadError}
+                  localStyleModels={localStyleModels}
+                  qwenModel={QWEN_STYLE_EDIT_MODEL}
+                  fluxModel={FLUX_STYLE_EDIT_MODEL}
+                  styleAssetIds={styleAssetIds}
+                  setStyleAssetIds={setStyleAssetIds}
+                  styleUsesMiniMax={styleUsesMiniMax}
+                  selectedStyleModel={selectedStyleModel}
+                  styleModelReady={styleModelReady}
+                  miniMaxIncompatibleSelection={miniMaxIncompatibleSelection}
+                  installStyleConversionModel={installStyleConversionModel}
+                  cancelStyleConversion={cancelStyleConversion}
+                  convertSelectedAssetsToStyle={convertSelectedAssetsToStyle}
+                  selectedDraftAssetIds={selectedDraftAssetIds}
+                  deleteSelectedDraftAssets={deleteSelectedDraftAssets}
+                  toggleStyleAsset={toggleStyleAsset}
+                  patchVisualAsset={patchVisualAsset}
+                  visualAssetsNewestFirst={visualAssetsNewestFirst}
+                />
+              </StoryUniverseTab>
+            ) : (
+              <>
+                {tab === 'assets' && (
+                  <StoryAssetsTab
+                    project={project}
+                    smartAssetBusy={smartAssetBusy}
+                    smartAssetDescription={smartAssetDescription}
+                    setSmartAssetDescription={setSmartAssetDescription}
+                    smartAssetRef={smartAssetRef}
+                    pendingSmartAssets={pendingSmartAssets}
+                    setPendingSmartAssets={setPendingSmartAssets}
+                    analyzeSmartAssets={analyzeSmartAssets}
+                    applySmartAssets={applySmartAssets}
+                    patchPendingSmartAsset={patchPendingSmartAsset}
+                    styleConversion={styleConversion}
+                    setStyleConversion={setStyleConversion}
+                    styleConversionModel={styleConversionModel}
+                    setStyleConversionModel={setStyleConversionModel}
+                    styleConversionBusy={styleConversionBusy}
+                    styleModelDownloading={styleModelDownloading}
+                    setStyleModelDownloadError={setStyleModelDownloadError}
+                    styleModelDownloadError={styleModelDownloadError}
+                    localStyleModels={localStyleModels}
+                    qwenModel={QWEN_STYLE_EDIT_MODEL}
+                    fluxModel={FLUX_STYLE_EDIT_MODEL}
+                    styleAssetIds={styleAssetIds}
+                    setStyleAssetIds={setStyleAssetIds}
+                    styleUsesMiniMax={styleUsesMiniMax}
+                    selectedStyleModel={selectedStyleModel}
+                    styleModelReady={styleModelReady}
+                    miniMaxIncompatibleSelection={miniMaxIncompatibleSelection}
+                    installStyleConversionModel={installStyleConversionModel}
+                    cancelStyleConversion={cancelStyleConversion}
+                    convertSelectedAssetsToStyle={convertSelectedAssetsToStyle}
+                    selectedDraftAssetIds={selectedDraftAssetIds}
+                    deleteSelectedDraftAssets={deleteSelectedDraftAssets}
+                    toggleStyleAsset={toggleStyleAsset}
+                    patchVisualAsset={patchVisualAsset}
+                    visualAssetsNewestFirst={visualAssetsNewestFirst}
+                  />
+                )}
+                {tab === 'world' && (
+                  <StoryWorldTab
+                    project={project}
+                    patch={patch}
+                    update={update}
+                    busy={busy}
+                    instruction={instruction}
+                    setInstruction={setInstruction}
+                    generate={generate}
+                    approve={approve}
+                    isApproved={isApproved}
+                  />
+                )}
+                {tab === 'characters' && (
+                  <StoryCharactersTab
+                    project={project}
+                    update={update}
+                    busy={busy}
+                    instruction={instruction}
+                    setInstruction={setInstruction}
+                    generate={generate}
+                    approve={approve}
+                    isApproved={isApproved}
+                  />
+                )}
+                {tab === 'relationships' && (
+                  <StoryRelationshipsTab
+                    project={project}
+                    update={update}
+                    busy={busy}
+                    instruction={instruction}
+                    setInstruction={setInstruction}
+                    generate={generate}
+                    approve={approve}
+                    isApproved={isApproved}
+                  />
+                )}
+              </>
             )}
 
             {tab === 'structure' && (
@@ -4176,16 +4204,9 @@ export function StoryLabPanel() {
                 translateMusicCueLyrics={translateMusicCueLyrics}
                 generateMusicCueAudio={generateMusicCueAudio}
                 openMusicalTrailer={openMusicalTrailer}
-                onImportCustomMp3={cueId => {
-                  customMusicUploadCueId.current = cueId
-                  customMusicUploadRef.current?.click()
-                }}
-                onImportLyria={cueId => {
-                  lyriaUploadCueId.current = cueId
-                  lyriaUploadRef.current?.click()
-                }}
+                onImportCustomMp3={uploadCustomMusic}
+                onImportLyria={uploadLyriaResult}
                 onCopied={text => setNotice({ kind: 'ok', text })}
-                musicCoverRef={musicCoverRef}
                 uploadCoverReference={uploadCoverReference}
                 writeStorySong={writeStorySong}
                 adaptStoryLyrics={adaptStoryLyrics}
@@ -4195,56 +4216,7 @@ export function StoryLabPanel() {
               />
             )}
 
-            {tab === 'trailer' && (
-              <StoryTrailerTab
-                project={project}
-                patch={patch}
-                trailerDuration={trailerDuration}
-                setTrailerDuration={setTrailerDuration}
-                trailerDirection={trailerDirection}
-                setTrailerDirection={setTrailerDirection}
-                trailerTagline={trailerTagline}
-                setTrailerTagline={setTrailerTagline}
-                trailerFormat={trailerFormat}
-                setTrailerFormat={setTrailerFormat}
-                trailerNarration={trailerNarration}
-                setTrailerNarration={setTrailerNarration}
-                trailerSpoiler={trailerSpoiler}
-                setTrailerSpoiler={setTrailerSpoiler}
-                trailerIntensity={trailerIntensity}
-                setTrailerIntensity={setTrailerIntensity}
-                trailerTitleCards={trailerTitleCards}
-                setTrailerTitleCards={setTrailerTitleCards}
-                trailerPreserveVisualStyle={trailerPreserveVisualStyle}
-                setTrailerPreserveVisualStyle={setTrailerPreserveVisualStyle}
-                markTrailerTouched={markTrailerTouched}
-                directVideo={directVideo}
-                directReferenceVideo={directReferenceVideo}
-                approvedVisualReferenceCount={approvedVisualReferenceCount}
-                directReferenceVideoReady={directReferenceVideoReady}
-                directReferenceVideoSupported={directReferenceVideoSupported}
-                directVideoMasterReady={directVideoMasterReady}
-                filmImageModel={filmImageModel}
-                filmVideoModel={filmVideoModel}
-                selectableImageModels={selectableImageModels}
-                selectableVideoModels={selectableVideoModels}
-                selectedFilmImageModel={selectedFilmImageModel}
-                selectedFilmVideoModel={selectedFilmVideoModel}
-                selectDirectorImageModel={selectDirectorImageModel}
-                selectStoryVideoModel={selectStoryVideoModel}
-                storyVideoOptionsReady={storyVideoOptionsReady}
-                storyVideoConfigurationReady={storyVideoConfigurationReady}
-                storyVideoResolution={storyVideoResolution}
-                storyVideoAspectRatio={storyVideoAspectRatio}
-                storyVideoOptions={storyVideoOptions}
-                storyVideoAdjusted={storyVideoFormat.adjusted}
-                setStoryVideoFormat={setStoryVideoFormat}
-                trailerProductionIssues={trailerProductionIssues}
-                productionBusy={productionBusy}
-                filmGenerationImageReady={filmGenerationImageReady}
-                stageTrailer={stageTrailer}
-              />
-            )}
+            {tab === 'trailer' && trailerTab}
 
             {tab === 'productions' && (
               <StoryProductionsTab
@@ -4309,15 +4281,15 @@ export function StoryLabPanel() {
                 productionIssues={productionIssues}
                 musicProductionIssues={musicProductionIssues}
                 visibleProductionIssues={visibleProductionIssues}
-                onNavigate={setTab}
+                onNavigate={tabId => openStorySection(tabId)}
                 onOpenIssue={openProductionReviewIssue}
                 minimaxConfigured={Boolean(servicesConfig?.minimax_api_key_set)}
-                musicCoverRef={musicCoverRef}
                 uploadCoverReference={uploadCoverReference}
                 writeStorySong={writeStorySong}
                 adaptStoryLyrics={adaptStoryLyrics}
                 generateMinimaxSongs={generateMinimaxSongs}
                 openMusicalTrailer={openMusicalTrailer}
+                trailerRecipe={project.projectType === 'full_story' ? trailerTab : undefined}
               />
             )}
 
@@ -4331,13 +4303,9 @@ export function StoryLabPanel() {
           </div>
         </div>
       </div>
-      <input ref={uploadRef} type="file" accept="image/*" multiple className="hidden" onChange={event => uploadVisual(event.target.files)} />
+
       <input ref={smartAssetRef} type="file" accept="image/*" multiple className="hidden"
         onChange={event => void analyzeSmartAssets(Array.from(event.target.files || []))} />
-      <input ref={lyriaUploadRef} type="file" accept="audio/*" className="hidden"
-        onChange={event => void uploadLyriaResult(event.target.files?.[0])} />
-      <input ref={customMusicUploadRef} type="file" accept=".mp3,audio/mpeg,audio/*" className="hidden"
-        onChange={event => void uploadCustomMusic(event.target.files?.[0])} />
     </div>
     </StoryLabVisualsProvider>
   )

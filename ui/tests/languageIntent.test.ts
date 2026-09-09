@@ -159,6 +159,7 @@ test('every creative language-aware capability publishes and parses the shared c
     'create_story', 'update_story', 'generate_story_section', 'stage_story_comic',
     'stage_story_video', 'configure_story_song', 'stage_story_music_video',
     'create_series_episode', 'update_series_episode', 'generate_series_plan',
+    'stage_series_comic',
     'create_rhythmic_3d_video', 'create_comic',
   ])
   for (const capability of listCapabilities()) {

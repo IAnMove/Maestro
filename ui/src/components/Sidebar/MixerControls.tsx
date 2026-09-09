@@ -2,8 +2,10 @@ import { useState } from 'react'
 import { Plus, Trash2, Play, ArrowRight } from 'lucide-react'
 import { useStore } from '../../stores/useStore'
 import { useUiTranslation } from '../../i18n'
-import { FileUploadZone } from '../shared/FileUploadZone'
 import * as api from '../../api/client'
+import type { ApiOutput } from '../../api/outputs'
+import { AssetInput } from '../../features/asset-picker/AssetInput.tsx'
+import { applyChosenStudioMedia, studioMediaPath, useWorkspaceOutputs } from '../../lib/studioAssetPick.ts'
 
 interface MixerTrack {
   id: number
@@ -20,20 +22,6 @@ function emptyTrack(): MixerTrack {
   return { id: _nextTrackId++, filename: null, path: null, startTime: 0, volume: 100, durationSec: null }
 }
 
-function getAudioDuration(file: File): Promise<number | null> {
-  return new Promise(resolve => {
-    const url = URL.createObjectURL(file)
-    const audio = new Audio()
-    audio.addEventListener('loadedmetadata', () => {
-      const dur = audio.duration
-      URL.revokeObjectURL(url)
-      resolve(Number.isFinite(dur) ? Math.round(dur * 10) / 10 : null)
-    })
-    audio.addEventListener('error', () => { URL.revokeObjectURL(url); resolve(null) })
-    audio.src = url
-  })
-}
-
 export function MixerControls() {
   const { t } = useUiTranslation('studio')
   const { t: tCommon } = useUiTranslation('common')
@@ -48,15 +36,23 @@ export function MixerControls() {
   const [mixing, setMixing] = useState(false)
   const [mixResult, setMixResult] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const audioItems = useWorkspaceOutputs(activeWorkspace, 'audio')
 
-  const handleFileUpload = async (file: File, track: MixerTrack, update: (t: MixerTrack) => void) => {
-    try {
-      const result = await api.uploadImage(file)
-      const dur = await getAudioDuration(file)
-      update({ ...track, filename: file.name, path: result.path, durationSec: dur })
-    } catch (e) {
-      console.error('Upload failed:', e)
+  const chooseTrack = (item: ApiOutput | null, track: MixerTrack, update: (next: MixerTrack) => void) => {
+    if (!item) {
+      update({ ...emptyTrack(), id: track.id, volume: track.volume })
+      return
     }
+    const capturedId = track.id
+    applyChosenStudioMedia(item, next => {
+      update({
+        ...track,
+        id: capturedId,
+        filename: item.name,
+        path: studioMediaPath(item),
+        durationSec: next.duration > 0 ? Math.round(next.duration * 10) / 10 : null,
+      })
+    })
   }
 
   const updateOverlay = (id: number, partial: Partial<MixerTrack>) => {
@@ -121,12 +117,15 @@ export function MixerControls() {
         <label className="text-[11px] text-text-muted uppercase tracking-wider mb-1.5 block">
           {t('mixer.base')} <span className="normal-case text-text-muted">({t('mixer.fullDuration')})</span>
         </label>
-        <FileUploadZone
+        <AssetInput
           label={t('mixer.dropBase')}
-          accept=".wav,.mp3,.flac,.ogg,.m4a"
-          filename={baseTrack.filename}
-          onFile={f => handleFileUpload(f, baseTrack, setBaseTrack)}
-          onClear={() => setBaseTrack({ ...emptyTrack(), volume: 100 })}
+          placeholder={t('mixer.dropBase')}
+          items={audioItems}
+          accept=".wav,.mp3,.flac,.ogg,.m4a,audio/*"
+          workspaceId={activeWorkspace}
+          optional={Boolean(baseTrack.path)}
+          constraints={{ kinds: ['audio'], maxCount: 1, optional: true }}
+          onChoose={item => chooseTrack(item, baseTrack, setBaseTrack)}
         />
         {baseTrack.path && (
           <div className="flex items-center gap-3 mt-1.5">
@@ -175,12 +174,17 @@ export function MixerControls() {
                 <span className="text-[9px] text-text-muted shrink-0">{idx + 1}.</span>
                 <div className="flex-1 min-w-0">
                   {!track.path ? (
-                    <FileUploadZone
+                    <AssetInput
                       label={t('mixer.dropAudio')}
-                      accept=".wav,.mp3,.flac,.ogg,.m4a"
-                      filename={track.filename}
-                      onFile={f => handleFileUpload(f, track, t => updateOverlay(track.id, t))}
-                      onClear={() => removeOverlay(track.id)}
+                      placeholder={t('mixer.dropAudio')}
+                      items={audioItems}
+                      accept=".wav,.mp3,.flac,.ogg,.m4a,audio/*"
+                      workspaceId={activeWorkspace}
+                      constraints={{ kinds: ['audio'], maxCount: 1, optional: false }}
+                      onChoose={item => {
+                        if (!item) return
+                        chooseTrack(item, track, next => updateOverlay(track.id, next))
+                      }}
                     />
                   ) : (
                     <div className="flex items-center gap-1.5 bg-bg-tertiary rounded px-2 py-1">

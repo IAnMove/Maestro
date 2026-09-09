@@ -135,6 +135,9 @@ export function MediaFeedItem({ file, index, isActive, onVisible, onMeasured, ma
   const [selectingForMontage, setSelectingForMontage] = useState(false)
   const [montageSelectionError, setMontageSelectionError] = useState('')
   const [comicOpenError, setComicOpenError] = useState('')
+  const [settingsError, setSettingsError] = useState('')
+  const [settingsBusy, setSettingsBusy] = useState(false)
+  const settingsPending = useRef(false)
   const moveRef = useRef<HTMLDivElement>(null)
   const itemRef = useRef<HTMLDivElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -302,15 +305,23 @@ export function MediaFeedItem({ file, index, isActive, onVisible, onMeasured, ma
     setSelectedOutput(index)
   }, [file, index, isComic, isScene, setMediaFilter, setSelectedOutput])
 
-  const handleLoadSettings = useCallback(() => {
+  const handleOutputSettings = useCallback(async (reroll: boolean) => {
+    if (settingsPending.current) return
+    settingsPending.current = true
+    setSettingsBusy(true)
+    setSettingsError('')
     setSelectedOutput(index)
-    setTimeout(() => loadSettingsFromOutput(), 50)
-  }, [index, setSelectedOutput, loadSettingsFromOutput])
-
-  const handleReroll = useCallback(() => {
-    setSelectedOutput(index)
-    setTimeout(() => rerollGeneration(), 50)
-  }, [index, setSelectedOutput, rerollGeneration])
+    try {
+      const action = reroll ? rerollGeneration : loadSettingsFromOutput
+      const restored = await action({ name: file.name, workspace: outputWorkspace })
+      if (restored === false) setSettingsError(t('settingsUnavailable'))
+    } catch (error) {
+      setSettingsError(error instanceof Error ? error.message : t('settingsUnavailable'))
+    } finally {
+      settingsPending.current = false
+      setSettingsBusy(false)
+    }
+  }, [file.name, outputWorkspace, index, setSelectedOutput, loadSettingsFromOutput, rerollGeneration, t])
 
   const handleUseAsEditorReplacement = useCallback(() => {
     const target = readVideoEditorReplacementTarget()
@@ -811,19 +822,22 @@ export function MediaFeedItem({ file, index, isActive, onVisible, onMeasured, ma
                 <BookMarked size={13} />
               </button>
               <button
-                onClick={handleLoadSettings}
+                onClick={event => { event.stopPropagation(); void handleOutputSettings(false) }}
+                disabled={settingsBusy}
                 className="p-1.5 rounded-lg hover:bg-bg-hover text-text-secondary hover:text-text-primary transition-colors"
                 title="Load settings"
               >
                 <Pencil size={13} />
               </button>
               <button
-                onClick={handleReroll}
+                onClick={event => { event.stopPropagation(); void handleOutputSettings(true) }}
+                disabled={settingsBusy}
                 className="p-1.5 rounded-lg hover:bg-bg-hover text-text-secondary hover:text-text-primary transition-colors"
                 title="Re-generate with same settings"
               >
                 <RefreshCw size={13} />
               </button>
+              {settingsError && <span role="alert" className="text-xs text-red-400">{settingsError}</span>}
               {file.type === 'video' && (
                 <>
                   <button

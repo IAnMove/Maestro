@@ -1,0 +1,9 @@
+# Optional H3 Semantic Bridge
+
+Source: [speach1sdef178/MiniMax-H3-Semantic-Bridge](https://huggingface.co/speach1sdef178/MiniMax-H3-Semantic-Bridge), revision `8c2d9b0edb844d6002864a9addd61458dbe81c22`. The weights are distributed under the [MiniMax H3 Community License Agreement](https://huggingface.co/MiniMaxAI/MiniMax-H3/blob/main/LICENSE). The model card and inspected ComfyUI implementation describe the math reproduced independently here; no ComfyUI node or teacher runtime is installed.
+
+The ~11 MB adapter modifies layer-49 native H3 conditioning through a 5120→512→512→5120 SiLU MLP, then blends its output back into the original conditioning. SenseNova was the research teacher and is not needed for inference. Default is **off**. Author-recommended enabled strength is 0.10 with per-token RMS matching; 0.15 was used for the published qualitative examples. Alignment scores and a few A/B clips do not establish a general video-quality guarantee or speech-quality improvement.
+
+Only standard FL2VA First/Last Pruned and Full are enabled. The author explicitly excludes Ref2VA because reference-audio tests degraded singing/lip-sync. Fused's compatibility is unverified and is conservatively excluded, as is the separate Legacy runtime. A zero strength is an identity operation with no download. Files are revision-pinned and size/SHA256 verified before loading; unexpected tensor keys or shapes fail explicitly. CPU weights may be cached, but GPU weight copies are not retained between calls. Floating-point inference needs more RAM than the 11 MB fp16 file size.
+
+Generation parameters: `minimax_h3_semantic_bridge_alpha` (0–1, default 0) and `minimax_h3_semantic_bridge_magnitude` (`per_token`, `global`, `none`). The UI starts with per-token matching and offers the recommended strengths 0.10/0.15; custom strengths restored from metadata remain visible. Reference tags, speaker bindings and the main transformer weights are unchanged.

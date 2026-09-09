@@ -9,10 +9,22 @@ name: CI
 # are documentation only; do not use moving tags such as @v4 or @latest.
 on:
   push:
-    branches: [main, dev]
+    branches: [main, development, dev]
   pull_request:
-    branches: [main, dev]
+    branches: [main, development, dev]
   workflow_dispatch:
+
+# Measuring jobs never get write tokens. Artifact upload still works with
+# contents: read on this repository. Do not restore pull-request write
+# permission on ui-check; that is how untrusted PR code published comments.
+permissions:
+  contents: read
+
+# Cancel superseded PR runs only. Pushes to development/main keep run_id so a
+# release or branch push is not cancelled by a later PR.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   guard:
@@ -40,6 +52,7 @@ jobs:
         run: >-
           python -m pip install
           "starlette==0.46.1"
+          "soundfile==0.13.1"
           "numpy==2.2.6"
           "opencv-python-headless==4.12.0.88"
           "Pillow==11.3.0"
@@ -81,9 +94,6 @@ jobs:
     name: UI tests + lint + type-check + build
     runs-on: ubuntu-24.04
     timeout-minutes: 10
-    permissions:
-      contents: read
-      pull-requests: write
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
@@ -97,32 +107,31 @@ jobs:
         run: npm ci
       - name: First-party LOC and complexity ratchet
         env:
-          GH_TOKEN: ${{ github.token }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          # PRs compare with the PR base. Pushes to development/main compare
+          # with the previous tip (github.event.before). Never fall back to
+          # the historical dashboard: that paints merge commits red.
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: |
           set -euo pipefail
-          SCORE_ARGS=()
-          BASELINE_ARGS=()
-          if [ -n "${BASE_SHA:-}" ]; then
-            if ! git cat-file -e "${BASE_SHA}^{commit}"; then
-              git fetch --no-tags --depth=1 origin "${BASE_SHA}"
-            fi
-            BASE_PARENT="$(mktemp -d)"
-            BASE_DIR="${BASE_PARENT}/repo"
-            git worktree add --detach "${BASE_DIR}" "${BASE_SHA}"
-            ln -s "${GITHUB_WORKSPACE}/ui/node_modules" "${BASE_DIR}/ui/node_modules"
-            (cd "${BASE_DIR}" && python scripts/code_health.py --json) > /tmp/code-health-pr-base.json
-            BASELINE_ARGS=(--baseline /tmp/code-health-pr-base.json)
-            SCORE_ARGS=(--score-baseline /tmp/code-health-pr-base.json --score-baseline-label "PR base")
+          if [ -z "${BASE_SHA:-}" ] || [ "${BASE_SHA}" = "0000000000000000000000000000000000000000" ]; then
+            echo "Cannot resolve code-health base: need pull_request.base.sha or push before" >&2
+            exit 2
           fi
           set +e
-          python scripts/code_health.py --check --markdown --publish-pr-comment "${BASELINE_ARGS[@]}" "${SCORE_ARGS[@]}" | tee code-health.md
+          bash scripts/check_code_health_pr_base.sh | tee code-health.md
           STATUS=${PIPESTATUS[0]}
           set -e
-          if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+          if [ -n "${GITHUB_STEP_SUMMARY:-}" ] && [ -s code-health.md ]; then
             cat code-health.md >> "$GITHUB_STEP_SUMMARY"
           fi
           exit "$STATUS"
+      - name: Upload code-health report
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: code-health-report
+          path: code-health.md
+          if-no-files-found: ignore
       # Split `npm run check` so a hung runner is visible in the failing step
       # instead of one opaque 6-hour job (GitHub's default timeout).
       - name: UI tests
@@ -155,11 +164,15 @@ jobs:
       - name: Install Playwright Chromium
         working-directory: ui
         run: npx playwright install --with-deps chromium
+      - name: Install Chrome for native H.264 and AAC speech export checks
+        working-directory: ui
+        run: npx playwright install chrome
       - name: UI E2E
         working-directory: ui
         run: npm run test:e2e
       - name: Upload Playwright artifacts
-        if: failure()
+        # Passing speech tests also attach screenshots, native JSON and MP4 evidence.
+        if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: ui-e2e-artifacts
@@ -167,3 +180,80 @@ jobs:
             ui/playwright-report
             ui/test-results
           if-no-files-found: ignore
+
+  ui-speech-windows:
+    name: Speech E2E Windows (real H.264 + AAC)
+    runs-on: windows-2025
+    timeout-minutes: 15
+    env:
+      # This job may not pass via the unsupported-codec assertion.
+      HOCUSPOCUS_REQUIRE_SPEECH_AAC: "1"
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: "24.18.0"
+          check-latest: false
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - name: Install UI deps
+        working-directory: ui
+        run: npm ci
+      - name: Install Chromium for screen regression and Edge for native AAC
+        working-directory: ui
+        run: npx playwright install chromium msedge
+      - name: Speech E2E with real export required
+        working-directory: ui
+        run: npm run test:e2e -- scene3d-speech.spec.ts scene3d-media-screen.spec.ts --workers=1
+      - name: Upload speech evidence
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: ui-speech-windows-artifacts
+          path: |
+            ui/playwright-report
+            ui/test-results
+          if-no-files-found: ignore
+
+  code-health-comment:
+    name: Code-health PR comment
+    if: ${{ github.event_name == 'pull_request' && always() && github.event.pull_request.head.repo.full_name == github.repository }}
+    needs: [ui-check]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      # Publisher runs from the PR *base* tree so untrusted head code cannot
+      # replace publish_pr_markdown.py while this job has pull-requests:write.
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+      - name: Download code-health report
+        continue-on-error: true
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+        with:
+          name: code-health-report
+          path: .
+      - name: Publish score comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/publish_pr_markdown.py --file code-health.md
+
+  ci-required:
+    name: CI required
+    if: always()
+    needs: [guard, ui-check, ui-e2e, ui-speech-windows]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - name: Require successful jobs
+        run: |
+          python3 scripts/ci_required.py \
+            "Clean-repo guard + Python checks=${{ needs.guard.result }}" \
+            "UI tests + lint + type-check + build=${{ needs.ui-check.result }}" \
+            "UI E2E boot (Chromium + simulated API)=${{ needs.ui-e2e.result }}" \
+            "Speech E2E Windows (real H.264 + AAC)=${{ needs.ui-speech-windows.result }}"

@@ -7,6 +7,8 @@ import math
 import re
 from typing import Any
 
+from .h3_prompt_policy import tagged_dialogue
+
 
 H3_RESOLUTIONS = {
     ("landscape", "480p"): "864x480",
@@ -115,7 +117,7 @@ def plan_series_shot_duration(series: dict, shot: dict) -> dict:
     if mode == "frame_lattice":
         native_params: dict[str, Any] = {
             "prompt": " ".join(
-                f"<d>[{segment['language']}] {segment['text']}</d>"
+                tagged_dialogue(segment["language"], segment["text"])
                 for segment in segments
             ),
             "video_length": round(float(updated.get("durationSeconds") or 0) * 24),
@@ -332,7 +334,7 @@ def _h3_dialogue_description(series: dict, shot: dict, character_names: dict[str
         dialogue = str(beat.get("text") or "").strip()
         lines.append(
             f"{speaker} ({speaker_ids[character_id]}), {emotion}, {delivery}: "
-            f"<d>[{language_tag}] {dialogue}</d>"
+            f"{tagged_dialogue(language_tag, dialogue)}"
         )
     return " ".join(lines)
 
@@ -346,6 +348,10 @@ def series_dialogue_preflight_issues(shot: dict, series: dict | None = None) -> 
         if isinstance(beat, dict) and str(beat.get("text") or "").strip()
     ]
     issues: list[str] = []
+    if shot.get("scriptDialogueStatus") in {"stale", "manual_conflict"}:
+        issues.append(
+            "shot dialogue is out of date with the episode script; sync the shot before rendering"
+        )
     for beat in beats:
         dialogue = str(beat.get("text") or "").strip()
         if re.search(r"</?d(?:\s|>)", dialogue, flags=re.IGNORECASE):
@@ -464,14 +470,76 @@ def shot_generation_prompt(series: dict, shot: dict, manifest: dict | None = Non
     )
 
 
+# Family / variant / workflow table aligned with ui/src/lib/h3Catalog.ts.
+# Unknown IDs are returned unchanged; they are never rewritten to pruned H3.
+H3_VARIANT_BY_WORKFLOW = {
+    "legacy": {
+        "frames": "minimax_h3_legacy",
+        "references": "minimax_h3_legacy",
+    },
+    "pruned": {
+        "frames": "minimax_h3",
+        "references": "minimax_h3_ref2va",
+    },
+    "full": {
+        "frames": "minimax_h3_full",
+        "references": "minimax_h3_ref2va_full",
+    },
+    "fast": {
+        "frames": "minimax_h3_fused_turbo",
+        "references": "minimax_h3_ref2va_fused_turbo",
+    },
+}
+H3_MODEL_ALIASES = {
+    "minimax-h3": "minimax_h3",
+}
+H3_MODEL_VARIANT = {
+    model: variant
+    for variant, workflows in H3_VARIANT_BY_WORKFLOW.items()
+    for model in workflows.values()
+}
+H3_MODEL_VARIANT.update({
+    alias: H3_MODEL_VARIANT[canonical]
+    for alias, canonical in H3_MODEL_ALIASES.items()
+    if canonical in H3_MODEL_VARIANT
+})
+
+
+def h3_variant_for_model(requested_model: str) -> str | None:
+    key = str(requested_model or "").strip()
+    if not key:
+        return "pruned"
+    key = H3_MODEL_ALIASES.get(key, key)
+    return H3_MODEL_VARIANT.get(key)
+
+
 def model_for_manifest(requested_model: str, manifest: dict) -> str:
-    if str(requested_model or "") == "minimax_h3_legacy":
-        return "minimax_h3_legacy"
-    strategy = str(manifest.get("strategy") or "direct")
-    full = str(requested_model or "").endswith("_full")
-    if strategy == "references":
-        return "minimax_h3_ref2va_full" if full else "minimax_h3_ref2va"
-    return "minimax_h3_full" if full else "minimax_h3"
+    requested = str(requested_model or "").strip() or "minimax_h3"
+    variant = h3_variant_for_model(requested)
+    if variant is None:
+        return requested
+    strategy = str((manifest or {}).get("strategy") or "direct")
+    workflow = "references" if strategy == "references" else "frames"
+    return H3_VARIANT_BY_WORKFLOW[variant][workflow]
+
+
+def apply_series_h3_model_settings(model: str, settings: dict | None) -> dict:
+    """Keep fused 4-8 step bounds without rewriting shifts or the prompt."""
+    out = copy.deepcopy(settings) if isinstance(settings, dict) else {}
+    if h3_variant_for_model(model) != "fast":
+        return out
+    from models.minimax_h3.fused_turbo import (
+        FUSED_H3_DEFAULT_EVALUATIONS,
+        normalize_fused_h3_steps,
+    )
+    raw = out.get("numInferenceSteps")
+    try:
+        out["numInferenceSteps"] = normalize_fused_h3_steps(
+            None if raw in (None, "") else raw
+        )
+    except ValueError:
+        out["numInferenceSteps"] = FUSED_H3_DEFAULT_EVALUATIONS
+    return out
 
 
 def _h3_reference(item: dict, path: str) -> dict:
@@ -512,10 +580,11 @@ def build_h3_generation_params(
     strategy = str(manifest.get("strategy") or "direct")
     settings = copy.deepcopy(attempt.get("settings")) if isinstance(attempt.get("settings"), dict) else {}
     requested_model = str(attempt.get("model") or "minimax_h3")
-    resolution, orientation = normalize_series_resolution(
-        settings.get("resolution"), settings.get("orientation"), requested_model,
-    )
     model = model_for_manifest(requested_model, manifest)
+    settings = apply_series_h3_model_settings(model, settings)
+    resolution, orientation = normalize_series_resolution(
+        settings.get("resolution"), settings.get("orientation"), model,
+    )
     params = {
         "model_type": model,
         "prompt": str(attempt.get("prompt") or shot_generation_prompt(series, shot, manifest)),

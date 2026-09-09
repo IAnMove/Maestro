@@ -5,6 +5,16 @@ export const MINIMAX_MUSIC3_LOCAL_MODEL = 'minimax_music3' as const
 
 export type StoryMusicModel = StoryMusicDraft['model']
 
+export class MusicModelResolutionError extends Error {
+  readonly reasons: string[]
+
+  constructor(message: string, reasons: string[] = []) {
+    super(message)
+    this.name = 'MusicModelResolutionError'
+    this.reasons = reasons
+  }
+}
+
 export interface StoryMusicModelInventoryItem {
   model_type: string
   is_downloaded?: boolean
@@ -44,6 +54,15 @@ export function storyMusicGenerationReady(
   return isLocalMusicModel(model) || minimaxConfigured
 }
 
+export function storyMusicReadyMessageKey(
+  model: string | undefined,
+  minimaxConfigured: boolean,
+): 'music.aceLocalReady' | 'music.minimaxLocalReady' | 'music.minimaxReady' | 'music.minimaxMissing' {
+  if (isAceStepMusicModel(model)) return 'music.aceLocalReady'
+  if (String(model || '') === MINIMAX_MUSIC3_LOCAL_MODEL) return 'music.minimaxLocalReady'
+  return minimaxConfigured ? 'music.minimaxReady' : 'music.minimaxMissing'
+}
+
 export function normalizeStoryMusicModel(model: unknown): StoryMusicDraft['model'] {
   const value = String(model || '')
   if (value === 'music-2.6' || value === 'music-3.0' || value === MINIMAX_MUSIC3_LOCAL_MODEL) return value
@@ -76,7 +95,10 @@ export function resolveStoryMusicModel(
   }
   if (installed.length === 1) return installed[0].model_type as StoryMusicModel
   if (isStoryMusicModel(selected)) return selected
-  return ACE_STEP_MUSIC_MODEL
+  throw new MusicModelResolutionError(
+    'No music model was requested, selected, or installed.',
+    ['Silent ACE-Step fallback is not allowed.'],
+  )
 }
 
 export function songWriteTarget(model: string | undefined): 'ace-step' | 'minimax' | 'minimax-music3' {

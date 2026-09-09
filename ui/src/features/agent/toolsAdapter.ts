@@ -2,7 +2,7 @@ import { useStore } from '../../stores/useStore'
 import * as api from '../../api/client'
 import i18n from '../../i18n'
 import type { AdapterOutcome, ToolsAdapter } from './applicationAdapters'
-import type { AgentRemoveBackgroundAction } from './agentActions'
+import type { AgentRemoveBackgroundAction, AgentUpscaleAction } from './agentActions'
 import type { AgentTab } from './capabilityRegistry'
 import type { GenerationSubmissionContext } from '../studio/generationProvenance'
 import {
@@ -19,6 +19,7 @@ type ResolvedSource = {
   url: string
   assetId?: string
   sourceWorkspace?: string
+  kind?: 'image' | 'video'
 }
 
 function sourceBasename(source: string): string {
@@ -56,7 +57,7 @@ function fileUrlQueryWorkspace(source: string | undefined): string | undefined {
   }
 }
 
-function explicitSourceWorkspace(action: AgentRemoveBackgroundAction): string | undefined {
+function explicitSourceWorkspace(action: { sourceWorkspace?: string; source?: string }): string | undefined {
   return action.sourceWorkspace?.trim() || fileUrlQueryWorkspace(action.source)
 }
 
@@ -113,6 +114,10 @@ function target(taskId: string): AgentExecutionTarget {
   return { kind: 'tool_job', id: taskId, title: i18n.t('removeBackgroundTitle', { ns: 'wizard' }) }
 }
 
+function upscaleTarget(taskId: string): AgentExecutionTarget {
+  return { kind: 'tool_job', id: taskId, title: i18n.t('upscaleTitle', { ns: 'wizard' }) }
+}
+
 export function createToolsAdapter(navigate: Navigate): ToolsAdapter {
   return {
     async removeBackground(action, context?: GenerationSubmissionContext) {
@@ -137,6 +142,52 @@ export function createToolsAdapter(navigate: Navigate): ToolsAdapter {
         },
       }
     },
+    async upscale(action, context?: GenerationSubmissionContext) {
+      const workspace = useStore.getState().activeWorkspace || 'default'
+      const source = await resolveUpscaleSource(action, workspace)
+      assertUpscaleWorkspace(workspace)
+      await showUpscaleSource(navigate, source, action, workspace)
+      assertUpscaleWorkspace(workspace)
+      const state = useStore.getState()
+      const { prepareStudioToolsUpscaleSubmission, toolsUpscaleParamsFromState } =
+        await import('../studio/toolsCommandSubmission')
+      const params = toolsUpscaleParamsFromState(state)
+      if (context?.workspaceCollectionId) {
+        params.provenance = { workspace_id: context.workspaceCollectionId }
+      }
+      const submission = await prepareStudioToolsUpscaleSubmission(
+        params,
+        state,
+        () => useStore.getState(),
+        context || { actor: 'wizard', capability: 'tools.upscale' },
+      )
+      const result = await submission.submit()
+      const taskId = result.task_id || result.job_id
+      const message = i18n.t('upscaleQueued', {
+        ns: 'wizard', name: source.name, kind: action.sourceKind,
+      })
+      const jobTarget = upscaleTarget(taskId)
+      const report = executionReport({
+        state: 'queued', message, target: jobTarget, taskId, recoverable: true,
+        executionKey: executionKey({ workspace, type: action.type, targetId: source.assetId || source.source, params: action }),
+      })
+      rememberExecution(report)
+      return {
+        message, target: jobTarget, taskId, report,
+        metadata: {
+          tool: 'upscale', sourceAssetId: source.assetId || null,
+          source: source.source, sourceWorkspace: source.sourceWorkspace || workspace,
+          sourceKind: source.kind, method: action.method,
+        },
+      }
+    },
+  }
+}
+
+function assertUpscaleWorkspace(workspace: string): void {
+  const currentWorkspace = useStore.getState().activeWorkspace || 'default'
+  if (currentWorkspace !== workspace) {
+    throw new Error(i18n.t('upscaleWorkspaceChanged', { ns: 'wizard' }))
   }
 }
 
@@ -149,6 +200,96 @@ async function showSource(navigate: Navigate, source: ResolvedSource): Promise<v
     path: source.source, name: source.name, url: source.url,
     assetId: source.assetId || null, workspace: source.sourceWorkspace || null, kind: 'image',
   })
+}
+
+async function showUpscaleSource(
+  navigate: Navigate,
+  source: ResolvedSource,
+  action: AgentUpscaleAction,
+  expectedWorkspace: string,
+): Promise<void> {
+  await navigate('studio')
+  // Navigation can suspend while the user changes workspace. Check before
+  // writing any Tools controls so a late adapter result cannot overwrite the
+  // newly selected workspace's form.
+  assertUpscaleWorkspace(expectedWorkspace)
+  const state = useStore.getState()
+  state.setGenerationMode('tools')
+  state.setToolsTool('upscale')
+  state.setToolsUpscaleMethod(action.method)
+  state.setParams({
+    seed: action.seed ?? -1,
+    wangp_processor_settings: action.wangpProcessorSettings ?? undefined,
+  })
+  state.setToolsSource({
+    path: source.assetId || source.source,
+    name: source.name,
+    url: source.url,
+    assetId: source.assetId || null,
+    workspace: source.sourceWorkspace || null,
+    kind: source.kind || null,
+  })
+}
+
+type AssetSource = {
+  asset: api.AssetCatalogItem
+  source: string
+  sourceWorkspace: string
+  url: string
+}
+
+async function resolveUpscaleSource(
+  action: AgentUpscaleAction,
+  workspace: string,
+): Promise<ResolvedSource> {
+  const { canonicalToolsSource } = await import('../studio/toolsSource')
+  const assetId = action.assetId?.trim() || undefined
+  const assetSource = assetId
+    ? await resolveUpscaleAssetSource(assetId, action, explicitSourceWorkspace(action), workspace)
+    : undefined
+  const rawSource = action.source?.trim() || ''
+  if (!assetId && !rawSource) throw new Error(i18n.t('upscaleMissingSource', { ns: 'wizard' }))
+  const source = assetId || canonicalToolsSource(
+    rawSource,
+    rawSource.startsWith('/api/') || rawSource.startsWith('asset') ? rawSource : undefined,
+    explicitSourceWorkspace(action),
+    workspace,
+  )
+  const sourceUrl = assetSource
+    ? canonicalToolsSource(assetSource.source, assetSource.url, assetSource.sourceWorkspace, workspace)
+    : source
+  return {
+    source,
+    name: assetSource?.asset.filename || sourceBasename(rawSource || source),
+    url: sourceUrl,
+    assetId,
+    sourceWorkspace: explicitSourceWorkspace(action) || assetSource?.sourceWorkspace,
+    kind: action.sourceKind,
+  }
+}
+
+async function resolveUpscaleAssetSource(
+  assetId: string,
+  action: AgentUpscaleAction,
+  preferredWorkspace: string | undefined,
+  workspace: string,
+): Promise<AssetSource> {
+  const asset = await api.fetchAsset(assetId)
+  if (asset.kind !== action.sourceKind) {
+    throw new Error(i18n.t('upscaleInvalidAsset', { ns: 'wizard', kind: action.sourceKind }))
+  }
+  const location = preferredWorkspace
+    ? asset.locations.find(item => item.workspace_id === preferredWorkspace)
+    : asset.locations.find(item => item.workspace_id === workspace)
+  if (preferredWorkspace && !location) {
+    throw new Error(i18n.t('upscaleSourceWorkspaceUnavailable', { ns: 'wizard', workspace: preferredWorkspace }))
+  }
+  if (!preferredWorkspace && !location && asset.locations.length > 1) {
+    throw new Error(i18n.t('upscaleSourceWorkspaceRequired', { ns: 'wizard' }))
+  }
+  const selected = location || asset.locations[0]
+  if (!selected) throw new Error(i18n.t('upscaleNoLocation', { ns: 'wizard' }))
+  return { asset, source: selected.filename, sourceWorkspace: selected.workspace_id, url: selected.url }
 }
 
 function buildRequest(

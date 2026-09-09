@@ -10,34 +10,9 @@ from typing import Optional
 
 _GUIDES_DIR = os.path.join(os.path.dirname(__file__), "llm_guides", "enhance")
 
-# Map architecture prefixes to guide files
+# Image/audio prefixes. Video stems live in guide_resolution.VIDEO_GUIDE_STEMS.
 # Values can be a string (single guide) or a tuple (with_images_guide, without_images_guide)
 _ARCHITECTURE_MAP = {
-    # MiniMax H3 joint native-audio video models
-    "minimax_h3_ref2va": "minimax_h3_ref2va_video.md",
-    "minimax_h3_legacy": "minimax_h3_video.md",
-    "minimax_h3": "minimax_h3_video.md",
-
-    # LTX-2 video models
-    "ltx2": "ltx2_video.md",
-    "ltxv": "ltx2_video.md",
-
-    # Wan video models
-    "t2v": "wan_video.md",
-    "i2v": "wan_video.md",
-    "ti2v": "wan_video.md",
-    "animate": "wan_video.md",
-    "wanmove": "wan_video.md",
-    "ovi": "wan_video.md",
-    "lucy": "wan_video.md",
-    "multitalk": "wan_video.md",
-    "phantom": "wan_video.md",
-    "fun_inp": "wan_video.md",
-    "alpha": "wan_video.md",
-    "fantasy": "wan_video.md",
-    "chrono": "wan_video.md",
-    "flf2v": "wan_video.md",
-
     # Qwen image models — edit guide when reference image exists, gen guide otherwise
     "qwen_image_edit": ("qwen_image_edit.md", "qwen_image_gen.md"),
     "qwen_image_layered": ("qwen_image_edit.md", "qwen_image_gen.md"),
@@ -52,9 +27,6 @@ _ARCHITECTURE_MAP = {
     "ace_step": "audio_tts.md",
     "chatterbox": "audio_tts.md",
 
-    # Hunyuan
-    "hunyuan": "wan_video.md",
-    "heartmula": "wan_video.md",
 }
 
 # Fallback by generation mode
@@ -84,7 +56,8 @@ def get_enhance_guide(model_type: str, generation_mode: str, has_images: bool = 
          that file. Lets specific community fine-tunes (e.g. 10Eros)
          ship their own prompt-enhancer rules without having to extend
          the architecture map below.
-      2. Architecture-prefix mapping (_ARCHITECTURE_MAP).
+      2. Shared video stems (guide_resolution.VIDEO_GUIDE_STEMS) or
+         image/audio prefixes (_ARCHITECTURE_MAP); longest prefix wins.
       3. Generation-mode fallback (_MODE_FALLBACK).
       4. Ultimate inline fallback string.
 
@@ -134,16 +107,18 @@ def get_enhance_guide(model_type: str, generation_mode: str, has_images: bool = 
 
     # 2. Architecture-specific match (longest prefix first)
     base = None
-    model_lower = model_type.lower()
-    best_match = None
-    best_len = 0
-    for prefix, guide_entry in _ARCHITECTURE_MAP.items():
-        if model_lower.startswith(prefix) and len(prefix) > best_len:
-            best_match = guide_entry
-            best_len = len(prefix)
+    from services.guide_resolution import VIDEO_GUIDE_STEMS, longest_prefix
 
-    if best_match:
-        # Resolve tuple: (with_images_guide, without_images_guide)
+    video_key = longest_prefix(model_type, VIDEO_GUIDE_STEMS)
+    arch_key = longest_prefix(model_type, _ARCHITECTURE_MAP)
+    if len(video_key) > len(arch_key):
+        guide_file = f"{VIDEO_GUIDE_STEMS[video_key]}.md"
+        guide = _load_guide(guide_file)
+        if guide:
+            print(f"[Enhance] Loaded guide: {guide_file} (has_images={has_images})")
+            base = guide
+    elif arch_key:
+        best_match = _ARCHITECTURE_MAP[arch_key]
         if isinstance(best_match, tuple):
             guide_file = best_match[0] if has_images else best_match[1]
         else:

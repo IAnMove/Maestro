@@ -22,7 +22,7 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-from . import execution_mode, resource_scheduler
+from . import execution_mode, resource_scheduler, model3d_external
 from .asset_manifest import publish_generation_sidecar_best_effort
 from .hunyuan3d.weight_integrity import dit_cache_root, purge_truncated_safetensors, truncated_safetensors
 from .minimax_image_service import MiniMaxImageError, generate_image as generate_minimax_image
@@ -175,6 +175,7 @@ MODELS: list[dict[str, Any]] = [
     },
 ]
 
+MODELS.extend(model3d_external.EXTERNAL_MODELS)
 MODEL_BY_ID = {model["id"]: model for model in MODELS}
 
 PRESETS: dict[str, dict[str, Any]] = {
@@ -377,7 +378,11 @@ def capabilities() -> dict[str, Any]:
         active = sum(1 for job in _jobs.values() if job["status"] in _ACTIVE_JOB_STATES)
     return {
         "runtime": installation_status(),
-        "models": MODELS,
+        "models": [
+            {**model, "runtime": model3d_external.installation_status(model["id"])}
+            if model["id"] in model3d_external.EXTERNAL_IDS else model
+            for model in MODELS
+        ],
         "presets": [{"id": key, **value} for key, value in PRESETS.items()],
         "texture_modes": [
             {"id": "none", "label": "Geometry only", "recommended_vram_gb": 6},
@@ -429,6 +434,9 @@ def _prepare_request(
     if model_id not in MODEL_BY_ID:
         raise ValueError(f"Unknown Hunyuan3D model: {model_id}")
     model = dict(MODEL_BY_ID[model_id])
+
+    if model_id in model3d_external.EXTERNAL_IDS:
+        return model3d_external.prepare_request(body, image_paths, model)
 
     prompt = str(body.get("prompt") or "").strip()
     clean_images = {key: value for key, value in image_paths.items() if key in {"front", "left", "right", "back"} and value}
@@ -515,6 +523,20 @@ def _physical_output_folder(value: Any) -> str | None:
         return None
     name = os.path.basename(text.replace("\\", "/"))
     return name or None
+
+
+def _model3d_sidecar_identity(job: dict[str, Any], request_data: dict[str, Any]) -> dict[str, Any]:
+    """Durable engine identity for Library metadata (real and simulated jobs)."""
+    model = request_data.get("model") if isinstance(request_data.get("model"), dict) else {}
+    identity = {
+        "model_id": model.get("id"),
+        "model_type": model.get("id"),
+        "provider": job.get("provider") or model.get("provider", "hunyuan3d"),
+    }
+    repo = model.get("repo")
+    if repo:
+        identity["model_repo"] = repo
+    return identity
 
 
 def _publish_model3d_result(job: dict[str, Any], output_path: str | Path, sidecar: dict[str, Any]) -> None:
@@ -786,7 +808,9 @@ def start_job(
         )
     request_data = _prepare_request(body, image_paths, source_mesh_path)
     if not execution_mode.policy().simulated:
-        runtime = installation_status()
+        runtime = (model3d_external.installation_status(request_data["model"]["id"])
+                   if request_data["model"]["id"] in model3d_external.EXTERNAL_IDS
+                   else installation_status())
         if not runtime["installed"]:
             raise RuntimeError(runtime["install_hint"])
 
@@ -912,6 +936,7 @@ def _cleanup_partial_output(output_path: Path) -> None:
     """Remove a failed/cancelled job's half-written export and its preview."""
     for stale in (
         output_path,
+        output_path.with_suffix(".glb.partial"),
         output_path.with_suffix(".preview.png"),
         output_path.with_suffix(".meta.json"),
     ):
@@ -997,9 +1022,7 @@ def _run_job_serialized(job_id: str, output_dir: str) -> None:
                 "execution_mode": "simulate",
                 "params": {
                     **request_data.get("settings", {}),
-                    "model_id": (request_data.get("model") or {}).get("id"),
-                    "model_type": (request_data.get("model") or {}).get("id"),
-                    "provider": "hunyuan3d",
+                    **_model3d_sidecar_identity(current_job, request_data),
                 },
             })
             _update_job(
@@ -1014,11 +1037,6 @@ def _run_job_serialized(job_id: str, output_dir: str) -> None:
                 job_id, status="failed", phase="failed", message=str(exc), error=str(exc),
             )
         return
-    python_path = _python_path()
-    if not python_path:
-        _update_job(job_id, status="failed", phase="failed", error="Hunyuan3D runtime is not installed")
-        return
-
     with _lock:
         job = _jobs.get(job_id)
         request_data = job.get("request") if job else None
@@ -1026,6 +1044,14 @@ def _run_job_serialized(job_id: str, output_dir: str) -> None:
         # Cancelled (and possibly pruned) before the slot was acquired.
         return
     model_id = request_data["model"]["id"]
+    python_path = _python_path()
+    worker_path, worker_cwd = WORKER_PATH, SERVICE_DIR
+    if model_id in model3d_external.EXTERNAL_IDS:
+        worker_cwd, python_path = model3d_external.runtime_paths(model_id)
+        worker_path = model3d_external.WORKER
+    if not python_path:
+        _update_job(job_id, status="failed", phase="failed", error="3D runtime is not installed")
+        return
     output_format = request_data["settings"]["output_format"]
     operation = request_data.get("operation") or "generate"
     safe_model = re.sub(r"[^a-zA-Z0-9._-]+", "-", model_id)
@@ -1074,7 +1100,9 @@ def _run_job_serialized(job_id: str, output_dir: str) -> None:
     request_path.write_text(json.dumps(request_data, indent=2), encoding="utf-8")
     pid_path = JOBS_DIR / f"{job_id}.pid"
 
-    command = [str(python_path), str(WORKER_PATH), "--request", str(request_path), "--output", str(output_path)]
+    command = [str(python_path), str(worker_path), "--request", str(request_path), "--output", str(output_path)]
+    if model_id in model3d_external.EXTERNAL_IDS:
+        command.extend(["--root", str(worker_cwd)])
     env = os.environ.copy()
     # Built-in Hunyuan3D models are public. Do not inherit Pinokio's global HF
     # credentials: some Hub/proxy combinations omit X-Repo-Commit from
@@ -1109,7 +1137,7 @@ def _run_job_serialized(job_id: str, output_dir: str) -> None:
         process = _spawn_worker_if_active(
             job_id,
             command,
-            cwd=str(SERVICE_DIR),
+            cwd=str(worker_cwd),
             env=env,
             message=(
                 "Starting isolated Hunyuan3D retexture worker"
@@ -1200,9 +1228,7 @@ def _run_job_serialized(job_id: str, output_dir: str) -> None:
                 "created_at": time.time(),
                 "params": {
                     **request_data["settings"],
-                    "model_id": model_id,
-                    "model_type": model_id,
-                    "provider": current_job.get("provider") or "hunyuan3d",
+                    **_model3d_sidecar_identity(current_job, request_data),
                     "operation": operation,
                     "source_model": os.path.basename(request_data["source_mesh"]) if request_data.get("source_mesh") else None,
                     "preset": request_data["preset"],

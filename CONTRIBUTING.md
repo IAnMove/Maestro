@@ -1,10 +1,25 @@
 # Contributing to Maestro
 
+## Development status
+
+Start with [CURRENT_WORK](docs/development/CURRENT_WORK.md) for integrated work,
+active areas and verified pending tasks. Read domain contracts on demand; archived
+phase packets and session handoffs are not the current queue.
+
 Thanks for your interest in improving Maestro! This is a local-first AI
 video/image/music studio built on the [Wan2GP](https://github.com/deepbeepmeep/Wan2GP)
 pipeline and distributed through [Pinokio](https://pinokio.computer).
 
 ## Getting set up
+
+### Branch policy for contributors and agents
+
+Create ordinary feature/fix branches from updated `origin/development` and open
+PRs with `--base development`. `main` is the published Pinokio line, reserved for
+release PRs and explicitly scoped hotfixes. Use isolated worktrees, preserve other
+sessions' edits, and do not merge or change remote protections without authorization.
+See [branch and release workflow](docs/development/BRANCHING.md). This policy
+supersedes historical main-as-integration examples, not their acceptance criteria.
 
 Maestro is a Pinokio app, so the easiest dev loop is:
 
@@ -35,7 +50,7 @@ comments risk, clean-repo leaks, secrets, local-first regressions, and
 whether tests/UI rebuilds are missing. Re-run it locally:
 
 ```bash
-python scripts/analyze_pr.py --base origin/main
+python scripts/analyze_pr.py --base origin/development
 ```
 
 This is the in-repo stand-in for Cursor Automations / Bugbot. Those cloud

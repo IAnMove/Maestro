@@ -105,8 +105,8 @@ test('Series Review pauses and clears episode-owned state when the episode chang
   fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
   assert.ok(screen.getByText(/Edit source data · shot 1/))
   fireEvent.click(screen.getByRole('button', { name: /Finish and canon/ }))
-  fireEvent.click(screen.getByRole('button', { name: 'accepted' }))
-  assert.match(screen.getByRole('button', { name: 'accepted' }).className, /bg-violet/)
+  fireEvent.click(screen.getByRole('button', { name: 'Accepted' }))
+  assert.match(screen.getByRole('button', { name: 'Accepted' }).className, /bg-violet/)
 
   view.rerender(<SeriesReviewPanel {...common} episode={second as never} series={series as never} />)
 
@@ -118,8 +118,8 @@ test('Series Review pauses and clears episode-owned state when the episode chang
   assert.ok(screen.getByRole('button', { name: /Ordered episode assembly/ }))
 
   fireEvent.click(screen.getByRole('button', { name: /Finish and canon/ }))
-  assert.doesNotMatch(screen.getByRole('button', { name: 'accepted' }).className, /bg-violet/)
-  assert.match(screen.getByRole('button', { name: 'pending' }).className, /bg-violet/)
+  assert.doesNotMatch(screen.getByRole('button', { name: 'Accepted' }).className, /bg-violet/)
+  assert.match(screen.getByRole('button', { name: 'Pending' }).className, /bg-violet/)
 })
 
 test('a late Review cancel does not attach episode 1 job onto episode 2', { concurrency: false }, async () => {

@@ -1,4 +1,5 @@
 import { Film } from 'lucide-react'
+import { SpeechProductionEntry } from '../scene3d/speech/SpeechProductionEntry'
 import { useUiTranslation } from '../../i18n'
 import { type ProductionReviewIssue } from './storyLabChrome'
 import type { StoryProject, StoryTrailerFormat, StoryTrailerIntensity, StoryTrailerNarration, StoryTrailerSpoiler } from './types'
@@ -60,7 +61,7 @@ export function StoryTrailerTab(props: StoryTrailerTabProps) {
   const { t } = useUiTranslation('storyLab')
   const { trailerDuration } = props
   return (
-    <div className="space-y-4">
+    <div id="story-review-trailer" className="scroll-mt-4 space-y-4">
       <div className="overflow-hidden rounded-2xl border border-amber-400/30 bg-gradient-to-br from-amber-500/10 via-bg-secondary to-purple-500/10 p-4 md:p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="max-w-2xl">
@@ -81,6 +82,7 @@ export function StoryTrailerTab(props: StoryTrailerTabProps) {
       </div>
 
       <StoryTrailerClipProduction {...props} />
+      <SpeechProductionEntry key={props.project.id} kind="trailer" title={props.project.title} sourceId={props.project.id} castOptions={props.project.characters} />
     </div>
   )
 }

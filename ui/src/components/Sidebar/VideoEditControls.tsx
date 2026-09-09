@@ -1,150 +1,87 @@
-import { useState, useCallback } from 'react'
-import { Upload, X, ImageIcon } from 'lucide-react'
+import { useState } from 'react'
 import { useStore } from '../../stores/useStore'
 import { useUiTranslation } from '../../i18n'
-import * as api from '../../api/client'
+import type { ApiOutput } from '../../api/outputs'
+import { AssetInput } from '../../features/asset-picker/AssetInput.tsx'
+import { studioMediaPath, useWorkspaceOutputs } from '../../lib/studioAssetPick.ts'
+
+function withPromptFlags(current: string, flags: string): string {
+  let next = current
+  for (const flag of flags) {
+    if (!next.includes(flag)) next += flag
+  }
+  return next
+}
 
 export function VideoEditControls() {
   const { t } = useUiTranslation('studio')
-  const params = useStore(s => s.params)
   const setParam = useStore(s => s.setParam)
-  const [sourceVideo, setSourceVideo] = useState<File | null>(null)
-  const [, setSourceVideoPath] = useState<string | null>(null)
-  const [refImage, setRefImage] = useState<File | null>(null)
-  const [uploading, setUploading] = useState(false)
+  const activeWorkspace = useStore(s => s.activeWorkspace)
+  const videoItems = useWorkspaceOutputs(activeWorkspace, 'video')
+  const imageItems = useWorkspaceOutputs(activeWorkspace, 'image')
+  const [source, setSource] = useState<ApiOutput | null>(null)
+  const [reference, setReference] = useState<ApiOutput | null>(null)
 
-  const handleVideoUpload = useCallback(async (file: File) => {
-    setUploading(true)
-    try {
-      // Upload as video guide (same path as control video)
-      const result = await api.uploadImage(file)
-      setSourceVideo(file)
-      setSourceVideoPath(result.path)
-      setParam('video_guide', result.path)
-      // Set the video prompt type to include V for video guide
-      const vpt = params.video_prompt_type || ''
-      if (!vpt.includes('V')) setParam('video_prompt_type', 'V' + vpt)
-    } catch (e) {
-      console.error('Video upload failed:', e)
-    } finally {
-      setUploading(false)
+  const chooseSource = (item: ApiOutput | null) => {
+    if (!item) {
+      setSource(null)
+      setParam('video_guide', undefined)
+      return
     }
-  }, [params.video_prompt_type, setParam])
+    setSource(item)
+    setParam('video_guide', studioMediaPath(item))
+    const vpt = String(useStore.getState().params.video_prompt_type || '')
+    const next = withPromptFlags(vpt, 'V')
+    if (next !== vpt) setParam('video_prompt_type', next)
+  }
 
-  const handleRefUpload = useCallback(async (file: File) => {
-    try {
-      const result = await api.uploadImage(file)
-      setRefImage(file)
-      setParam('image_refs', [result.path])
-      // Add K and I to video_prompt_type for reference image
-      const vpt = params.video_prompt_type || ''
-      let newVpt = vpt
-      if (!newVpt.includes('K')) newVpt += 'K'
-      if (!newVpt.includes('I')) newVpt += 'I'
-      setParam('video_prompt_type', newVpt)
-    } catch (e) {
-      console.error('Reference upload failed:', e)
+  const chooseReference = (item: ApiOutput | null) => {
+    if (!item) {
+      setReference(null)
+      setParam('image_refs', undefined)
+      return
     }
-  }, [params.video_prompt_type, setParam])
+    setReference(item)
+    setParam('image_refs', [studioMediaPath(item)])
+    const vpt = String(useStore.getState().params.video_prompt_type || '')
+    const next = withPromptFlags(vpt, 'KI')
+    if (next !== vpt) setParam('video_prompt_type', next)
+  }
 
   return (
     <div className="space-y-3">
-      {/* Source Video */}
       <div>
         <label className="text-[11px] text-text-muted uppercase tracking-wider mb-1.5 block">
           {t('videoEdit.source')}
         </label>
-        <div
-          className={`relative border border-dashed rounded-lg overflow-hidden transition-colors cursor-pointer
-            ${sourceVideo ? 'border-accent-blue' : 'border-border hover:border-border-light'}`}
-          onDrop={e => {
-            e.preventDefault()
-            const f = e.dataTransfer.files[0]
-            if (f && f.type.startsWith('video/')) handleVideoUpload(f)
-          }}
-          onDragOver={e => e.preventDefault()}
-          onClick={() => {
-            const input = document.createElement('input')
-            input.type = 'file'
-            input.accept = '.mp4,.webm,.avi,.mov'
-            input.onchange = (ev) => {
-              const f = (ev.target as HTMLInputElement).files?.[0]
-              if (f) handleVideoUpload(f)
-            }
-            input.click()
-          }}
-        >
-          {sourceVideo ? (
-            <div className="flex items-center gap-2 px-3 py-2.5">
-              <span className="text-xs text-text-primary truncate flex-1">{sourceVideo.name}</span>
-              <button
-                onClick={e => {
-                  e.stopPropagation()
-                  setSourceVideo(null)
-                  setSourceVideoPath(null)
-                  setParam('video_guide', undefined)
-                }}
-                className="p-0.5 rounded hover:bg-bg-hover text-text-muted"
-              >
-                <X size={12} />
-              </button>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center gap-1 py-4 text-text-muted">
-              <Upload size={18} />
-              <span className="text-[10px]">{uploading ? t('chrome.uploading') : t('videoEdit.drop')}</span>
-            </div>
-          )}
-        </div>
+        <AssetInput
+          label={t('videoEdit.source')}
+          placeholder={t('videoEdit.drop')}
+          items={videoItems}
+          value={source ?? undefined}
+          accept=".mp4,.webm,.avi,.mov,video/*"
+          workspaceId={activeWorkspace}
+          optional={Boolean(source)}
+          constraints={{ kinds: ['video'], maxCount: 1, optional: true }}
+          onChoose={chooseSource}
+        />
       </div>
 
-      {/* Reference Image (optional) */}
       <div>
         <label className="text-[11px] text-text-muted uppercase tracking-wider mb-1.5 block">
           {t('videoEdit.reference')} <span className="text-text-muted font-normal">({t('chrome.optional')})</span>
         </label>
-        <div
-          className={`relative border border-dashed rounded-lg overflow-hidden transition-colors cursor-pointer min-h-[48px]
-            ${refImage ? 'border-accent-blue' : 'border-border hover:border-border-light'}`}
-          onDrop={e => {
-            e.preventDefault()
-            const f = e.dataTransfer.files[0]
-            if (f && f.type.startsWith('image/')) handleRefUpload(f)
-          }}
-          onDragOver={e => e.preventDefault()}
-          onClick={() => {
-            const input = document.createElement('input')
-            input.type = 'file'
-            input.accept = '.png,.jpg,.jpeg,.webp'
-            input.onchange = (ev) => {
-              const f = (ev.target as HTMLInputElement).files?.[0]
-              if (f) handleRefUpload(f)
-            }
-            input.click()
-          }}
-        >
-          {refImage ? (
-            <div className="flex items-center gap-2 px-3 py-2">
-              <ImageIcon size={14} className="text-accent-blue shrink-0" />
-              <span className="text-xs text-text-primary truncate flex-1">{refImage.name}</span>
-              <button
-                onClick={e => {
-                  e.stopPropagation()
-                  setRefImage(null)
-                  setParam('image_refs', undefined)
-                }}
-                className="p-0.5 rounded hover:bg-bg-hover text-text-muted"
-              >
-                <X size={12} />
-              </button>
-            </div>
-          ) : (
-            <div className="flex items-center justify-center gap-1 py-2 text-text-muted">
-              <ImageIcon size={14} />
-              <span className="text-[10px]">{t('videoEdit.dropRef')}</span>
-            </div>
-          )}
-        </div>
+        <AssetInput
+          label={t('videoEdit.reference')}
+          placeholder={t('videoEdit.dropRef')}
+          items={imageItems}
+          value={reference ?? undefined}
+          accept=".png,.jpg,.jpeg,.webp,image/*"
+          workspaceId={activeWorkspace}
+          optional
+          constraints={{ kinds: ['image'], maxCount: 1, optional: true }}
+          onChoose={chooseReference}
+        />
         <p className="text-[9px] text-text-muted mt-1">
           {t('videoEdit.refHint')}
         </p>

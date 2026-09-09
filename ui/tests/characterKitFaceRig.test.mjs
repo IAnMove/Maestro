@@ -3,9 +3,24 @@ import test from 'node:test'
 import { createCharacterKit } from '../src/lib/characterKit.ts'
 import { applyFaceRigMouthPreset, assessFaceRigPlacement, characterKitPosePrompt, classifyCharacterKitAlpha, composeCharacterKitLook, containedImageRect, faceRigAnchorFor, faceRigAnchorFromRegion, faceRigGenerationRequests, faceRigOverlayPreviewStyle, faceRigPrompt, faceRigRegionFromAnchor, faceRigVisemeAt, lockFaceRigMouthPlacement, previewFaceRigDialogue, previewFaceRigDialogueFromAudio, previewPercentToImagePixel, registerCleanedFaceRigAsset, registerGeneratedFaceRigAsset, setFaceRigAnchor, setFaceRigReviewState, validateFaceRigPose, wipeMouthRegion } from '../src/lib/characterKitFaceRig.ts'
 import { registerWipedKitPose } from '../src/lib/characterKit.ts'
+import { facePatchControls } from '../src/lib/characterKitFaceRig.ts'
 
 const pose = { id: 'base', name: 'Base', source: 'base.png', kind: 'image', alphaStatus: 'opaque', reviewState: 'approved' }
 const generated = state => ({ id: `generated-${state}`, name: state, source: `${state}.png`, kind: 'overlay', alphaStatus: 'transparent', reviewState: 'approved' })
+
+test('any raster mouth patch protects its base from wiping even when another state is selected', () => {
+  const kit = { ...createCharacterKit('Luna'), base: pose }
+  const legacy = generated('closed')
+  assert.equal(facePatchControls(kit, legacy, false, null).wipeDisabled, false)
+  const patch = { ...generated('wide'), facePatch: { version: 1 } }
+  const mixed = { ...kit, mouth: { closed: legacy, wide: patch } }
+  const controls = facePatchControls(mixed, legacy, false, null)
+  assert.equal(controls.wipeDisabled, true)
+  assert.equal(controls.cleanupDisabled, false)
+  assert.equal(controls.instruction, 'facePatch.keepTexture')
+  assert.equal(facePatchControls(mixed, patch, false, null).cleanupDisabled, true)
+  assert.equal(facePatchControls(kit, legacy, false, 'pack').wipeDisabled, true)
+})
 
 test('alpha classification detects a materially transparent RGBA image', () => {
   const rgba = new Uint8ClampedArray([255, 255, 255, 0, 255, 255, 255, 255, 255, 255, 255, 128, 255, 255, 255, 255])
@@ -203,7 +218,8 @@ test('wiping a mouth region fills the ellipse without touching distant pixels', 
     { ...pose, source: '/api/v1/file/luna-wiped.png', name: 'Wiped' },
   )
   assert.equal(kit.base.source, '/api/v1/file/luna-wiped.png')
-  assert.equal(kit.base.reviewState, 'approved')
+  assert.equal(kit.base.reviewState, 'pending')
+  assert.notEqual(kit.base.id, pose.id)
   assert.equal(kit.provenance.at(-1).method, 'character-kit-mouth-wipe')
 })
 

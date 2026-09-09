@@ -30,17 +30,20 @@ export function StoryFilmProductionCard(props: StoryProductionsTabProps) {
       <div className="rounded-md border border-violet-500/25 bg-violet-500/5 p-2.5 space-y-2">
         <p className="text-[10px] font-medium text-violet-100">{t('productions.visualGuidance')}</p>
         <div className="grid grid-cols-2 gap-1.5">
-          <button type="button" className={`${button} flex-col ${!directReferenceVideo ? 'border-purple-400/60 text-purple-200' : ''}`}
+          <button type="button" aria-pressed={project.musicVideoGenerationMode === 'image_guided'}
+            className={`${button} flex-col ${project.musicVideoGenerationMode === 'image_guided' ? 'border-purple-400/60 text-purple-200' : ''}`}
             onClick={() => patch({ musicVideoGenerationMode: 'image_guided' })}>
             <span>{t('productions.generateStartImages')}</span>
             <span className="text-[9px] text-text-muted">{t('productions.imageGuidedHint')}</span>
           </button>
-          <button type="button" className={`${button} flex-col ${directReferenceVideo ? 'border-violet-400/70 bg-violet-500/10 text-violet-200' : ''}`}
+          <button type="button" aria-pressed={directReferenceVideo}
+            className={`${button} flex-col ${directReferenceVideo ? 'border-violet-400/70 bg-violet-500/10 text-violet-200' : ''}`}
             onClick={() => patch({ musicVideoGenerationMode: 'direct_references' })}>
             <span>{t('productions.directApproved')}</span>
             <span className="text-[9px] text-text-muted">{t('productions.h3NoStart')}</span>
           </button>
-          <button type="button" className={`${button} flex-col ${directVideo ? 'border-fuchsia-400/70 bg-fuchsia-500/10 text-fuchsia-200' : ''}`}
+          <button type="button" aria-pressed={directVideo}
+            className={`${button} flex-col ${directVideo ? 'border-fuchsia-400/70 bg-fuchsia-500/10 text-fuchsia-200' : ''}`}
             onClick={() => patch({ musicVideoGenerationMode: 'direct_video', protagonistConsistency: false })}>
             <span>{t('productions.directVideo')}</span>
             <span className="text-[9px] text-text-muted">{t('productions.t2vNoRefs')}</span>

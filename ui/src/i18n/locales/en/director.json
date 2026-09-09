@@ -9,9 +9,9 @@
     "unknownModel": "Unknown model",
     "interrupted": "Interrupted",
     "waiting": "Waiting",
-    "duplicateWarning": "Do not press Resume if Activity already shows an H3 in sampling/decode: that duplicates the GPU. Discard leftovers and let the live job finish.",
+    "duplicateWarning": "Discarding these jobs does not affect the active generation or delete completed videos.",
     "rerunWarning": "The clip that was running will start again from the beginning; waiting clips keep their order.",
-    "discardClean": "Discard and start clean",
+    "discardClean": "Discard interrupted jobs only",
     "resumeAnyway": "Resume old leftovers anyway",
     "resumeQueue": "Resume queue"
   },

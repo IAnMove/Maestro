@@ -141,17 +141,17 @@ export function VideoInfoBar() {
           <>
             <div className="text-xs text-text-secondary truncate">
               {modelLabel && <span className="font-medium" title={modelType}>{modelLabel}</span>}
-              {resolution && <span className="text-text-muted"> &middot; {resolution}</span>}
-              {seed != null && seed >= 0 && <span className="text-text-muted"> &middot; seed {seed}</span>}
+              {resolution && <span className="text-text-secondary"> &middot; {resolution}</span>}
+              {seed != null && seed >= 0 && <span className="text-text-secondary"> &middot; seed {seed}</span>}
               {generationTime != null && (
-                <span className="text-text-muted"> &middot; total {formatGenerationDuration(generationTime)}</span>
+                <span className="text-text-secondary"> &middot; total {formatGenerationDuration(generationTime)}</span>
               )}
               {clipIndex != null && clipTotal != null && (
                 <span className="text-accent-blue"> &middot; clip {clipIndex + 1}/{clipTotal}</span>
               )}
             </div>
             {generationBreakdown && (
-              <div className="text-[10px] text-text-muted truncate mt-0.5" title={generationBreakdown}>
+              <div className="text-[10px] text-text-secondary truncate mt-0.5" title={generationBreakdown}>
                 {generationBreakdown}
               </div>
             )}
@@ -171,14 +171,14 @@ export function VideoInfoBar() {
         {params && (
           <>
             <button
-              onClick={loadSettingsFromOutput}
+              onClick={() => void loadSettingsFromOutput()}
               className="p-1.5 rounded-lg hover:bg-bg-hover text-text-secondary hover:text-text-primary transition-colors"
               title="Load settings"
             >
               <Pencil size={14} />
             </button>
             <button
-              onClick={rerollGeneration}
+              onClick={() => void rerollGeneration()}
               className="p-1.5 rounded-lg hover:bg-bg-hover text-text-secondary hover:text-text-primary transition-colors"
               title="Re-generate with same settings"
             >
@@ -242,6 +242,9 @@ export function VideoInfoBar() {
             </button>
           </>
         )}
+        {/* Separado del resto: borrar estaba indistinguible de favorito o
+            descargar en una fila de once iconos idénticos. */}
+        <span aria-hidden="true" className="mx-1 h-4 w-px shrink-0 bg-border" />
         <button
           onClick={handleDelete}
           className={`p-1.5 rounded-lg transition-colors flex items-center gap-1 ${

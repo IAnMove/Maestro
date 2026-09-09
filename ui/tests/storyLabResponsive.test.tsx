@@ -160,7 +160,7 @@ test('Story Lab relationships tab is extracted and keeps its review chrome', asy
   assert.ok(document.getElementById('story-review-relationships'))
   assert.ok(screen.getByRole('heading', { name: 'Relationships' }))
   fireEvent.click(screen.getByRole('button', { name: /Generate text/ }))
-  fireEvent.click(screen.getByRole('button', { name: /^Approve$/ }))
+  fireEvent.click(screen.getByRole('button', { name: /^Mark reviewed$/ }))
   assert.deepEqual(handlers.generated, ['relationships'])
   assert.deepEqual(handlers.approved, ['relationships'])
   assert.equal(screen.getByDisplayValue('Rivals').tagName, 'INPUT')
@@ -231,7 +231,7 @@ test('Story Lab world tab uses the shared visuals controller', async () => {
   assert.ok(screen.getByRole('heading', { name: 'World bible' }))
   assert.ok(screen.getByDisplayValue('Harbor'))
   fireEvent.click(screen.getByRole('button', { name: /Generate text/ }))
-  fireEvent.click(screen.getByRole('button', { name: /^Approve$/ }))
+  fireEvent.click(screen.getByRole('button', { name: /^Mark reviewed$/ }))
   fireEvent.click(screen.getByRole('button', { name: /Generate world concept/ }))
   fireEvent.click(screen.getAllByRole('button', { name: /^Add reference$/ })[0])
   assert.deepEqual(handlers.generated, ['world'])
@@ -286,7 +286,7 @@ test('Story Lab characters tab is extracted with i18n chrome', async () => {
   assert.ok(document.getElementById('story-review-character-c1'))
   assert.ok(screen.getByRole('heading', { name: 'Characters' }))
   fireEvent.click(screen.getByRole('button', { name: /Generate text/ }))
-  fireEvent.click(screen.getByRole('button', { name: /^Approve$/ }))
+  fireEvent.click(screen.getByRole('button', { name: /^Mark reviewed$/ }))
   fireEvent.click(screen.getByRole('button', { name: /Generate first identity/ }))
   assert.deepEqual(handlers.generated, ['characters'])
   assert.deepEqual(handlers.approved, ['characters'])
@@ -326,7 +326,7 @@ test('Story Lab structure tab is extracted with i18n chrome', async () => {
   assert.ok(document.getElementById('story-review-structure'))
   assert.ok(screen.getByRole('heading', { name: 'Dramatic structure' }))
   fireEvent.click(screen.getByRole('button', { name: /Generate text/ }))
-  fireEvent.click(screen.getByRole('button', { name: /^Approve$/ }))
+  fireEvent.click(screen.getByRole('button', { name: /^Mark reviewed$/ }))
   assert.deepEqual(handlers.generated, ['structure'])
   assert.deepEqual(handlers.approved, ['structure'])
   assert.equal(screen.getByDisplayValue('Arrival').tagName, 'INPUT')
@@ -458,7 +458,6 @@ test('Story Lab music tab is extracted with i18n chrome', async () => {
       onImportCustomMp3={cueId => { imports.push(cueId) }}
       onImportLyria={() => {}}
       onCopied={() => {}}
-      musicCoverRef={{ current: null }}
       uploadCoverReference={() => {}}
       writeStorySong={() => {}}
       adaptStoryLyrics={() => {}}
@@ -471,9 +470,9 @@ test('Story Lab music tab is extracted with i18n chrome', async () => {
   assert.ok(document.getElementById('story-review-music'))
   assert.ok(screen.getByRole('heading', { name: 'Music bible' }))
   fireEvent.click(screen.getByRole('button', { name: /Generate LLM suggestions/ }))
-  fireEvent.click(screen.getAllByRole('button', { name: /Import custom MP3/ })[0])
   assert.deepEqual(generated, ['music'])
-  assert.deepEqual(imports, ['cue-story'])
+  assert.ok(screen.getAllByRole('button', { name: /From HocusPocus/ }).length >= 1)
+  assert.equal(imports.length, 0)
   cleanup()
 })
 
@@ -633,7 +632,6 @@ test('Story Lab productions tab is extracted with i18n chrome', async () => {
       onNavigate={() => {}}
       onOpenIssue={() => {}}
       minimaxConfigured
-      musicCoverRef={{ current: null }}
       uploadCoverReference={() => {}}
       writeStorySong={() => {}}
       adaptStoryLyrics={() => {}}
@@ -701,7 +699,7 @@ test('Story Lab compact workspace is extracted and uses shared visuals', async (
   assert.ok(document.getElementById('story-review-world'))
   assert.ok(screen.getByRole('heading', { name: 'Images and sequence of the music video' }))
   fireEvent.click(screen.getByRole('button', { name: /Prepare setting · text only/ }))
-  fireEvent.click(screen.getAllByRole('button', { name: /^Approve$/ })[0])
+  fireEvent.click(screen.getAllByRole('button', { name: /^Mark reviewed$/ })[0])
   fireEvent.click(screen.getByRole('button', { name: /Generate image/ }))
   assert.deepEqual(generated, ['world'])
   assert.deepEqual(approved, ['world'])

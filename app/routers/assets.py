@@ -11,6 +11,10 @@ from fastapi import APIRouter, HTTPException, Query
 from services.asset_catalog import find_asset, scan_asset_catalog
 from services.asset_manifest import ASSET_KINDS
 
+CATALOG_SORTS = frozenset({
+    "", "completed_desc", "created_desc", "created_asc", "name_asc", "name_desc",
+})
+
 
 def create_assets_router(
     *,
@@ -57,15 +61,23 @@ def create_assets_router(
     @router.get("/api/v1/assets")
     def list_assets(
         search: str = Query(default="", max_length=300),
-        kind: str = Query(default="", max_length=30),
+        kind: str = Query(default="", max_length=80),
         workspace: str = Query(default="", max_length=160),
         collection: str = Query(default="", max_length=40),
+        sort: str = Query(default="", max_length=32),
         limit: int = Query(default=100, ge=0, le=500),
         offset: int = Query(default=0, ge=0),
     ):
-        wanted_kind = str(kind or "").strip().casefold()
-        if wanted_kind and wanted_kind not in ASSET_KINDS:
+        wanted_kinds = {
+            part.strip().casefold()
+            for part in str(kind or "").split(",")
+            if part.strip()
+        }
+        if wanted_kinds - ASSET_KINDS:
             raise HTTPException(status_code=400, detail="Unknown asset kind")
+        wanted_sort = str(sort or "").strip().casefold()
+        if wanted_sort not in CATALOG_SORTS:
+            raise HTTPException(status_code=400, detail="Unknown catalog sort")
         wanted_collection = str(collection or "").strip().casefold()
         if wanted_collection not in {"", "inbox_legacy"}:
             raise HTTPException(status_code=400, detail="Unknown asset collection")
@@ -76,11 +88,12 @@ def create_assets_router(
         result = scan_asset_catalog(
             available,
             search=search,
-            kind=wanted_kind,
+            kind=",".join(sorted(wanted_kinds)),
             workspace_id=workspace,
             metadata_statuses=("legacy", "missing", "unreadable", "invalid") if wanted_collection == "inbox_legacy" else (),
             limit=limit,
             offset=offset,
+            sort=wanted_sort,
         )
         result["assets"] = [add_urls(item) for item in result["assets"]]
         return result

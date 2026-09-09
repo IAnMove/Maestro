@@ -7,7 +7,7 @@ import type { StoryProductionsTabProps } from './storyLabProductions'
 
 export function StoryProductionsTab(props: StoryProductionsTabProps) {
   const { t } = useUiTranslation('storyLab')
-  const { project } = props
+  const { project, trailerRecipe } = props
   const title = project.projectType === 'music_video'
     ? t('productions.titleVideo')
     : project.projectType === 'quick_video'
@@ -25,6 +25,7 @@ export function StoryProductionsTab(props: StoryProductionsTabProps) {
         {project.projectType !== 'music_video' && <StoryFilmProductionCard {...props} />}
         {project.projectType !== 'quick_video' && <StoryProductionsMusicPanel {...props} />}
       </div>
+      {trailerRecipe}
       <StoryProductionIssuesBanner {...props} />
     </>
   )

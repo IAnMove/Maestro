@@ -12,6 +12,17 @@ import {
 export const CHARACTER_FACE_RIG_STATES = ['closed', 'small', 'wide', 'round', 'open-eyes', 'blink'] as const
 export type CharacterKitFaceRigState = typeof CHARACTER_FACE_RIG_STATES[number]
 
+export function facePatchControls(kit: CharacterKit, asset: CharacterKitAsset | undefined, disabled: boolean | undefined, busy: unknown) {
+  const isPatch = Boolean(asset?.facePatch)
+  const hasPatches = Object.values(kit.mouth).some(mouth => Boolean(mouth?.facePatch))
+  return {
+    disabled: Boolean(disabled || busy),
+    cleanupDisabled: Boolean(disabled || busy || isPatch),
+    wipeDisabled: Boolean(disabled || busy || hasPatches),
+    instruction: hasPatches ? 'facePatch.keepTexture' as const : 'faceRig.steps.wipe' as const,
+  }
+}
+
 export interface FaceRigGenerationRequest {
   state: CharacterKitFaceRigState
   prompt: string
@@ -202,6 +213,7 @@ export function registerCleanedFaceRigAsset(
   if (!CHARACTER_FACE_RIG_STATES.includes(state)) throw new Error(`Unknown Face Rig state: ${state}`)
   const current = assetForState(kit, state)
   if (!current) throw new Error(`Character Kit “${kit.name}” has no generated ${state} asset to clean.`)
+  if (current.facePatch) throw new Error('A facial patch must retain its skin or beard. Do not remove its background.')
   if (!cleaned.source || cleaned.source.startsWith('blob:')) throw new Error('Cleaned Face Rig assets need a persistent source.')
   const nextAsset: CharacterKitAsset = {
     ...current,

@@ -14,7 +14,7 @@ Object.assign(globalThis, {
 })
 Object.defineProperty(globalThis, 'navigator', { configurable: true, value: dom.window.navigator })
 
-test('Quick Video batch falls back from missing references to image-guided mode', { concurrency: false }, async () => {
+test('Quick Video batch blocks missing references instead of silently switching recipe', { concurrency: false }, async () => {
   const { render, screen, fireEvent, waitFor, cleanup } = await import('@testing-library/react')
   const { createStoryProject } = await import('../src/features/stories/model.ts')
   const { QuickVideoBatchPanel } = await import('../src/features/stories/QuickVideoBatchPanel.tsx')
@@ -50,17 +50,16 @@ test('Quick Video batch falls back from missing references to image-guided mode'
     />)
     const imageGuided = screen.getByRole('button', { name: /Start image/ })
     const references = screen.getByRole('button', { name: /References/ })
-    assert.equal(imageGuided.getAttribute('aria-pressed'), 'true')
-    assert.equal(references.getAttribute('aria-pressed'), 'false')
+    assert.equal(imageGuided.getAttribute('aria-pressed'), 'false')
+    assert.equal(references.getAttribute('aria-pressed'), 'true')
 
     fireEvent.change(screen.getByLabelText('Quick-video batch ideas, one per line'), {
       target: { value: 'Un robot pierde su sombra' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Queue 1 video' }))
-    await waitFor(() => assert.equal(payloads.length, 1))
-    const settings = payloads[0].settings as Record<string, unknown>
-    assert.equal(settings.generationMode, 'image_guided')
-    assert.deepEqual(settings.references, [])
+    const queueMissing = screen.getByRole('button', { name: 'Queue 1 video' })
+    assert.equal(queueMissing.hasAttribute('disabled'), true)
+    fireEvent.click(queueMissing)
+    assert.equal(payloads.length, 0)
 
     fireEvent.click(screen.getByRole('button', { name: /Text to video/ }))
     assert.ok(screen.getByText('Each line will define its own visual style; no global style sheet will be applied.'))
@@ -68,8 +67,8 @@ test('Quick Video batch falls back from missing references to image-guided mode'
       target: { value: 'Stop-motion: una criatura abre una puerta imposible' },
     })
     fireEvent.click(screen.getByRole('button', { name: 'Queue 1 video' }))
-    await waitFor(() => assert.equal(payloads.length, 2))
-    const directSettings = payloads[1].settings as Record<string, unknown>
+    await waitFor(() => assert.equal(payloads.length, 1))
+    const directSettings = payloads[0].settings as Record<string, unknown>
     assert.equal(directSettings.generationMode, 'direct_video')
     assert.match(String(directSettings.directVideoMasterPrompt), /Each batch idea defines its own visual style/)
   } finally {

@@ -3,6 +3,8 @@ import { useStore } from '../stores/useStore'
 import { generateImageAsset } from './imageGeneration'
 import type { SceneRecipe, SceneRecipeAsset, SceneRecipeAudio } from './sceneRecipe'
 import { aspectRatioForScene, h3FramesForDuration, h3ResolutionForScene, recipeAssetDuration, recipeAudioDuration } from './sceneRecipe'
+import { assertSceneRecipeGenerationAllowed, effectiveSceneGenerationPolicy } from './sceneGenerationPolicy'
+import type { SceneGenerationPolicy } from './sceneGenerationPolicy'
 
 const wait = (ms: number) => new Promise(resolve => window.setTimeout(resolve, ms))
 
@@ -229,17 +231,26 @@ async function resolveAudio(
 }
 
 export async function resolveRecipeAssets(
-  recipe: SceneRecipe,
+  input: SceneRecipe,
   options: {
     workspace: string
     onStatus?: (message: string) => void
     signal?: AbortSignal
     generateMissing?: boolean
+    policy?: SceneGenerationPolicy
   },
 ): Promise<Record<string, string>> {
+  // Freeze the input before the first await/status callback. A caller editing a
+  // recipe during resolution must not insert a forbidden job after preflight.
+  const recipe = structuredClone(input)
+  const policy = effectiveSceneGenerationPolicy(
+    recipe.generationPolicy, options.policy,
+    options.generateMissing === false ? 'provided_only' : undefined,
+  )
+  throwIfAborted(options.signal)
+  assertSceneRecipeGenerationAllowed(recipe, policy)
   const resolved: Record<string, string> = {}
   const byIdentity = new Map<string, string>()
-  const generateMissing = options.generateMissing !== false
 
   for (const asset of recipe.assets) {
     throwIfAborted(options.signal)
@@ -247,8 +258,11 @@ export async function resolveRecipeAssets(
       resolved[asset.id] = byIdentity.get(asset.identity) as string
       continue
     }
-    if (!asset.source && !generateMissing) {
-      throw new Error(`Asset “${asset.id}” has no source. Load it in Manual mode or generate it in Auto.`)
+    if (policy === 'provided_only') {
+      // Preflight already verified every source. In particular, never re-rig
+      // an existing GLB just because it carries rig capability metadata.
+      resolved[asset.id] = asset.source as string
+      continue
     }
     const value = asset.kind === 'image'
       ? await resolveImage(asset, recipe, options.onStatus, options.signal)
@@ -260,9 +274,6 @@ export async function resolveRecipeAssets(
   }
   for (const track of recipe.audio ?? []) {
     throwIfAborted(options.signal)
-    if (!track.source && !generateMissing) {
-      throw new Error(`Audio track “${track.id}” has no source. Attach it in Manual mode or generate it in Auto.`)
-    }
     resolved[track.id] = await resolveAudio(track, recipe, options.workspace, options.onStatus, options.signal)
   }
   return resolved

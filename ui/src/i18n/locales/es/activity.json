@@ -1,4 +1,5 @@
 {
+  "settingsUnavailable": "No se pudieron recuperar los ajustes guardados. Selecciona el archivo de nuevo.",
   "title": "Actividad",
   "openHistory": "Mostrar el historial canónico de tareas",
   "inboxLegacy": "Inbox / Legacy",
@@ -120,5 +121,11 @@
     "openSource": "Abrir origen",
     "installManually": "instalar a mano",
     "downloadStarted": "iniciada ↓ (mira la barra de descarga)"
+  },
+  "view": {
+    "label": "Disposición de la galería",
+    "feed": "De una en una",
+    "grid": "Rejilla",
+    "masonry": "Mosaico"
   }
 }

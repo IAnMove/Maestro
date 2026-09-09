@@ -6,6 +6,7 @@ import * as api from '../../api/client'
 import type { GenerationMode } from '../../types'
 import { FAMILIES, resolveVariant, onOsThemeChange, type FamilyId, type ThemeMode } from '../../lib/theme'
 import { setUiLanguage, useUiTranslation, type UiLanguage } from '../../i18n'
+import { H3ModelInfo, H3ModelName } from '../Sidebar/H3ModelInfo'
 import { MINIMAX_MUSIC_COMMUNITY_MODELS, modelRequirementsText } from '../../lib/minimaxMusicCatalog'
 
 const profileLabels: Record<string, string> = {
@@ -392,7 +393,7 @@ function ModelVisibilitySection() {
                               ? 'text-text-primary'
                               : 'text-text-muted group-hover:text-text-secondary'
                           }`}>
-                            {m.name}
+                            <H3ModelName modelType={m.model_type} fallback={m.name} />
                           </span>
                           {m.resource_requirements && (
                             <span
@@ -425,6 +426,7 @@ function ModelVisibilitySection() {
                           </button>
                         )}
                       </div>
+                      <H3ModelInfo modelType={m.model_type} />
                       {alsoDeletes.length > 0 && (
                         <p className="ml-6 text-[10px] text-red-400/90 leading-snug">
                           Shared weights — also deletes: {alsoDeletes.join(', ')}

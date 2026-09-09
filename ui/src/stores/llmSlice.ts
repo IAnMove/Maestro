@@ -73,7 +73,7 @@ function omniAudioLabel(note: string, intent: string, audioIndex: number): strin
   return `<Audio ${audioIndex}>: ${note}; intent=VOICE REFERENCE; retention=reference; use timbre/emotion/delivery for new scripted dialogue without copying source words, timing, or waveform`
 }
 
-function collectOmniEnhanceMedia(params: GenerateParams): EnhanceMedia {
+export function collectOmniEnhanceMedia(params: GenerateParams): EnhanceMedia {
   const imagePaths: string[] = []
   let pictureIndex = 0
   let videoIndex = 0
@@ -147,7 +147,7 @@ function enhanceWindowLayout(state: LlmSliceHost): EnhanceWindowLayout {
     windowCount,
     shouldPlanH3Windows: (
       state.generationMode === 'video'
-      && state.modelOptions?.sliding_window_auto_prompt_pacing === true
+      && (state.modelOptions?.sliding_window_auto_prompt_pacing === true || state.params.minimax_h3_reference_sequence === true)
       && state.params.image_mode !== 2
       && windowCount > 1
     ),
@@ -169,6 +169,7 @@ async function applyH3WindowPlan(
   set: SliceSet<LlmSliceHost>,
   imagePaths: string[],
   layout: EnhanceWindowLayout,
+  referenceContext?: string,
 ): Promise<void> {
   // The ordinary H3 enhancer writes one complete Context-IR timeline.
   // Multi-window H3 instead needs a structured storyboard whose prompts
@@ -178,6 +179,11 @@ async function applyH3WindowPlan(
   const { params } = state
   const plan = await api.planH3Windows({
     prompt: params.prompt,
+    planning_style: params.minimax_h3_planning_style ?? 'faithful',
+    h3_audio_policy: params.minimax_h3_audio_policy ?? 'native',
+    reference_context: referenceContext,
+    minimax_h3_references: params.minimax_h3_references,
+    minimax_h3_reference_sequence: params.minimax_h3_reference_sequence,
     model_type: params.model_type,
     resolution: params.resolution,
     total_frames: Math.max(1, Math.round(state.durationSeconds * layout.fps)),
@@ -202,6 +208,7 @@ async function applyH3WindowPlan(
       ...s.params,
       sliding_window_size: effectiveWindowFrames,
       minimax_h3_window_storyboard: true,
+      h3_reference_context: referenceContext,
     },
     isEnhancing: false,
   }))
@@ -294,12 +301,14 @@ export const createLlmSlice: SliceCreator<LlmSlice, LlmSliceHost> = (set, get) =
       const media = await collectEnhanceMedia(state)
       const layout = enhanceWindowLayout(state)
       if (layout.shouldPlanH3Windows) {
-        await applyH3WindowPlan(state, set, media.imagePaths, layout)
+        await applyH3WindowPlan(state, set, media.imagePaths, layout, media.referenceContext)
         return
       }
       const timed = timedModeFields(state, layout.windowCount)
       const result = await api.llmEnhancePrompt({
         prompt: state.params.prompt,
+        planning_style: state.params.minimax_h3_planning_style ?? 'faithful',
+        h3_audio_policy: state.params.minimax_h3_audio_policy ?? 'native',
         mode: state.generationMode,
         model_type: state.params.model_type,
         max_new_tokens: (state.generationMode === 'audio' && ttsMode) ? 2048 : undefined,

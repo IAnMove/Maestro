@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { ACE_STEP_MUSIC_MODEL, normalizeStoryMusicModel, songWriteTarget } from '../src/features/stories/musicModel.ts'
+import {
+  ACE_STEP_MUSIC_MODEL,
+  MINIMAX_MUSIC3_LOCAL_MODEL,
+  normalizeStoryMusicModel,
+  songWriteTarget,
+  storyMusicReadyMessageKey,
+} from '../src/features/stories/musicModel.ts'
+import { LOCAL_PROMPT_LIMIT, REMOTE_PROMPT_LIMIT } from '../src/lib/musicGenerationSpec.ts'
+import { compiledMusicCuePrompt, miniMaxCuePayload, musicCueBlock, musicPromptLimit, musicRequiresLyricSections } from '../src/features/stories/storyLabMusic.ts'
 
 test('new stories default to ACE-Step and keep MiniMax only when chosen', () => {
   assert.equal(normalizeStoryMusicModel(''), ACE_STEP_MUSIC_MODEL)
@@ -9,4 +17,29 @@ test('new stories default to ACE-Step and keep MiniMax only when chosen', () => 
   assert.equal(normalizeStoryMusicModel('music-2.6'), 'music-2.6')
   assert.equal(songWriteTarget(ACE_STEP_MUSIC_MODEL), 'ace-step')
   assert.equal(songWriteTarget('music-3.0'), 'minimax')
+})
+
+test('ready copy names ACE, MiniMax local and MiniMax API separately', () => {
+  assert.equal(storyMusicReadyMessageKey(ACE_STEP_MUSIC_MODEL, false), 'music.aceLocalReady')
+  assert.equal(storyMusicReadyMessageKey(MINIMAX_MUSIC3_LOCAL_MODEL, false), 'music.minimaxLocalReady')
+  assert.equal(storyMusicReadyMessageKey('music-3.0', true), 'music.minimaxReady')
+  assert.equal(storyMusicReadyMessageKey('music-3.0', false), 'music.minimaxMissing')
+})
+
+test('prompt limits come from the adapter catalog and ACE is not sliced to 300', () => {
+  const longStyle = 'cinematic folk with close Spanish vocals and a wide final chorus. '.repeat(8)
+  const cue = {
+    id: 'cue-1', kind: 'story', targetId: 'story-1', title: 'Theme', purpose: '',
+    referenceSong: '', brief: '', style: longStyle, lyrics: 'free verse without tags',
+    lyriaPrompt: '', instrumental: false, durationSeconds: 90, candidates: [],
+  }
+  assert.equal(musicPromptLimit(ACE_STEP_MUSIC_MODEL), LOCAL_PROMPT_LIMIT)
+  assert.equal(musicPromptLimit('music-3.0'), REMOTE_PROMPT_LIMIT)
+  assert.equal(musicRequiresLyricSections(ACE_STEP_MUSIC_MODEL), false)
+  assert.equal(musicRequiresLyricSections('music-3.0'), true)
+  assert.equal(compiledMusicCuePrompt(cue, ACE_STEP_MUSIC_MODEL), longStyle.trim())
+  assert.equal(compiledMusicCuePrompt(cue, 'music-3.0').length, REMOTE_PROMPT_LIMIT)
+  assert.equal(JSON.parse(miniMaxCuePayload(cue, ACE_STEP_MUSIC_MODEL)).prompt.length > REMOTE_PROMPT_LIMIT, true)
+  assert.equal(musicCueBlock(cue, ACE_STEP_MUSIC_MODEL), null)
+  assert.equal(musicCueBlock(cue, 'music-3.0')?.key, 'music.promptOverLimit')
 })

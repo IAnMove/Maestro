@@ -87,6 +87,12 @@ def _clean_card(value: Any) -> dict[str, Any] | None:
     return card
 
 
+def _optional_media_evidence(value: Any) -> dict[str, Any]:
+    from services.wangp_analysis import normalize_media_evidence
+    evidence = normalize_media_evidence(value)
+    return {"mediaEvidence": evidence} if evidence else {}
+
+
 def _clean_message(value: Any) -> dict[str, Any] | None:
     if not isinstance(value, dict):
         return None
@@ -123,6 +129,7 @@ def _clean_message(value: Any) -> dict[str, Any] | None:
         "lastState": _clean_text(value.get("lastState"), 40),
         "error": _clean_text(value.get("error"), 2000),
     }
+    normalized.update(_optional_media_evidence(value.get("mediaEvidence")))
     language = _clean_text(value.get("language"), 20)
     if language:
         normalized["language"] = language

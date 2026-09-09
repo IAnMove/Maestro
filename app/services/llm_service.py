@@ -350,6 +350,15 @@ def _build_size_hint(info: dict) -> str:
 # size_hint is built automatically from weights_gb + mmproj_gb + KV-cache
 # estimate at module load (see post-loop below).
 MODEL_REGISTRY = {
+    "DeepBeepMeep/Wan2.1": {
+        "label": "Qwen3.8 27B Uncensored (Vision, WanGP)",
+        "gguf_file": "Qwen3_8_27B_Uncensored/Qwen3.8-27B-Uncensored-Q4_K_M.gguf",
+        "mmproj_file": "Qwen3_8_27B_Uncensored/Qwen3.8-27B-Uncensored-vision-f16.gguf",
+        "revision": "850ed9ffca04b4d1ba6b95b5cd6167abedd3fc65",
+        "weights_gb": 16.81, "mmproj_gb": 0.93,
+        "cache_dir_override": "Qwen3_8_27B_Uncensored",
+        "extra_flags": ["-c", "65536", "-np", "1", "-fa", "on", "--cache-type-k", "q4_0", "--cache-type-v", "q4_0"],
+    },
     "unsloth/Qwen3.5-2B-GGUF": {
         "label": "Qwen3.5 2B (Fast)",
         "gguf_file": "Qwen3.5-2B-Q4_K_S.gguf",
@@ -618,6 +627,7 @@ for _repo_id, _info in MODEL_REGISTRY.items():
 # deprecated / experimental variants. A repo id listed here that isn't
 # currently in the registry is simply skipped.
 _PUBLIC_MODEL_ORDER = [
+    "DeepBeepMeep/Wan2.1",
     "Youssofal/Qwen3.6-27B-Abliterated-Heretic-Uncensored-GGUF",
     "Nesuwka/gemma-4-E2B-it-heretic-ara-Q4_K_M-GGUF",
     "Abhiray/gemma-4-E4B-it-heretic-GGUF",                         # default (Recommended)
@@ -1002,6 +1012,10 @@ def is_loaded() -> bool:
     return _process is not None and _process.poll() is None
 
 
+def supports_vision() -> bool:
+    return _vision_available or _provider in ('remote', 'ollama', 'openai', 'minimax', 'grok')
+
+
 def get_status() -> dict:
     return {
         "loaded": is_loaded(),
@@ -1025,6 +1039,7 @@ def _download_gguf(repo_id: str, filename: str, cache_dir: str) -> str:
         repo_id=repo_id,
         filename=filename,
         local_dir=cache_dir,
+        revision=MODEL_REGISTRY.get(repo_id, {}).get("revision"),
     )
     print(f"[LLM] Downloaded to: {downloaded}")
     return downloaded
@@ -1051,7 +1066,8 @@ def _llama_server_build(exe_path: str):
         out = subprocess.run(
             [exe_path, "--version"], capture_output=True, text=True, timeout=20, **kwargs
         )
-        m = re.search(r"version:\s*(\d+)", (out.stdout or "") + (out.stderr or ""))
+        version_text = (out.stdout or "") + (out.stderr or "")
+        m = re.search(r"\bbuild\s+(\d+)", version_text) or re.search(r"version:\s*(\d+)(?![\d.])", version_text)
         if m:
             return int(m.group(1))
     except Exception:
@@ -1158,6 +1174,8 @@ def _ensure_llama_server(bin_dir: str) -> None:
         )
         with urlopen(req, timeout=15) as r:
             release_info = json.load(r)
+        from services.llama_release_assets import compatible_binary_release
+        release_info = compatible_binary_release(release_info, asset_specs)
         tag = release_info.get("tag_name", FALLBACK_TAG)
     except (URLError, HTTPError, json.JSONDecodeError, TimeoutError) as e:
         print(f"[LLM] GitHub API unavailable ({e}); falling back to pinned tag {FALLBACK_TAG}")
@@ -2066,6 +2084,7 @@ def generate(
     stop: Optional[list[str]] = None,
     json_schema: Optional[dict] = None,
     cancellation_token=None,
+    require_vision: bool = False,
 ) -> str:
     """Generate text via llama-server's OpenAI-compatible chat endpoint.
 
@@ -2085,6 +2104,10 @@ def generate(
     """
     if not is_loaded():
         raise RuntimeError("LLM not loaded. Call load_model() first.")
+
+    # Routing is locked by _scheduled_llm_request here, after acquiring its lane.
+    if require_vision and not supports_vision():
+        raise ValueError("Select a vision-capable LLM before attaching visual evidence")
 
     # MiniMax M-series completions use max_completion_tokens, reasoning_split
     # and a provider-specific thinking switch. The generic request below uses
@@ -3327,6 +3350,8 @@ def enhance_prompt(
     lora_system_hint: str = "",
     raw_enhancer_mode: bool = False,
     reference_context: Optional[str] = None,
+    planning_style: str = "faithful",
+    h3_audio_policy: str = "native",
 ) -> str:
     is_h3_ref2va = (
         mode in ("video", "avatar")
@@ -3615,15 +3640,18 @@ def enhance_prompt(
             "(S2), etc. speaker ID and use <d>[Language] literal words</d>. "
             "When the user requests a discussion without supplying lines, write "
             "short meaningful dialogue that fits the supplied Duration. Once the "
-            "last line ends, continue with visible action only. Do not describe "
-            "sound or silence. overall_soundscape and non_diegetic_music are N/A. "
+            "last line ends, continue with concrete nonverbal action and closed mouths. "
             "No markdown, explanation, or LoRA filenames."
         )
     else:
         system += "\n\nCRITICAL: Output ONLY the enhanced prompt text. No headers, no labels, no markdown, no explanation, no \"Enhancement Logic\", no \"Edit Prompt:\". No LoRA filenames (.safetensors). Just the raw prompt text."
 
     if is_h3_structured:
-        dialogue_requirement = _build_h3_dialogue_requirement(prompt, duration_seconds)
+        from services.h3_prompt_policy import writing_contract, sound_contract
+        system += "\n\n" + writing_contract(planning_style) + "\n" + sound_contract(h3_audio_policy)
+
+    if is_h3_structured:
+        dialogue_requirement = _build_h3_dialogue_requirement(prompt, duration_seconds, planning_style)
         if dialogue_requirement:
             # Keep this adjacent to the output contract so a long vision guide
             # cannot demote literal dialogue into a vague "speaks" action.
@@ -3663,6 +3691,10 @@ def enhance_prompt(
     # valid Context-IR response at its first repeated <Picture>/<Audio> mapping.
     if result:
         result = _clean_enhance_output(result, preserve_structure=is_h3_structured)
+
+    if is_h3_structured:
+        from services.h3_story_contract import repair_literal_tags
+        result = repair_literal_tags(result, prompt, bind_speakers=True)
 
     structure_is_valid = (
         _has_complete_h3_ref2va_structure(result)
@@ -3722,6 +3754,7 @@ def enhance_prompt(
             presence_penalty=0.15,
         )
         retry = _clean_enhance_output(retry, preserve_structure=True) if retry else ""
+        retry = repair_literal_tags(retry, prompt, bind_speakers=True)
         retry_structure_is_valid = (
             _has_complete_h3_ref2va_structure(retry)
             if is_h3_ref2va
@@ -3779,9 +3812,10 @@ def enhance_prompt(
             ),
             system_prompt=(
                 "Write only the concise dialogue requested by the user. Output one to three lines in "
-                "the exact form 'Speaker description (S1): <d>[English] Literal words.</d>', using "
-                "stable sequential speaker IDs. Communicate the requested topic. No narration, "
-                "markdown, quotation marks, headings, or dialogue beyond the word budget."
+                "the exact form 'Speaker description (S1): <d>[Language] Literal words.</d>', using "
+                "stable sequential speaker IDs and the language of the spoken words. Communicate the "
+                "requested topic. No narration, markdown, quotation marks, headings, or dialogue "
+                "beyond the word budget."
             ),
             max_new_tokens=min(320, effective_max_tokens),
             temperature=min(float(temperature), 0.5),
@@ -3805,46 +3839,38 @@ def enhance_prompt(
         else:
             print("[Enhance] Focused H3 dialogue pass returned no valid <d> block.")
 
+    if is_h3_structured:
+        result = _apply_creative_supporting_dialogue(
+            result,
+            prompt,
+            planning_style=planning_style,
+            duration_seconds=duration_seconds,
+            is_h3_ref2va=is_h3_ref2va,
+            effective_max_tokens=effective_max_tokens,
+            temperature=temperature,
+        )
+
     # Explicit user dialogue is immutable. Even if both LLM attempts omit it,
     # compile every quoted line into H3 syntax before returning the prompt.
     if is_h3_structured and not _h3_dialogue_contract_satisfied(prompt, result):
         result = _inject_missing_h3_dialogue(result, prompt, ref2va=is_h3_ref2va)
     if is_h3_structured:
         result = _strip_h3_untagged_dialogue_duplicates(result, prompt)
-        result = _enforce_h3_soundscape_silence(result, prompt)
+        from services.h3_story_contract import enforce_single_dialogue
+        result = enforce_single_dialogue(result, prompt, planning_style)
         result = _enforce_h3_music_request(result, prompt, reference_context)
-        try:
-            from services.director.h3_dialogue import apply_h3_no_sound_description
-        except ImportError:
-            from app.services.director.h3_dialogue import apply_h3_no_sound_description
-        result = apply_h3_no_sound_description(result)
+        from services.h3_prompt_finalization import finalize_h3_prompt
+        result = finalize_h3_prompt(
+            result, policy=h3_audio_policy, duration_seconds=duration_seconds or 0,
+        )
+
     return result
-
-
-_H3_REF2VA_FIELDS = (
-    "subject_definitions",
-    "summary",
-    "retention_analysis",
-    "detailed_description",
-    "overall_soundscape",
-    "non_diegetic_music",
-)
-_H3_CONTEXT_FIELDS = (
-    "integrated_multimodal_description",
-    "overall_soundscape",
-    "non_diegetic_music",
-)
 
 
 def _extract_h3_quoted_dialogue(text: str) -> list[str]:
     """Extract explicit straight- or curly-quoted speech in source order."""
-    import re
-    matches = []
-    for match in re.finditer(r'"([^"\r\n]{1,500})"|“([^”\r\n]{1,500})”', str(text or "")):
-        value = (match.group(1) or match.group(2) or "").strip()
-        if value:
-            matches.append(value)
-    return matches
+    from services.h3_story_contract import extract_locked_lines
+    return [line["text"] for line in extract_locked_lines(text)]
 
 
 def _h3_requests_speech(text: str) -> bool:
@@ -3859,6 +3885,19 @@ def _h3_requests_speech(text: str) -> bool:
             flags=re.IGNORECASE,
         )
     )
+
+
+_H3_EXTRA_SPEECH_RE = re.compile(
+    r"\b(?:add(?:ing)?\s+(?:a\s+)?(?:short\s+)?(?:reply|line|phrase|exchange)|"
+    r"supporting\s+dialogue|"
+    r"a[nñ]ade(?:r)?\s+(?:una?\s+)?(?:r[eé]plica|frase|l[ií]nea)|"
+    r"di[aá]logo\s+adicional)\b",
+    re.IGNORECASE,
+)
+
+
+def _h3_requests_extra_speech(text: str) -> bool:
+    return bool(_H3_EXTRA_SPEECH_RE.search(str(text or "")))
 
 
 def _extract_h3_dialogue_blocks(text: str) -> list[str]:
@@ -3899,25 +3938,35 @@ def _build_h3_timed_silence_clause(prompt: str, duration_seconds: Optional[float
 def _build_h3_dialogue_requirement(
     prompt: str,
     duration_seconds: Optional[float] = None,
+    planning_style: str = "faithful",
 ) -> str:
-    quotes = _extract_h3_quoted_dialogue(prompt)
+    from services.h3_story_contract import extract_locked_lines
+    from services.h3_prompt_policy import tagged_dialogue
+    quotes = extract_locked_lines(prompt)
     timed_clause = _build_h3_timed_silence_clause(prompt, duration_seconds)
     if quotes:
         required = "\n".join(
-            f"- REQUIRED VERBATIM: <d>[English] {line}</d>" for line in quotes
+            f'- REQUIRED VERBATIM ({line["speaker"]}): {tagged_dialogue(line["language"], line["text"])}' for line in quotes
+        )
+        extra = (
+            " The user asked for an additional spoken line. Write that new line with a stable "
+            "speaker ID, a [Language] tag matching the spoken words, and a duration budget. "
+            "Do not copy a canned sentence from the system."
+            if planning_style == "creative" and _h3_requests_extra_speech(prompt)
+            else ""
         )
         return (
             "IMMUTABLE H3 DIALOGUE CONTRACT: The user supplied the spoken lines below. "
             "Every line must appear verbatim inside a <d> block in the output; do not summarize, "
-            "paraphrase, censor, omit, or add speech. Give each line a stable (S1), (S2), etc. "
+            "paraphrase, censor, or omit it. Additional speech follows WRITING MODE. Give each line a stable (S1), (S2), etc. "
             f"speaker outside its tag. Never repeat these words as ordinary quoted text in summary "
-            f"or any other field.\n{required}\n{timed_clause}"
+            f"or any other field.{extra}\n{required}\n{timed_clause}"
         )
     if _h3_requests_speech(prompt):
         return (
             "MANDATORY H3 DIALOGUE CONTRACT: The user explicitly requests speech but supplied no "
             "script. Write concise, meaningful dialogue that communicates the requested subject, "
-            "using stable speaker IDs and one or more <d>[English] literal words</d> blocks. "
+            "using stable speaker IDs and one or more <d>[Language] literal words</d> blocks. "
             "Writing only 'speaks', 'talks', or 'they discuss' makes the output invalid. "
             f"{timed_clause}"
         )
@@ -3971,61 +4020,34 @@ def _h3_voice_binding_contract_satisfied(
 
 def _has_complete_h3_ref2va_structure(text: str) -> bool:
     """Return true only for one complete, ordered six-field Ref2VA prompt."""
-    if not text:
-        return False
-    import re
-    positions = []
-    for field in _H3_REF2VA_FIELDS:
-        matches = list(re.finditer(rf"(?mi)^\s*{re.escape(field)}\s*:", text))
-        if len(matches) != 1:
-            return False
-        positions.append(matches[0].start())
-    return positions == sorted(positions)
+    from services.h3_prompt_policy import has_complete_h3_fields
+    return bool(text) and has_complete_h3_fields(text, "ref2va")
 
 
 def _has_complete_h3_context_structure(text: str) -> bool:
     """Return true only for one complete, ordered three-field H3 prompt."""
-    if not text:
-        return False
-    import re
-    positions = []
-    for field in _H3_CONTEXT_FIELDS:
-        matches = list(re.finditer(rf"(?mi)^\s*{re.escape(field)}\s*:", text))
-        if len(matches) != 1:
-            return False
-        positions.append(matches[0].start())
-    return positions == sorted(positions)
+    from services.h3_prompt_policy import has_complete_h3_fields
+    return bool(text) and has_complete_h3_fields(text, "context")
 
 
 def _compile_h3_explicit_dialogue(prompt: str) -> str:
-    """Replace user quotation marks with literal H3 dialogue blocks."""
-    import re
-    counter = 0
-
-    def replace(match):
-        nonlocal counter
-        counter += 1
-        value = (match.group(1) or match.group(2) or "").strip()
-        return f"(S{counter}) <d>[English] {value}</d>"
-
-    return re.sub(
-        r'"([^"\r\n]{1,500})"|“([^”\r\n]{1,500})”',
-        replace,
-        str(prompt or ""),
-    )
+    from services.h3_story_contract import tag_source_dialogue
+    return tag_source_dialogue(str(prompt or ""))
 
 
 def _inject_missing_h3_dialogue(result: str, prompt: str, *, ref2va: bool) -> str:
     """Deterministically append omitted literal dialogue to the correct H3 field."""
-    quotes = _extract_h3_quoted_dialogue(prompt)
+    from services.h3_story_contract import extract_locked_lines
+    from services.h3_prompt_policy import tagged_dialogue
+    quotes = extract_locked_lines(prompt)
     if not quotes:
         return result
     existing = set(_extract_h3_dialogue_blocks(result))
-    missing = [line for line in quotes if line not in existing]
+    missing = [line for line in quotes if line["text"] not in existing]
     if not missing:
         return result
     additions = " ".join(
-        f"The intended speaker (S{index}) says exactly once: <d>[English] {line}</d>."
+        f'{line["speaker"] or "The intended speaker"} (S{index}) says exactly once: {tagged_dialogue(line["language"], line["text"])}.'
         for index, line in enumerate(missing, start=1)
     )
     field = "detailed_description" if ref2va else "integrated_multimodal_description"
@@ -4041,6 +4063,70 @@ def _inject_missing_h3_dialogue(result: str, prompt: str, *, ref2va: bool) -> st
             count=1,
         )
     return f"{result or ''}\n{field}: {additions}".strip()
+
+
+def _apply_creative_supporting_dialogue(
+    result: str,
+    prompt: str,
+    *,
+    planning_style: str,
+    duration_seconds: Optional[float],
+    is_h3_ref2va: bool,
+    effective_max_tokens: int,
+    temperature: float,
+) -> str:
+    """Ask the LLM for a supporting line. Never invent a canned sentence."""
+    from services.h3_prompt_policy import planning_style as normalize_style
+    from services.h3_story_contract import (
+        extract_locked_lines,
+        requests_only_supplied_lines,
+        requests_silence,
+    )
+
+    if normalize_style(planning_style) != "creative":
+        return result
+    if not _h3_requests_extra_speech(prompt):
+        return result
+    if requests_only_supplied_lines(prompt):
+        return result
+    locked_lines = extract_locked_lines(prompt)
+    if requests_silence(prompt) and not locked_lines:
+        return result
+    locked = {line["text"] for line in locked_lines}
+    extras = [
+        block for block in _extract_h3_dialogue_blocks(result) if block not in locked
+    ]
+    if extras:
+        return result
+    word_budget = max(4, int(duration_seconds or 8))
+    print("[Enhance] Creative extra line missing; requesting a supporting line from the LLM.")
+    fragment = generate(
+        prompt=(
+            f"Duration: {duration_seconds or 8} seconds. Total additional dialogue budget: "
+            f"at most {word_budget} spoken words. Request: {prompt}"
+        ),
+        system_prompt=(
+            "Write only the additional spoken line the user asked for. Output one line in the "
+            "form 'Speaker description (S2): <d>[Language] Literal words.</d>'. Match the "
+            "language of the spoken words. Do not repeat the already supplied quoted lines. "
+            "No narration."
+        ),
+        max_new_tokens=min(240, effective_max_tokens),
+        temperature=min(float(temperature), 0.5),
+        image_paths=None,
+        enable_thinking=False,
+        thinking_budget=2048,
+        frequency_penalty=0.4,
+        presence_penalty=0.1,
+    )
+    fragment = _clean_enhance_output(fragment, preserve_structure=True) if fragment else ""
+    extra_blocks = [
+        block for block in _extract_h3_dialogue_blocks(fragment) if block not in locked
+    ]
+    if not extra_blocks:
+        print("[Enhance] Creative extra-line pass returned no new <d> block.")
+        return result
+    return _inject_h3_generated_dialogue(result, fragment, ref2va=is_h3_ref2va)
 
 
 def _inject_h3_generated_dialogue(result: str, fragment: str, *, ref2va: bool) -> str:
@@ -4101,17 +4187,6 @@ def _strip_h3_untagged_dialogue_duplicates(result: str, prompt: str) -> str:
     for index, block in enumerate(protected):
         text = text.replace(f"@@MAESTRO_H3_DIALOGUE_{index}@@", block)
     return text
-
-
-def _enforce_h3_soundscape_silence(result: str, prompt: str) -> str:
-    """Temporary: never describe sound. Keep the required label; value is N/A."""
-    import re
-    return re.sub(
-        r"(?ms)^\s*overall_soundscape\s*:.*?(?=^\s*non_diegetic_music\s*:)",
-        "overall_soundscape: N/A\n",
-        str(result or ""),
-        count=1,
-    )
 
 
 def _enforce_h3_music_request(

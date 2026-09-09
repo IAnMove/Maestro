@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { resolveSupportedVideoFormat } from '../src/lib/productionProfile.ts'
+import {
+  applySeriesGlobalProvider,
+  DEFAULT_PRODUCTION_PROFILE,
+  resolveSupportedVideoFormat,
+  seriesProviderFieldsFromProfile,
+  seriesProviderMatchesGlobal,
+} from '../src/lib/productionProfile.ts'
 
 const options = {
   resolution_preset_order: ['480p', '540p', '720p', '768p'],
@@ -20,6 +26,43 @@ test('keeps an exact H3 Legacy tier and portrait orientation', () => {
     aspectRatio: '9:16',
     adjusted: false,
   })
+})
+
+test('series global profile compares every copied field including shifts', () => {
+  const fields = seriesProviderFieldsFromProfile({
+    ...DEFAULT_PRODUCTION_PROFILE,
+    video: {
+      ...DEFAULT_PRODUCTION_PROFILE.video,
+      model: 'minimax_h3_fused_turbo',
+      settings: {
+        ...DEFAULT_PRODUCTION_PROFILE.video.settings,
+        steps: 4,
+        flowShift: 7,
+        audioShift: 1,
+        profile: 'fast',
+      },
+    },
+  })
+  const provider = applySeriesGlobalProvider({
+    useGlobalProfile: true,
+    writingProvider: 'minimax',
+    writingModel: 'old',
+    writingBaseUrl: '',
+    imageProvider: 'maestro',
+    imageModel: '',
+    videoModel: 'minimax_h3',
+    videoSettings: { resolution: '540p', orientation: 'landscape', numInferenceSteps: 20, flowShift: 12, audioShift: 3, modelProfile: 'quality' },
+  }, fields)
+  assert.equal(provider.videoModel, 'minimax_h3_fused_turbo')
+  assert.equal(provider.videoSettings.flowShift, 7)
+  assert.equal(provider.videoSettings.audioShift, 1)
+  assert.equal(provider.videoSettings.modelProfile, 'fast')
+  assert.equal(provider.writingBaseUrl, 'https://api.minimax.io')
+  assert.equal(seriesProviderMatchesGlobal(provider, fields), true)
+  assert.equal(seriesProviderMatchesGlobal({
+    ...provider,
+    videoSettings: { ...provider.videoSettings, flowShift: 12 },
+  }, fields), false)
 })
 
 test('chooses the nearest advertised tier without flipping orientation', () => {

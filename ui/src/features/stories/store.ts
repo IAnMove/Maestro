@@ -10,6 +10,7 @@ import {
   storySongOutputRefFromMetadata,
   type StorySongOutputRef,
 } from './storySongRecovery'
+import { inFlightJobIds, recoverInFlightStorySongs } from './storySongJobRecovery'
 import type { StoryProject, StoryProjectType } from './types'
 
 const LEGACY_AUTOSAVE_KEY = 'maestro-story-lab-v1'
@@ -236,11 +237,16 @@ async function recoverHydratedLibrary(
 ): Promise<{ library: StoryLibraryData; recovered: boolean }> {
   if (!libraryHasPendingSongs(library)) return { library, recovered: false }
   try {
-    const recovered = recoverPendingStorySongs(
+    const fromFiles = recoverPendingStorySongs(
       library.projects,
       await fetchStorySongOutputRefs(workspace),
     )
-    if (!recovered.changed) return { library, recovered: false }
+    const jobIds = inFlightJobIds(fromFiles.projects)
+    const jobs = (await Promise.all(
+      jobIds.map(jobId => api.fetchStoryMusicCandidatesJob(jobId).catch(() => null)),
+    )).filter((job): job is NonNullable<typeof job> => Boolean(job))
+    const recovered = recoverInFlightStorySongs(fromFiles.projects, jobs, { workspace })
+    if (!fromFiles.changed && !recovered.changed) return { library, recovered: false }
     const projects = Object.fromEntries(
       Object.values(recovered.projects).map(project => {
         const normalized = normalizeStoryProject(project)
@@ -564,6 +570,16 @@ export const useStoryStore = create<StoryState>((set, get) => ({
 let saveTimer: number | undefined
 let backendSaveChain: Promise<void> = Promise.resolve()
 const lastPersistedLibrary = new Map<string, string>()
+
+export function noteStoryLibraryPersisted(options?: { onlyIfClean?: boolean }): void {
+  if (typeof window !== 'undefined') window.clearTimeout(saveTimer)
+  const state = useStoryStore.getState()
+  if (options?.onlyIfClean && state.dirty) return
+  lastPersistedLibrary.set(
+    state.workspace,
+    JSON.stringify(buildLibrary(state.project, state.projects, state.libraryRevision)),
+  )
+}
 useStoryStore.subscribe(state => {
   if (typeof window === 'undefined') return
   try {
@@ -652,12 +668,12 @@ useStoryStore.subscribe(state => {
   }, 750)
 })
 
-export async function saveStoryProjectMutation(
+export async function commitStoryProjectMutation(
   workspace: string,
   current: { libraryRevision: number; projects: Record<string, StoryProject> },
   projectId: string,
   mutate: (project: StoryProject) => StoryProject,
-): Promise<StoryProject> {
+): Promise<NonNullable<Awaited<ReturnType<typeof api.saveStoryLibrary>>>> {
   let baseline = current
   let library: Awaited<ReturnType<typeof api.saveStoryLibrary>> | null = null
   for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -665,10 +681,11 @@ export async function saveStoryProjectMutation(
     if (!source) throw new Error('La historia activa desapareció antes de poder guardarla.')
     const project = mutate(source)
     try {
+      const visibleId = useStoryStore.getState().project.id
       library = await api.saveStoryLibrary(workspace, {
         version: 2,
         revision: baseline.libraryRevision,
-        activeId: project.id,
+        activeId: baseline.projects[visibleId] ? visibleId : project.id,
         projects: { ...baseline.projects, [project.id]: project },
       })
       break
@@ -682,9 +699,20 @@ export async function saveStoryProjectMutation(
     }
   }
   if (!library?.projects[projectId]) throw new Error('Story Lab guardó la biblioteca sin devolver la historia editada.')
+  return library
+}
+
+export async function saveStoryProjectMutation(
+  workspace: string,
+  current: { libraryRevision: number; projects: Record<string, StoryProject> },
+  projectId: string,
+  mutate: (project: StoryProject) => StoryProject,
+): Promise<StoryProject> {
+  const library = await commitStoryProjectMutation(workspace, current, projectId, mutate)
+  const visibleId = useStoryStore.getState().project.id
   useStoryStore.setState({
     workspace,
-    project: library.projects[projectId],
+    project: library.projects[visibleId] || library.projects[projectId],
     projects: library.projects,
     libraryRevision: library.revision,
     dirty: false,

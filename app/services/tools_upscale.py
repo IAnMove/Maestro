@@ -23,6 +23,9 @@ TOOL_UPSCALE_METHODS = frozenset(
         "flashvsr2pass4",
         "lanczos1.5",
         "lanczos2",
+        "h3facerefine", "dlss5*1", "dlss5*1.5", "dlss5*1.724", "dlss5*2", "dlss5*3",
+        "rife2", "rife3", "rife4",
+        "dlssg*2", "dlssg*3", "dlssg*4", "dlssg*5", "dlssg*6",
     }
 )
 TOOL_SOURCE_EXTENSIONS = {
@@ -45,6 +48,12 @@ TOOL_SOURCE_EXTENSIONS = {
 }
 
 
+def processor_backend(method):
+    if method.startswith(('h3facerefine', 'dlss', 'rife')):
+        return method.split('*')[0]
+    return 'flashvsr' if method.startswith('flashvsr') else 'lanczos'
+
+
 def upscale_image(
     source_path: str,
     output_path: str,
@@ -54,6 +63,7 @@ def upscale_image(
     seed: int = -1,
     abort_callback=None,
     progress_callback=None,
+    processor_settings=None,
 ) -> tuple[int, int]:
     """Upscale one still image through the existing spatial adapter."""
     from PIL import Image
@@ -67,7 +77,7 @@ def upscale_image(
             image = wgp.convert_image(opened).copy()
             sample = convert_image_to_tensor(image).unsqueeze(1)
         if callable(progress_callback):
-            progress_callback("Upscaling image", 5, 0, 1)
+            progress_callback("Upscaling image", 0, 1)
         sample = wgp.perform_spatial_upsampling(
             sample,
             method,
@@ -75,6 +85,7 @@ def upscale_image(
             abort_callback=abort_callback,
             progress_callback=progress_callback,
             still_image=True,
+            processor_settings=processor_settings,
         )
         if callable(abort_callback) and abort_callback():
             raise InterruptedError("Image upscale was cancelled")
@@ -111,6 +122,7 @@ def _upscale_image_job(
         seed=int(params.get("seed", -1)),
         abort_callback=abort,
         progress_callback=progress,
+        processor_settings=params.get("wangp_processor_settings"),
     )
     return final_path, image_size
 
@@ -121,7 +133,7 @@ def _upscale_video_job(
     from shared.utils.utils import get_video_info
 
     fps, _width, _height, _frames = get_video_info(source_path)
-    audio_tracks, audio_metadata = wgp.extract_audio_tracks(source_path)
+    audio_tracks, audio_metadata = wgp.extract_audio_tracks(source_path, **({"temp_format": "wav"} if method == "h3facerefine" else {}))
     has_audio = len(audio_tracks) > 0
     if not update_job(job, message="Upscaling...", phase="Upscaling", progress=5):
         return None, None, audio_tracks
@@ -159,16 +171,17 @@ def _upscale_video_job(
         source_path, 0, wgp.max_source_video_frames, fps
     )
     sample = sample.permute(-1, 0, 1, 2)
-    sample = wgp.perform_spatial_upsampling(
-        sample,
-        method,
-        seed=int(params.get("seed", -1)),
-        abort_callback=abort,
-        progress_callback=progress["callback"],
-    )
+    output_fps = fps
+    if method.startswith(("rife", "dlssg")):
+        sample, _, output_fps = wgp.perform_temporal_upsampling(sample, None, method, fps, abort_callback=abort, progress_callback=progress["callback"])
+    else:
+        sample = wgp.perform_spatial_upsampling(
+            sample, method, seed=int(params.get("seed", -1)), fps=fps,
+            source_audio_path=audio_tracks[0] if audio_tracks else None, processor_settings=params.get("wangp_processor_settings"),
+            abort_callback=abort, progress_callback=progress["callback"],
+        )
     if abort():
         return None, None, audio_tracks
-    output_fps = round(fps)
     if has_audio:
         tmp_path = wgp.get_available_filename(
             out_dir, source_filename, "_uptmp", force_extension=f".{container}"
@@ -216,6 +229,8 @@ def _publish_upscale_outputs(*, runtime, job_id, job, out_dir, before, source_fi
                 "method": method, "model_type": "post_processing",
                 "source_asset_id": source_asset_id, "source_kind": source_kind,
                 "source_filename": source_filename,
+                "seed": job["params"].get("seed", -1),
+                "wangp_processor_settings": job["params"].get("wangp_processor_settings", {}),
             },
             elapsed=time.time() - float(job.get("started_at") or time.time()),
             job_id=job_id, task_id=job.get("task_id"),
@@ -226,7 +241,7 @@ def _publish_upscale_outputs(*, runtime, job_id, job, out_dir, before, source_fi
             parents=[source_ref] if source_asset_id else [],
             transformations=[{
                 "type": "upscale",
-                "backend": "flashvsr" if method.startswith("flashvsr") else "lanczos",
+                "backend": processor_backend(method),
                 "method": method,
             }],
             technical=(
@@ -243,6 +258,8 @@ def _prepare_upscale_source(*, params, workspace, runtime):
     source_kind = str(params.get("source_kind") or "video").casefold()
     if method not in TOOL_UPSCALE_METHODS:
         raise ValueError("Unsupported upscale method")
+    if source_kind == "image" and (method == "h3facerefine" or method.startswith(("rife", "dlssg"))):
+        raise ValueError("This processor requires a video")
     if source_kind not in TOOL_SOURCE_EXTENSIONS:
         raise ValueError("Unsupported source kind")
     source_value = (

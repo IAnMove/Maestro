@@ -11,9 +11,14 @@ import { SeriesReviewPanel } from './SeriesReviewPanel'
 import { Pill, seriesFormatLabel } from './components'
 import { primaryButton, secondaryButton } from './styles'
 import { stageSeriesComic } from './adapters'
-import type { SeriesJobStatus, SeriesProject } from './types'
+import type { SeriesJobStatus } from './types'
 import { listenForAgentSeriesRenderJob, listenForAgentSeriesSection } from '../../lib/uiBus'
 import { useUiTranslation } from '../../i18n'
+import {
+  applySeriesGlobalProvider,
+  seriesProviderFieldsFromProfile,
+  seriesProviderMatchesGlobal,
+} from '../../lib/productionProfile'
 
 type LabTab = 'setup' | 'canon' | 'episode' | 'shots' | 'review'
 type SetupGap = 'title' | 'premise' | 'visualStyle'
@@ -51,55 +56,11 @@ export function SeriesLabPanel() {
   const series = library.seriesById[activeSeriesId] || null
   useEffect(() => {
     if (!series?.provider.useGlobalProfile) return
-    const next = {
-      writingProvider: (productionProfile.text.provider === 'local' || productionProfile.text.provider === 'anthropic'
-        ? 'maestro'
-        : productionProfile.text.provider === 'remote' ? 'openai-compatible' : productionProfile.text.provider) as SeriesProject['provider']['writingProvider'],
-      writingModel: productionProfile.text.model,
-      writingBaseUrl: productionProfile.text.base_url || (
-        productionProfile.text.provider === 'minimax' ? 'https://api.minimax.io/v1'
-          : productionProfile.text.provider === 'grok' ? 'https://api.x.ai/v1'
-            : productionProfile.text.provider === 'ollama' ? 'http://127.0.0.1:11434'
-              : ''
-      ),
-      imageProvider: productionProfile.image.provider === 'minimax' ? 'minimax' : 'maestro',
-      imageModel: productionProfile.image.model,
-      videoModel: productionProfile.video.model,
-      resolution: productionProfile.video.settings.resolution,
-      orientation: productionProfile.video.settings.aspectRatio === '9:16' || productionProfile.video.settings.aspectRatio === '3:4'
-        ? 'portrait' as const : 'landscape' as const,
-      numInferenceSteps: productionProfile.video.settings.steps,
-    }
-    if (
-      series.provider.writingProvider === next.writingProvider
-      && series.provider.writingModel === next.writingModel
-      && series.provider.imageProvider === next.imageProvider
-      && series.provider.imageModel === next.imageModel
-      && series.provider.videoModel === next.videoModel
-      && series.provider.videoSettings.resolution === next.resolution
-      && series.provider.videoSettings.orientation === next.orientation
-      && series.provider.videoSettings.numInferenceSteps === next.numInferenceSteps
-    ) return
+    const fields = seriesProviderFieldsFromProfile(productionProfile)
+    if (seriesProviderMatchesGlobal(series.provider, fields)) return
     updateSeries(current => ({
       ...current,
-      provider: {
-        ...current.provider,
-        writingProvider: next.writingProvider,
-        writingModel: next.writingModel,
-        writingBaseUrl: next.writingBaseUrl,
-        imageProvider: next.imageProvider,
-        imageModel: next.imageModel,
-        videoModel: next.videoModel,
-        videoSettings: {
-          ...current.provider.videoSettings,
-          resolution: next.resolution,
-          orientation: next.orientation,
-          numInferenceSteps: next.numInferenceSteps,
-          flowShift: productionProfile.video.settings.flowShift,
-          audioShift: productionProfile.video.settings.audioShift,
-          modelProfile: productionProfile.video.settings.profile,
-        },
-      },
+      provider: applySeriesGlobalProvider(current.provider, fields),
     }))
   }, [productionProfile, series, updateSeries])
   const episode = series?.episodesById[activeEpisodeId] || null
@@ -168,6 +129,14 @@ export function SeriesLabPanel() {
     try {
       await saveNow()
       const current = useSeriesStore.getState().library.seriesById[series.id]
+      const currentEpisode = current?.episodesById[episode.id] || episode
+      const stale = currentEpisode.shots.filter(shot => (
+        (mode !== 'selected' || (shotIds || []).includes(shot.id))
+        && (shot.scriptDialogueStatus === 'stale' || shot.scriptDialogueStatus === 'manual_conflict')
+      ))
+      if (stale.length) {
+        throw new Error(t('episode.syncBeforeRender', { count: stale.length }))
+      }
       setRenderJob(await api.startSeriesRender(workspace, series.id, episode.id, {
         mode, shotIds, seed,
         settings: current?.provider.videoSettings || series.provider.videoSettings,
@@ -175,7 +144,7 @@ export function SeriesLabPanel() {
       setTab('review')
     } catch (reason) { setActionError((reason as Error).message) }
     finally { setActionBusy(false) }
-  }, [episode, saveNow, series, workspace])
+  }, [episode, saveNow, series, t, workspace])
   const handleRecovery = async (job: SeriesJobStatus, kind: 'plan' | 'render', discard = false) => {
     await runAction(async () => {
       if (discard) {

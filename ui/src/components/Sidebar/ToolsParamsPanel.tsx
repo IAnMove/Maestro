@@ -1,5 +1,9 @@
-import type { RefObject } from 'react'
-import { Mic, X } from 'lucide-react'
+import { Mic } from 'lucide-react'
+import { useWangpProcessors } from './useWangpProcessors'
+import { WangpProcessorOptions } from './WangpProcessorOptions'
+import { useStore } from '../../stores/useStore'
+import type { ApiOutput } from '../../api/outputs'
+import { AssetInput } from '../../features/asset-picker/AssetInput.tsx'
 import { useUiTranslation } from '../../i18n'
 import type { ToolsPanelTool } from './ToolsSourcePanel'
 
@@ -22,10 +26,8 @@ type ParamsProps = {
   revoiceMode: 'single' | 'two'
   setRevoiceMode: (mode: 'single' | 'two') => void
   revoiceRefs: VoiceReference[]
-  setRevoiceRef: (index: number, reference: VoiceReference) => void
-  vcFileRefs: RefObject<HTMLInputElement | null>[]
-  vcUploading: number | null
-  handleVcUpload: (index: number, file: File) => Promise<void>
+  voiceItems: ApiOutput[]
+  onChooseVoice: (index: number, item: ApiOutput | null) => void
   removeBackgroundInstruction: string
   setRemoveBackgroundInstruction: (instruction: string) => void
 }
@@ -37,6 +39,8 @@ export function ToolsParamsPanel(props: ParamsProps) {
 }
 
 function UpscaleParams({ method, setMethod, flashvsrOff }: ParamsProps) {
+  const processors = useWangpProcessors()
+  const kind = useStore(s => s.toolsSourceKind)
   const { t } = useUiTranslation('studio')
   return (
     <div>
@@ -47,7 +51,9 @@ function UpscaleParams({ method, setMethod, flashvsrOff }: ParamsProps) {
         className="w-full bg-bg-tertiary border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-accent-blue"
       >
         {upscaleMethods.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+        {processors.filter(option => !kind || option.media.includes(kind)).map(option => <option key={option.value} value={option.value} disabled={!option.enabled}>{option.label}{option.reason ? ` (${option.reason})` : ''}</option>)}
       </select>
+      <WangpProcessorOptions processor={processors.find(option => option.value === method)} />
       {flashvsrOff && <p className="text-[10px] text-indicator-warning mt-1.5 leading-snug">{t('tools.flashvsrOff')}</p>}
       <p className="text-[10px] text-text-muted mt-1.5 leading-snug">{t('tools.upscaleHint')}</p>
     </div>
@@ -79,43 +85,34 @@ function RevoiceParams(props: ParamsProps) {
 
 function VoiceReferenceInput({ index, ...props }: ParamsProps & { index: number }) {
   const { t } = useUiTranslation('studio')
-  const { t: tCommon } = useUiTranslation('common')
-  const { revoiceMode, revoiceRefs, setRevoiceRef } = props
+  const { revoiceMode, revoiceRefs, voiceItems, onChooseVoice } = props
   const reference = revoiceRefs[index]
   const label = revoiceMode === 'two'
     ? (index === 0 ? t('tools.voiceA') : t('tools.voiceB'))
     : t('tools.referenceVoice')
+  const workspaceId = useStore(s => s.activeWorkspace)
+  const value = reference?.path
+    ? { name: reference.filename, type: 'audio' as const, mode: null, size: 0, created_at: 0, url: '', thumbnail_url: '' }
+    : undefined
   return (
     <div>
-      <label className="text-[10px] text-text-muted uppercase tracking-wider mb-1 block">{label}</label>
-      {!reference?.path
-        ? <VoiceReferenceUpload index={index} label={label} {...props} />
-        : <div className="flex items-center gap-2 bg-bg-tertiary border border-border rounded-lg px-2 py-1.5">
+      <AssetInput
+        label={label}
+        placeholder={t('tools.uploadSample', { label: label.toLowerCase() })}
+        items={voiceItems}
+        value={value}
+        accept="audio/*,video/*"
+        workspaceId={workspaceId}
+        optional
+        constraints={{ kinds: ['audio', 'video'], maxCount: 1, optional: true }}
+        onChoose={item => onChooseVoice(index, item)}
+      />
+      {reference?.path && (
+        <div className="mt-1 flex items-center gap-2 bg-bg-tertiary border border-border rounded-lg px-2 py-1.5">
           <Mic size={12} className="text-accent-blue shrink-0" />
           <span className="flex-1 min-w-0 truncate text-[11px] text-text-primary">{reference.filename}</span>
-          <button onClick={() => setRevoiceRef(index, null)} className="p-0.5 text-text-muted hover:text-red-400 transition-colors" title={tCommon('actions.remove')}>
-            <X size={12} />
-          </button>
-        </div>}
-    </div>
-  )
-}
-
-function VoiceReferenceUpload({ index, label, vcFileRefs, vcUploading, handleVcUpload }: ParamsProps & { index: number; label: string }) {
-  const { t } = useUiTranslation('studio')
-  return (
-    <div
-      onClick={() => vcFileRefs[index].current?.click()}
-      className={`border-2 border-dashed border-border rounded-lg p-2 text-center cursor-pointer hover:border-accent-blue transition-colors ${vcUploading === index ? 'opacity-50 pointer-events-none' : ''}`}
-    >
-      <p className="text-[11px] text-text-secondary">{vcUploading === index ? t('chrome.uploading') : t('tools.uploadSample', { label: label.toLowerCase() })}</p>
-      <input
-        ref={vcFileRefs[index]}
-        type="file"
-        accept="audio/*,video/*"
-        className="hidden"
-        onChange={event => { const file = event.target.files?.[0]; if (file) void handleVcUpload(index, file) }}
-      />
+        </div>
+      )}
     </div>
   )
 }

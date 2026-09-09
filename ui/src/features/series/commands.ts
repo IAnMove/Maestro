@@ -64,7 +64,7 @@ export interface ReviewSeriesAttemptsCommand {
   seriesTitle: string
   targetEpisodeTitle: string
   decision: 'approve' | 'reject'
-  scope: 'selected_latest' | 'all_latest'
+  scope: 'selected_latest' | 'all_latest' | 'replace_latest'
   shotNumbers: number[]
   attemptId: string
   confirm: true

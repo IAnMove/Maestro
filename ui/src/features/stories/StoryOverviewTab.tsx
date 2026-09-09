@@ -11,32 +11,38 @@ import { StoryProviderPanel } from './StoryProviderPanel'
 import type { StoryProject } from './types'
 
 const GENRES = [
-  'Adventure', 'Action', 'Comedy', 'Drama', 'Fantasy', 'Science fiction', 'Horror',
-  'Mystery', 'Thriller', 'Romance', 'Historical', 'Crime', 'Slice of life',
-  'Western', 'Cyberpunk', 'Noir', 'Satire',
-]
+  ['Adventure', 'adventure'], ['Action', 'action'], ['Comedy', 'comedy'], ['Drama', 'drama'],
+  ['Fantasy', 'fantasy'], ['Science fiction', 'scienceFiction'], ['Horror', 'horror'],
+  ['Mystery', 'mystery'], ['Thriller', 'thriller'], ['Romance', 'romance'],
+  ['Historical', 'historical'], ['Crime', 'crime'], ['Slice of life', 'sliceOfLife'],
+  ['Western', 'western'], ['Cyberpunk', 'cyberpunk'], ['Noir', 'noir'], ['Satire', 'satire'],
+] as const
 const TONES = [
-  'Cinematic', 'Epic', 'Lighthearted', 'Dark', 'Humorous', 'Dramatic',
-  'Suspenseful', 'Emotional', 'Hopeful', 'Gritty', 'Whimsical', 'Mysterious',
-  'Romantic', 'Melancholic', 'Satirical', 'Family-friendly',
-]
+  ['Cinematic', 'cinematic'], ['Epic', 'epic'], ['Lighthearted', 'lighthearted'], ['Dark', 'dark'],
+  ['Humorous', 'humorous'], ['Dramatic', 'dramatic'], ['Suspenseful', 'suspenseful'],
+  ['Emotional', 'emotional'], ['Hopeful', 'hopeful'], ['Gritty', 'gritty'],
+  ['Whimsical', 'whimsical'], ['Mysterious', 'mysterious'], ['Romantic', 'romantic'],
+  ['Melancholic', 'melancholic'], ['Satirical', 'satirical'], ['Family-friendly', 'familyFriendly'],
+] as const
 const CHARACTER_STYLE_PRESETS = [
   ['presetPhotoreal', 'Photorealistic live-action people, natural skin texture, anatomically realistic proportions, authentic hair and fabric, cinematic photographic detail'],
   ['presetClay', 'Handmade claymation characters sculpted from plasticine, visible fingerprints and tool marks, tactile matte clay surfaces, stop-motion proportions'],
   ['presetAnime', '2D anime characters, clean expressive linework, consistent cel shading, stylized facial proportions, illustrated skin and hair, never photorealistic'],
 ] as const
 
+type GenreToneKey = (typeof GENRES)[number][1] | (typeof TONES)[number][1]
+
 function Choice({
   label, value, options, onChange, required = false,
 }: {
   label: string
   value: string
-  options: string[]
+  options: ReadonlyArray<readonly [string, GenreToneKey]>
   onChange: (value: string) => void
   required?: boolean
 }) {
   const { t } = useUiTranslation('storyLab')
-  const custom = !options.includes(value)
+  const custom = !options.some(([stored]) => stored === value)
   return (
     <label className={`block text-[10px] ${required ? 'text-violet-200' : 'text-text-muted'}`}>
       {label}{required && <span className="ml-1 text-violet-300" title={t('chrome.required')}>●</span>}
@@ -47,7 +53,7 @@ function Choice({
         required={required}
         aria-required={required}
       >
-        {options.map(option => <option key={option}>{option}</option>)}
+        {options.map(([stored, key]) => <option key={stored} value={stored}>{t(`overview.genreTone.${key}`)}</option>)}
         <option value="__other__">{t('overview.other')}</option>
       </select>
       {custom && <input className={`${input} mt-1`} value={value} onChange={event => onChange(event.target.value)} placeholder={label} />}

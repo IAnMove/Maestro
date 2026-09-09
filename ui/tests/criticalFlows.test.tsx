@@ -96,7 +96,7 @@ test('Director recovery resumes the selected crashed pipeline from the accessibl
   cleanup()
 })
 
-test('Approve all sends every eligible shot in one bulk review action', { concurrency: false }, async () => {
+test('Use pending takes sends every eligible shot in one bulk review action', { concurrency: false }, async () => {
   const { render, screen, waitFor, fireEvent, cleanup } = await import('@testing-library/react')
   const { SeriesReviewPanel } = await import('../src/features/series/SeriesReviewPanel.tsx')
   const { episode, series } = makeSeriesReviewFixture()
@@ -118,7 +118,7 @@ test('Approve all sends every eligible shot in one bulk review action', { concur
     updateEpisode={() => {}}
     saveNow={async () => null}
   />)
-  fireEvent.click(screen.getByRole('button', { name: 'Approve all (2)' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Use pending takes (2)' }))
   await waitFor(() => assert.equal(reloads, 1))
   assert.deepEqual(submitted?.selections, [
     { shotId: 'shot-1', attemptId: 'attempt-1' },
@@ -206,9 +206,10 @@ test('recovery dialog warns that leftover jobs would duplicate a live generation
 
   render(<QueueRecoveryDialog />)
   await screen.findByRole('dialog', { name: /Older leftovers besides the current generation/i })
-  assert.ok(screen.getByText(/duplicates the GPU/i))
+  assert.ok(screen.getByText(/queues them behind and reruns them from scratch/i))
+  assert.ok(screen.getByText(/does not affect the active generation/i))
   assert.equal(screen.getByRole('button', { name: 'Resume old leftovers anyway' }).disabled, false)
-  assert.equal(screen.getByRole('button', { name: 'Discard and start clean' }).disabled, false)
+  assert.equal(screen.getByRole('button', { name: 'Discard interrupted jobs only' }).disabled, false)
   cleanup()
 })
 

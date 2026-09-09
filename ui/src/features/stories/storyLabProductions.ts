@@ -1,4 +1,5 @@
-import type { RefObject } from 'react'
+import type { ReactNode } from 'react'
+import type { ApiOutput } from '../../api/outputs'
 import type { AspectRatio, ModelDef, ModelOptions, ResolutionPreset } from '../../types'
 import type { ProductionReviewIssue, StoryLabTab } from './storyLabChrome'
 import type { StoryMusicCandidateOption } from './storyLabMusic'
@@ -73,10 +74,10 @@ export type StoryProductionsTabProps = {
   onNavigate: (tab: StoryLabTab) => void
   onOpenIssue: (issue: ProductionReviewIssue) => void
   minimaxConfigured: boolean
-  musicCoverRef: RefObject<HTMLInputElement | null>
-  uploadCoverReference: (file?: File) => void
+  uploadCoverReference: (item: ApiOutput) => void
   writeStorySong: () => void
   adaptStoryLyrics: () => void
   generateMinimaxSongs: () => void
   openMusicalTrailer: (candidateId?: string) => void
+  trailerRecipe?: ReactNode
 }
