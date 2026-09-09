@@ -37,3 +37,39 @@ migration from disabling an existing Wizard feature.
 Presentation hints are metadata only. Speed, panel visibility, scrolling,
 sound and detailed animation remain behind Decision gate A; none of them is
 required for action correctness.
+
+## Turn validation and displayed results
+
+The model response is a proposal. `parseAgentTurn` keeps bounded, locally derived
+rejections for malformed actions, missing parameters, action limits and invalid
+Studio generation order. `reconcileWizardMediaTurn` preserves those diagnostics
+and records actions excluded by request or visual-evidence policy. Model-supplied
+rejection fields are not authoritative.
+
+For a turn containing actions (including navigation) or rejections, `wizardTurnReport.ts`
+builds the displayed answer from execution results and rejection reasons. It
+does not prepend a model claim such as “created” when parsing rejected the action.
+Queued, running, prepared and awaiting-input results have distinct labels;
+admission does not certify a completed artifact. Text, cards and the avatar use
+the same defensive state: a failed report overrides an `ok` flag, and queued or
+running work never lights the completed indicator. The trace retains original
+adapter results, including inconsistencies, and receipt IDs survive normalization.
+
+For empty or absent action lists the panel passes the user's question to a
+conservative EN/ES presentation classifier. Informational questions retain prose;
+an action request without an execution result displays the local no-receipt
+message. This classifier grants no permissions and starts no work. Mixed action
+and explanation turns deliberately use local result/validation messages: arbitrary
+model prose cannot reliably be separated into a safe explanation and a false
+success claim. Unsupported phrasing may therefore require rephrasing the question.
+Reconciliation compares complete normalized parameters, preserves original
+proposal indices after parser exclusions, and retains diagnostics from both turns.
+
+Comic context comes from user requests. A general assistant inventory mentioning
+Comics must not redirect a later Flux retry, and an explicit Studio context takes
+precedence over an older comic request. Task retries continue through the existing
+canonical task adapter; this does not change backend retry/idempotency semantics.
+
+This layer does not fact-check unrestricted informational prose, migrate workflow
+execution to the server or implement the shared MCP command catalogue. Those are
+separate follow-up scopes.
