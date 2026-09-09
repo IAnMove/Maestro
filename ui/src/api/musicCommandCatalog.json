@@ -1,0 +1,1394 @@
+{
+  "version": 2,
+  "operations": [
+    {
+      "name": "generation.music",
+      "version": 2,
+      "supportedVersions": [
+        2
+      ],
+      "domain": "studio",
+      "mutation": true,
+      "description": "Admit one local music generation with literal lyrics and caption through the canonical generation queue. The selected ACE-Step or MiniMax-Music3 model must already be installed; retries reuse the same intent receipt.",
+      "musicModelTypes": [
+        "ace_step_v1_5_xl_sft_lm_4b",
+        "minimax_music3"
+      ],
+      "guideRevision": "music-model-contract-v1",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "$defs": {
+          "StudioMusicCustomSettings": {
+            "additionalProperties": false,
+            "description": "Closed ACE-Step custom setting IDs shared by the native handler.",
+            "properties": {
+              "bpm": {
+                "anyOf": [
+                  {
+                    "maximum": 300,
+                    "minimum": 30,
+                    "type": "integer"
+                  },
+                  {
+                    "const": "",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Bpm"
+              },
+              "keyscale": {
+                "anyOf": [
+                  {
+                    "maxLength": 8192,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Keyscale"
+              },
+              "timesignature": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      2,
+                      3,
+                      4,
+                      6,
+                      ""
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Timesignature"
+              },
+              "language": {
+                "anyOf": [
+                  {
+                    "maxLength": 8192,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Language"
+              }
+            },
+            "title": "StudioMusicCustomSettings",
+            "type": "object"
+          },
+          "StudioMusicParams": {
+            "additionalProperties": false,
+            "description": "Strict native music parameters emitted by Studio.",
+            "properties": {
+              "prompt": {
+                "maxLength": 200000,
+                "minLength": 1,
+                "title": "Prompt",
+                "type": "string"
+              },
+              "alt_prompt": {
+                "default": "",
+                "maxLength": 200000,
+                "title": "Alt Prompt",
+                "type": "string"
+              },
+              "model_type": {
+                "maxLength": 240,
+                "minLength": 1,
+                "title": "Model Type",
+                "type": "string"
+              },
+              "resolution": {
+                "anyOf": [
+                  {
+                    "maxLength": 8192,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Resolution"
+              },
+              "lyrics_language": {
+                "anyOf": [
+                  {
+                    "maxLength": 8192,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Lyrics Language"
+              },
+              "video_length": {
+                "default": 0,
+                "maximum": 0,
+                "minimum": 0,
+                "title": "Video Length",
+                "type": "integer"
+              },
+              "num_inference_steps": {
+                "anyOf": [
+                  {
+                    "maximum": 1000,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Num Inference Steps"
+              },
+              "guidance_scale": {
+                "anyOf": [
+                  {
+                    "maximum": 1000.0,
+                    "minimum": 0.0,
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Guidance Scale"
+              },
+              "seed": {
+                "default": -1,
+                "maximum": 9223372036854775807,
+                "minimum": -9223372036854775808,
+                "title": "Seed",
+                "type": "integer"
+              },
+              "image_mode": {
+                "default": 0,
+                "maximum": 0,
+                "minimum": 0,
+                "title": "Image Mode",
+                "type": "integer"
+              },
+              "generation_mode": {
+                "const": "audio",
+                "default": "audio",
+                "title": "Generation Mode",
+                "type": "string"
+              },
+              "negative_prompt": {
+                "default": "",
+                "enum": [
+                  "",
+                  null
+                ],
+                "title": "Negative Prompt"
+              },
+              "repeat_generation": {
+                "default": 1,
+                "maximum": 1,
+                "minimum": 1,
+                "title": "Repeat Generation",
+                "type": "integer"
+              },
+              "batch_size": {
+                "default": 1,
+                "maximum": 1,
+                "minimum": 1,
+                "title": "Batch Size",
+                "type": "integer"
+              },
+              "activated_loras": {
+                "items": {
+                  "maxLength": 8192,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "maxItems": 64,
+                "title": "Activated Loras",
+                "type": "array"
+              },
+              "loras_multipliers": {
+                "default": "",
+                "maxLength": 8192,
+                "title": "Loras Multipliers",
+                "type": "string"
+              },
+              "multi_prompts_gen_type": {
+                "default": 2,
+                "maximum": 2,
+                "minimum": 2,
+                "title": "Multi Prompts Gen Type",
+                "type": "integer"
+              },
+              "audio_prompt_type": {
+                "default": "",
+                "enum": [
+                  "",
+                  "A",
+                  "B",
+                  "AB"
+                ],
+                "title": "Audio Prompt Type",
+                "type": "string"
+              },
+              "audio_guide": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Audio Guide"
+              },
+              "audio_guide2": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Audio Guide2"
+              },
+              "audio_guide3": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Audio Guide3"
+              },
+              "audio_guide4": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Audio Guide4"
+              },
+              "audio_guide5": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Audio Guide5"
+              },
+              "audio_guide6": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Audio Guide6"
+              },
+              "audio_source": {
+                "default": null,
+                "enum": [
+                  "",
+                  null
+                ],
+                "title": "Audio Source"
+              },
+              "duration_seconds": {
+                "anyOf": [
+                  {
+                    "minimum": 0.0,
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Duration Seconds"
+              },
+              "temperature": {
+                "anyOf": [
+                  {
+                    "minimum": 0.0,
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Temperature"
+              },
+              "top_p": {
+                "anyOf": [
+                  {
+                    "maximum": 1.0,
+                    "minimum": 0.0,
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Top P"
+              },
+              "top_k": {
+                "anyOf": [
+                  {
+                    "maximum": 1000,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Top K"
+              },
+              "audio_scale": {
+                "anyOf": [
+                  {
+                    "maximum": 1000.0,
+                    "minimum": 0.0,
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Audio Scale"
+              },
+              "alt_guidance_scale": {
+                "anyOf": [
+                  {
+                    "maximum": 1000.0,
+                    "minimum": 0.0,
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Alt Guidance Scale"
+              },
+              "guidance_phases": {
+                "anyOf": [
+                  {
+                    "maximum": 16,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Guidance Phases"
+              },
+              "sample_solver": {
+                "default": "",
+                "maxLength": 8192,
+                "title": "Sample Solver",
+                "type": "string"
+              },
+              "settings_version": {
+                "anyOf": [
+                  {
+                    "minimum": 0.0,
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Settings Version"
+              },
+              "prompt_enhancer": {
+                "default": "",
+                "enum": [
+                  "",
+                  null
+                ],
+                "title": "Prompt Enhancer"
+              },
+              "model_mode": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Model Mode"
+              },
+              "custom_settings": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/StudioMusicCustomSettings"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "_music_description": {
+                "default": "",
+                "maxLength": 200000,
+                "title": "Music Description",
+                "type": "string"
+              },
+              "_music_instrumental": {
+                "default": false,
+                "title": "Music Instrumental",
+                "type": "boolean"
+              },
+              "_audio_sub_mode": {
+                "const": "music",
+                "default": "music",
+                "title": "Audio Sub Mode",
+                "type": "string"
+              },
+              "_tts_original_prompt": {
+                "anyOf": [
+                  {
+                    "maxLength": 200000,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Tts Original Prompt"
+              },
+              "_tts_speaker_name1": {
+                "anyOf": [
+                  {
+                    "maxLength": 200000,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": "",
+                "title": "Tts Speaker Name1"
+              },
+              "_tts_speaker_name2": {
+                "anyOf": [
+                  {
+                    "maxLength": 200000,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": "",
+                "title": "Tts Speaker Name2"
+              },
+              "_tts_speaker_name3": {
+                "anyOf": [
+                  {
+                    "maxLength": 200000,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": "",
+                "title": "Tts Speaker Name3"
+              },
+              "_tts_speaker_name4": {
+                "anyOf": [
+                  {
+                    "maxLength": 200000,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": "",
+                "title": "Tts Speaker Name4"
+              },
+              "_tts_speaker_name5": {
+                "anyOf": [
+                  {
+                    "maxLength": 200000,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": "",
+                "title": "Tts Speaker Name5"
+              },
+              "_tts_speaker_name6": {
+                "anyOf": [
+                  {
+                    "maxLength": 200000,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": "",
+                "title": "Tts Speaker Name6"
+              },
+              "_tts_voice_count": {
+                "default": 0,
+                "maximum": 0,
+                "minimum": 0,
+                "title": "Tts Voice Count",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "prompt",
+              "model_type"
+            ],
+            "title": "StudioMusicParams",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "version": {
+            "type": "integer",
+            "const": 2
+          },
+          "operation": {
+            "const": "generation.music"
+          },
+          "intent_id": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Intent Id",
+            "type": "string"
+          },
+          "input": {
+            "additionalProperties": false,
+            "properties": {
+              "workspace": {
+                "maxLength": 240,
+                "minLength": 1,
+                "pattern": "^(?:default|[A-Za-z0-9][A-Za-z0-9_-]*)$",
+                "title": "Workspace",
+                "type": "string"
+              },
+              "workspace_collection_id": {
+                "anyOf": [
+                  {
+                    "maxLength": 200,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Workspace Collection Id"
+              },
+              "params": {
+                "$ref": "#/$defs/StudioMusicParams"
+              }
+            },
+            "required": [
+              "workspace",
+              "params"
+            ],
+            "title": "StudioMusicInput",
+            "type": "object"
+          }
+        },
+        "required": [
+          "version",
+          "operation",
+          "intent_id",
+          "input"
+        ]
+      }
+    }
+  ],
+  "studio": {
+    "version": 2,
+    "operation": "generation.music",
+    "intent_id": {
+      "maxLength": 160,
+      "minLength": 1,
+      "title": "Intent Id",
+      "type": "string"
+    },
+    "input": {
+      "$defs": {
+        "StudioMusicCustomSettings": {
+          "additionalProperties": false,
+          "description": "Closed ACE-Step custom setting IDs shared by the native handler.",
+          "properties": {
+            "bpm": {
+              "anyOf": [
+                {
+                  "maximum": 300,
+                  "minimum": 30,
+                  "type": "integer"
+                },
+                {
+                  "const": "",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Bpm"
+            },
+            "keyscale": {
+              "anyOf": [
+                {
+                  "maxLength": 8192,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Keyscale"
+            },
+            "timesignature": {
+              "anyOf": [
+                {
+                  "enum": [
+                    2,
+                    3,
+                    4,
+                    6,
+                    ""
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Timesignature"
+            },
+            "language": {
+              "anyOf": [
+                {
+                  "maxLength": 8192,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Language"
+            }
+          },
+          "title": "StudioMusicCustomSettings",
+          "type": "object"
+        },
+        "StudioMusicParams": {
+          "additionalProperties": false,
+          "description": "Strict native music parameters emitted by Studio.",
+          "properties": {
+            "prompt": {
+              "maxLength": 200000,
+              "minLength": 1,
+              "title": "Prompt",
+              "type": "string"
+            },
+            "alt_prompt": {
+              "default": "",
+              "maxLength": 200000,
+              "title": "Alt Prompt",
+              "type": "string"
+            },
+            "model_type": {
+              "maxLength": 240,
+              "minLength": 1,
+              "title": "Model Type",
+              "type": "string"
+            },
+            "resolution": {
+              "anyOf": [
+                {
+                  "maxLength": 8192,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Resolution"
+            },
+            "lyrics_language": {
+              "anyOf": [
+                {
+                  "maxLength": 8192,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Lyrics Language"
+            },
+            "video_length": {
+              "default": 0,
+              "maximum": 0,
+              "minimum": 0,
+              "title": "Video Length",
+              "type": "integer"
+            },
+            "num_inference_steps": {
+              "anyOf": [
+                {
+                  "maximum": 1000,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Num Inference Steps"
+            },
+            "guidance_scale": {
+              "anyOf": [
+                {
+                  "maximum": 1000.0,
+                  "minimum": 0.0,
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Guidance Scale"
+            },
+            "seed": {
+              "default": -1,
+              "maximum": 9223372036854775807,
+              "minimum": -9223372036854775808,
+              "title": "Seed",
+              "type": "integer"
+            },
+            "image_mode": {
+              "default": 0,
+              "maximum": 0,
+              "minimum": 0,
+              "title": "Image Mode",
+              "type": "integer"
+            },
+            "generation_mode": {
+              "const": "audio",
+              "default": "audio",
+              "title": "Generation Mode",
+              "type": "string"
+            },
+            "negative_prompt": {
+              "default": "",
+              "enum": [
+                "",
+                null
+              ],
+              "title": "Negative Prompt"
+            },
+            "repeat_generation": {
+              "default": 1,
+              "maximum": 1,
+              "minimum": 1,
+              "title": "Repeat Generation",
+              "type": "integer"
+            },
+            "batch_size": {
+              "default": 1,
+              "maximum": 1,
+              "minimum": 1,
+              "title": "Batch Size",
+              "type": "integer"
+            },
+            "activated_loras": {
+              "items": {
+                "maxLength": 8192,
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 64,
+              "title": "Activated Loras",
+              "type": "array"
+            },
+            "loras_multipliers": {
+              "default": "",
+              "maxLength": 8192,
+              "title": "Loras Multipliers",
+              "type": "string"
+            },
+            "multi_prompts_gen_type": {
+              "default": 2,
+              "maximum": 2,
+              "minimum": 2,
+              "title": "Multi Prompts Gen Type",
+              "type": "integer"
+            },
+            "audio_prompt_type": {
+              "default": "",
+              "enum": [
+                "",
+                "A",
+                "B",
+                "AB"
+              ],
+              "title": "Audio Prompt Type",
+              "type": "string"
+            },
+            "audio_guide": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Audio Guide"
+            },
+            "audio_guide2": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Audio Guide2"
+            },
+            "audio_guide3": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Audio Guide3"
+            },
+            "audio_guide4": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Audio Guide4"
+            },
+            "audio_guide5": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Audio Guide5"
+            },
+            "audio_guide6": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Audio Guide6"
+            },
+            "audio_source": {
+              "default": null,
+              "enum": [
+                "",
+                null
+              ],
+              "title": "Audio Source"
+            },
+            "duration_seconds": {
+              "anyOf": [
+                {
+                  "minimum": 0.0,
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Duration Seconds"
+            },
+            "temperature": {
+              "anyOf": [
+                {
+                  "minimum": 0.0,
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Temperature"
+            },
+            "top_p": {
+              "anyOf": [
+                {
+                  "maximum": 1.0,
+                  "minimum": 0.0,
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Top P"
+            },
+            "top_k": {
+              "anyOf": [
+                {
+                  "maximum": 1000,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Top K"
+            },
+            "audio_scale": {
+              "anyOf": [
+                {
+                  "maximum": 1000.0,
+                  "minimum": 0.0,
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Audio Scale"
+            },
+            "alt_guidance_scale": {
+              "anyOf": [
+                {
+                  "maximum": 1000.0,
+                  "minimum": 0.0,
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Alt Guidance Scale"
+            },
+            "guidance_phases": {
+              "anyOf": [
+                {
+                  "maximum": 16,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Guidance Phases"
+            },
+            "sample_solver": {
+              "default": "",
+              "maxLength": 8192,
+              "title": "Sample Solver",
+              "type": "string"
+            },
+            "settings_version": {
+              "anyOf": [
+                {
+                  "minimum": 0.0,
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Settings Version"
+            },
+            "prompt_enhancer": {
+              "default": "",
+              "enum": [
+                "",
+                null
+              ],
+              "title": "Prompt Enhancer"
+            },
+            "model_mode": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Model Mode"
+            },
+            "custom_settings": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/StudioMusicCustomSettings"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "_music_description": {
+              "default": "",
+              "maxLength": 200000,
+              "title": "Music Description",
+              "type": "string"
+            },
+            "_music_instrumental": {
+              "default": false,
+              "title": "Music Instrumental",
+              "type": "boolean"
+            },
+            "_audio_sub_mode": {
+              "const": "music",
+              "default": "music",
+              "title": "Audio Sub Mode",
+              "type": "string"
+            },
+            "_tts_original_prompt": {
+              "anyOf": [
+                {
+                  "maxLength": 200000,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Tts Original Prompt"
+            },
+            "_tts_speaker_name1": {
+              "anyOf": [
+                {
+                  "maxLength": 200000,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": "",
+              "title": "Tts Speaker Name1"
+            },
+            "_tts_speaker_name2": {
+              "anyOf": [
+                {
+                  "maxLength": 200000,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": "",
+              "title": "Tts Speaker Name2"
+            },
+            "_tts_speaker_name3": {
+              "anyOf": [
+                {
+                  "maxLength": 200000,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": "",
+              "title": "Tts Speaker Name3"
+            },
+            "_tts_speaker_name4": {
+              "anyOf": [
+                {
+                  "maxLength": 200000,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": "",
+              "title": "Tts Speaker Name4"
+            },
+            "_tts_speaker_name5": {
+              "anyOf": [
+                {
+                  "maxLength": 200000,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": "",
+              "title": "Tts Speaker Name5"
+            },
+            "_tts_speaker_name6": {
+              "anyOf": [
+                {
+                  "maxLength": 200000,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": "",
+              "title": "Tts Speaker Name6"
+            },
+            "_tts_voice_count": {
+              "default": 0,
+              "maximum": 0,
+              "minimum": 0,
+              "title": "Tts Voice Count",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "prompt",
+            "model_type"
+          ],
+          "title": "StudioMusicParams",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "workspace": {
+          "maxLength": 240,
+          "minLength": 1,
+          "pattern": "^(?:default|[A-Za-z0-9][A-Za-z0-9_-]*)$",
+          "title": "Workspace",
+          "type": "string"
+        },
+        "workspace_collection_id": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Workspace Collection Id"
+        },
+        "params": {
+          "$ref": "#/$defs/StudioMusicParams"
+        }
+      },
+      "required": [
+        "workspace",
+        "params"
+      ],
+      "title": "StudioMusicInput",
+      "type": "object"
+    },
+    "supported_input_fields": [
+      "prompt",
+      "alt_prompt",
+      "model_type",
+      "resolution",
+      "video_length",
+      "num_inference_steps",
+      "guidance_scale",
+      "seed",
+      "image_mode",
+      "generation_mode",
+      "negative_prompt",
+      "repeat_generation",
+      "batch_size",
+      "activated_loras",
+      "loras_multipliers",
+      "audio_prompt_type",
+      "audio_guide",
+      "audio_guide2",
+      "audio_guide3",
+      "audio_guide4",
+      "audio_guide5",
+      "audio_guide6",
+      "audio_source",
+      "duration_seconds",
+      "temperature",
+      "top_p",
+      "top_k",
+      "audio_scale",
+      "alt_guidance_scale",
+      "guidance_phases",
+      "sample_solver",
+      "settings_version",
+      "prompt_enhancer",
+      "model_mode",
+      "custom_settings",
+      "multi_prompts_gen_type",
+      "_audio_sub_mode",
+      "_music_description",
+      "_music_instrumental",
+      "_tts_original_prompt",
+      "_tts_speaker_name1",
+      "_tts_speaker_name2",
+      "_tts_speaker_name3",
+      "_tts_speaker_name4",
+      "_tts_speaker_name5",
+      "_tts_speaker_name6",
+      "_tts_voice_count"
+    ],
+    "music_model_types": [
+      "ace_step_v1_5_xl_sft_lm_4b",
+      "minimax_music3"
+    ],
+    "local_models": [
+      "ace_step_v1_5_xl_sft_lm_4b",
+      "minimax_music3"
+    ],
+    "guide_revision": "music-model-contract-v1",
+    "effects": {
+      "generation_mode": "audio",
+      "_audio_sub_mode": "music",
+      "video_length": 0,
+      "image_mode": 0,
+      "multi_prompts_gen_type": 2,
+      "negative_prompt": "",
+      "repeat_generation": 1,
+      "batch_size": 1,
+      "activated_loras": [],
+      "loras_multipliers": "",
+      "audio_prompt_type": "",
+      "prompt_enhancer": "",
+      "_music_description": "",
+      "_music_instrumental": false,
+      "_tts_speaker_name1": "",
+      "_tts_speaker_name2": "",
+      "_tts_speaker_name3": "",
+      "_tts_speaker_name4": "",
+      "_tts_speaker_name5": "",
+      "_tts_speaker_name6": "",
+      "_tts_voice_count": 0
+    },
+    "inactive": [
+      "image_mode=0",
+      "video_length=0",
+      "generation_mode=audio",
+      "_audio_sub_mode=music",
+      "multi_prompts_gen_type=2",
+      "repeat_generation=1",
+      "batch_size=1",
+      "negative_prompt=empty",
+      "prompt_enhancer=empty_or_null",
+      "_tts_speaker_name1..6=empty_or_null",
+      "_tts_voice_count=0",
+      "audio_guide3..6=empty_or_null",
+      "audio_source=empty_or_null"
+    ],
+    "excluded": [
+      "actor",
+      "client",
+      "permission",
+      "provenance",
+      "workspace inside input.params",
+      "filesystem paths",
+      "free-form provider payloads",
+      "remote MiniMax and community model IDs",
+      "speech voice names, voice counts and voice-clone controls",
+      "SFX/MMAudio, video, image, avatar and model3d controls",
+      "LLM song-writing or prompt enhancement"
+    ]
+  }
+}
