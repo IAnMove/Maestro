@@ -393,6 +393,48 @@ test('Studio configuration slice owns form state without owning generation execu
   assert.equal('runTool' in studio, false)
 })
 
+test('Studio duration setter keeps TTS auto sentinel at zero', async () => {
+  const { createStudioConfigurationSlice } = await import('../src/stores/studioConfigurationSlice.ts')
+  let state = {
+    params: { prompt: 'Speaker 1: hello', image_mode: 0 },
+    modelOptions: {
+      fps: 16,
+      audio_only: true,
+      duration_slider: { label: 'Target Duration (seconds, 0 = auto)', min: 0, max: 120, increment: 0.5, default: 0 },
+    },
+    h3WindowPlan: null,
+    generationMode: 'audio',
+    savedParamsPerMode: {},
+  }
+  const set = update => {
+    const partial = typeof update === 'function' ? update(state) : update
+    state = { ...state, ...partial }
+  }
+  const studio = createStudioConfigurationSlice({
+    alignFrameCount: frames => frames,
+    resolveResolution: (_options, preset, ratio) => `${preset}:${ratio}`,
+  })(set, () => state)
+  state = { ...state, ...studio }
+
+  state.setDurationSeconds(0)
+  assert.equal(state.durationSeconds, 0)
+  assert.equal(state.params.video_length, 0)
+
+  state.setDurationSeconds(12)
+  assert.equal(state.durationSeconds, 12)
+
+  state.modelOptions = {
+    fps: 24,
+    frames_minimum: 24,
+    frames_maximum: 120,
+    sliding_window: true,
+    audio_only: false,
+    duration_slider: null,
+  }
+  state.setDurationSeconds(0)
+  assert.equal(state.durationSeconds, 1)
+})
+
 test('composed slices bind without as-never casts at the useStore call site', async () => {
   const fs = await import('node:fs/promises')
   const source = await fs.readFile(new URL('../src/stores/useStore.ts', import.meta.url), 'utf8')
