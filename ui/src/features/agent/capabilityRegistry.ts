@@ -1,3 +1,4 @@
+import type { CommandResult } from '../../lib/commandContract'
 import type {
   AgentAction,
   AgentApply3dRhythmAction,
@@ -42,6 +43,7 @@ import type { AgentCreateVideoEditorProjectAction, AgentOpenVideoEditorProjectAc
 import type { AgentAttachVideoclipAlternativeSongAction, AgentMountVideoclipAlternativeSongAction } from './alternativeSongActions'
 import type { AgentApplyCharacterKitPresetAction, AgentAttachCharacterKitReferencesAction, AgentBuildCharacterKitAction, AgentCreateCharacterKitAction, AgentOpenCharacterKitAction, AgentOpenCharacterKitRigAction, AgentTrackCharacterKitJobAction } from './characterKitActions'
 import { registerStudioCapabilities } from './studioCapabilities'
+export { restoreAuthoredMusicFields, authoredSfxPackInput } from './audioActionParser'
 import { registerNavigationQueueCapabilities } from './navigationQueueCapabilities'
 import { registerEditorAuxCapabilities } from './editorAuxCapabilities'
 import { registerToolCapabilities } from './toolCapabilities'
@@ -87,6 +89,7 @@ export interface CapabilityPresentation {
 }
 
 export interface CapabilityExecutionOutcome {
+  commandResult?: CommandResult
   message: string
   report?: AgentExecutionReport
   metadata?: Record<string, unknown>
@@ -127,7 +130,7 @@ export interface CapabilityDefinition<TAction extends AgentAction = AgentAction>
   ): Promise<CapabilityExecutionOutcome>
   report: {
     targetKind: string
-    successState: 'prepared' | 'completed'
+    successState: 'prepared' | 'queued' | 'completed'
   }
   summarize(action: TAction, outcome: CapabilityExecutionOutcome): string
   presentation: CapabilityPresentation

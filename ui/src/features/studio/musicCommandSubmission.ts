@@ -1,8 +1,10 @@
 import * as api from '../../api/client'
+import { assertSameAudioForm } from './audioFormSnapshot'
 import { canonicalAudioReferences } from './audioCommandReferences'
 import { stableSerialize } from '../../lib/commandContract'
 import type { AppState } from '../../stores/useStore'
 import type { GenerationSubmissionContext } from './generationProvenance'
+import { neutralizeSfxOwnedFormFields } from './sfxFormResidue'
 import {
   createStudioMusicGenerationCommand,
   neutralizeStudioMusicSpeechResidue,
@@ -27,25 +29,6 @@ export interface MusicSubmission {
   params: Record<string, unknown>
   receipt?: MusicGenerationReceipt
   submit: () => Promise<NativeReceipt>
-}
-
-
-/** Include all visible music inputs in the pre-admission guard. */
-function musicFormFingerprint(state: StudioState): string {
-  return stableSerialize({
-    params: state.params, activeWorkspace: state.activeWorkspace,
-    generationMode: state.generationMode, audioSubMode: state.audioSubMode,
-    durationSeconds: state.durationSeconds, musicDescription: state.musicDescription,
-    musicInstrumental: state.musicInstrumental,
-    settingsOpen: state.settingsOpen, dashboardOpen: state.dashboardOpen,
-    sidebarMode: state.sidebarMode,
-  })
-}
-
-function assertSameMusicForm(before: StudioState, current: StudioState): void {
-  if (musicFormFingerprint(before) !== musicFormFingerprint(current)) {
-    throw new Error(i18n.t('studio:commands.contextChanged'))
-  }
 }
 
 
@@ -78,10 +61,12 @@ export async function prepareStudioMusicSubmission(
     // known video/H3 controls alongside the music fields. Project only that
     // explicit form residue; the command builder remains closed for direct
     // Wizard/MCP envelopes and rejects every other unknown key.
-    snapshotParams = projectStudioMusicFormParams(snapshotParams).params
-    assertSameMusicForm(before, current())
+    snapshotParams = projectStudioMusicFormParams(
+      neutralizeSfxOwnedFormFields(snapshotParams),
+    ).params
+    assertSameAudioForm(before, current())
     await canonicalAudioReferences(snapshotParams)
-    assertSameMusicForm(before, current())
+    assertSameAudioForm(before, current())
     const command = createStudioMusicGenerationCommand(
       snapshotParams,
       context?.commandId || newMusicGenerationIntentId(),
@@ -93,9 +78,9 @@ export async function prepareStudioMusicSubmission(
           const receipt = await submitMusicGenerationCommand(command, {
             submissionContext: context,
             onSnapshotReady: async frozen => {
-              assertSameMusicForm(before, current())
+              assertSameAudioForm(before, current())
               await presentStudioMusicCommand(frozen)
-              assertSameMusicForm(before, current())
+              assertSameAudioForm(before, current())
             },
           })
           submission.receipt = receipt

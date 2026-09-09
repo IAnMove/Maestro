@@ -73,3 +73,28 @@ test('SFX optional video slot exposes dual-origin AssetInput without opening the
     globalThis.fetch = previousFetch
   }
 })
+
+
+test('SFX restored guide is visible and removable without changing manual duration', { concurrency: false }, async () => {
+  const { render, cleanup, fireEvent, act } = await import('@testing-library/react')
+  const { SfxControls } = await import('../src/components/Sidebar/SfxControls.tsx')
+  const { useStore } = await import('../src/stores/useStore.ts')
+  const previousFetch = globalThis.fetch
+  globalThis.fetch = mockFetch()
+  const guide = '/api/v1/file/clip.mp4?workspace=original'
+  useStore.setState({ activeWorkspace: 'destination', params: { video_guide: guide }, durationSeconds: 8 } as never)
+  try {
+    const view = render(<SfxControls />)
+    assert.ok(view.getByText(guide))
+    assert.equal(view.container.querySelectorAll('input[type="range"]').length, 1)
+    assert.equal(useStore.getState().durationSeconds, 8)
+    await act(async () => { fireEvent.click(view.getByRole('button', { name: 'Remove' })) })
+    assert.equal(useStore.getState().params.video_guide, undefined)
+    assert.equal(view.container.querySelectorAll('input[type="range"]').length, 2)
+    assert.equal(useStore.getState().durationSeconds, 8)
+  } finally {
+    cleanup()
+    document.body.innerHTML = ''
+    globalThis.fetch = previousFetch
+  }
+})

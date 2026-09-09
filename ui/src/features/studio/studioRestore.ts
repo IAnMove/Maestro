@@ -1,5 +1,17 @@
 export const CLIP_BOUNDARY = '\n---CLIP_BOUNDARY---\n'
 
+/** Only call after the output has been identified as SFX, never on tab entry. */
+export function restoredSfxSettings(params: Record<string, unknown>) {
+  return {
+    MMAudio_prompt: typeof params.MMAudio_prompt === 'string' ? params.MMAudio_prompt
+      : typeof params.prompt === 'string' ? params.prompt : '',
+    MMAudio_neg_prompt: typeof params.MMAudio_neg_prompt === 'string' ? params.MMAudio_neg_prompt : '',
+    sfx_text_weight: typeof params.sfx_text_weight === 'number' ? params.sfx_text_weight : 1,
+    guidance_scale: typeof params.guidance_scale === 'number' ? params.guidance_scale : 4.5,
+    video_length: 0,
+  }
+}
+
 const JOINED_SEQUENCE_NAME = /(?:^|[._-])multiclip\.(?:mp4|webm|mkv|mov)$/i
 
 export function isJoinedSequenceOutput(name: string | null | undefined): boolean {

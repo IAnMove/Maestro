@@ -25,6 +25,7 @@ const {
   neutralizeStudioMusicSpeechResidue,
   projectStudioMusicFormParams,
 } = await import('../src/features/studio/musicGenerationSpec.ts')
+const { neutralizeSfxOwnedFormFields } = await import('../src/features/studio/sfxFormResidue.ts')
 
 const originalFetch = globalThis.fetch
 
@@ -272,6 +273,21 @@ test('music submission projection strips leftover speech voices before the close
   assert.equal(typeof prepared.submit, 'function')
 })
 
+test('music builder admits empty or omitted style captions', { concurrency: false }, () => {
+  const blank = command('music-blank-caption', { alt_prompt: '' })
+  assert.equal(blank.input.params.alt_prompt, '')
+  assert.equal(blank.input.params.prompt, nativeParams().prompt)
+
+  const withoutCaption = nativeParams()
+  delete withoutCaption.alt_prompt
+  const omitted = createStudioMusicGenerationCommand({
+    ...withoutCaption,
+    workspace: 'music-workspace',
+  }, 'music-omitted-caption')
+  assert.equal('alt_prompt' in omitted.input.params, false)
+  assert.equal(omitted.input.params.prompt, withoutCaption.prompt)
+})
+
 test('form projection preserves music text, language, refs and sentinels while rejecting active stale controls', { concurrency: false }, () => {
   const source = {
     ...nativeParams(),
@@ -311,10 +327,42 @@ test('form projection preserves music text, language, refs and sentinels while r
     () => projectStudioMusicFormParams({ ...source, unknown_music_field: true }),
     /unknown_music_field is not supported/,
   )
+  const emptyGuide = projectStudioMusicFormParams({ ...source, video_guide: '' })
+  assert.ok(emptyGuide.droppedFields.includes('video_guide'))
+  assert.equal('video_guide' in emptyGuide.params, false)
+  assert.throws(
+    () => projectStudioMusicFormParams({
+      ...source, video_guide: '/api/v1/file/clip.mp4?workspace=sfx-source',
+    }),
+    /video_guide is active and incompatible/,
+  )
   assert.throws(
     () => createStudioMusicGenerationCommand(source, 'music-direct-closed'),
     /skip_steps_cache_type|image_refs|voice_clone_enabled/,
   )
+})
+
+test('Music form adapter drops leftover SFX prompt and weight without opening the closed builder', { concurrency: false }, () => {
+  const leftover = {
+    ...nativeParams(),
+    MMAudio_prompt: 'thunder crash on tin roof',
+    MMAudio_neg_prompt: 'music',
+    MMAudio_setting: 1,
+    sfx_text_weight: 2.5,
+    sfx_mode: true,
+    _mmaudio_variant: 'v2',
+    _sfx_virtual_model: 'mmaudio_v2',
+  }
+  assert.throws(
+    () => projectStudioMusicFormParams(leftover),
+    /MMAudio_prompt is active|sfx_text_weight is not supported/,
+  )
+  const projection = projectStudioMusicFormParams(neutralizeSfxOwnedFormFields(leftover))
+  const command = createStudioMusicGenerationCommand(projection.params, 'music-sfx-form')
+  assert.equal(command.input.params.prompt, leftover.prompt)
+  assert.equal('MMAudio_prompt' in command.input.params, false)
+  assert.equal('sfx_text_weight' in command.input.params, false)
+  assert.equal('sfx_mode' in command.input.params, false)
 })
 
 test('music admission persists exact envelope before POST and validates a correlated queued receipt', { concurrency: false }, async () => {
@@ -443,4 +491,11 @@ test('uncorrelated 200 and invalid GET receipts remain recoverable, valid GET cl
   assert.equal(recovered.commandId, value.intent_id)
   assert.deepEqual(pendingMusicGenerationCommands(), [])
   assert.equal(pendingMusicGenerationCommand(value.intent_id), null)
+})
+
+
+test('Music3 still rejects blank or omitted captions before submission', () => {
+  for (const caption of ['', '  ', undefined]) {
+    assert.throws(() => command('music3-caption', { model_type: 'minimax_music3', alt_prompt: caption }), /alt_prompt/)
+  }
 })

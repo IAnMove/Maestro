@@ -22447,6 +22447,13 @@ def _run_sfx_generation(job: dict, raw_params: dict, start_time: float):
         ):
             return False
 
+        from services.studio_sfx_execution import prepared_sfx_execution
+        from services.studio_sfx_commands import check_sfx_models
+        typed_sfx = prepared_sfx_execution(
+            job, raw_params, registry=_task_registry(job["workspace"]),
+            check_models=lambda variant: check_sfx_models(globals(), variant),
+        )
+
         out_dir = job.get("out_dir") or wgp.save_path
         os.makedirs(out_dir, exist_ok=True)
         wgp.save_path = out_dir
@@ -22468,11 +22475,17 @@ def _run_sfx_generation(job: dict, raw_params: dict, start_time: float):
                 video_path = candidate
 
         if video_path and not os.path.isfile(video_path):
+            if typed_sfx:
+                raise ValueError("The admitted SFX video is no longer available")
             print(f"[SFX] Warning: video_guide not found: {video_path}, falling back to text-only")
             video_path = None
 
         # If video provided, derive duration from it
-        if video_path:
+        if typed_sfx:
+            # The admission records the inspected guide duration and exact
+            # source identity. Do not rederive it or silently cap the request.
+            pass
+        elif video_path:
             try:
                 import decord
                 vr = decord.VideoReader(video_path)
@@ -22503,12 +22516,14 @@ def _run_sfx_generation(job: dict, raw_params: dict, start_time: float):
             )
             return False
 
-        # Download model files if needed
-        if not update_job(
-            job, message="Downloading MMAudio models...", phase="Downloading models",
-        ):
-            return False
-        wgp.download_mmaudio(variant_override=variant)
+        # Typed commands require installed dependencies, checked again above.
+        # Keep legacy provisioning until its callers have been migrated.
+        if not typed_sfx:
+            if not update_job(
+                job, message="Downloading MMAudio models...", phase="Downloading models",
+            ):
+                return False
+            wgp.download_mmaudio(variant_override=variant)
         if is_cancel_requested(job):
             return False
 
@@ -22561,10 +22576,10 @@ def _run_sfx_generation(job: dict, raw_params: dict, start_time: float):
         elapsed = time.time() - start_time
         for fname in new_files:
             ext = os.path.splitext(fname)[1].lower()
-            if ext not in {".wav", ".mp3", ".flac"}:
+            if ext not in {".wav", ".mp3", ".flac", ".mp4"}:
                 continue
             sidecar = {
-                "params": {
+                "params": copy.deepcopy(raw_params) if typed_sfx else {
                     "prompt": prompt,
                     "MMAudio_prompt": prompt,
                     "MMAudio_neg_prompt": neg_prompt,

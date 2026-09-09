@@ -15,6 +15,7 @@ export function AudioModeSection() {
   const params = useStore(s => s.params)
   const setParam = useStore(s => s.setParam)
   const audioGuideFilename = useStore(s => s.audioGuideFilename)
+  const audioGuide2Filename = useStore(s => s.audioGuide2Filename)
   const setAudioGuideFilename = useStore(s => s.setAudioGuideFilename)
   const [videoGuideFilename, setVideoGuideFilename] = useState<string | null>(null)
   const activeWorkspace = useStore(s => s.activeWorkspace)
@@ -146,6 +147,20 @@ export function AudioModeSection() {
     setParam(key as keyof import('../../types').GenerateParams, path)
   }
 
+  const voiceValue = (index: number): ApiOutput | undefined => {
+    const voice = ttsVoices[index]
+    const reference = voice?.path || params[index === 0 ? 'audio_guide' : `audio_guide${index + 1}` as keyof typeof params]
+    if (typeof reference !== 'string' || !reference) return undefined
+    const catalogItem = audioItems.find(item => studioMediaPath(item) === reference)
+    if (catalogItem) return catalogItem
+    const basename = reference.replace(/\\/g, '/').split(/[?#]/)[0].split('/').pop() || ''
+    return {
+      name: voice?.filename || [audioGuideFilename, audioGuide2Filename][index] || basename,
+      type: 'audio', mode: null, size: 0, created_at: 0, path: reference,
+      url: reference.startsWith('/api/') ? reference : api.getStoredAssetUrl(reference),
+    }
+  }
+
   return (
     <div className="space-y-3">
       {/* Audio mode selector — shown for any model that exposes audio_prompt_type_sources
@@ -214,9 +229,10 @@ export function AudioModeSection() {
                     label={t('audio.dropAudio')}
                     placeholder={t('audio.dropAudio')}
                     items={audioItems}
+                    value={voiceValue(i)}
                     accept=".wav,.mp3,.flac,.ogg,.m4a,audio/*"
                     workspaceId={activeWorkspace}
-                    optional={Boolean(voice.filename)}
+                    optional
                     constraints={{ kinds: ['audio'], maxCount: 1, optional: true }}
                     onChoose={item => chooseVoice(i, item)}
                   />

@@ -63,6 +63,8 @@ import {
   parseRegisteredCapability,
   registeredCapabilitySchemas,
   reconcileProgrammaticVideoRequest,
+  restoreAuthoredMusicFields,
+  authoredSfxPackInput,
   type AgentPrepareProgrammaticVideoAction,
   type AgentTab,
   type LanguageIntent,
@@ -141,6 +143,10 @@ export interface AgentPrepareAudioAction extends AgentLanguageAwareAction {
   guidanceScale?: number
   /** Music native generation currently admits one output per command. */
   outputCount?: number
+  /** Native MMAudio SFX text-conditioning weight (0..5). */
+  sfxTextWeight?: number
+  /** Canonical SFX video reference; omitted preserves the selected guide, null removes it. */
+  videoGuide?: string | null
 }
 
 export interface AgentDownloadModelAction {
@@ -849,7 +855,6 @@ const SERIES_SECTIONS = new Set<AgentSeriesSection>([
   'setup', 'canon', 'episode', 'shots', 'review',
 ])
 const MAX_ACTIONS = 6
-const AUDIO_SUB_MODES = new Set<AgentPrepareAudioAction['subMode']>(['speech', 'music', 'sfx'])
 const ACTION_TYPE_ALIASES: Record<string, AgentAction['type']> = {
   opentab: 'open_tab',
   openstorysection: 'open_story_section',
@@ -923,11 +928,6 @@ const cleanString = (value: unknown, maxLength: number): string => (
   typeof value === 'string' ? value.trim().slice(0, maxLength) : ''
 )
 
-/** Preserve authored text; callers validate blankness separately. */
-const literalString = (value: unknown, maxLength: number): string | undefined => (
-  typeof value === 'string' && value.length <= maxLength ? value : undefined
-)
-
 function canonicalActionType(value: unknown): string {
   const raw = cleanString(value, 40)
   const collapsed = raw.toLowerCase().replace(/[^a-z0-9]/g, '')
@@ -943,19 +943,6 @@ const optionalNumber = (
   if (typeof value !== 'number' || !Number.isFinite(value)) return undefined
   const bounded = Math.max(minimum, Math.min(maximum, value))
   return integer ? Math.round(bounded) : bounded
-}
-
-/** Validate a Music control without silently changing the requested value. */
-const strictNumber = (
-  value: unknown,
-  minimum: number,
-  maximum: number,
-  integer = false,
-): number | undefined => {
-  if (value === undefined) return undefined
-  if (typeof value !== 'number' || !Number.isFinite(value)) return undefined
-  if (value < minimum || value > maximum || (integer && !Number.isInteger(value))) return undefined
-  return value
 }
 
 const optionalPositiveNumber = (
@@ -1050,7 +1037,7 @@ const CANONICAL_FIELD_NAMES = [
   'scene_name', 'layer_name', 'audio_output_name', 'videoclip_name', 'cue_source', 'rhythm_profile', 'intensity',
   'confirm', 'characters', 'locations', 'outline_beats', 'story_visual_selections', 'story_visual_scope', 'target_names',
   'target_kind', 'target_name', 'asset_name', 'primary',
-  'audio_sub_mode', 'alt_prompt', 'music_description', 'music_instrumental', 'sfx_clips', 'name', 'preset', 'comic_panels', 'comic_pages', 'caption', 'stage', 'image_provider',
+  'audio_sub_mode', 'alt_prompt', 'music_description', 'music_instrumental', 'sfx_text_weight', 'video_guide', 'sfx_clips', 'name', 'preset', 'comic_panels', 'comic_pages', 'caption', 'stage', 'image_provider',
   'page_number', 'panel_number', 'page_numbers', 'pilot',
   'factual_biography', 'biography_review',
   'kit_name', 'look_notes', 'preset_id',
@@ -1162,21 +1149,6 @@ function parseComicPages(value: unknown): AgentComicPage[] {
   }) : []
 }
 
-function parseSfxClips(value: unknown): AgentSfxClip[] {
-  return Array.isArray(value) ? value.slice(0, 12).flatMap(item => {
-    if (!item || typeof item !== 'object' || Array.isArray(item)) return []
-    const raw = item as Record<string, unknown>
-    const name = cleanString(raw.name, 80)
-    const prompt = cleanString(raw.prompt, 1_500)
-    if (!name || !prompt) return []
-    return [{
-      name,
-      prompt,
-      durationSeconds: optionalPositiveNumber(raw.duration_seconds, 1, 20) ?? 1,
-    }]
-  }) : []
-}
-
 function parseAction(value: unknown): AgentAction | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
   const raw = canonicalRecord(value as Record<string, unknown>)
@@ -1239,57 +1211,6 @@ function parseAction(value: unknown): AgentAction | null {
       outputCount: optionalPositiveNumber(raw.output_count, 1, 8, true),
     }
   }
-  if (type === 'prepare_audio') {
-    const subMode = cleanString(raw.audio_sub_mode, 12) as AgentPrepareAudioAction['subMode']
-    const speechOrMusic = subMode === 'speech' || subMode === 'music'
-    const prompt = speechOrMusic ? literalString(raw.prompt, 200_000) : cleanString(raw.prompt, 8_000)
-    if (!prompt?.trim()) return null
-    const music = subMode === 'music'
-    const altPrompt = music
-      ? (raw.alt_prompt === undefined ? undefined : literalString(raw.alt_prompt, 200_000))
-      : undefined
-    const musicDescription = music
-      ? (raw.music_description === undefined ? undefined : literalString(raw.music_description, 200_000))
-      : undefined
-    if (raw.alt_prompt !== undefined && altPrompt === undefined) return null
-    if (raw.music_description !== undefined && musicDescription === undefined) return null
-    if (raw.music_instrumental !== undefined && typeof raw.music_instrumental !== 'boolean') return null
-    const durationSeconds = subMode === 'speech'
-      ? optionalNumber(raw.duration_seconds, 0, 1_800)
-      : music
-        ? strictNumber(raw.duration_seconds, 5, 360)
-        : optionalPositiveNumber(raw.duration_seconds, 1, 20)
-    const negativePrompt = speechOrMusic
-      ? (raw.negative_prompt === undefined ? undefined : literalString(raw.negative_prompt, 200_000))
-      : cleanString(raw.negative_prompt, 2_000) || undefined
-    if (raw.negative_prompt !== undefined && negativePrompt === undefined) return null
-    const seed = music ? strictNumber(raw.seed, -1, 2_147_483_647, true) : undefined
-    const inferenceSteps = music ? strictNumber(raw.inference_steps, 1, 1_000, true) : undefined
-    const guidanceScale = music ? strictNumber(raw.guidance_scale, 0, 1_000) : undefined
-    const outputCount = music ? strictNumber(raw.output_count, 1, 1, true) : undefined
-    if (music && (
-      (raw.duration_seconds !== undefined && durationSeconds === undefined)
-      || (raw.seed !== undefined && seed === undefined)
-      || (raw.inference_steps !== undefined && inferenceSteps === undefined)
-      || (raw.guidance_scale !== undefined && guidanceScale === undefined)
-      || (raw.output_count !== undefined && outputCount === undefined)
-    )) return null
-    return {
-      type: 'prepare_audio',
-      subMode: AUDIO_SUB_MODES.has(subMode) ? subMode : 'sfx',
-      prompt,
-      modelType: cleanString(raw.model_type, 160) || undefined,
-      durationSeconds,
-      negativePrompt: negativePrompt || undefined,
-      altPrompt,
-      musicDescription,
-      musicInstrumental: music ? raw.music_instrumental as boolean | undefined : undefined,
-      seed,
-      inferenceSteps,
-      guidanceScale,
-      outputCount,
-    }
-  }
   if (type === 'prepare_3d') {
     const prompt = cleanString(raw.prompt, 8_000)
     if (!prompt) return null
@@ -1299,19 +1220,6 @@ function parseAction(value: unknown): AgentAction | null {
       modelType: cleanString(raw.model_type, 160) || undefined,
       preset: cleanString(raw.preset, 40) || undefined,
       seed: optionalNumber(raw.seed, -1, 2_147_483_647, true),
-    }
-  }
-  if (type === 'queue_sfx_pack') {
-    if (raw.confirm !== true) return null
-    const clips = parseSfxClips(raw.sfx_clips)
-    if (!clips.length) return null
-    return {
-      type: 'queue_sfx_pack',
-      style: cleanString(raw.visual_style, 2_000) || cleanString(raw.theme, 1_000),
-      clips,
-      modelType: cleanString(raw.model_type, 160) || undefined,
-      negativePrompt: cleanString(raw.negative_prompt, 2_000) || undefined,
-      confirm: true,
     }
   }
   if (type === 'start_generation') return raw.confirm === true ? { type: 'start_generation', confirm: true } : null
@@ -1924,7 +1832,7 @@ const NEGATED_CANCEL_REQUEST = /\b(?:no|sin|don['’]?t|do\s+not)\b[^.!?\n]{0,24
 
 export function isExplicitCancelRequest(request: string): boolean {
   const text = request.trim()
-  if (!text || NEGATED_CANCEL_REQUEST.test(text)) return false
+  if (!text || NEGATED_CANCEL_REQUEST.test(text) || isHowToGenerateQuestion(text)) return false
   return EXPLICIT_CANCEL_REQUESTS.some(pattern => pattern.test(text))
 }
 
@@ -1979,13 +1887,14 @@ export function isExplicitImageGenerationRequest(request: string): boolean {
 }
 
 const EXPLICIT_AUDIO_GENERATION_REQUESTS = [
-  /\b(?:gen[eé]ra(?:la|lo|r|d|me)?|crea(?:la|lo|r|d|me)?|lanza(?:la|lo|r|d)?|encola(?:la|lo|r|d)?)\b[^.!?\n]{0,120}\b(?:audio|canci[oó]n|m[uú]sica|voz|speech)\b/i,
-  /\b(?:make|create|generate|render|queue|start|launch)\b[^.!?\n]{0,120}\b(?:audio|song|music|voice|speech|track)\b/i,
+  /\b(?:gen[eé]ra(?:la|lo|r|d|me)?|crea(?:la|lo|r|d|me)?|lanza(?:la|lo|r|d)?|encola(?:la|lo|r|d)?|ejec[uú]ta(?:la|lo|r|d|me)?)\b[^.!?\n]{0,120}\b(?:audio|canci[oó]n|m[uú]sica|voz|speech)\b/i,
+  /\b(?:make|create|generate|render|queue|start|launch|run|execute)\b[^.!?\n]{0,120}\b(?:audio|song|music|voice|speech|track)\b/i,
   /\b(?:audio|canci[oó]n|m[uú]sica|voz|speech)\b[^.!?\n]{0,160}\b(?:gen[eé]ra(?:la|lo|r|d|me)?|l[aá]nza(?:la|lo|r|d)?|enc[oó]la(?:la|lo|r|d)?)\b/i,
-  /\b(?:audio|song|music|voice|speech|track)\b[^.!?\n]{0,160}\b(?:make|create|generate|render|queue|start|launch)\b/i,
+  /\b(?:audio|song|music|voice|speech|track)\b[^.!?\n]{0,160}\b(?:make|create|generate|render|queue|start|launch|run|execute)\b/i,
 ]
 const STUDIO_AUDIO_CONTEXT = [
-  /\bstudio\s*(?:(?:→|->|›|\/|-)\s*)?audio\b/i,
+  /\bstudio\s*(?:(?:→|->|›|\/|-)\s*)?(?:audio|music|m[uú]sica)\b/i,
+  /\b(?:audio|song|music|voice|speech|canci[oó]n|m[uú]sica|voz)\b[^.!?\n]{0,80}\b(?:in|from|through|en|del|de)\s+(?:the\s+|el\s+|la\s+)?studio\b/i,
   /\baudio\s+(?:de|del|en)\s+studio\b/i,
   /\b(?:pestaña|tab|secci[oó]n|modo|panel|formulario)\s+(?:de\s+)?audio\b/i,
 ]
@@ -2088,6 +1997,22 @@ const HOW_TO_GENERATE = [
   /\b(?:dime|expl[ií]came|descr[ií]beme|mu[eé]strame)\b[^.!?\n]{0,96}\b(?:c[oó]mo|pasos?(?:\s+para)?)\b/i,
   /\b(?:qu[eé])\s+pasos?\b[^.!?\n]{0,160}\b(?:gener|cre|lanz)/i,
   /\b(?:antes\s+de\s+(?:generar|crear|lanzar)|qu[eé]\s+(?:debo|deber[ií]a)\s+(?:configurar|saber|preparar))\b/i,
+  // Educational stop/cancel questions must not kill the active GPU job.
+  /\bhow\s+(?:can|do|would|should)\s+(?:i|we|you)\s+(?:stop|cancel|abort)\b/i,
+  /\bhow\s+to\s+(?:stop|cancel|abort)\b/i,
+  /\bwhen\s+(?:should|do|can|would)\s+(?:i|we|you)\s+(?:stop|cancel|abort)\b/i,
+  /\bshould\s+(?:i|we)\s+(?:stop|cancel|abort)\b/i,
+  /\b(?:what|why)\b[^.!?\n]{0,80}\b(?:stop|cancel|abort)\b/i,
+  /\b(?:explain|describe|tell\s+me)\b[^.!?\n]{0,96}\b(?:stop|cancel|abort)\b/i,
+  /\b(?:c[oó]mo(?:\s+(?:lo|la|las|los|puedo|se))?\s+(?:paro|parar|cancelo|cancelar|detengo|detener))\b/i,
+  /\b(?:cu[aá]ndo|por\s+qu[eé]|qu[eé]\s+pasa)\b[^.!?\n]{0,80}\b(?:paro|parar|cancelo|cancelar|detengo|detener|stop|cancel)\b/i,
+  /\b(?:puedo|podemos|podr[ií]a)\s+(?:cancelar|parar|detener)\b/i,
+  /\b(?:debo|deber[ií]a)\s+(?:cancelar|parar|detener)\b/i,
+  // UI-label questions mention "generate video" without being a launch command.
+  /\bwhat\s+does\b[^.!?\n]{0,80}\b(?:the\s+)?(?:generate|genera|launch|start)\b/i,
+  /\btell\s+me\s+about\b[^.!?\n]{0,64}\b(?:the\s+)?(?:generate\s+video|video\s+generation|generation\s+workflow)\b/i,
+  /\bexpli(?:ca|came)\b[^.!?\n]{0,80}\b(?:qu[eé]\s+)?(?:significa|hace)\b[^.!?\n]{0,48}\b(?:genera|generate)\b/i,
+  /\bqu[eé]\s+hace\b[^.!?\n]{0,80}\b(?:el\s+)?(?:bot[oó]n\s+)?(?:genera|generate)\b/i,
 ]
 
 export function isHowToGenerateQuestion(request: string): boolean {
@@ -2503,22 +2428,31 @@ export async function reconcileAgentTurnWithRequest(
     }
   }
   if (isExplicitSfxGenerationRequest(request)) {
-    const existing = turn.actions.find(
+    const authored = authoredSfxPackInput(request)
+    const proposed = turn.actions.find(
       (action): action is AgentQueueSfxPackAction => action.type === 'queue_sfx_pack',
     )
+    const existing = authored ? parseRegisteredCapability('queue_sfx_pack', authored) as AgentQueueSfxPackAction | null : proposed
     const clips = existing?.clips.length
       ? existing.clips
-      : GAME_SFX_HINT.test(request) ? ARCADE_HORDE_SFX_PACK : []
+      : !authored && GAME_SFX_HINT.test(request) ? ARCADE_HORDE_SFX_PACK : []
     if (clips.length) {
       return {
         reply: 'Prepararé Studio → Audio → SFX y encolaré el pack de efectos. Irán detrás de lo que ya use la GPU. La galería Audios solo muestra resultados cuando terminen. 🪄',
         actions: [{
+          ...existing,
           type: 'queue_sfx_pack',
           style: existing?.style || 'retro fantasy arcade',
           clips,
           confirm: true,
         }],
       }
+    }
+    if (authored || /\b(?:pack|paquete|lote|queue_sfx_pack|sfx_clips)\b/i.test(request)) {
+      // Missing pack data is not permission to invent a Video generation.
+      return { ...turn, reply: '', actions: [], rejections: [
+        ...(turn.rejections || []), rejectedWizardAction({ type: 'queue_sfx_pack' }, 0),
+      ] }
     }
   }
   if (isExplicitCancelRequest(request)) {
@@ -2558,7 +2492,7 @@ export async function reconcileAgentTurnWithRequest(
       } satisfies AgentPrepareAudioAction
     return {
       reply: 'Prepararé Studio → Audio con los valores visibles y enviaré la generación a la cola. 🪄',
-      actions: [...navigation, prepare, { type: 'start_generation', confirm: true }],
+      actions: [...navigation, restoreAuthoredMusicFields(request, prepare), { type: 'start_generation', confirm: true }],
     }
   }
   if (isExplicitVideoGenerationRequest(request)) {
@@ -2782,19 +2716,8 @@ export const HOCUSPOCUS_AGENT_RESPONSE_SCHEMA: Record<string, unknown> = mergeRe
             },
           },
           audio_sub_mode: { type: 'string', enum: ['', 'speech', 'music', 'sfx'] },
+          sfx_text_weight: { type: 'number', minimum: 0, maximum: 5 },
           preset: { type: 'string', maxLength: 40 },
-          sfx_clips: {
-            type: 'array', maxItems: 12,
-            items: {
-              type: 'object', additionalProperties: false,
-              properties: {
-                name: { type: 'string', maxLength: 80 },
-                prompt: { type: 'string', maxLength: 1_500 },
-                duration_seconds: { type: 'number', minimum: 0, maximum: 20 },
-              },
-              required: ['name', 'prompt', 'duration_seconds'],
-            },
-          },
           story_visual_selections: {
             type: 'array', maxItems: 40,
             items: {

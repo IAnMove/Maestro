@@ -19,13 +19,36 @@ by this guarantee.
 5. If a submission response is lost, recover the saved request in the panel.
    Recovery reuses its intention; it must not silently create a new generation.
 
-The shared native routes currently cover image, speech, local music and upscale. Other
+Gallery Load Settings and Re-generate capture the clicked filename and source
+workspace. They fetch that file's metadata directly instead of waiting 50 ms and
+reading whichever item scrolling has selected. A newer restore request supersedes
+an older one; a workspace change cancels a pending restore before reroll can
+submit. Missing metadata cannot fall back to another clip's cached settings.
+
+The Generate button stays disabled while preparation/submission is pending and
+shows “Preparing…”, never an optimistic “Queued” based on the click alone. Rapid
+repeat clicks in that interval share the pending UI action. Admission and its
+identity are reported by the command panel/Activity. Failed local placeholders
+do not increase the active-job count on the button.
+
+The shared native routes currently cover image, speech, local music, SFX and upscale. Other
 Studio modes continue through their existing paths until migrated. Speech
 model duration controls have model-specific meanings: for example, a 20-second
 Kugel setting does not force a short sentence to occupy exactly 20 seconds.
 Music keeps the lyrics and Music Caption as distinct literal fields and does
 not inherit speech voices. Its native model controls determine the accepted
 duration; the Story song workflow retains its own contract.
+
+Audio reference selectors, source URLs, SFX video guides and displayed filenames belong to their
+Speech, Music or SFX tab. Switching tabs starts an unused tab without inherited
+audio references and restores that tab's own references when returning. Loading
+an output's settings first retains the previous tab's references, then restores
+the selected output's explicit references. Speech voice slots remain available
+when returning to Speech; hidden voice counts cannot overwrite Music selectors
+or cause new Music references to be discarded. These reference drafts live in
+the current browser session; they do not add cross-reload draft persistence.
+This isolation does not yet stash all prompts, captions or duration settings.
+Direct command envelopes still reject incompatible active Speech metadata.
 
 ## MCP connection and discovery
 
@@ -49,6 +72,7 @@ Relevant tools include:
 | `generation.image` | Submit the shared image specification |
 | `generation.speech` | Submit the shared speech specification |
 | `generation.music` | Submit literal lyrics and a music caption to an installed local model |
+| `generation.sfx` | Generate MMAudio effects from text or replace a canonical video's audio |
 | `tools.upscale` | Submit a typed upscale request for an existing image/video |
 | `generation.receipt` | Recover a shared admission and its canonical task |
 | `status` | Follow the returned native job ID |
@@ -111,6 +135,6 @@ interrupted job.
 Validation errors do not establish admission. A storage/dispatch error can
 require recovery, so do not replace its intention automatically. Native task
 status remains the completion authority. Read [image](IMAGE_COMMANDS.md),
-[speech](SPEECH_COMMANDS.md), [music](MUSIC_COMMANDS.md) and [upscale](TOOLS_COMMANDS.md) contracts for
+[speech](SPEECH_COMMANDS.md), [music](MUSIC_COMMANDS.md), [SFX](SFX_COMMANDS.md) and [upscale](TOOLS_COMMANDS.md) contracts for
 supported inputs and current limits. Hashes record inspected sources; they do
 not make external source files immutable throughout queue lifetime.

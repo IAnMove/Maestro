@@ -7,6 +7,7 @@
  * parent capability registry imports this file as a side effect.
  */
 import type { defineCapability, CapabilityDefinition } from './capabilityRegistry'
+import { parsePrepareAudioAction } from './audioActionParser'
 import type {
   AgentAction,
   AgentAttachStudioReferencesAction,
@@ -44,19 +45,6 @@ function number(
   if (typeof value !== 'number' || !Number.isFinite(value)) return undefined
   const bounded = Math.max(minimum, Math.min(maximum, value))
   return integer ? Math.round(bounded) : bounded
-}
-
-/** Validate a Music control without silently changing the requested value. */
-function strictNumber(
-  value: unknown,
-  minimum: number,
-  maximum: number,
-  integer = false,
-): number | undefined {
-  if (value === undefined) return undefined
-  if (typeof value !== 'number' || !Number.isFinite(value)) return undefined
-  if (value < minimum || value > maximum || (integer && !Number.isInteger(value))) return undefined
-  return value
 }
 
 function stringArray(value: unknown, maxItems: number, maxLength: number): string[] {
@@ -130,61 +118,6 @@ function imageAction(raw: Record<string, unknown>): AgentPrepareImageAction | nu
   }
 }
 
-function audioAction(raw: Record<string, unknown>): AgentPrepareAudioAction | null {
-  const subMode = text(raw.audio_sub_mode, 12) as AgentPrepareAudioAction['subMode']
-  const speech = subMode === 'speech'
-  const music = subMode === 'music'
-  // Speech text is authored content. Keep every character, including
-  // whitespace and newlines, and let the closed speech command schema reject
-  // anything beyond its native 200k limit instead of silently truncating it.
-  // Music lyrics have the same literal-text contract; its caption is handled
-  // separately below and must never be folded into the lyrics.
-  const prompt = speech || music ? literalText(raw.prompt, 200_000) : text(raw.prompt, 8_000)
-  if (!prompt?.trim()) return null
-  const negativePrompt = speech || music
-    ? (raw.negative_prompt === undefined ? undefined : literalText(raw.negative_prompt, 200_000))
-    : text(raw.negative_prompt, 2_000) || undefined
-  if (raw.negative_prompt !== undefined && negativePrompt === undefined) return null
-  const altPrompt = music
-    ? (raw.alt_prompt === undefined ? undefined : literalText(raw.alt_prompt, 200_000))
-    : undefined
-  const musicDescription = music
-    ? (raw.music_description === undefined ? undefined : literalText(raw.music_description, 200_000))
-    : undefined
-  if (raw.alt_prompt !== undefined && altPrompt === undefined) return null
-  if (raw.music_description !== undefined && musicDescription === undefined) return null
-  if (raw.music_instrumental !== undefined && typeof raw.music_instrumental !== 'boolean') return null
-  const durationSeconds = music
-    ? strictNumber(raw.duration_seconds, 5, 360)
-    : number(raw.duration_seconds, speech ? 0 : 1, speech ? 1_800 : 20)
-  const seed = music ? strictNumber(raw.seed, -1, 2_147_483_647, true) : undefined
-  const inferenceSteps = music ? strictNumber(raw.inference_steps, 1, 1_000, true) : undefined
-  const guidanceScale = music ? strictNumber(raw.guidance_scale, 0, 1_000) : undefined
-  const outputCount = music ? strictNumber(raw.output_count, 1, 1, true) : undefined
-  if (music && (
-    (raw.duration_seconds !== undefined && durationSeconds === undefined)
-    || (raw.seed !== undefined && seed === undefined)
-    || (raw.inference_steps !== undefined && inferenceSteps === undefined)
-    || (raw.guidance_scale !== undefined && guidanceScale === undefined)
-    || (raw.output_count !== undefined && outputCount === undefined)
-  )) return null
-  return {
-    type: 'prepare_audio',
-    subMode: AUDIO_SUB_MODES.has(subMode) ? subMode : 'sfx',
-    prompt,
-    modelType: text(raw.model_type, 160) || undefined,
-    durationSeconds,
-    negativePrompt,
-    altPrompt,
-    musicDescription,
-    musicInstrumental: music ? raw.music_instrumental as boolean | undefined : undefined,
-    seed,
-    inferenceSteps,
-    guidanceScale,
-    outputCount,
-  }
-}
-
 function model3dAction(raw: Record<string, unknown>): AgentPrepare3dAction | null {
   const prompt = text(raw.prompt, 8_000)
   if (!prompt) return null
@@ -197,26 +130,31 @@ function model3dAction(raw: Record<string, unknown>): AgentPrepare3dAction | nul
   }
 }
 
+function sfxClips(value: unknown): AgentQueueSfxPackAction['clips'] | null {
+  if (!Array.isArray(value) || value.length === 0 || value.length > 12) return null
+  const clips: AgentQueueSfxPackAction['clips'] = []
+  for (const item of value) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return null
+    const record = item as Record<string, unknown>
+    const name = text(record.name, 80)
+    const prompt = literalText(record.prompt, 1_500)
+    if (!name || !prompt?.trim()) return null
+    clips.push({ name, prompt, durationSeconds: number(record.duration_seconds, 1, 20) ?? 1 })
+  }
+  return clips
+}
+
 function sfxAction(raw: Record<string, unknown>): AgentQueueSfxPackAction | null {
   if (raw.confirm !== true) return null
-  const clips = Array.isArray(raw.sfx_clips)
-    ? raw.sfx_clips.slice(0, 12).flatMap(item => {
-      if (!item || typeof item !== 'object' || Array.isArray(item)) return []
-      const record = item as Record<string, unknown>
-      const name = text(record.name, 80)
-      const prompt = text(record.prompt, 1_500)
-      if (!name || !prompt) return []
-      return [{ name, prompt, durationSeconds: number(record.duration_seconds, 1, 20) ?? 1 }]
-    })
-    : []
-  if (!clips.length) return null
+  const clips = sfxClips(raw.sfx_clips)
+  if (!clips) return null
+  const modelType = text(raw.model_type, 160) || undefined
+  if (modelType && !['mmaudio_v2', 'mmaudio_nsfw'].includes(modelType)) return null
+  const negativePrompt = raw.negative_prompt === undefined ? undefined : literalText(raw.negative_prompt, 2_000)
+  if (raw.negative_prompt !== undefined && negativePrompt === undefined) return null
   return {
-    type: 'queue_sfx_pack',
-    style: text(raw.visual_style, 2_000) || text(raw.theme, 1_000),
-    clips,
-    modelType: text(raw.model_type, 160) || undefined,
-    negativePrompt: text(raw.negative_prompt, 2_000) || undefined,
-    confirm: true,
+    type: 'queue_sfx_pack', style: text(raw.visual_style, 2_000) || text(raw.theme, 1_000),
+    clips, modelType, negativePrompt, confirm: true,
   }
 }
 
@@ -310,18 +248,15 @@ export function registerStudioCapabilities(register: typeof defineCapability): v
   title: 'Prepare Studio audio',
   description: 'Open Studio → Audio and fill Speech, Music or SFX.',
   useWhen: 'The user asks to prepare, show or fill a Studio audio form.',
-  parameters: ['audio_sub_mode', 'prompt', 'model_type', 'duration_seconds', 'negative_prompt', 'alt_prompt', 'music_description', 'music_instrumental', 'seed', 'inference_steps', 'guidance_scale', 'output_count'],
-  inputSchema: { type: 'object', additionalProperties: false, properties: { type: { const: 'prepare_audio' }, audio_sub_mode: { type: 'string', enum: [...AUDIO_SUB_MODES] }, prompt: { type: 'string', minLength: 1, maxLength: 200_000 }, model_type: { type: 'string' }, duration_seconds: { type: 'number', minimum: 0, maximum: 1_800 }, negative_prompt: { type: 'string', maxLength: 200_000 }, alt_prompt: { type: 'string', maxLength: 200_000 }, music_description: { type: 'string', maxLength: 200_000 }, music_instrumental: { type: 'boolean' }, seed: { type: 'integer', minimum: -1, maximum: 2_147_483_647 }, inference_steps: { type: 'integer', minimum: 1, maximum: 1_000 }, guidance_scale: { type: 'number', minimum: 0, maximum: 1_000 }, output_count: { type: 'integer', minimum: 1, maximum: 1 } }, required: ['type', 'prompt'] },
+  parameters: ['audio_sub_mode', 'prompt', 'model_type', 'duration_seconds', 'negative_prompt', 'alt_prompt', 'music_description', 'music_instrumental', 'seed', 'inference_steps', 'guidance_scale', 'output_count', 'sfx_text_weight', 'video_guide'],
+  inputSchema: { type: 'object', additionalProperties: false, properties: { type: { const: 'prepare_audio' }, audio_sub_mode: { type: 'string', enum: [...AUDIO_SUB_MODES] }, prompt: { type: 'string', minLength: 1, maxLength: 200_000 }, model_type: { type: 'string' }, duration_seconds: { type: 'number', minimum: 0, maximum: 1_800 }, negative_prompt: { type: 'string', maxLength: 200_000 }, alt_prompt: { type: 'string', maxLength: 200_000 }, music_description: { type: 'string', maxLength: 200_000 }, music_instrumental: { type: 'boolean' }, seed: { type: 'integer', minimum: -1, maximum: 2_147_483_647 }, inference_steps: { type: 'integer', minimum: 1, maximum: 1_000 }, guidance_scale: { type: 'number', minimum: 0, maximum: 1_000 }, output_count: { type: 'integer', minimum: 1, maximum: 1 }, sfx_text_weight: { type: 'number', minimum: 0, maximum: 5 }, video_guide: { description: 'SFX only. Omit this property to KEEP the currently selected video guide. Set null ONLY when the user explicitly requests REMOVING the guide or text-only SFX. To replace it, provide the exact canonical video reference. Null never means keep.', anyOf: [{ type: 'string', minLength: 1, maxLength: 8_192 }, { type: 'null' }] } }, required: ['type', 'prompt'] },
   risk: 'edit', confirmation: 'none', progress: 'Rellenando Studio → Audio…',
-  resolve: audioAction,
+  resolve: parsePrepareAudioAction,
   validate(action) { return action.prompt ? validType('prepare_audio', action) : ['prompt is required'] },
   async prepare(action) {
-    // Language intent remains workflow metadata. The speech native request
-    // carries authored text exactly; provider-side language handling belongs
-    // to its model/preflight contract, not this capability parser.
-    return action.subMode === 'speech' || action.subMode === 'music'
-      ? action
-      : compilePromptAction(action, 'sfx')
+    // Authored audio descriptions stay literal for every native submode.
+    // Language intent remains workflow metadata.
+    return action
   },
   async execute(action, context) { return context.adapters.studio.prepareAudio(action) },
   correlate(_action, outcome) { return outcome.target }, async track(_action, outcome) { return outcome },
@@ -352,24 +287,14 @@ export function registerStudioCapabilities(register: typeof defineCapability): v
   description: 'Open Studio → Audio → SFX and submit several one-shot effects.',
   useWhen: 'The user explicitly asks to generate or queue a pack of sound effects.',
   parameters: ['visual_style', 'theme', 'sfx_clips', 'model_type', 'negative_prompt', 'confirm'],
-  inputSchema: { type: 'object', additionalProperties: false, properties: { type: { const: 'queue_sfx_pack' }, visual_style: { type: 'string' }, theme: { type: 'string' }, sfx_clips: { type: 'array', minItems: 1 }, model_type: { type: 'string' }, negative_prompt: { type: 'string' }, confirm: { const: true } }, required: ['type', 'sfx_clips', 'confirm'] },
+  inputSchema: { type: 'object', additionalProperties: false, properties: { type: { const: 'queue_sfx_pack' }, visual_style: { type: 'string' }, theme: { type: 'string' }, sfx_clips: { type: 'array', minItems: 1, maxItems: 12, items: { type: 'object', additionalProperties: false, properties: { name: { type: 'string', minLength: 1, maxLength: 80 }, prompt: { type: 'string', minLength: 1, maxLength: 1_500 }, duration_seconds: { type: 'number', minimum: 0, maximum: 20 } }, required: ['name', 'prompt', 'duration_seconds'] } }, model_type: { type: 'string' }, negative_prompt: { type: 'string' }, confirm: { const: true } }, required: ['type', 'sfx_clips', 'confirm'] },
   risk: 'compute', confirmation: 'required', progress: 'Encolando el pack de SFX…',
   resolve: sfxAction,
   validate(action) { return action.confirm === true && action.clips.length > 0 ? validType('queue_sfx_pack', action) : ['confirmed SFX clips are required'] },
-  async prepare(action) {
-    if (!action.languageIntent) return action
-    return {
-      ...action,
-      style: compileProviderPrompt(action.style, action.languageIntent, { medium: 'sfx' }),
-      clips: action.clips.map(clip => ({
-        ...clip,
-        prompt: compileProviderPrompt(clip.prompt, action.languageIntent, { medium: 'sfx' }),
-      })),
-    }
-  },
+  async prepare(action) { return action },
   async execute(action, context) { return context.adapters.studio.queueSfxPack(action, context.generationContext) },
   correlate(_action, outcome) { return outcome.target }, async track(_action, outcome) { return outcome },
-  report: { targetKind: 'studio_sfx_pack', successState: 'completed' }, summarize(_action, outcome) { return outcome.message },
+  report: { targetKind: 'studio_sfx_pack', successState: 'queued' }, summarize(_action, outcome) { return outcome.message },
   presentation: commonPresentation(['audio-mode', 'sfx-pack', 'queue']),
   })
 

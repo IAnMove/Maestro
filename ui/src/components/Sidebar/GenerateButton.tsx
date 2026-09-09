@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useRef } from 'react'
 import { Play, AlertTriangle } from 'lucide-react'
 import { useStore } from '../../stores/useStore'
 import { useUiTranslation } from '../../i18n'
 import { splitPromptSchedule } from '../../lib/promptScheduler'
 import { newUserGenerationContext } from '../../features/studio/generationProvenance'
 import { useViggleGenerationGuard } from '../../lib/useViggleGenerationGuard'
+import { isGenerationJobActive } from '../../lib/generationJobState'
 
 export function GenerateButton() {
   const { t } = useUiTranslation('studio')
@@ -12,7 +13,9 @@ export function GenerateButton() {
   const jobs = useStore(s => s.jobs)
   const startGeneration = useStore(s => s.startGeneration)
   const setSidebarOpen = useStore(s => s.setSidebarOpen)
-  const [cooldown, setCooldown] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [submissionError, setSubmissionError] = useState('')
+  const submissionPending = useRef(false)
   const { checkingFrame, frameError, checkBeforeGenerate } = useViggleGenerationGuard()
 
   // Check if i2v-only model needs a start image. Video mode only: edit
@@ -50,22 +53,26 @@ export function GenerateButton() {
   const needsScheduledPrompts = schedulerApplies && scheduledVideoCount === 0
   const blocked = needsImage || needsReference || needsOutpaintSource || needsOutpaintArea || needsScheduledPrompts
 
-  // Brief gray flash after clicking
-  useEffect(() => {
-    if (!cooldown) return
-    const timer = setTimeout(() => setCooldown(false), 1000)
-    return () => clearTimeout(timer)
-  }, [cooldown])
-
   const handleClick = async () => {
-    if (blocked || !await checkBeforeGenerate()) return
-    setCooldown(true)
-    const submitted = startGeneration(undefined, newUserGenerationContext())
-    if (generationMode === 'image') await submitted
-    setSidebarOpen(false)
+    if (blocked || submissionPending.current) return
+    submissionPending.current = true
+    setSubmitting(true)
+    setSubmissionError('')
+    try {
+      if (!await checkBeforeGenerate()) return
+      // Keep the visible command panel mounted through preparation/admission.
+      // A click or a resolved legacy return value is not a queue receipt.
+      await startGeneration(undefined, newUserGenerationContext())
+      setSidebarOpen(false)
+    } catch (error) {
+      setSubmissionError(error instanceof Error ? error.message : tCommon('status.failed'))
+    } finally {
+      submissionPending.current = false
+      setSubmitting(false)
+    }
   }
 
-  const queueCount = jobs.length
+  const queueCount = jobs.filter(job => isGenerationJobActive(job.status)).length
 
   if (blocked) {
     const label = needsImage
@@ -97,12 +104,13 @@ export function GenerateButton() {
 
   return <div>
     {frameError && <p role="alert" className="mb-1 max-w-xs text-xs text-red-300">{frameError}</p>}
+    {submissionError && <p role="alert" className="mb-1 max-w-xs text-xs text-red-300">{submissionError}</p>}
     <button
       onClick={handleClick}
       data-wizard-anchor="generate"
-      disabled={cooldown || checkingFrame || needsScheduledPrompts}
+      disabled={submitting || checkingFrame}
       className={`px-4 py-2 rounded-lg flex items-center gap-1.5 font-medium text-xs transition-all whitespace-nowrap ${
-        cooldown || checkingFrame || needsScheduledPrompts
+        submitting || checkingFrame
           ? 'bg-bg-active text-text-muted cursor-not-allowed'
           // Classic theme: bg-cta resolves to a flat accent-green.
           // HocusPocus Blue resolves to the branded blue gradient, while
@@ -110,11 +118,9 @@ export function GenerateButton() {
           : 'bg-cta hover:brightness-110 shadow-accent-glow text-white'
       }`}
     >
-      <Play size={13} fill={cooldown || needsScheduledPrompts ? 'currentColor' : 'white'} />
-      {checkingFrame ? t('wangp.checkingFrame') : needsScheduledPrompts
-        ? t('generate.addPrompts')
-        : cooldown
-          ? scheduledVideoCount > 1 ? t('generate.queuedCount', { count: scheduledVideoCount }) : tCommon('status.queued')
+      <Play size={13} fill={submitting ? 'currentColor' : 'white'} />
+      {checkingFrame ? t('wangp.checkingFrame') : submitting
+          ? t('generate.submitting')
           : scheduledVideoCount > 1
             ? t('generate.queueCount', { count: scheduledVideoCount })
             : queueCount > 0 ? t('generate.goCount', { count: queueCount }) : tCommon('actions.generate')}

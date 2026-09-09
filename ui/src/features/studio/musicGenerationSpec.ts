@@ -62,6 +62,9 @@ export const STUDIO_MUSIC_FORM_RESIDUAL_FIELDS = [
   // Image/video references and selectors restored by Load Settings.
   'image_start', 'image_end', 'image_refs', 'image_guide', 'image_mask',
   'video_guide', 'video_mask', 'video_source', 'video_prompt_type',
+  // Both registered music handlers hide flow_shift; the native settings
+  // filter drops it, but loadModelOptions still writes its shared default.
+  'flow_shift',
   'image_prompt_type', 'input_video_strength', 'denoising_strength',
   'masking_strength', 'video_guide_outpainting', 'frames_positions',
   'canonical_image_refs', 'image_fit_mode', 'image_refs_relative_size',
@@ -204,7 +207,8 @@ export function neutralizeStudioMusicSpeechResidue(
 }
 
 const RESIDUAL_TEXT_FIELDS = new Set([
-  'viggle_audio_mode', 'video_prompt_type', 'image_prompt_type', 'video_guide_outpainting',
+  'viggle_audio_mode', 'video_prompt_type', 'image_prompt_type', 'video_guide',
+  'video_guide_outpainting',
   'image_fit_mode', 'force_fps', 'skip_steps_cache_type', 'keyframe_conditioning_mode',
   'keyframe_inject_mode', 'matanyone_version', 'output_filename', 'voice_clone_mode',
   'voice_reference', 'sfx_mode', '_sfx_virtual_model', '_mmaudio_variant',
@@ -240,12 +244,24 @@ const RESIDUAL_ZERO_FIELDS = new Set([
   'tts_voice_count', 'MMAudio_setting',
 ])
 
-function isInactiveResidual(key: string, value: unknown, fullParams: Record<string, unknown>): boolean {
+function isAlwaysInactiveResidual(key: string, value: unknown): boolean {
   if (value === undefined || value === null) return true
   if (value === '' && RESIDUAL_TEXT_FIELDS.has(key)) return true
   if (value === false && RESIDUAL_BOOLEAN_FIELDS.has(key)) return true
   if (value === 0 && RESIDUAL_ZERO_FIELDS.has(key)) return true
   if (isEmptyList(value) && RESIDUAL_LIST_FIELDS.has(key)) return true
+  return false
+}
+
+// Native Music disables these video controls even when model-options writes
+// shared numeric defaults. Source assets and active processors stay validated.
+const INACTIVE_MUSIC_MODEL_CONTROLS = new Set([
+  'flow_shift', 'sliding_window_size', 'sliding_window_overlap',
+  'sliding_window_discard_last_frames',
+])
+
+function isContextInactiveResidual(key: string, value: unknown, fullParams: Record<string, unknown>): boolean {
+  if (INACTIVE_MUSIC_MODEL_CONTROLS.has(key)) return typeof value === 'number' && Number.isFinite(value)
   if (key === 'cfg_zero_step') return value === -1
   if (key === 'skip_steps_multiplier' || key === 'skip_steps_start_step_perc') {
     return fullParams.skip_steps_cache_type === undefined || fullParams.skip_steps_cache_type === ''
@@ -255,6 +271,10 @@ function isInactiveResidual(key: string, value: unknown, fullParams: Record<stri
   }
   if (key === 'stg_scale') return value === 0
   return false
+}
+
+function isInactiveResidual(key: string, value: unknown, fullParams: Record<string, unknown>): boolean {
+  return isAlwaysInactiveResidual(key, value) || isContextInactiveResidual(key, value, fullParams)
 }
 
 function assertActiveResidual(key: string, value: unknown, fullParams: Record<string, unknown>): void {
@@ -303,7 +323,7 @@ function assertLoraNames(value: Record<string, unknown>): void {
   })
 }
 
-function assertMusicSelectors(value: Record<string, unknown>): void {
+function assertMusicModeSelectors(value: Record<string, unknown>): void {
   if (value.generation_mode !== undefined && value.generation_mode !== 'audio') {
     throw new Error('input.params.generation_mode must be audio')
   }
@@ -324,6 +344,9 @@ function assertMusicSelectors(value: Record<string, unknown>): void {
   if (value._tts_original_prompt === null) {
     throw new Error('input.params._tts_original_prompt must be a string when supplied')
   }
+}
+
+function assertUnusedMusicAudioGuides(value: Record<string, unknown>): void {
   if (value.audio_guide3 !== undefined && value.audio_guide3 !== null && value.audio_guide3 !== '') {
     throw new Error('input.params.audio_guide3 is not supported by Studio music')
   }
@@ -336,6 +359,9 @@ function assertMusicSelectors(value: Record<string, unknown>): void {
   if (value.audio_guide6 !== undefined && value.audio_guide6 !== null && value.audio_guide6 !== '') {
     throw new Error('input.params.audio_guide6 is not supported by Studio music')
   }
+}
+
+function assertMusicAudioGuideSelector(value: Record<string, unknown>): void {
   const mode = typeof value.audio_prompt_type === 'string' ? value.audio_prompt_type : ''
   const first = value.audio_guide
   const second = value.audio_guide2
@@ -350,6 +376,12 @@ function assertMusicSelectors(value: Record<string, unknown>): void {
   }
 }
 
+function assertMusicSelectors(value: Record<string, unknown>): void {
+  assertMusicModeSelectors(value)
+  assertUnusedMusicAudioGuides(value)
+  assertMusicAudioGuideSelector(value)
+}
+
 function assertMusicParams(value: unknown): asserts value is StudioMusicParams {
   if (!isRecord(value)) throw new Error('input.params must be an object')
   for (const key of Object.keys(value)) {
@@ -359,7 +391,10 @@ function assertMusicParams(value: unknown): asserts value is StudioMusicParams {
   }
   assertCatalogValue(value, paramsSchema, 'input.params')
   requiredText(value.prompt, 'input.params.prompt', MAX_PROMPT_LENGTH)
-  requiredText(value.alt_prompt, 'input.params.alt_prompt', MAX_PROMPT_LENGTH)
+  // ACE-Step's caption is optional; MiniMax requires it before admission.
+  if (value.model_type === 'minimax_music3') {
+    requiredText(value.alt_prompt, 'input.params.alt_prompt', MAX_PROMPT_LENGTH)
+  }
   requiredText(value.model_type, 'input.params.model_type', MAX_WORKSPACE_LENGTH)
   assertMusicSelectors(value)
   assertAudioReferences(value)

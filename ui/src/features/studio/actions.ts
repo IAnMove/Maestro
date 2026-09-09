@@ -13,6 +13,7 @@ import type {
   PrepareVideoCommand,
   QueueSfxPackCommand,
 } from './commands'
+import { sfxPackContexts, sfxPackResult } from './sfxPackResult'
 import {
   generationProvenancePayload,
   type GenerationSubmissionContext,
@@ -120,11 +121,23 @@ export async function selectAudioModel(
   // same model here before applying an explicit Wizard duration; otherwise
   // the late options response can overwrite it with the model's default
   // (ACE-Step's 120 s default turned a requested 20 s track into 120 s).
-  if (selected && subMode !== 'sfx') {
+  if (selected) {
     await useStore.getState().loadModelOptions(selected)
   }
   const selectedModel = useStore.getState().models.find(model => model.model_type === selected)
   return selectedModel?.name || selected
+}
+
+async function submitSfxPackClip(
+  clip: StudioSfxClip, negative: string, context: GenerationSubmissionContext,
+): Promise<GenerationReceiptLike> {
+  applySfxClip(clip, negative)
+  const before = new Set(useStore.getState().jobs)
+  const receipt = await useStore.getState().startGeneration(undefined, context)
+  // A replay may have no new UI job. Its durable receipt is authoritative.
+  if (receipt) return receipt
+  const failed = useStore.getState().jobs.find(job => !before.has(job) && job.status === 'failed')
+  throw new Error(failed?.error || failed?.message || i18n.t('studio:sfxCommands.packMissingReceipt', { name: clip.name }))
 }
 
 export async function queueSfxPack(
@@ -133,29 +146,21 @@ export async function queueSfxPack(
 ): Promise<CommandResult> {
   if (!action.confirm) throw new Error('Encolar el pack de SFX requiere confirm=true tras una petición explícita.')
   if (!action.clips.length) throw new Error('El pack de SFX no incluye clips.')
+  const contexts = sfxPackContexts(context, action.clips.length)
+  const workspace = workspaceId()
   openStudioAudio('sfx')
   await selectAudioModel(action.modelType, 'sfx')
-  const ids: string[] = []
-  const negative = action.negativePrompt || 'music, speech, talking, vocals, long melody'
-  for (const clip of action.clips) {
-    applySfxClip(clip, negative)
-    const before = new Set(useStore.getState().jobs)
-    await useStore.getState().startGeneration(undefined, context)
-    const created = useStore.getState().jobs.find(job => !before.has(job))
-    if (!created) throw new Error(`HocusPocus no encoló el efecto ${clip.name}.`)
-    if (created.status === 'failed') throw new Error(created.error || created.message || `Falló ${clip.name}.`)
-    ids.push(`${clip.name}${created.id ? ` (${created.id})` : ''}`)
+  const receipts: GenerationReceiptLike[] = []
+  const negative = action.negativePrompt ?? 'music, speech, talking, vocals, long melody'
+  try {
+    for (const [index, clip] of action.clips.entries()) {
+      if (workspaceId() !== workspace) throw new Error(i18n.t('studio:sfxCommands.contextChanged'))
+      receipts.push(await submitSfxPackClip(clip, negative, contexts[index]))
+    }
+    return sfxPackResult(workspace, contexts, receipts)
+  } catch (error) {
+    return sfxPackResult(workspace, contexts, receipts, error instanceof Error ? error.message : String(error))
   }
-  return studioResult(
-    'audio',
-    'Audio → SFX',
-    [
-      `He encolado **${ids.length} efectos SFX** en Studio → Audio → SFX.`,
-      'Irán detrás de lo que ya use la GPU y aparecerán en la galería Audios al terminar.',
-      '',
-      ...ids.map(id => `- ${id}`),
-    ].join('\n'),
-  )
 }
 
 export function applySfxClip(clip: StudioSfxClip, negativePrompt: string): void {
@@ -164,7 +169,7 @@ export function applySfxClip(clip: StudioSfxClip, negativePrompt: string): void 
   state.setParams({
     prompt: clip.prompt,
     MMAudio_prompt: clip.prompt,
-    MMAudio_neg_prompt: negativePrompt || 'music, speech, talking, vocals, long melody',
+    MMAudio_neg_prompt: negativePrompt,
     video_guide: undefined,
   })
 }
@@ -329,16 +334,39 @@ export async function prepare3d(action: Prepare3dCommand): Promise<CommandResult
   )
 }
 
+async function prepareSfxForm(action: PrepareAudioCommand): Promise<Record<string, unknown>> {
+  if (action.outputCount !== undefined && action.outputCount !== 1) throw new Error('SFX supports one output per command')
+  const state = useStore.getState()
+  const { createStudioSfxGenerationCommand } = await import('./sfxGenerationSpec')
+  const modelType = action.modelType ?? (
+    String(state.params.model_type).startsWith('mmaudio_') ? state.params.model_type : 'mmaudio_v2'
+  )
+  if (action.videoGuide === '') throw new Error('video_guide must be a canonical reference or null')
+  const videoGuide = action.videoGuide === undefined ? state.params.video_guide || undefined : action.videoGuide
+  // Validate before navigation/model loading can mutate the form. The same
+  // closed contract validates direct commands and these Wizard form controls.
+  const command = createStudioSfxGenerationCommand({
+    workspace: workspaceId(), model_type: modelType,
+    prompt: action.prompt, MMAudio_prompt: action.prompt,
+    MMAudio_neg_prompt: action.negativePrompt ?? '',
+    duration_seconds: action.durationSeconds ?? 2,
+    seed: action.seed ?? -1, guidance_scale: action.guidanceScale ?? 4.5,
+    num_inference_steps: action.inferenceSteps ?? 25,
+    sfx_text_weight: action.sfxTextWeight ?? 1,
+    ...(videoGuide != null ? { video_guide: videoGuide } : {}),
+  }, 'wizard-sfx-form-validation')
+  return { ...command.input.params, video_guide: videoGuide ?? undefined }
+}
+
 export async function prepareAudio(action: PrepareAudioCommand): Promise<CommandResult> {
+  const sfxParams = action.subMode === 'sfx' ? await prepareSfxForm(action) : undefined
   openStudioAudio(action.subMode)
   const modelName = await selectAudioModel(action.modelType, action.subMode)
   const state = useStore.getState()
-  if (action.subMode === 'sfx') {
-    applySfxClip({
-      name: 'sfx',
-      prompt: action.prompt,
-      durationSeconds: action.durationSeconds ?? 2,
-    }, action.negativePrompt || '')
+  if (sfxParams) {
+    state.setDurationSeconds(sfxParams.duration_seconds as number)
+    state.setOutputCount(1)
+    state.setParams(sfxParams)
   } else {
     state.setDurationSeconds(action.durationSeconds ?? state.durationSeconds)
     const music = action.subMode === 'music'
@@ -373,12 +401,20 @@ export async function prepareAudio(action: PrepareAudioCommand): Promise<Command
   )
 }
 
+const ADMISSION_MESSAGE_KEYS = {
+  'generation.image': 'studio:commands.admitted',
+  'generation.speech': 'studio:speechCommands.admitted',
+  'generation.music': 'studio:musicCommands.admitted',
+  'generation.sfx': 'studio:sfxCommands.admitted',
+  'tools.upscale': 'studio:toolsCommands.admitted',
+} as const
+
 function studioAdmissionResult(receipt: GenerationReceiptLike): CommandResult {
   const entity = { kind: 'generation_task', id: receipt.result.task_id, workspaceId: receipt.result.workspace }
   return commandResultFromSlice({
     commandId: receipt.commandId, status: 'queued', entity, taskIds: receipt.taskIds,
     artifacts: [{ id: 'reply', kind: 'document', owner: entity, uri: 'studio:reply', metadata: {
-      summary: i18n.t('studio:commands.admitted', { id: receipt.result.job_id }),
+      summary: i18n.t(ADMISSION_MESSAGE_KEYS[receipt.operation as keyof typeof ADMISSION_MESSAGE_KEYS] || 'studio:commands.generationAdmitted', { id: receipt.result.job_id }),
       title: 'Studio generation', mode: 'generation', receipt,
     } }],
   })

@@ -668,7 +668,15 @@ export function createGenerationCommandClient<Command extends GenerationCommandL
       const key = area.key(index)
       if (!key?.startsWith(config.storagePrefix)) continue
       const intentId = key.slice(config.storagePrefix.length)
-      const command = readPending(config, intentId)
+      let command: Command | null
+      try {
+        command = readPending(config, intentId)
+      } catch (error) {
+        // One damaged hint must not hide unrelated recoverable admissions.
+        // Keep its bytes and let direct lookup/retry report the corruption.
+        if (error instanceof GenerationCommandError && error.code === 'invalid_pending_command') continue
+        throw error
+      }
       if (!command || (workspace !== undefined && command.input.workspace !== workspace)) continue
       pending.push(command)
     }

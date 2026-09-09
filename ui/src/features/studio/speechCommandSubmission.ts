@@ -1,8 +1,10 @@
 import * as api from '../../api/client'
+import { assertSameAudioForm } from './audioFormSnapshot'
 import { canonicalAudioReferences } from './audioCommandReferences'
 import { stableSerialize } from '../../lib/commandContract'
 import type { AppState } from '../../stores/useStore'
 import type { GenerationSubmissionContext } from './generationProvenance'
+import { neutralizeSfxOwnedFormFields } from './sfxFormResidue'
 import {
   createStudioSpeechGenerationCommand,
   projectStudioSpeechFormParams,
@@ -26,49 +28,6 @@ export interface SpeechSubmission {
   params: Record<string, unknown>
   receipt?: SpeechGenerationReceipt
   submit: () => Promise<NativeReceipt>
-}
-
-
-type VoiceSnapshot = {
-  name: string
-  filename: string | null
-  path: string | null
-}
-
-function voiceSnapshot(state: StudioState): VoiceSnapshot[] {
-  return state.ttsVoices.map(voice => ({
-    name: voice.name,
-    filename: voice.filename,
-    path: voice.path,
-  }))
-}
-
-/**
- * Speech has controls outside `params`. Include each one in the admission
- * guard so editing a voice, its file or duration while refs are resolving can
- * never post a snapshot that no longer describes the visible form.
- */
-function speechFormFingerprint(state: StudioState): string {
-  return stableSerialize({
-    params: state.params,
-    activeWorkspace: state.activeWorkspace,
-    generationMode: state.generationMode,
-    audioSubMode: state.audioSubMode,
-    durationSeconds: state.durationSeconds,
-    ttsVoiceCount: state.ttsVoiceCount,
-    ttsSpeakerName1: state.ttsSpeakerName1,
-    ttsSpeakerName2: state.ttsSpeakerName2,
-    ttsVoices: voiceSnapshot(state),
-    settingsOpen: state.settingsOpen,
-    dashboardOpen: state.dashboardOpen,
-    sidebarMode: state.sidebarMode,
-  })
-}
-
-function assertSameSpeechForm(before: StudioState, current: StudioState): void {
-  if (speechFormFingerprint(before) !== speechFormFingerprint(current)) {
-    throw new Error(i18n.t('studio:commands.contextChanged'))
-  }
 }
 
 
@@ -96,10 +55,12 @@ export async function prepareStudioSpeechSubmission(
     // known video/H3 controls alongside the speech fields. Project only that
     // explicit form residue; the command builder remains closed for direct
     // Wizard/MCP envelopes and rejects every other unknown key.
-    snapshotParams = projectStudioSpeechFormParams(snapshotParams).params
-    assertSameSpeechForm(before, current())
+    snapshotParams = projectStudioSpeechFormParams(
+      neutralizeSfxOwnedFormFields(snapshotParams),
+    ).params
+    assertSameAudioForm(before, current())
     await canonicalAudioReferences(snapshotParams)
-    assertSameSpeechForm(before, current())
+    assertSameAudioForm(before, current())
     const command = createStudioSpeechGenerationCommand(
       snapshotParams,
       context?.commandId || newSpeechGenerationIntentId(),
@@ -111,9 +72,9 @@ export async function prepareStudioSpeechSubmission(
           const receipt = await submitSpeechGenerationCommand(command, {
             submissionContext: context,
             onSnapshotReady: async frozen => {
-              assertSameSpeechForm(before, current())
+              assertSameAudioForm(before, current())
               await presentStudioSpeechCommand(frozen)
-              assertSameSpeechForm(before, current())
+              assertSameAudioForm(before, current())
             },
           })
           submission.receipt = receipt

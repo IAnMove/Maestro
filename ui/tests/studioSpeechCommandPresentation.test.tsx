@@ -314,3 +314,31 @@ test('speech presentation waits for the listening panel and cancels when it is r
   )
   window.removeEventListener(SPEECH_PRESENTATION_EVENT, removeOnRequest)
 })
+
+test('Speech form submission admits after leftover SFX prompt and weight', { concurrency: false }, async () => {
+  const params = {
+    ...baseParams('sfx-residue'),
+    MMAudio_prompt: 'thunder crash on tin roof',
+    MMAudio_neg_prompt: 'music',
+    sfx_text_weight: 2.5,
+    sfx_mode: true,
+  }
+  const state = formState(params)
+  const prepared = await prepareStudioSpeechSubmission(
+    params, state, () => state, { actor: 'user', commandId: 'speech-sfx-residue' },
+  )
+  assert.equal(prepared.params.prompt, params.prompt)
+  assert.equal('MMAudio_prompt' in prepared.params, false)
+  assert.equal('sfx_text_weight' in prepared.params, false)
+})
+
+test('Speech form accepts Music slider and lyric-language residue while direct commands reject it', { concurrency: false }, async () => {
+  const params = { ...baseParams('music-residue'), alt_guidance_scale: 3, lyrics_language: 'en' }
+  assert.throws(() => createStudioSpeechGenerationCommand(params, 'direct-music-residue'), /alt_guidance_scale/)
+  const state = formState(params)
+  const prepared = await prepareStudioSpeechSubmission(params, state, () => state)
+  assert.equal(prepared.params.prompt, params.prompt)
+  assert.equal('alt_guidance_scale' in prepared.params, false)
+  assert.equal('lyrics_language' in prepared.params, false)
+  assert.equal(params.alt_guidance_scale, 3, 'projection does not erase the original Music draft')
+})

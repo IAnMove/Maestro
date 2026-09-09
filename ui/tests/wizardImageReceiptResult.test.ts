@@ -22,11 +22,11 @@ const { resolveAndRunRegisteredCapability } = await import('../src/features/agen
 
 const WORKSPACE = 'wizard-image-receipt-result-test'
 
-function queuedReceipt(commandId: string, taskId: string) {
+function queuedReceipt(commandId: string, taskId: string, operation = 'generation.image') {
   return {
     version: 1 as const,
     commandId,
-    operation: 'generation.image' as const,
+    operation,
     status: 'queued' as const,
     entities: [],
     artifacts: [],
@@ -140,5 +140,25 @@ test('Wizard result keeps the receipt and presentation warning when Studio canno
     assert.equal(result.report?.message, warning)
   } finally {
     generation.restore()
+  }
+})
+
+
+test('Wizard admission names the operation from its receipt even if the selected form differs', { concurrency: false }, async () => {
+  const { setUiLanguage } = await import('../src/i18n/index.ts')
+  for (const [language, expected] of [
+    ['en', 'Sound effect queued'], ['es', 'Efecto de sonido en cola'],
+  ] as const) {
+    await setUiLanguage(language)
+    const receipt = queuedReceipt('receipt-sfx', 'task-sfx', 'generation.sfx')
+    // Deliberately keep the current form on Image. The durable receipt, not
+    // mutable navigation state, determines what was actually admitted.
+    const generation = installAdmittedGeneration(receipt, { navigationVisible: true })
+    try {
+      const result = await runStartGeneration()
+      assert.ok(result?.report?.message.includes(expected), result?.report?.message)
+      assert.deepEqual(result.report.metadata?.receipt, receipt)
+      assert.equal(generation.calls(), 1)
+    } finally { generation.restore() }
   }
 })

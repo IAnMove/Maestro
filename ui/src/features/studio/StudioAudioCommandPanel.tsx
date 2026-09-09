@@ -21,7 +21,7 @@ export interface AudioPanelProps<R> {
 }
 
 export interface AudioPanelConfiguration<C, R> {
-  subMode: 'speech' | 'music'
+  subMode: 'speech' | 'music' | 'sfx'
   pendingCommands: (workspace: string) => C[]
   subscribeCommands: (callback: () => void) => () => void
   submitCommand: (command: C) => Promise<R>

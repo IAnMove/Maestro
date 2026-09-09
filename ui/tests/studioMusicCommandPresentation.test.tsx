@@ -323,6 +323,13 @@ test('store startGeneration keeps real defaults and ignores stale speech and voi
   globalThis.setInterval = (() => 0) as unknown as typeof setInterval
   globalThis.fetch = (async (input, init) => {
     const url = String(input)
+    if (url.includes('/model-options/')) return jsonResponse({
+      audio_only: true, fps: 25, guidance_max_phases: 1,
+      default_num_inference_steps: 30, default_guidance_scale: 7,
+      // Installed ACE XL SFT hides this setting while returning a default.
+      flow_shift: false, default_flow_shift: 5,
+      duration_slider: { min: 5, max: 360, default: 120 },
+    })
     if (!url.endsWith('/generation/commands')) throw new Error(`unexpected fetch: ${url}`)
     const body = JSON.parse(String(init?.body)) as Record<string, unknown>
     posts.push(body)
@@ -375,6 +382,11 @@ test('store startGeneration keeps real defaults and ignores stale speech and voi
   })
   const view = render(<StudioMusicCommandPanel workspace={workspace} model="ace_step_v1_5_xl_sft_lm_4b" visible onRecovered={async () => undefined} />)
   try {
+    await act(async () => {
+      await useStore.getState().loadModelOptions('ace_step_v1_5_xl_sft_lm_4b')
+      useStore.getState().setDurationSeconds(20)
+    })
+    assert.equal(useStore.getState().params.flow_shift, 5)
     const start = useStore.getState().startGeneration(undefined, { actor: 'user', commandId: intent })
     for (let pass = 0; pass < 10 && posts.length === 0; pass += 1) {
       await act(async () => {
@@ -384,6 +396,7 @@ test('store startGeneration keeps real defaults and ignores stale speech and voi
       await new Promise(resolve => setTimeout(resolve, 0))
     }
     const receipt = await start
+    assert.ok(receipt, useStore.getState().jobs.map(job => job.error || job.message).join("\n"))
     assert.equal(receipt?.result.job_id, `job-${intent}`)
     assert.equal(posts.length, 1)
     const posted = posts[0]
@@ -393,8 +406,9 @@ test('store startGeneration keeps real defaults and ignores stale speech and voi
     // survive the music projection unless the music branch intentionally
     // changes them.
     assert.equal(submitted.resolution, '1280x720')
-    assert.equal(submitted.num_inference_steps, 8)
-    assert.equal(submitted.guidance_scale, 1)
+    assert.equal(submitted.num_inference_steps, 30)
+    assert.equal(submitted.guidance_scale, 7)
+    assert.equal(submitted.flow_shift, undefined)
     assert.equal(submitted.seed, -1)
     assert.equal(submitted.repeat_generation, 1)
     assert.equal(submitted.video_length, 0)
@@ -418,4 +432,21 @@ test('store startGeneration keeps real defaults and ignores stale speech and voi
     globalThis.setInterval = originalInterval
     useStore.setState(before)
   }
+})
+
+test('Music form submission admits after leftover SFX prompt and weight', { concurrency: false }, async () => {
+  const params = {
+    ...baseParams('sfx-residue'),
+    MMAudio_prompt: 'thunder crash on tin roof',
+    MMAudio_neg_prompt: 'music',
+    sfx_text_weight: 2.5,
+    sfx_mode: true,
+  }
+  const state = formState(params)
+  const prepared = await prepareStudioMusicSubmission(
+    params, state, () => state, { actor: 'user', commandId: 'music-sfx-residue' },
+  )
+  assert.equal(prepared.params.prompt, params.prompt)
+  assert.equal('MMAudio_prompt' in prepared.params, false)
+  assert.equal('sfx_text_weight' in prepared.params, false)
 })

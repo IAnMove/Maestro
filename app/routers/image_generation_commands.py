@@ -12,7 +12,7 @@ from services.image_generation_commands import command_error
 class ReferenceResolutionInput(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     references: list[StrictStr] = Field(min_length=1, max_length=64)
-    media_kind: Literal["image", "audio"] = "image"
+    media_kind: Literal["image", "audio", "video"] = "image"
 
 
 class UISubmissionContext(BaseModel):
@@ -125,7 +125,7 @@ def create_image_generation_commands_router(service):
             raise command_error(422, "invalid_reference", "An exact bounded media reference is required")
         try:
             return {"references": [resolve(value) if body.media_kind == "image"
-                                   else resolve(value, media_kind="audio") for value in body.references]}
+                                   else resolve(value, media_kind=body.media_kind) for value in body.references]}
         except (ValueError, OSError) as error:
             raise command_error(422, "invalid_reference", str(error)) from error
 
