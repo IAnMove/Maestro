@@ -193,20 +193,33 @@ class ImageGenerationCommands:
                                        "created_at": task["created_at"], **deepcopy(runtime)})
 
     def _recovery_task(self, record):
+        """Link one leftover to its admission, or withhold it.
+
+        Non-image leftovers return None so the native queue can recover them.
+        A linked image leftover returns ``(registry, task)``. An image row that
+        cannot be matched — deleted workspace, missing admission, corrupt
+        snapshot, or job-id drift — returns False so this one row is skipped.
+        Raising here would take down list/resume/discard for every other job.
+        """
         provenance = record.get("provenance") or {}
         if provenance.get("capability") != "generation.image":
             return None
-        registry = self._registry(record["workspace"])
-        intent_id = provenance.get("command", {}).get("command_id")
-        entry = registry.command_admission(intent_id)
-        if entry is None or entry["receipt"]["result"]["job_id"] != record["id"]:
-            raise command_error(503, "recovery_mismatch", "Recovery does not match a durable image admission")
-        return registry, registry.get(entry["task_id"])
+        try:
+            registry = self._registry(record.get("workspace"))
+            intent_id = (provenance.get("command") or {}).get("command_id")
+            entry = registry.command_admission(intent_id)
+            if entry is None or entry["receipt"]["result"]["job_id"] != record.get("id"):
+                return False
+            return registry, registry.get(entry["task_id"])
+        except (HTTPException, OSError, sqlite3.Error, TypeError, KeyError):
+            return False
 
     def filter_recovery(self, records):
         retained = []
         for record in records:
             linked = self._recovery_task(record)
+            if linked is False:
+                continue
             if linked is None or (linked[1] and linked[1]["status"] == "interrupted"):
                 retained.append(record)
         return retained
@@ -214,7 +227,7 @@ class ImageGenerationCommands:
     def discard_recovery(self, records):
         for record in records:
             linked = self._recovery_task(record)
-            if linked is not None and linked[1] and linked[1]["status"] == "interrupted":
+            if linked and linked[1] and linked[1]["status"] == "interrupted":
                 registry, task = linked
                 registry.update(task["id"], status="cancelled", phase="recovery_discarded",
                                 message="Recovery discarded", completed_at=time.time(), recoverable=False)

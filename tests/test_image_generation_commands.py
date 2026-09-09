@@ -441,6 +441,49 @@ def test_restart_marks_queued_task_interrupted_and_projects_recovery_without_sta
     assert receipt["task"]["status"] == "interrupted"
 
 
+def _queue_record(job_id, workspace, *, capability, command_id=None, params=None):
+    provenance = {"capability": capability}
+    if command_id is not None:
+        provenance["command"] = {"command_id": command_id}
+    return {
+        "id": job_id,
+        "status": "interrupted",
+        "workspace": workspace,
+        "params": params or {"model_type": "pi_flux2", "prompt": job_id},
+        "provenance": provenance,
+    }
+
+
+def test_orphaned_image_leftover_does_not_block_other_recovery(tmp_path):
+    native = FakeNative(tmp_path)
+    command = _command("linked-recovery")
+    first = _run(native.service().submit(command))
+    restarted = FakeNative(tmp_path, interrupt_stale=True)
+    service = restarted.service()
+    service.restore_recovery(["workspace-a"])
+    linked = restarted.persisted[first["receipt"]["result"]["job_id"]]
+    video = _queue_record("video-leftover", "workspace-b", capability="generation.video")
+    orphan = _queue_record(
+        "orphan-image", "deleted-workspace",
+        capability="generation.image", command_id="missing-admission",
+    )
+    drifted = _queue_record(
+        "drifted-job", "workspace-a",
+        capability="generation.image", command_id=command["intent_id"],
+    )
+    invalid_workspace = _queue_record(
+        "bad-workspace", "../outside",
+        capability="generation.image", command_id="any-intent",
+    )
+
+    retained = service.filter_recovery([video, orphan, drifted, invalid_workspace, linked])
+
+    assert [record["id"] for record in retained] == ["video-leftover", linked["id"]]
+    service.discard_recovery([video, orphan, drifted, invalid_workspace, linked])
+    assert restarted.registry("workspace-a").get(first["receipt"]["taskIds"][0])["status"] == "cancelled"
+    assert service.filter_recovery([video, orphan, linked]) == [video]
+
+
 def test_queued_admission_is_not_a_recovery_candidate_while_dispatch_is_pending(tmp_path):
     native = FakeNative(tmp_path)
     service, registry, _entry = _seed_undispatched(native, _command("queued-not-recovery"))
