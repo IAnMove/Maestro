@@ -1656,6 +1656,37 @@ test('drops cancel_task unless confirm is true and repairs an explicit cancel re
   assert.equal(repaired.actions[0].confirm, true)
 })
 
+test('Spanish para-preposition does not cancel the active GPU task', async () => {
+  const { isExplicitCancelRequest, reconcileAgentTurnWithRequest } = await import('../src/features/agent/agentActions.ts')
+  for (const request of [
+    'Dime los pasos para generar un vídeo',
+    'Qué pasos sigo para generar un vídeo',
+    'Abre Studio para generar un vídeo',
+    'Necesito ayuda para lanzar el vídeo',
+    'Ajustes para la generación en Studio',
+    'Ayuda para la tarea de vídeo',
+  ]) {
+    assert.equal(isExplicitCancelRequest(request), false, request)
+    const turn = await reconcileAgentTurnWithRequest(request, { reply: 'Cancelo.', actions: [] })
+    assert.equal(turn.actions.some(action => action.type === 'cancel_task'), false, request)
+  }
+
+  for (const request of [
+    'para la generación',
+    'Para la tarea',
+    'por favor para ya la cola',
+    'Para lo que está generando',
+    'detén el vídeo',
+    'cancela el vídeo',
+  ]) {
+    assert.equal(isExplicitCancelRequest(request), true, request)
+  }
+  for (const request of ['para la generación', 'Para la tarea', 'por favor para ya la cola', 'Para lo que está generando']) {
+    const turn = await reconcileAgentTurnWithRequest(request, { reply: 'Vale.', actions: [] })
+    assert.equal(turn.actions[0].type, 'cancel_task', request)
+  }
+})
+
 test('requires confirmation for retry and resolves an explicit latest failure request', async () => {
   const { parseAgentTurn, reconcileAgentTurnWithRequest } = await import('../src/features/agent/agentActions.ts')
   const unsigned = parseAgentTurn(JSON.stringify({
@@ -1752,6 +1783,54 @@ test('repairs an explicit Studio audio request when the model only prepares it',
   })
   assert.deepEqual(voice.actions.map(action => action.type), ['prepare_audio', 'start_generation'])
   assert.equal(voice.actions[0].subMode, 'speech')
+})
+
+test('educational generate paraphrases do not enqueue Studio generation', async () => {
+  const {
+    isHowToGenerateQuestion,
+    isExplicitVideoGenerationRequest,
+    isExplicitImageGenerationRequest,
+    reconcileAgentTurnWithRequest,
+  } = await import('../src/features/agent/agentActions.ts')
+
+  for (const question of [
+    'Tell me the steps to generate a video in Studio.',
+    'What steps do I follow to generate a video?',
+    'Before I generate a video, what should I configure in Studio?',
+    'Can you explain what happens when you generate a video?',
+    'Dime los pasos para generar un vídeo',
+    'Qué pasos sigo para generar un vídeo',
+  ]) {
+    assert.equal(isHowToGenerateQuestion(question), true, question)
+    assert.equal(isExplicitVideoGenerationRequest(question), false, question)
+    const turn = await reconcileAgentTurnWithRequest(question, {
+      reply: 'I will generate it now.',
+      actions: [
+        { type: 'prepare_video', prompt: 'un mago en la torre' },
+        { type: 'start_generation', confirm: true },
+      ],
+    })
+    assert.deepEqual(turn.actions.map(action => action.type), [], question)
+  }
+
+  const imageQuestion = 'Tell me the steps to generate an image in Studio.'
+  assert.equal(isHowToGenerateQuestion(imageQuestion), true)
+  assert.equal(isExplicitImageGenerationRequest(imageQuestion), false)
+  const imageTurn = await reconcileAgentTurnWithRequest(imageQuestion, {
+    reply: 'I will paint it now.',
+    actions: [
+      { type: 'prepare_image', prompt: 'un gato naranja' },
+      { type: 'start_generation', confirm: true },
+    ],
+  })
+  assert.deepEqual(imageTurn.actions.map(action => action.type), [])
+
+  const command = await reconcileAgentTurnWithRequest('Generate a video of a wizard on a tower', {
+    reply: '¿De qué?',
+    actions: [],
+  })
+  assert.deepEqual(command.actions.map(action => action.type), ['prepare_video', 'start_generation'])
+  assert.ok(String(command.actions[0].prompt).includes('wizard'))
 })
 
 test('keeps Story Lab song generation out of the Studio Audio shortcut', async () => {
@@ -1983,6 +2062,71 @@ test('genera el video de un mapache uses the new topic instead of the prepared f
   assert.equal(example.actions[0].prompt.includes('genera el video'), false)
   assert.equal(example.actions[0].prompt.includes('Sheldon'), false)
   useStore.setState(original)
+})
+
+test('how-to launch questions do not queue a prepared Studio video', async () => {
+  const { useStore } = await import('../src/stores/useStore.ts')
+  const {
+    isHowToGenerateQuestion,
+    isResumePreparedStudioVideoRequest,
+    isExplicitVideoGenerationRequest,
+    isExplicitAudioGenerationRequest,
+    reconcileAgentTurnWithRequest,
+  } = await import('../src/features/agent/agentActions.ts')
+  const original = {
+    generationMode: useStore.getState().generationMode,
+    params: useStore.getState().params,
+    savedPromptPerMode: useStore.getState().savedPromptPerMode,
+  }
+  useStore.setState({
+    generationMode: 'video',
+    params: { ...useStore.getState().params, prompt: 'un mago en la torre' },
+    savedPromptPerMode: { ...useStore.getState().savedPromptPerMode, video: 'un mago en la torre' },
+  })
+
+  try {
+    for (const question of [
+      'How do I launch the video?',
+      'How do I start the video?',
+      'Explain how to launch the video',
+    ]) {
+      assert.equal(isHowToGenerateQuestion(question), true, question)
+      assert.equal(isResumePreparedStudioVideoRequest(question), false, question)
+      assert.equal(isExplicitVideoGenerationRequest(question), false, question)
+      const turn = await reconcileAgentTurnWithRequest(question, {
+        reply: 'I will launch it.',
+        actions: [{ type: 'prepare_video', prompt: 'un mago en la torre' }, { type: 'start_generation', confirm: true }],
+      })
+      assert.deepEqual(turn.actions.map(action => action.type), [], question)
+    }
+
+    const longVideo = `How do I generate a video? ${'Please explain the workflow in detail. '.repeat(8)}`
+    assert.ok(longVideo.length > 240)
+    assert.equal(isHowToGenerateQuestion(longVideo), true)
+    assert.equal(isExplicitVideoGenerationRequest(longVideo), false)
+    const longVideoTurn = await reconcileAgentTurnWithRequest(longVideo, { reply: 'Here is how.', actions: [] })
+    assert.deepEqual(longVideoTurn.actions.map(action => action.type), [])
+
+    const longAudio = `How can I generate music in Studio Audio? ${'Please explain the workflow in detail. '.repeat(8)}`
+    assert.ok(longAudio.length > 240)
+    assert.equal(isHowToGenerateQuestion(longAudio), true)
+    assert.equal(isExplicitAudioGenerationRequest(longAudio), false)
+    const longAudioTurn = await reconcileAgentTurnWithRequest(longAudio, {
+      reply: 'I will generate it now.',
+      actions: [
+        { type: 'open_tab', tab: 'audio' },
+        { type: 'prepare_audio', subMode: 'music', prompt: 'Piano' },
+        { type: 'start_generation', confirm: true },
+      ],
+    })
+    assert.deepEqual(longAudioTurn.actions.map(action => action.type), ['open_tab'])
+
+    const launch = await reconcileAgentTurnWithRequest('lanza el vídeo', { reply: '¿De qué?', actions: [] })
+    assert.deepEqual(launch.actions.map(action => action.type), ['prepare_video', 'start_generation'])
+    assert.equal(launch.actions[0].prompt, 'un mago en la torre')
+  } finally {
+    useStore.setState(original)
+  }
 })
 
 test('genera el video does not copy an incompatible I2V, audio or 3D model as T2V', async () => {
