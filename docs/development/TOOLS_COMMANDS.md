@@ -35,9 +35,10 @@ The current method names come from the native Tools worker and are published
 by `tools_upscale_schema()`. The preparation layer calls the existing WangGP
 processor selection and settings validators. `WangpProcessorSettings` is the
 only typed settings model; processor prompts retain their literal spelling.
-Processor reference images, when declared by the selected processor, are
-resolved against their explicit source workspace and recorded with size and
-SHA-256 identity after a Pillow verification. Image sources receive the same
+The preparation adapter resolves processor reference images against their
+explicit source workspace and records size and SHA-256 identity after Pillow
+verification. The current native scalar-settings validator still rejects H3
+reference-image arrays; that option is not yet end-to-end supported. Image sources receive the same
 verification. Video sources receive the existing `video_editor.probe_media`
 probe and must report positive dimensions and duration.
 

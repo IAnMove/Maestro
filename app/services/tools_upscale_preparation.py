@@ -48,7 +48,10 @@ def _validated_params(params: Any) -> tuple[dict[str, Any], str]:
         )
         raise command_error(422, "invalid_tools_upscale_input", details) from error
     working = parsed.model_dump(mode="json")
-    working["wangp_processor_settings"] = working.get("wangp_processor_settings") or {}
+    # Only submitted settings belong to this processor. Nested model defaults
+    # include an inactive H3 reference list which is not a Lanczos parameter.
+    settings = parsed.wangp_processor_settings
+    working["wangp_processor_settings"] = settings.model_dump(mode="json", exclude_unset=True) if settings else {}
     working["workspace"] = workspace
     return working, workspace
 

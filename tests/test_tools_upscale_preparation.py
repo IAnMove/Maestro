@@ -280,3 +280,16 @@ def test_native_projection_keeps_managed_asset_id_with_canonical_source(tmp_path
 
     assert canonical == "/api/v1/file/poster.png?workspace=source"
     assert ready["asset_id"] == "asset-poster"
+
+
+@pytest.mark.parametrize("settings", [None, {}, {"spatial_upsampler_prompt": None}])
+def test_empty_settings_cross_real_scalar_processor_validator(prepared_fixture, settings):
+    from shared.wangp1272.processors import validated_settings
+
+    native, _ = _prepare(
+        prepared_fixture,
+        _params(prepared_fixture, wangp_processor_settings=settings),
+        processor_settings=validated_settings,
+        processor_parameters=lambda _method: [],
+    )
+    assert native["wangp_processor_settings"] == {}
