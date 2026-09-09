@@ -31,6 +31,10 @@ function text(value: unknown, maxLength: number): string {
   return typeof value === 'string' ? value.trim().slice(0, maxLength) : ''
 }
 
+function literalText(value: unknown, maxLength: number): string | undefined {
+  return typeof value === 'string' && value.length <= maxLength ? value : undefined
+}
+
 function number(
   value: unknown,
   minimum: number,
@@ -90,8 +94,9 @@ function videoAction(raw: Record<string, unknown>): AgentPrepareVideoAction | nu
 }
 
 function imageAction(raw: Record<string, unknown>): AgentPrepareImageAction | null {
-  const prompt = text(raw.prompt, 8_000)
-  if (!prompt) return null
+  const prompt = literalText(raw.prompt, 200_000)
+  const negativePrompt = literalText(raw.negative_prompt, 200_000)
+  if (!prompt?.trim() || (raw.negative_prompt !== undefined && negativePrompt === undefined)) return null
   const resolutionPreset = text(raw.resolution_preset, 12) as ResolutionPreset
   const aspectRatio = text(raw.aspect_ratio, 12) as AspectRatio
   const resolution = text(raw.resolution, 20)
@@ -102,10 +107,12 @@ function imageAction(raw: Record<string, unknown>): AgentPrepareImageAction | nu
     resolutionPreset: RESOLUTION_PRESETS.has(resolutionPreset) ? resolutionPreset : undefined,
     resolution: /^\d{2,4}x\d{2,4}$/.test(resolution) ? resolution : undefined,
     aspectRatio: ASPECT_RATIOS.has(aspectRatio) ? aspectRatio : undefined,
-    negativePrompt: text(raw.negative_prompt, 2_000) || undefined,
+    negativePrompt,
     seed: number(raw.seed, -1, 2_147_483_647, true),
     inferenceSteps: number(raw.inference_steps, 1, 100, true),
-    guidanceScale: number(raw.guidance_scale, 0, 30),
+    // The Wizard response schema uses -1 for an unspecified CFG value.
+    guidanceScale: typeof raw.guidance_scale === 'number' && raw.guidance_scale >= 0
+      ? number(raw.guidance_scale, 0, 30) : undefined,
     outputCount: number(raw.output_count, 1, 8, true),
   }
 }
@@ -231,11 +238,13 @@ export function registerStudioCapabilities(register: typeof defineCapability): v
   description: 'Open Studio → Image and fill a validated text-to-image form.',
   useWhen: 'The user asks to prepare, show or fill an image generation form.',
   parameters: ['prompt', 'model_type', 'resolution_preset', 'resolution', 'aspect_ratio', 'negative_prompt', 'seed', 'inference_steps', 'guidance_scale', 'output_count'],
-  inputSchema: { type: 'object', additionalProperties: false, properties: { type: { const: 'prepare_image' }, prompt: { type: 'string', minLength: 1 }, model_type: { type: 'string' }, resolution_preset: { type: 'string', enum: [...RESOLUTION_PRESETS] }, resolution: { type: 'string' }, aspect_ratio: { type: 'string', enum: [...ASPECT_RATIOS] }, negative_prompt: { type: 'string' }, seed: { type: 'integer' }, inference_steps: { type: 'integer' }, guidance_scale: { type: 'number' }, output_count: { type: 'integer' } }, required: ['type', 'prompt'] },
+  inputSchema: { type: 'object', additionalProperties: false, properties: { type: { const: 'prepare_image' }, prompt: { type: 'string', minLength: 1, maxLength: 200_000 }, model_type: { type: 'string' }, resolution_preset: { type: 'string', enum: [...RESOLUTION_PRESETS] }, resolution: { type: 'string' }, aspect_ratio: { type: 'string', enum: [...ASPECT_RATIOS] }, negative_prompt: { type: 'string', maxLength: 200_000 }, seed: { type: 'integer' }, inference_steps: { type: 'integer' }, guidance_scale: { type: 'number' }, output_count: { type: 'integer' } }, required: ['type', 'prompt'] },
   risk: 'edit', confirmation: 'none', progress: 'Rellenando Studio → Image…',
   resolve: imageAction,
   validate(action) { return action.prompt ? validType('prepare_image', action) : ['prompt is required'] },
-  async prepare(action) { return compilePromptAction(action, 'image') },
+  // Language intent remains on the action/workflow. The visible image form
+  // and durable command must contain the authored prompt character-for-character.
+  async prepare(action) { return action },
   async execute(action, context) { return context.adapters.studio.prepareImage(action) },
   correlate(_action, outcome) { return outcome.target }, async track(_action, outcome) { return outcome },
   report: { targetKind: 'studio_form', successState: 'prepared' }, summarize(_action, outcome) { return outcome.message },

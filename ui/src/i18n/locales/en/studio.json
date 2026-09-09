@@ -925,5 +925,18 @@
       "exampleTitle": "Example prompt",
       "example": "Replace the character in image 1 with the person in image 2. Keep the pose, background, camera, framing and aspect ratio of image 1."
     }
+  },
+  "commands": {
+    "prepared": "Image request ready",
+    "admitted": "Image queued · {{id}}",
+    "admittedNotVisible": "Image task {{id}} was admitted. Reopen Studio or Activity to follow it.",
+    "pending": "A previous submission needs recovery",
+    "recover": "Recover this submission",
+    "resources": "{{references}} references · {{loras}} LoRAs",
+    "contextChanged": "The image form changed before submission. Review the current settings and try again.",
+    "panelUnavailable": "The image request could not be shown. Open Studio and try again.",
+    "pendingInvalid": "The saved submission could not be read. It has been preserved for recovery.",
+    "referenceFailed": "A selected reference could not be prepared. No image was submitted.",
+    "conflictingGuides": "Conflicting image guides are selected. Choose one control image and mask before generating."
   }
 }

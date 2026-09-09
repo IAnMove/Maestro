@@ -39,6 +39,7 @@ import { DirectorChat } from './DirectorChat'
 import { useUiTranslation } from '../../i18n'
 
 const ViggleControls = lazy(() => import('./ViggleControls').then(module => ({ default: module.ViggleControls })))
+const StudioImageCommandPanel = lazy(() => import('../../features/studio/StudioImageCommandPanel').then(module => ({ default: module.StudioImageCommandPanel })))
 
 export function Sidebar() {
   const { t } = useUiTranslation('navigation')
@@ -57,6 +58,8 @@ export function Sidebar() {
   const setDashboardOpen = useStore(s => s.setDashboardOpen)
   const editSubMode = useStore(s => s.editSubMode)
   const modelType = useStore(s => s.params.model_type)
+  const workspace = useStore(s => s.activeWorkspace)
+  const studioUnobscured = useStore(s => !s.settingsOpen && !s.dashboardOpen)
   const openLoraBrowser = useStore(s => s.setLoraBrowserOpen)
   const isMobile = useIsMobile()
 
@@ -94,6 +97,16 @@ export function Sidebar() {
     setToolsCollapsed(collapsed)
     window.localStorage.setItem('hocuspocus-tools-sidebar-collapsed', String(collapsed))
   }
+
+  useEffect(() => {
+    const openImageSubmission = () => {
+      setToolsCollapsed(false)
+      window.localStorage.setItem('hocuspocus-tools-sidebar-collapsed', 'false')
+      setSidebarOpen(true)
+    }
+    window.addEventListener('hocuspocus:studio-image-open', openImageSubmission)
+    return () => window.removeEventListener('hocuspocus:studio-image-open', openImageSubmission)
+  }, [setSidebarOpen])
 
   useEffect(() => {
     const openStudio = () => {
@@ -235,6 +248,13 @@ export function Sidebar() {
 
         {/* Prompt area (non-edit modes, skip for SFX/Mixer/Music which have their own UI) */}
         {!isEdit && !(isAudio && (audioSubMode === 'sfx' || audioSubMode === 'mixer' || audioSubMode === 'music')) && (isMultiClip ? <MultiClipEditor /> : <PromptInput />)}
+        {isImage && <Suspense fallback={null}><StudioImageCommandPanel workspace={workspace || 'default'} model={String(modelType)}
+          visible={studioUnobscured && (!isMobile || sidebarOpen)} onRecovered={async receipt => {
+            await useStore.getState().reconnectJobs()
+            if (useStore.getState().activeWorkspace === receipt.result.workspace) {
+              await useStore.getState().maybeRefreshGallery()
+            }
+          }} /></Suspense>}
 
         {/* Video: reference images below prompt. In Frames mode the InputsPanel
             renders them as ordered tiles instead. */}

@@ -60,7 +60,8 @@ export function GenerateButton() {
   const handleClick = async () => {
     if (blocked || !await checkBeforeGenerate()) return
     setCooldown(true)
-    startGeneration(undefined, newUserGenerationContext())
+    const submitted = startGeneration(undefined, newUserGenerationContext())
+    if (generationMode === 'image') await submitted
     setSidebarOpen(false)
   }
 

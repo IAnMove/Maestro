@@ -925,5 +925,18 @@
       "exampleTitle": "Ejemplo de instrucción",
       "example": "Sustituye al personaje de la imagen 1 por la persona de la imagen 2. Conserva la pose, el fondo, la cámara, el encuadre y las proporciones de la imagen 1."
     }
+  },
+  "commands": {
+    "prepared": "Solicitud de imagen preparada",
+    "admitted": "Imagen en cola · {{id}}",
+    "admittedNotVisible": "La tarea de imagen {{id}} está admitida. Abre Studio o Actividad para seguirla.",
+    "pending": "Una solicitud anterior necesita recuperación",
+    "recover": "Recuperar esta solicitud",
+    "resources": "{{references}} referencias · {{loras}} LoRAs",
+    "contextChanged": "El formulario de imagen cambió antes del envío. Revisa los ajustes actuales y vuelve a intentarlo.",
+    "panelUnavailable": "No se pudo mostrar la solicitud de imagen. Abre Studio y vuelve a intentarlo.",
+    "pendingInvalid": "No se pudo leer la solicitud guardada. Se ha conservado para recuperarla.",
+    "referenceFailed": "No se pudo preparar una referencia seleccionada. No se ha enviado ninguna imagen.",
+    "conflictingGuides": "Hay guías de imagen distintas seleccionadas. Elige una imagen de control y una máscara antes de generar."
   }
 }

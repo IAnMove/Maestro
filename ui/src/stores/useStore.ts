@@ -36,6 +36,8 @@ import {
   type GenerationSubmissionContext,
 } from '../features/studio/generationProvenance'
 import { storyDirectorSubmissionProvenance } from '../features/stories/provenance'
+import type { ImageGenerationReceipt } from '../api/imageGenerationCommands'
+import { prepareStudioSubmission, studioUploadReference } from '../features/studio/studioSubmission'
 
 const DASHBOARD_PIPELINE_PAGE_SIZE = 8
 const CIVIT_DOWNLOAD_POLL_MS = 2000
@@ -1518,7 +1520,7 @@ export interface AppState extends LlmSlice, StudioConfigurationSlice {
   startGeneration: (
     scheduledPrompt?: ScheduledPromptSubmission,
     submissionContext?: GenerationSubmissionContext,
-  ) => Promise<void>
+  ) => Promise<void | ImageGenerationReceipt>
   stopGeneration: (jobId?: string) => void
   dismissJob: (jobId: string) => void
   reconnectJobs: () => Promise<void>
@@ -4723,6 +4725,7 @@ export const useStore = create<AppState>((set, get) => {
     }
 
     const params: Record<string, unknown> = { ...state.params, ...viggleEditingParameters(state), generation_mode: state.generationMode, workspace: state.activeWorkspace }
+    const referenceUploadErrors: string[] = []
     const provenance = generationProvenancePayload(submissionContext)
     if (provenance) params.provenance = provenance
     if (scheduledPrompt) {
@@ -4999,10 +5002,6 @@ export const useStore = create<AppState>((set, get) => {
     if (state.generationMode === 'image') {
       params.video_length = 1
       params.image_mode = 1
-      // WanGP expects control input in image_guide (not video_guide) for image mode
-      if (params.video_guide && !params.image_guide) {
-        params.image_guide = params.video_guide
-      }
     }
 
     // Audio mode: branch by sub-mode (Speech/Music vs SFX)
@@ -5257,10 +5256,11 @@ export const useStore = create<AppState>((set, get) => {
     if (!isOmniReference && state.endImage) {
       try {
         const result = await api.uploadImage(state.endImage)
-        params.image_end = result.path
+        params.image_end = studioUploadReference(result, state.generationMode)
         const ipt = (params.image_prompt_type as string) || ''
         if (!ipt.includes('E')) params.image_prompt_type = ipt + 'E'
       } catch (e) {
+        referenceUploadErrors.push(String(e))
         console.error('Failed to upload end image:', e)
       }
     } else if (params.image_end) {
@@ -5334,8 +5334,9 @@ export const useStore = create<AppState>((set, get) => {
       for (const file of state.imageRefs) {
         try {
           const result = await api.uploadImage(file)
-          refPaths.push(result.path)
+          refPaths.push(studioUploadReference(result, state.generationMode))
         } catch (e) {
+          referenceUploadErrors.push(String(e))
           console.error('Failed to upload reference image:', e)
         }
       }
@@ -5452,6 +5453,7 @@ export const useStore = create<AppState>((set, get) => {
       delete params.h3_window_plan
     }
 
+    const submission = await prepareStudioSubmission(params, state, get, submissionContext, referenceUploadErrors)
     const newJob: GenerationJob = {
       id: '',
       status: 'queued',
@@ -5466,7 +5468,7 @@ export const useStore = create<AppState>((set, get) => {
       error: null,
       createdAt: Date.now(),
       oomInfo: null,
-      generationDetails: _generationDetailsFromParams(params, state.models),
+      generationDetails: _generationDetailsFromParams(submission.params, state.models),
     }
 
     set(s => {
@@ -5474,7 +5476,7 @@ export const useStore = create<AppState>((set, get) => {
     })
 
     try {
-      const { job_id, task_id, root_task_id, h3_window_plan } = await api.submitGeneration(params)
+      const { job_id, task_id, root_task_id, h3_window_plan } = await submission.submit()
 
       if (h3_window_plan) {
         const planFps = state.modelOptions?.fps ?? 24
@@ -5553,7 +5555,7 @@ export const useStore = create<AppState>((set, get) => {
           console.error('Status poll error:', e)
         }
       }, 2000)
-
+      return submission.receipt
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Generation failed'
       // Submit itself failed (pre-queue). Convert the placeholder to a failed

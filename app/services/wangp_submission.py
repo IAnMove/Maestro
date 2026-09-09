@@ -20,7 +20,7 @@ class JsonRequest:
         return deepcopy(self.payload)
 
 
-def prepare_generation_inputs(body, model_def, workspace, *, uploads_dir, workspace_dir):
+def prepare_generation_inputs(body, model_def, workspace, *, uploads_dir, workspace_dir, prepared_images=False):
     """Validate processor options and resolve new-family media before admission."""
     canonical_refs = body.pop('canonical_image_refs', False)
     if canonical_refs:
@@ -39,9 +39,15 @@ def prepare_generation_inputs(body, model_def, workspace, *, uploads_dir, worksp
         body['wangp_processor_settings'] = validated_settings(body.get('spatial_upsampling', ''), body.get('wangp_processor_settings'))
     if not model_def.get('wangp_1272'):
         return
+    if prepared_images and (not model_def.get('image_outputs') or body.get('image_mode') != 1):
+        raise ValueError('Prepared image inputs require an image generation request')
     def resolve(value):
         return resolve_wangp_media(value, workspace, uploads_dir=uploads_dir, workspace_dir=workspace_dir)
     for field in ('video_guide', 'video_guide2', 'video_mask', 'audio_guide', 'audio_guide2', 'image_start', 'image_end', 'image_refs'):
+        if prepared_images and field in ('image_start', 'image_end', 'image_refs'):
+            # Only the in-process Studio command adapter supplies this flag.
+            # Those exact paths were resolved against each source workspace.
+            continue
         values = body.get(field)
         if values:
             body[field] = [resolve(value) for value in values] if isinstance(values, list) else resolve(values)

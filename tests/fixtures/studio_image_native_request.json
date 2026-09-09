@@ -1,0 +1,38 @@
+{
+  "prompt": "Taller de luz ámbar — mañana\n第二行: café crème\nlinea final — conserva literalmente esta composición",
+  "model_type": "flux2_klein_9b",
+  "resolution": "672x672",
+  "video_length": 1,
+  "num_inference_steps": 1,
+  "guidance_scale": 1,
+  "seed": 424242,
+  "image_mode": 1,
+  "negative_prompt": "borroso\nнизкое качество — do not rewrite",
+  "repeat_generation": 1,
+  "activated_loras": [],
+  "loras_multipliers": "",
+  "settings_version": 2.52,
+  "flow_shift": 5,
+  "embedded_guidance_scale": 1,
+  "guidance_phases": 1,
+  "sliding_window_size": 80,
+  "sliding_window_overlap": 5,
+  "sliding_window_discard_last_frames": 0,
+  "minimax_h3_turbo_mode": false,
+  "generation_mode": "image",
+  "workspace": "studio-fixture-workspace",
+  "provenance": {
+    "actor": "user",
+    "tool": "studio",
+    "capability": "start_generation",
+    "command": {
+      "command_id": "captured-native-studio-intent"
+    }
+  },
+  "image_refs": [
+    "/api/v1/uploads/captured-reference-one.jpg",
+    "/api/v1/uploads/captured-reference-two.jpg"
+  ],
+  "remove_background_images_ref": 0,
+  "video_prompt_type": "KI"
+}
