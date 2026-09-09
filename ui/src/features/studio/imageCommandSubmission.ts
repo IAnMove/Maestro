@@ -1,13 +1,13 @@
 import * as api from '../../api/client'
 import { BASE } from '../../api/http'
 import { stableSerialize } from '../../lib/commandContract'
-import type { useStore } from '../../stores/useStore'
+import type { AppState } from '../../stores/useStore'
 import type { GenerationSubmissionContext } from './generationProvenance'
 import type { ImageGenerationReceipt } from '../../api/imageGenerationCommands'
 import { finishStudioImageCommand, presentStudioImageCommand } from './imageCommandPresentation'
 import i18n from '../../i18n'
 
-type StudioState = ReturnType<typeof useStore.getState>
+type StudioState = AppState
 type NativeReceipt = Awaited<ReturnType<typeof api.submitGeneration>>
 interface Submission {
   params: Record<string, unknown>
@@ -52,9 +52,17 @@ async function canonicalReferences(params: Record<string, unknown>): Promise<voi
   }
 }
 
-/** Keep normal image reference uploads canonical while legacy modes retain paths. */
-export function studioUploadReference(upload: { path: string; url: string }, mode: string): string {
-  return mode === 'image' ? upload.url : upload.path
+/** Bind legacy form field names without discarding conflicting image inputs. */
+export function translateLegacyImageGuides(params: Record<string, unknown>): void {
+  for (const [legacy, canonical] of [['video_guide', 'image_guide'], ['video_mask', 'image_mask']]) {
+    const value = params[legacy]
+    if (!value) continue
+    if (params[canonical] && stableSerialize(params[canonical]) !== stableSerialize(value)) {
+      throw new Error(i18n.t('studio:commands.conflictingGuides'))
+    }
+    params[canonical] = value
+    delete params[legacy]
+  }
 }
 
 /** Called after the complete native form builder; never reduces its parameters. */
@@ -69,6 +77,7 @@ export async function prepareStudioSubmission(
       await import('../../api/imageGenerationCommands')
     if (referenceErrors.length) throw new Error(i18n.t('studio:commands.referenceFailed'))
     snapshot = JSON.parse(stableSerialize(params)) as Record<string, unknown>
+    translateLegacyImageGuides(snapshot)
     assertSameForm(before, current())
     await canonicalReferences(snapshot)
     assertSameForm(before, current())

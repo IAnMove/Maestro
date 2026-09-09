@@ -371,6 +371,7 @@ export function createDefaultApplicationAdapters(): WizardApplicationAdapters {
           state: 'queued',
           message: presented.message,
           target: presented.target,
+          metadata: presented.metadata,
           taskId,
           recoverable: true,
           executionKey: executionKey({

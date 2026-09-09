@@ -37,6 +37,7 @@ import {
 } from '../features/studio/generationProvenance'
 import { storyDirectorSubmissionProvenance } from '../features/stories/provenance'
 import type { ImageGenerationReceipt } from '../api/imageGenerationCommands'
+import { prepareStudioSubmission, studioUploadReference } from '../features/studio/studioSubmission'
 
 const DASHBOARD_PIPELINE_PAGE_SIZE = 8
 const CIVIT_DOWNLOAD_POLL_MS = 2000
@@ -5001,10 +5002,6 @@ export const useStore = create<AppState>((set, get) => {
     if (state.generationMode === 'image') {
       params.video_length = 1
       params.image_mode = 1
-      // WanGP expects control input in image_guide (not video_guide) for image mode
-      if (params.video_guide && !params.image_guide) {
-        params.image_guide = params.video_guide
-      }
     }
 
     // Audio mode: branch by sub-mode (Speech/Music vs SFX)
@@ -5256,7 +5253,6 @@ export const useStore = create<AppState>((set, get) => {
       if (!ipt.includes('S')) params.image_prompt_type = 'S' + ipt
       if (params.input_video_strength == null) params.input_video_strength = _defaultIVS
     }
-    const { prepareStudioSubmission, studioUploadReference } = await import('../features/studio/imageCommandSubmission')
     if (!isOmniReference && state.endImage) {
       try {
         const result = await api.uploadImage(state.endImage)

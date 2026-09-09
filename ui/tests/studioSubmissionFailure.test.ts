@@ -1,0 +1,72 @@
+import assert from 'node:assert/strict'
+import test from 'node:test'
+import { prepareStudioSubmission } from '../src/features/studio/studioSubmission.ts'
+import { prepareStudioSubmission as prepareImage, translateLegacyImageGuides } from '../src/features/studio/imageCommandSubmission.ts'
+
+const originalFetch = globalThis.fetch
+test.afterEach(() => { globalThis.fetch = originalFetch })
+
+function state(mode: string, params: Record<string, unknown>) {
+  return { generationMode: mode, params, activeWorkspace: 'command-qa', imageRefs: [] } as Parameters<typeof prepareStudioSubmission>[1]
+}
+
+test('a missing image chunk produces a failed submission for the existing job error path', async () => {
+  const params = { prompt: 'Keep my request', workspace: 'command-qa' }
+  const before = state('image', params)
+  const failure = new Error('Failed to fetch dynamically imported module')
+  let requests = 0
+  globalThis.fetch = async () => { requests += 1; throw new Error('Unexpected POST') }
+  const submission = await prepareStudioSubmission(params, before, () => before, undefined, [], async () => { throw failure })
+  assert.deepEqual(submission.params, params)
+  await assert.rejects(submission.submit, error => error === failure)
+  assert.equal(requests, 0)
+})
+
+for (const mode of ['audio', 'video']) {
+  test(`${mode} submits through its native API without loading image code`, async () => {
+    const params = { prompt: 'literal\nsecond line', generation_mode: mode, workspace: 'command-qa' }
+    const before = state(mode, params)
+    let loads = 0
+    let sent: unknown
+    globalThis.fetch = async (_url, options) => {
+      sent = JSON.parse(String(options?.body))
+      return new Response(JSON.stringify({ job_id: 'native-job', status: 'queued' }), { status: 200 })
+    }
+    const submission = await prepareStudioSubmission(params, before, () => before, undefined, [], async () => {
+      loads += 1
+      throw new Error('Image chunk unavailable')
+    })
+    const result = await submission.submit()
+    assert.equal(result.job_id, 'native-job')
+    assert.equal(loads, 0)
+    assert.deepEqual(sent, params)
+  })
+}
+
+test('legacy image control and mask fields are translated in the detached V2 snapshot', async () => {
+  const params = { workspace: 'command-qa', prompt: 'Use this control image literally', model_type: 'pi_flux2',
+    resolution: '512x512', num_inference_steps: 4, seed: 42, guidance_scale: 1,
+    video_guide: '/api/v1/uploads/control.png', video_mask: '/api/v1/uploads/mask.png', video_prompt_type: 'VA' }
+  const before = state('image', params)
+  let resolutions = 0
+  globalThis.fetch = async (url, options) => {
+    assert.match(String(url), /generation\/commands\/references$/)
+    resolutions += 1
+    const body = JSON.parse(String(options?.body))
+    return new Response(JSON.stringify({ references: body.references }), { status: 200 })
+  }
+  const submission = await prepareImage(params, before, () => before)
+  assert.equal(submission.params.image_guide, params.video_guide)
+  assert.equal(submission.params.image_mask, params.video_mask)
+  assert.equal(submission.params.video_guide, undefined)
+  assert.equal(submission.params.video_mask, undefined)
+  assert.equal(params.video_guide, '/api/v1/uploads/control.png')
+  assert.equal(resolutions, 1)
+})
+
+test('two different legacy and image guides fail instead of silently discarding one', () => {
+  const params = { video_guide: '/api/v1/uploads/one.png', image_guide: '/api/v1/uploads/two.png' }
+  assert.throws(() => translateLegacyImageGuides(params))
+  assert.equal(params.video_guide, '/api/v1/uploads/one.png')
+  assert.equal(params.image_guide, '/api/v1/uploads/two.png')
+})

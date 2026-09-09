@@ -936,6 +936,7 @@
     "contextChanged": "The image form changed before submission. Review the current settings and try again.",
     "panelUnavailable": "The image request could not be shown. Open Studio and try again.",
     "pendingInvalid": "The saved submission could not be read. It has been preserved for recovery.",
-    "referenceFailed": "A selected reference could not be prepared. No image was submitted."
+    "referenceFailed": "A selected reference could not be prepared. No image was submitted.",
+    "conflictingGuides": "Conflicting image guides are selected. Choose one control image and mask before generating."
   }
 }
