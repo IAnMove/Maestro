@@ -152,6 +152,7 @@ class ImageGenerationCommands:
                 frozen, trusted_tool, submission_context)}, trusted_tool=trusted_tool)
             request.prepared_studio_images = command["operation"] == "generation.image" and command["version"] == 2
             request.prepared_studio_speech = command["operation"] == "generation.speech"
+            request.prepared_studio_audio = command["operation"] == "generation.music"
             # This callback is an in-process capability, never a JSON option.
             # The native facade performs its ordinary validation first and then
             # transfers admission to the same canonical task/worker adapter.

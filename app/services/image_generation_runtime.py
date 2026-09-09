@@ -65,23 +65,32 @@ def create_image_generation_commands(runtime):
             validate_processors=processors.validate_selection, processor_settings=processors.validated_settings,
         )
 
-    def speech_operation():
+    def audio_operation(freeze_spec, prepare_audio, catalog):
         from services.native_generation_operation import NativeGenerationOperation
-        from services.studio_speech_spec import freeze_studio_speech_spec
-        from services.studio_speech_preparation import prepare_studio_speech
-        from routers.studio_speech_commands import speech_command_catalog
 
         def freeze(command):
-            frozen = freeze_studio_speech_spec(command)
+            frozen = freeze_spec(command)
             effective = frozen["effective"]["input"]
             return frozen, {**deepcopy(effective["params"]), "workspace": effective["workspace"]}
 
         def prepare(params):
-            return prepare_studio_speech(params, model_definition=runtime["wgp"].get_model_def,
-                                         model_downloaded=runtime["_check_model_downloaded"],
-                                         resources=resources("audio"), execution_policy=execution_policy)
+            return prepare_audio(params, model_definition=runtime["wgp"].get_model_def,
+                                 model_downloaded=runtime["_check_model_downloaded"],
+                                 resources=resources("audio"), execution_policy=execution_policy)
 
-        return NativeGenerationOperation(freeze=freeze, prepare=prepare, catalog=speech_command_catalog())
+        return NativeGenerationOperation(freeze=freeze, prepare=prepare, catalog=catalog())
+
+    from services.studio_speech_spec import freeze_studio_speech_spec
+    from services.studio_speech_preparation import prepare_studio_speech
+    from routers.studio_speech_commands import speech_command_catalog
+    from services.studio_music_spec import freeze_studio_music_spec
+    from services.studio_music_preparation import prepare_studio_music
+    from routers.studio_music_commands import music_command_catalog
+
+    operations = {
+        "generation.speech": audio_operation(freeze_studio_speech_spec, prepare_studio_speech, speech_command_catalog),
+        "generation.music": audio_operation(freeze_studio_music_spec, prepare_studio_music, music_command_catalog),
+    }
 
     operations = {"generation.speech": speech_operation()}
     if callable(runtime.get("tools_upscale")) and callable(runtime.get("_run_tool_upscale")):
