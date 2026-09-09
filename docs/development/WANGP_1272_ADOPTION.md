@@ -114,6 +114,18 @@ servidor. Un cliente compatible con Streamable HTTP puede usar
 `/api/v1/wangp/mcp` con cabecera `Authorization: Bearer <token>`; el token no se
 guarda en el repositorio. El protocolo implementado es `2025-03-26`.
 
+Las nuevas llamadas a `tools/call` de `generate` deben incluir un
+`params.generation_mode` explícito: `image`, `video`, `audio` o `avatar`. No se
+infiere el modo desde `image_mode`. El campo nativo opcional debe ser un entero
+no negativo y coherente con el modo: `image` requiere un valor mayor que cero,
+y los demás modos requieren `0`. Si falta, el adaptador añade `image_mode=1`
+para `image` y `image_mode=0` para los demás modos antes de invocar WanGP.
+`model3d` tiene su propio endpoint `/api/v1/model3d/generate`. El diario
+comprueba primero un `request_id` ya existente, por lo que los replays
+históricos sin ese campo siguen devolviendo su recibo, mientras que una
+admisión nueva inválida no consume el ID. Su digest conserva los `params`
+originales, antes de añadir defaults nativos o provenance.
+
 | Herramientas MCP | Servicio reutilizado |
 | --- | --- |
 | `models`, `processors` | Catálogos y opciones reales del motor |
