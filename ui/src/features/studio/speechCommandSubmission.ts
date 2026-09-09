@@ -3,6 +3,7 @@ import { canonicalAudioReferences } from './audioCommandReferences'
 import { stableSerialize } from '../../lib/commandContract'
 import type { AppState } from '../../stores/useStore'
 import type { GenerationSubmissionContext } from './generationProvenance'
+import { neutralizeSfxOwnedFormFields } from './sfxFormResidue'
 import {
   createStudioSpeechGenerationCommand,
   projectStudioSpeechFormParams,
@@ -96,7 +97,9 @@ export async function prepareStudioSpeechSubmission(
     // known video/H3 controls alongside the speech fields. Project only that
     // explicit form residue; the command builder remains closed for direct
     // Wizard/MCP envelopes and rejects every other unknown key.
-    snapshotParams = projectStudioSpeechFormParams(snapshotParams).params
+    snapshotParams = projectStudioSpeechFormParams(
+      neutralizeSfxOwnedFormFields(snapshotParams),
+    ).params
     assertSameSpeechForm(before, current())
     await canonicalAudioReferences(snapshotParams)
     assertSameSpeechForm(before, current())
