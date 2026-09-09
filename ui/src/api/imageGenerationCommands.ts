@@ -234,6 +234,10 @@ function retainPending(command: ImageGenerationCommand, done = false): boolean {
   return existing != null
 }
 
+function forgetPending(command: ImageGenerationCommand): void {
+  try { retainPending(command, true) } catch { /* A cleanup failure must not hide a confirmed server result. */ }
+}
+
 export function newImageGenerationIntentId(): string {
   return globalThis.crypto?.randomUUID?.()
     || `image-${Date.now()}-${Math.random().toString(36).slice(2)}`
@@ -339,12 +343,18 @@ function validTaskResult(value: unknown, workspace: string, taskIds: unknown[]):
     && value.workspace === workspace && value.status === 'queued'
 }
 
+function receiptReplay(value: Record<string, unknown>, command: ReceiptContext, fallback?: boolean): boolean | undefined {
+  if ('replayed' in value && typeof value.replayed !== 'boolean') throw invalidReceipt(command)
+  return typeof value.replayed === 'boolean' ? value.replayed : fallback
+}
+
 function validateReceipt(
   value: unknown,
   command: ReceiptContext,
   replayed?: boolean,
 ): ImageGenerationReceipt {
   if (!isRecord(value)) throw invalidReceipt(command)
+  const outerReplayed = receiptReplay(value, command, replayed)
   const result = value.result
   const taskIds = value.taskIds
   if (value.version !== IMAGE_GENERATION_SCHEMA_VERSION
@@ -355,8 +365,7 @@ function validateReceipt(
     || !Array.isArray(value.artifacts)
     || !Array.isArray(taskIds)
     || !Array.isArray(value.pipelineIds)
-    || !validTaskResult(result, command.input.workspace, taskIds)
-    || ('replayed' in value && typeof value.replayed !== 'boolean')) {
+    || !validTaskResult(result, command.input.workspace, taskIds)) {
     throw invalidReceipt(command)
   }
   const receipt: ImageGenerationReceipt = {
@@ -370,7 +379,6 @@ function validateReceipt(
     pipelineIds: [...value.pipelineIds] as string[],
     result: JSON.parse(stableSerialize(result)) as ImageGenerationTaskResult,
   }
-  const outerReplayed = typeof value.replayed === 'boolean' ? value.replayed : replayed
   if (outerReplayed !== undefined) receipt.replayed = outerReplayed
   return receipt
 }
@@ -429,7 +437,7 @@ export async function submitImageGenerationCommand(
     if (envelope.malformed) throw invalidReceipt(snapshot)
     const receipt = validateReceipt(envelope.receipt, snapshot, envelope.replayed)
     // A committed receipt is returned even if best-effort local cleanup fails.
-    try { retainPending(snapshot, true) } catch { /* Receipt remains the recovery authority. */ }
+    forgetPending(snapshot)
     return receipt
   } catch (error) {
     const commandError = error instanceof ImageGenerationCommandError
@@ -445,7 +453,7 @@ export async function submitImageGenerationCommand(
     // preserve it, including a 401 after a timeout or lost response.
     if (!recovering && commandError.status !== undefined
       && commandError.status >= 400 && commandError.status < 500) {
-      try { retainPending(snapshot, true) } catch { /* Best effort only. */ }
+      forgetPending(snapshot)
     }
     throw new ImageGenerationCommandError(
       commandError.message,

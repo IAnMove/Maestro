@@ -285,7 +285,7 @@ test('a valid committed receipt is returned even when local cleanup fails', { co
 })
 
 test('receipt query uses exact workspace and intention and recovers the POST wrapper', { concurrency: false }, async () => {
-  const value = command('intent / recovery', 'workspace A')
+  const value = command('intent / recovery', 'workspace_A')
   globalThis.fetch = (async () => { throw new Error('lost POST response') }) as typeof fetch
   await assert.rejects(submitImageGenerationCommand(value))
 
@@ -299,7 +299,7 @@ test('receipt query uses exact workspace and intention and recovers the POST wra
 
   assert.equal(
     requestUrl,
-    '/api/v1/generation/commands/receipt?workspace=workspace%20A&intent_id=intent%20%2F%20recovery',
+    '/api/v1/generation/commands/receipt?workspace=workspace_A&intent_id=intent%20%2F%20recovery',
   )
   assert.equal(recovered.commandId, value.intent_id)
   assert.equal(recovered.result.workspace, value.input.workspace)

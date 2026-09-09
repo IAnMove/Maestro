@@ -150,7 +150,7 @@ class ImageGenerationCommands:
             registry = self._registry(workspace)
             for entry in registry.command_recovery_candidates():
                 task = registry.get(entry["task_id"])
-                if task["backend_job_id"] in active:
+                if not task or task["status"] != "interrupted" or task["backend_job_id"] in active:
                     continue
                 runtime = entry["effective"]["runtime"]
                 # No model preflight: recovering the editable request must also
