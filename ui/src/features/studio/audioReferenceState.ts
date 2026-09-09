@@ -4,6 +4,10 @@ import type { AudioSubMode } from '../../types'
 const referenceKeys = [
   'audio_prompt_type', 'audio_source',
   'audio_guide', 'audio_guide2', 'audio_guide3', 'audio_guide4', 'audio_guide5', 'audio_guide6',
+  // SFX video replacement is a per-tab reference. Leaving it in the shared
+  // form after SFX → Speech/Music blocks those commands (active residual /
+  // catalog enum) or silently reconditions a later text-only SFX submit.
+  'video_guide',
   '_tts_original_prompt', '_tts_voice_count',
   '_tts_speaker_name1', '_tts_speaker_name2', '_tts_speaker_name3',
   '_tts_speaker_name4', '_tts_speaker_name5', '_tts_speaker_name6',
