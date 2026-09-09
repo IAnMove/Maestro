@@ -52,6 +52,8 @@ const AGENT_ACTIONS_IMPORTS = [
   './toolCapabilities',
   './videoEditorActions',
   './wizardContext',
+  // Pure validation/result formatting; no store, transport or execution port.
+  './wizardTurnReport',
 ]
 
 const LAB_ACTIONS_IMPORTS = [

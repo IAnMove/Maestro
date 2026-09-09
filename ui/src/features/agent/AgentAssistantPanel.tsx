@@ -492,7 +492,7 @@ export function AgentAssistantPanel({ workspace, tasks, onClose, embedded = fals
         id: newId(),
         role: 'assistant',
         text: formatWizardTurnReply({ ...turn, reply: humanReply(turn.reply || '') }, results,
-          (key, options) => String(t(key, options)), question),
+          (key, options) => String(t(key, { defaultValue: key, ...options })), question),
         createdAt: Date.now(),
         language: turn.conversationLanguage || undefined,
         mediaEvidence,

@@ -44,7 +44,10 @@ type Translate = (key: string, options?: Record<string, unknown>) => string
 /** Conservative presentation policy, not an authorization or execution classifier. */
 function allowsExplanation(request: string): boolean {
   const text = request.trim().replace(/^[¿¡]+/, '')
-  return /^(?:(?:please|por favor)[,\s]+)?(?:how\b|what\b|which\b|why\b|where\b|explain\b|describe\b|tell me (?:about|how|what|why)\b|(?:can|could) you (?:explain|describe)\b|c[oó]mo\b|qu[eé]\b|cu[aá]l\b|por qu[eé]\b|d[oó]nde\b|explica(?:me|rme)?\b|describe\b|descr[ií]beme\b|(?:puedes|podr[ií]as) explica(?:r|rme)\b|hola\b|hello\b|hi\b|gracias\b|thanks\b)/i.test(text)
+  if (/^(?:hola|hello|hi|gracias|thanks)[\s!.]*$/i.test(text)) return true
+  // An informational prefix does not erase a later imperative in a mixed turn.
+  if (/(?:[,;.!?\n]|\b(?:and|then|also|y|luego|despu[eé]s))\s*(?:(?:please|por favor)[,\s]+)?(?:create|generate|make|update|delete|remove|add|save|export|start|retry|run|open|select|crea\w*|genera\w*|haz\w*|actualiza\w*|elimina\w*|borra\w*|a[nñ]ade\w*|guarda\w*|exporta\w*|inicia\w*|reintenta\w*|ejecuta\w*|abre|selecciona\w*)\b/i.test(text)) return false
+  return /^(?:(?:please|por favor)[,\s]+)?(?:how\b|what\b|which\b|why\b|where\b|explain\b|describe\b|tell me (?:about|how|what|why)\b|(?:can|could) you (?:explain|describe)\b|c[oó]mo\b|qu[eé]\b|cu[aá]l\b|por qu[eé]\b|d[oó]nde\b|explica(?:me|rme)?\b|describe\b|descr[ií]beme\b|(?:puedes|podr[ií]as) explica(?:r|rme)\b)/i.test(text)
 }
 
 export function wizardResultState(result: AgentActionResult) {
@@ -79,9 +82,9 @@ export function wizardTurnVisualState(turn: AgentTurn, results: AgentActionResul
 }
 
 /** Free-form model prose cannot certify the result of an action-bearing turn. */
-export function formatWizardTurnReply(turn: AgentTurn, results: AgentActionResult[], t: Translate, request?: string): string {
+export function formatWizardTurnReply(turn: AgentTurn, results: AgentActionResult[], t: Translate, request = ''): string {
   const hasActions = Boolean(turn.actions.length || results.length || turn.rejections?.length)
-  const explanation = !hasActions && (request === undefined || allowsExplanation(request))
+  const explanation = !hasActions && allowsExplanation(request)
   const paragraphs: string[] = []
   if (explanation && turn.reply) paragraphs.push(turn.reply)
   if (results.length) {

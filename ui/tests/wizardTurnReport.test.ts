@@ -107,7 +107,10 @@ test('informational conversation is preserved while navigation requires its own 
 test('empty and omitted actions never claim creation in response to an action request', () => {
   for (const payload of [{ actions: [] }, {}]) {
     const turn = parseAgentTurn(JSON.stringify({ reply: 'Created invented-999.', ...payload }))
-    for (const request of ['Create Nightwatch using my settings.', 'Can you create a collection?', 'Crea un proyecto Nightwatch.']) {
+    for (const request of ['Create Nightwatch using my settings.', 'Can you create a collection?', 'Crea un proyecto Nightwatch.',
+      'Hola, crea un proyecto Nightwatch.', 'Hi, create Nightwatch.',
+      'Can you explain collections and create Nightwatch?', 'What are collections? Create one named Nightwatch.',
+      'Explica las colecciones y crea Nightwatch.', '']) {
       const reply = formatWizardTurnReply(turn, [], t, request)
       assert.match(reply, /No action was executed/)
       assert.doesNotMatch(reply, /invented-999|Created/)
