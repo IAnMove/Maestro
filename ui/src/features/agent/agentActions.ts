@@ -1979,13 +1979,14 @@ export function isExplicitImageGenerationRequest(request: string): boolean {
 }
 
 const EXPLICIT_AUDIO_GENERATION_REQUESTS = [
-  /\b(?:gen[eé]ra(?:la|lo|r|d|me)?|crea(?:la|lo|r|d|me)?|lanza(?:la|lo|r|d)?|encola(?:la|lo|r|d)?)\b[^.!?\n]{0,120}\b(?:audio|canci[oó]n|m[uú]sica|voz|speech)\b/i,
-  /\b(?:make|create|generate|render|queue|start|launch)\b[^.!?\n]{0,120}\b(?:audio|song|music|voice|speech|track)\b/i,
+  /\b(?:gen[eé]ra(?:la|lo|r|d|me)?|crea(?:la|lo|r|d|me)?|lanza(?:la|lo|r|d)?|encola(?:la|lo|r|d)?|ejec[uú]ta(?:la|lo|r|d|me)?)\b[^.!?\n]{0,120}\b(?:audio|canci[oó]n|m[uú]sica|voz|speech)\b/i,
+  /\b(?:make|create|generate|render|queue|start|launch|run|execute)\b[^.!?\n]{0,120}\b(?:audio|song|music|voice|speech|track)\b/i,
   /\b(?:audio|canci[oó]n|m[uú]sica|voz|speech)\b[^.!?\n]{0,160}\b(?:gen[eé]ra(?:la|lo|r|d|me)?|l[aá]nza(?:la|lo|r|d)?|enc[oó]la(?:la|lo|r|d)?)\b/i,
-  /\b(?:audio|song|music|voice|speech|track)\b[^.!?\n]{0,160}\b(?:make|create|generate|render|queue|start|launch)\b/i,
+  /\b(?:audio|song|music|voice|speech|track)\b[^.!?\n]{0,160}\b(?:make|create|generate|render|queue|start|launch|run|execute)\b/i,
 ]
 const STUDIO_AUDIO_CONTEXT = [
-  /\bstudio\s*(?:(?:→|->|›|\/|-)\s*)?audio\b/i,
+  /\bstudio\s*(?:(?:→|->|›|\/|-)\s*)?(?:audio|music|m[uú]sica)\b/i,
+  /\b(?:audio|song|music|voice|speech|canci[oó]n|m[uú]sica|voz)\b[^.!?\n]{0,80}\b(?:in|from|through|en|del|de)\s+(?:the\s+|el\s+|la\s+)?studio\b/i,
   /\baudio\s+(?:de|del|en)\s+studio\b/i,
   /\b(?:pestaña|tab|secci[oó]n|modo|panel|formulario)\s+(?:de\s+)?audio\b/i,
 ]
