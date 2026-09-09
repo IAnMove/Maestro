@@ -130,6 +130,17 @@ export interface AgentPrepareAudioAction extends AgentLanguageAwareAction {
   modelType?: string
   durationSeconds?: number
   negativePrompt?: string
+  /** ACE-Step Music Caption (style/genre/instruments), kept verbatim. */
+  altPrompt?: string
+  /** Visible Music description, persisted separately from lyrics. */
+  musicDescription?: string
+  /** Whether the Music form is explicitly instrumental. */
+  musicInstrumental?: boolean
+  seed?: number
+  inferenceSteps?: number
+  guidanceScale?: number
+  /** Music native generation currently admits one output per command. */
+  outputCount?: number
 }
 
 export interface AgentDownloadModelAction {
@@ -912,6 +923,11 @@ const cleanString = (value: unknown, maxLength: number): string => (
   typeof value === 'string' ? value.trim().slice(0, maxLength) : ''
 )
 
+/** Preserve authored text; callers validate blankness separately. */
+const literalString = (value: unknown, maxLength: number): string | undefined => (
+  typeof value === 'string' && value.length <= maxLength ? value : undefined
+)
+
 function canonicalActionType(value: unknown): string {
   const raw = cleanString(value, 40)
   const collapsed = raw.toLowerCase().replace(/[^a-z0-9]/g, '')
@@ -927,6 +943,19 @@ const optionalNumber = (
   if (typeof value !== 'number' || !Number.isFinite(value)) return undefined
   const bounded = Math.max(minimum, Math.min(maximum, value))
   return integer ? Math.round(bounded) : bounded
+}
+
+/** Validate a Music control without silently changing the requested value. */
+const strictNumber = (
+  value: unknown,
+  minimum: number,
+  maximum: number,
+  integer = false,
+): number | undefined => {
+  if (value === undefined) return undefined
+  if (typeof value !== 'number' || !Number.isFinite(value)) return undefined
+  if (value < minimum || value > maximum || (integer && !Number.isInteger(value))) return undefined
+  return value
 }
 
 const optionalPositiveNumber = (
@@ -1021,7 +1050,7 @@ const CANONICAL_FIELD_NAMES = [
   'scene_name', 'layer_name', 'audio_output_name', 'videoclip_name', 'cue_source', 'rhythm_profile', 'intensity',
   'confirm', 'characters', 'locations', 'outline_beats', 'story_visual_selections', 'story_visual_scope', 'target_names',
   'target_kind', 'target_name', 'asset_name', 'primary',
-  'audio_sub_mode', 'sfx_clips', 'name', 'preset', 'comic_panels', 'comic_pages', 'caption', 'stage', 'image_provider',
+  'audio_sub_mode', 'alt_prompt', 'music_description', 'music_instrumental', 'sfx_clips', 'name', 'preset', 'comic_panels', 'comic_pages', 'caption', 'stage', 'image_provider',
   'page_number', 'panel_number', 'page_numbers', 'pilot',
   'factual_biography', 'biography_review',
   'kit_name', 'look_notes', 'preset_id',
@@ -1211,16 +1240,54 @@ function parseAction(value: unknown): AgentAction | null {
     }
   }
   if (type === 'prepare_audio') {
-    const prompt = cleanString(raw.prompt, 8_000)
-    if (!prompt) return null
     const subMode = cleanString(raw.audio_sub_mode, 12) as AgentPrepareAudioAction['subMode']
+    const speechOrMusic = subMode === 'speech' || subMode === 'music'
+    const prompt = speechOrMusic ? literalString(raw.prompt, 200_000) : cleanString(raw.prompt, 8_000)
+    if (!prompt?.trim()) return null
+    const music = subMode === 'music'
+    const altPrompt = music
+      ? (raw.alt_prompt === undefined ? undefined : literalString(raw.alt_prompt, 200_000))
+      : undefined
+    const musicDescription = music
+      ? (raw.music_description === undefined ? undefined : literalString(raw.music_description, 200_000))
+      : undefined
+    if (raw.alt_prompt !== undefined && altPrompt === undefined) return null
+    if (raw.music_description !== undefined && musicDescription === undefined) return null
+    if (raw.music_instrumental !== undefined && typeof raw.music_instrumental !== 'boolean') return null
+    const durationSeconds = subMode === 'speech'
+      ? optionalNumber(raw.duration_seconds, 0, 1_800)
+      : music
+        ? strictNumber(raw.duration_seconds, 5, 360)
+        : optionalPositiveNumber(raw.duration_seconds, 1, 20)
+    const negativePrompt = speechOrMusic
+      ? (raw.negative_prompt === undefined ? undefined : literalString(raw.negative_prompt, 200_000))
+      : cleanString(raw.negative_prompt, 2_000) || undefined
+    if (raw.negative_prompt !== undefined && negativePrompt === undefined) return null
+    const seed = music ? strictNumber(raw.seed, -1, 2_147_483_647, true) : undefined
+    const inferenceSteps = music ? strictNumber(raw.inference_steps, 1, 1_000, true) : undefined
+    const guidanceScale = music ? strictNumber(raw.guidance_scale, 0, 1_000) : undefined
+    const outputCount = music ? strictNumber(raw.output_count, 1, 1, true) : undefined
+    if (music && (
+      (raw.duration_seconds !== undefined && durationSeconds === undefined)
+      || (raw.seed !== undefined && seed === undefined)
+      || (raw.inference_steps !== undefined && inferenceSteps === undefined)
+      || (raw.guidance_scale !== undefined && guidanceScale === undefined)
+      || (raw.output_count !== undefined && outputCount === undefined)
+    )) return null
     return {
       type: 'prepare_audio',
       subMode: AUDIO_SUB_MODES.has(subMode) ? subMode : 'sfx',
       prompt,
       modelType: cleanString(raw.model_type, 160) || undefined,
-      durationSeconds: optionalPositiveNumber(raw.duration_seconds, 1, 20),
-      negativePrompt: cleanString(raw.negative_prompt, 2_000) || undefined,
+      durationSeconds,
+      negativePrompt: negativePrompt || undefined,
+      altPrompt,
+      musicDescription,
+      musicInstrumental: music ? raw.music_instrumental as boolean | undefined : undefined,
+      seed,
+      inferenceSteps,
+      guidanceScale,
+      outputCount,
     }
   }
   if (type === 'prepare_3d') {
@@ -1912,13 +1979,14 @@ export function isExplicitImageGenerationRequest(request: string): boolean {
 }
 
 const EXPLICIT_AUDIO_GENERATION_REQUESTS = [
-  /\b(?:gen[eé]ra(?:la|lo|r|d|me)?|crea(?:la|lo|r|d|me)?|lanza(?:la|lo|r|d)?|encola(?:la|lo|r|d)?)\b[^.!?\n]{0,120}\b(?:audio|canci[oó]n|m[uú]sica|voz|speech)\b/i,
-  /\b(?:make|create|generate|render|queue|start|launch)\b[^.!?\n]{0,120}\b(?:audio|song|music|voice|speech|track)\b/i,
+  /\b(?:gen[eé]ra(?:la|lo|r|d|me)?|crea(?:la|lo|r|d|me)?|lanza(?:la|lo|r|d)?|encola(?:la|lo|r|d)?|ejec[uú]ta(?:la|lo|r|d|me)?)\b[^.!?\n]{0,120}\b(?:audio|canci[oó]n|m[uú]sica|voz|speech)\b/i,
+  /\b(?:make|create|generate|render|queue|start|launch|run|execute)\b[^.!?\n]{0,120}\b(?:audio|song|music|voice|speech|track)\b/i,
   /\b(?:audio|canci[oó]n|m[uú]sica|voz|speech)\b[^.!?\n]{0,160}\b(?:gen[eé]ra(?:la|lo|r|d|me)?|l[aá]nza(?:la|lo|r|d)?|enc[oó]la(?:la|lo|r|d)?)\b/i,
-  /\b(?:audio|song|music|voice|speech|track)\b[^.!?\n]{0,160}\b(?:make|create|generate|render|queue|start|launch)\b/i,
+  /\b(?:audio|song|music|voice|speech|track)\b[^.!?\n]{0,160}\b(?:make|create|generate|render|queue|start|launch|run|execute)\b/i,
 ]
 const STUDIO_AUDIO_CONTEXT = [
-  /\bstudio\s*(?:(?:→|->|›|\/|-)\s*)?audio\b/i,
+  /\bstudio\s*(?:(?:→|->|›|\/|-)\s*)?(?:audio|music|m[uú]sica)\b/i,
+  /\b(?:audio|song|music|voice|speech|canci[oó]n|m[uú]sica|voz)\b[^.!?\n]{0,80}\b(?:in|from|through|en|del|de)\s+(?:the\s+|el\s+|la\s+)?studio\b/i,
   /\baudio\s+(?:de|del|en)\s+studio\b/i,
   /\b(?:pestaña|tab|secci[oó]n|modo|panel|formulario)\s+(?:de\s+)?audio\b/i,
 ]

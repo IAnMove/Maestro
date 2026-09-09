@@ -67,9 +67,12 @@ The command accepts the model-owned timing and sampling fields
 `alt_guidance_scale`, `sample_solver`, `model_mode`, `settings_version` and
 closed ACE custom settings (`bpm`, `keyscale`, `timesignature`, `language`).
 The preparation layer fills omitted duration/steps/guidance/phases from the
-selected native model definition or the documented handler defaults. It
-rejects values outside the shared `music_model_contract` duration range and
-the model's declared controls; it never silently clips a value.
+selected native model definition or the documented handler defaults. Studio
+uses the selected native handler's declared `duration_slider` minimum and
+maximum; the Story-only `music_model_contract` minimum of 20 seconds is not
+applied to Studio requests. The catalog maximum remains a safety ceiling. A
+value outside those native controls is rejected before resource preparation;
+it is never silently clipped.
 
 ACE-Step's declared source selectors are `""`, `"A"`, `"B"` and `"AB"`.
 `audio_guide` and `audio_guide2` are required exactly when their selector is

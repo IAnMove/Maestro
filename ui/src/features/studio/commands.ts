@@ -38,6 +38,16 @@ export type PrepareAudioCommand = {
   modelType?: string
   durationSeconds?: number
   negativePrompt?: string
+  /** ACE-Step Music Caption (style/genre/instruments), kept literal. */
+  altPrompt?: string
+  /** Music description is a separate visible Studio field. */
+  musicDescription?: string
+  musicInstrumental?: boolean
+  seed?: number
+  inferenceSteps?: number
+  guidanceScale?: number
+  /** Music's native command currently admits one output. */
+  outputCount?: number
 }
 
 export type Prepare3dCommand = {

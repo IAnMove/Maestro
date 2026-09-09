@@ -19,10 +19,13 @@ by this guarantee.
 5. If a submission response is lost, recover the saved request in the panel.
    Recovery reuses its intention; it must not silently create a new generation.
 
-The shared native routes currently cover image, speech and upscale. Other
+The shared native routes currently cover image, speech, local music and upscale. Other
 Studio modes continue through their existing paths until migrated. Speech
 model duration controls have model-specific meanings: for example, a 20-second
 Kugel setting does not force a short sentence to occupy exactly 20 seconds.
+Music keeps the lyrics and Music Caption as distinct literal fields and does
+not inherit speech voices. Its native model controls determine the accepted
+duration; the Story song workflow retains its own contract.
 
 ## MCP connection and discovery
 
@@ -45,6 +48,7 @@ Relevant tools include:
 | `assets` | Find source IDs and workspace-qualified media URLs |
 | `generation.image` | Submit the shared image specification |
 | `generation.speech` | Submit the shared speech specification |
+| `generation.music` | Submit literal lyrics and a music caption to an installed local model |
 | `tools.upscale` | Submit a typed upscale request for an existing image/video |
 | `generation.receipt` | Recover a shared admission and its canonical task |
 | `status` | Follow the returned native job ID |
@@ -107,6 +111,6 @@ interrupted job.
 Validation errors do not establish admission. A storage/dispatch error can
 require recovery, so do not replace its intention automatically. Native task
 status remains the completion authority. Read [image](IMAGE_COMMANDS.md),
-[speech](SPEECH_COMMANDS.md) and [upscale](TOOLS_COMMANDS.md) contracts for
+[speech](SPEECH_COMMANDS.md), [music](MUSIC_COMMANDS.md) and [upscale](TOOLS_COMMANDS.md) contracts for
 supported inputs and current limits. Hashes record inspected sources; they do
 not make external source files immutable throughout queue lifetime.

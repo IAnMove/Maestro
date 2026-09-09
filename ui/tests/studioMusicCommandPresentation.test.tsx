@@ -103,8 +103,8 @@ function baseParams(intent: string): Record<string, unknown> {
   }
 }
 
-function command(intent: string) {
-  return createStudioMusicGenerationCommand(baseParams(intent), intent)
+function command(intent: string, overrides: Record<string, unknown> = {}) {
+  return createStudioMusicGenerationCommand({ ...baseParams(intent), ...overrides }, intent)
 }
 
 function formState(params: Record<string, unknown>) {
@@ -256,8 +256,60 @@ test('music recovery replays the stored command after reload without rebuilding 
   }
 })
 
+test('music summary presents null duration as the model default', { concurrency: false }, async () => {
+  const { render, screen, waitFor, cleanup } = await import('@testing-library/react')
+  const saved = command('default-duration', { duration_seconds: null })
+  globalThis.fetch = (async () => { throw new Error('response lost after admission') }) as typeof fetch
+  try {
+    await assert.rejects(submitMusicGenerationCommand(saved), /response lost after admission/)
+    render(<StudioMusicCommandPanel workspace="music-panel-workspace" model="ace_step_v1_5_xl_sft_lm_4b" visible onRecovered={async () => undefined} />)
+    await waitFor(() => screen.getByText(/Model default duration/))
+    assert.match(screen.getByText(/Model default duration/).textContent || '', /Model default duration/)
+    assert.equal(screen.queryByText('nulls'), null)
+  } finally {
+    cleanup()
+  }
+})
+
+test('MusicControls passes the selected native duration to the song writer', { concurrency: false }, async () => {
+  const { render, screen, fireEvent, waitFor, cleanup } = await import('@testing-library/react')
+  const { MusicControls } = await import('../src/components/Sidebar/MusicControls.tsx')
+  const { useStore } = await import('../src/stores/useStore.ts')
+  const before = useStore.getState()
+  const requests: Record<string, unknown>[] = []
+  globalThis.fetch = (async (input, init) => {
+    const url = String(input)
+    if (!url.endsWith('/api/v1/llm/write-song')) throw new Error(`unexpected fetch: ${url}`)
+    requests.push(JSON.parse(String(init?.body)) as Record<string, unknown>)
+    return jsonResponse({ style: 'native style', lyrics: '[Verse]\nNative lyrics', lyria_prompt: '', raw: '' })
+  }) as typeof fetch
+  useStore.setState({
+    generationMode: 'audio',
+    audioSubMode: 'music',
+    durationSeconds: 5,
+    musicDescription: 'A short native Studio song',
+    musicInstrumental: false,
+    params: {
+      ...before.params,
+      model_type: 'ace_step_v1_5_xl_sft_lm_4b',
+      // Deliberately differs from the Studio slider. The old Story helper
+      // read this stale field and rewrote the writer request to 20 seconds.
+      duration_seconds: 19,
+    },
+  })
+  try {
+    render(<MusicControls />)
+    fireEvent.click(screen.getByRole('button', { name: 'Write Song' }))
+    await waitFor(() => assert.equal(requests.length, 1))
+    assert.equal(requests[0].duration_seconds, 5)
+  } finally {
+    cleanup()
+    useStore.setState(before)
+  }
+})
+
 test('store startGeneration keeps real defaults and ignores stale speech and voice-clone state for music', { concurrency: false }, async () => {
-  const { render, cleanup, act } = await import('@testing-library/react')
+  const { render, act } = await import('@testing-library/react')
   const { useStore } = await import('../src/stores/useStore.ts')
   const before = useStore.getState()
   const originalInterval = globalThis.setInterval
