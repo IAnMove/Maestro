@@ -112,7 +112,7 @@ def _resolve_source(runtime):
         if asset_id:
             body["asset_id"] = asset_id
             body.pop("source", None)
-        _check_asset_scope(runtime, asset_id, body.get("source_workspace"))
+            _check_asset_scope(runtime, asset_id, body.get("source_workspace"))
         expected_kinds = kwargs.get("expected_kinds") or (body.get("source_kind"),)
         try:
             return resolver(body, expected_kinds=expected_kinds)

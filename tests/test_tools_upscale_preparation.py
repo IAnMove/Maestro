@@ -341,6 +341,21 @@ def test_factory_source_adapter_accepts_prepared_asset_id_without_losing_it():
     )]
 
 
+def test_scoped_file_source_does_not_depend_on_global_asset_discovery():
+    def unavailable_catalog():
+        raise OSError("An unrelated catalog root is unavailable")
+
+    request = {
+        "source": "/api/v1/file/poster.png?workspace=source",
+        "source_kind": "image", "workspace": "destination",
+    }
+    resolve = _resolve_source({
+        "_resolve_tool_source": lambda body, **_kwargs: body,
+        "_tool_asset_roots": unavailable_catalog,
+    })
+    assert resolve(request) == request
+
+
 def test_native_projection_keeps_managed_asset_id_with_canonical_source(tmp_path):
     source_root = tmp_path / "source"
     output_root = tmp_path / "destination"
