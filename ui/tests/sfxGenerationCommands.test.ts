@@ -194,3 +194,13 @@ test('uncertain SFX admission retries the same detached intent and command', { c
   assert.deepEqual(bodies, [value, value])
   assert.deepEqual(pendingSfxGenerationCommands(), [])
 })
+
+test('an explicitly blank prompt alias cannot override the other literal', () => {
+  for (const field of ['prompt', 'MMAudio_prompt']) {
+    for (const blank of ['', ' ', '\n']) {
+      const params = { ...baseParams(), [field]: blank }
+      assert.throws(() => createStudioSfxGenerationCommand(params, 'blank-alias'), /prompt|description/i)
+      assert.equal(params[field], blank)
+    }
+  }
+})

@@ -614,6 +614,12 @@
       "reason": "Imports the public Zustand facade; it should survive slice extraction unchanged."
     },
     {
+      "file": "ui/tests/studioSfxAction.test.mjs",
+      "target": "ui/src/stores/useStore.ts",
+      "classification": "behavior",
+      "reason": "Imports the public Zustand facade to verify native SFX preparation, literal fields and explicit guide removal."
+    },
+    {
       "file": "ui/tests/studioSfxCommandPresentation.test.tsx",
       "target": "ui/src/stores/useStore.ts",
       "classification": "behavior",

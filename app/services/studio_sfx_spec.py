@@ -268,9 +268,7 @@ class StudioSfxParams(_ClosedModel):
             raise ValueError("prompt or MMAudio_prompt must contain a non-blank value")
         if (
             prompt is not None
-            and prompt.strip()
             and mmaudio_prompt is not None
-            and mmaudio_prompt.strip()
             and prompt != mmaudio_prompt
         ):
             raise ValueError("prompt and MMAudio_prompt must match when both are supplied")

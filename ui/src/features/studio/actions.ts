@@ -330,12 +330,14 @@ export async function prepare3d(action: Prepare3dCommand): Promise<CommandResult
 }
 
 async function prepareSfxForm(action: PrepareAudioCommand): Promise<Record<string, unknown>> {
+  if (action.outputCount !== undefined && action.outputCount !== 1) throw new Error('SFX supports one output per command')
   const state = useStore.getState()
   const { createStudioSfxGenerationCommand } = await import('./sfxGenerationSpec')
   const modelType = action.modelType ?? (
     String(state.params.model_type).startsWith('mmaudio_') ? state.params.model_type : 'mmaudio_v2'
   )
-  const videoGuide = action.videoGuide === undefined ? state.params.video_guide : action.videoGuide
+  if (action.videoGuide === '') throw new Error('video_guide must be a canonical reference or null')
+  const videoGuide = action.videoGuide === undefined ? state.params.video_guide || undefined : action.videoGuide
   // Validate before navigation/model loading can mutate the form. The same
   // closed contract validates direct commands and these Wizard form controls.
   const command = createStudioSfxGenerationCommand({
@@ -345,8 +347,8 @@ async function prepareSfxForm(action: PrepareAudioCommand): Promise<Record<strin
     duration_seconds: action.durationSeconds ?? 2,
     seed: action.seed ?? -1, guidance_scale: action.guidanceScale ?? 4.5,
     num_inference_steps: action.inferenceSteps ?? 25,
-    repeat_generation: action.outputCount ?? 1, sfx_text_weight: action.sfxTextWeight ?? 1,
-    ...(videoGuide ? { video_guide: videoGuide } : {}),
+    sfx_text_weight: action.sfxTextWeight ?? 1,
+    ...(videoGuide != null ? { video_guide: videoGuide } : {}),
   }, 'wizard-sfx-form-validation')
   return { ...command.input.params, video_guide: videoGuide ?? undefined }
 }

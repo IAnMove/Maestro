@@ -175,3 +175,14 @@ def test_schema_publishes_video_derived_duration_and_no_host_paths():
     assert schema["limits"]["text_duration_seconds"]["maximum"] == 20
     assert "video_duration_seconds" in schema["limits"]
     assert "filesystem paths" in schema["excluded"]
+
+
+@pytest.mark.parametrize("blank", ["", " ", "\n"])
+@pytest.mark.parametrize("field", ["prompt", "MMAudio_prompt"])
+def test_explicit_blank_alias_cannot_override_the_other_literal(field, blank):
+    submitted = command(prompt="literal sound", MMAudio_prompt="literal sound")
+    submitted["input"]["params"][field] = blank
+    before = deepcopy(submitted)
+    with pytest.raises(StudioSfxSpecError, match="must match"):
+        freeze_studio_sfx_spec(submitted)
+    assert submitted == before

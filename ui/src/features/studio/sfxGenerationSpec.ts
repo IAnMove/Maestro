@@ -36,7 +36,7 @@ export function assertStudioSfxGenerationCommand(value: unknown): asserts value 
   }
   const prompt = params.MMAudio_prompt || params.prompt
   if (typeof prompt !== 'string' || !prompt.trim()) throw new Error('A literal sound description is required')
-  if (params.prompt && params.MMAudio_prompt && params.prompt !== params.MMAudio_prompt) {
+  if (params.prompt != null && params.MMAudio_prompt != null && params.prompt !== params.MMAudio_prompt) {
     throw new Error('The main and MMAudio prompts must identify the same sound description')
   }
   if (params.sfx_mode != null && params.sfx_mode !== true) throw new Error('SFX mode must be active')
