@@ -130,26 +130,29 @@ function model3dAction(raw: Record<string, unknown>): AgentPrepare3dAction | nul
   }
 }
 
+function sfxClips(value: unknown): AgentQueueSfxPackAction['clips'] | null {
+  if (!Array.isArray(value) || value.length === 0 || value.length > 12) return null
+  const clips: AgentQueueSfxPackAction['clips'] = []
+  for (const item of value) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return null
+    const record = item as Record<string, unknown>
+    const name = text(record.name, 80)
+    const prompt = literalText(record.prompt, 1_500)
+    if (!name || !prompt?.trim()) return null
+    clips.push({ name, prompt, durationSeconds: number(record.duration_seconds, 1, 20) ?? 1 })
+  }
+  return clips
+}
+
 function sfxAction(raw: Record<string, unknown>): AgentQueueSfxPackAction | null {
   if (raw.confirm !== true) return null
-  const clips = Array.isArray(raw.sfx_clips)
-    ? raw.sfx_clips.slice(0, 12).flatMap(item => {
-      if (!item || typeof item !== 'object' || Array.isArray(item)) return []
-      const record = item as Record<string, unknown>
-      const name = text(record.name, 80)
-      const prompt = text(record.prompt, 1_500)
-      if (!name || !prompt) return []
-      return [{ name, prompt, durationSeconds: number(record.duration_seconds, 1, 20) ?? 1 }]
-    })
-    : []
-  if (!clips.length) return null
+  const clips = sfxClips(raw.sfx_clips)
+  if (!clips) return null
+  const negativePrompt = raw.negative_prompt === undefined ? undefined : literalText(raw.negative_prompt, 2_000)
+  if (raw.negative_prompt !== undefined && negativePrompt === undefined) return null
   return {
-    type: 'queue_sfx_pack',
-    style: text(raw.visual_style, 2_000) || text(raw.theme, 1_000),
-    clips,
-    modelType: text(raw.model_type, 160) || undefined,
-    negativePrompt: text(raw.negative_prompt, 2_000) || undefined,
-    confirm: true,
+    type: 'queue_sfx_pack', style: text(raw.visual_style, 2_000) || text(raw.theme, 1_000),
+    clips, modelType: text(raw.model_type, 160) || undefined, negativePrompt, confirm: true,
   }
 }
 
@@ -282,24 +285,14 @@ export function registerStudioCapabilities(register: typeof defineCapability): v
   description: 'Open Studio → Audio → SFX and submit several one-shot effects.',
   useWhen: 'The user explicitly asks to generate or queue a pack of sound effects.',
   parameters: ['visual_style', 'theme', 'sfx_clips', 'model_type', 'negative_prompt', 'confirm'],
-  inputSchema: { type: 'object', additionalProperties: false, properties: { type: { const: 'queue_sfx_pack' }, visual_style: { type: 'string' }, theme: { type: 'string' }, sfx_clips: { type: 'array', minItems: 1 }, model_type: { type: 'string' }, negative_prompt: { type: 'string' }, confirm: { const: true } }, required: ['type', 'sfx_clips', 'confirm'] },
+  inputSchema: { type: 'object', additionalProperties: false, properties: { type: { const: 'queue_sfx_pack' }, visual_style: { type: 'string' }, theme: { type: 'string' }, sfx_clips: { type: 'array', minItems: 1, maxItems: 12, items: { type: 'object', additionalProperties: false, properties: { name: { type: 'string', minLength: 1, maxLength: 80 }, prompt: { type: 'string', minLength: 1, maxLength: 1_500 }, duration_seconds: { type: 'number', minimum: 0, maximum: 20 } }, required: ['name', 'prompt', 'duration_seconds'] } }, model_type: { type: 'string' }, negative_prompt: { type: 'string' }, confirm: { const: true } }, required: ['type', 'sfx_clips', 'confirm'] },
   risk: 'compute', confirmation: 'required', progress: 'Encolando el pack de SFX…',
   resolve: sfxAction,
   validate(action) { return action.confirm === true && action.clips.length > 0 ? validType('queue_sfx_pack', action) : ['confirmed SFX clips are required'] },
-  async prepare(action) {
-    if (!action.languageIntent) return action
-    return {
-      ...action,
-      style: compileProviderPrompt(action.style, action.languageIntent, { medium: 'sfx' }),
-      clips: action.clips.map(clip => ({
-        ...clip,
-        prompt: compileProviderPrompt(clip.prompt, action.languageIntent, { medium: 'sfx' }),
-      })),
-    }
-  },
+  async prepare(action) { return action },
   async execute(action, context) { return context.adapters.studio.queueSfxPack(action, context.generationContext) },
   correlate(_action, outcome) { return outcome.target }, async track(_action, outcome) { return outcome },
-  report: { targetKind: 'studio_sfx_pack', successState: 'completed' }, summarize(_action, outcome) { return outcome.message },
+  report: { targetKind: 'studio_sfx_pack', successState: 'queued' }, summarize(_action, outcome) { return outcome.message },
   presentation: commonPresentation(['audio-mode', 'sfx-pack', 'queue']),
   })
 

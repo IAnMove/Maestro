@@ -146,30 +146,150 @@ for (const settleWithFailure of [false, true]) {
   })
 }
 
-test('queue_sfx_pack mints a unique generation.sfx intent for each clip', async () => {
+
+const pack = {
+  type: 'queue_sfx_pack', confirm: true, style: 'audio test', modelType: 'mmaudio_v2',
+  clips: [
+    { name: 'hit', prompt: 'impact', durationSeconds: 2 },
+    { name: 'whoosh', prompt: 'whoosh', durationSeconds: 3 },
+    { name: 'hit-again', prompt: 'impact', durationSeconds: 2 },
+  ],
+}
+const packContext = { actor: 'wizard', capability: 'queue_sfx_pack', commandId: 'pack-intent', workflowId: 'workflow-1' }
+function packReceipt(id) {
+  return { version: 1, commandId: id, operation: 'generation.sfx', status: 'queued',
+    entities: [], artifacts: [], taskIds: [`task-${id}`], pipelineIds: [],
+    result: { task_id: `task-${id}`, job_id: `job-${id}`, workspace: 'sfx-output', status: 'queued' } }
+}
+
+function simulatedAdmissions({ failAt = 0, changeWorkspace = false } = {}) {
+  const receipts = new Map()
+  const attempts = []
+  let fail = failAt
+  useStore.setState({ jobs: [], startGeneration: async (_scheduled, context) => {
+    const params = structuredClone(useStore.getState().params)
+    attempts.push({ context, params })
+    if (attempts.length === fail) throw new Error('native admission unavailable')
+    if (!receipts.has(context.commandId)) receipts.set(context.commandId, packReceipt(context.commandId))
+    if (changeWorkspace) useStore.setState({ activeWorkspace: 'other-workspace' })
+    // No synthetic UI job: a receipt replay need not append anything locally.
+    return receipts.get(context.commandId)
+  } })
+  return { receipts, attempts, recover: () => { fail = 0 } }
+}
+
+test('SFX packs keep distinct child intents, replay the same pack and allow a deliberate new pack', async () => {
   await withStudio(async () => {
-    const seen = []
-    useStore.setState({
-      jobs: [],
-      loadModelOptions: async () => undefined,
-      startGeneration: async (_scheduled, context) => {
-        seen.push(context?.commandId)
-        const job = { id: `job-${seen.length}`, status: 'queued' }
-        useStore.setState(state => ({ jobs: [job, ...state.jobs] }))
-      },
-    })
-    await queueSfxPack({
-      type: 'queue_sfx_pack',
-      confirm: true,
-      clips: [
-        { name: 'hit', prompt: 'impact', durationSeconds: 2 },
-        { name: 'whoosh', prompt: 'whoosh', durationSeconds: 3 },
-        { name: 'hit-again', prompt: 'impact', durationSeconds: 2 },
-      ],
-      modelType: 'mmaudio_v2',
-    }, { actor: 'wizard', capability: 'queue_sfx_pack', commandId: 'pack-intent' })
-    assert.equal(seen.length, 3)
-    assert.equal(new Set(seen).size, 3)
-    assert.ok(seen.every(id => typeof id === 'string' && id.length > 0 && id !== 'pack-intent'))
+    const native = simulatedAdmissions()
+    const result = await queueSfxPack(pack, packContext)
+    assert.equal(result.status, 'queued')
+    assert.equal(native.receipts.size, 3, 'identical clips at different indices are different intentions')
+    assert.equal(result.taskIds.length, 3)
+    assert.equal(new Set(native.attempts.map(a => a.context.commandId)).size, 3)
+    assert.ok(native.attempts.every(a => a.context.workflowId === 'workflow-1'))
+    const replay = await queueSfxPack(pack, packContext)
+    assert.equal(native.receipts.size, 3)
+    assert.deepEqual(replay.taskIds, result.taskIds)
+    assert.deepEqual(replay.artifacts[0].metadata.receipts, result.artifacts[0].metadata.receipts)
+    await queueSfxPack(pack, { ...packContext, commandId: 'another-pack' })
+    assert.equal(native.receipts.size, 6)
+  })
+})
+
+test('SFX partial submission retains prior receipts and recovers without creating their jobs again', async () => {
+  await withStudio(async () => {
+    const native = simulatedAdmissions({ failAt: 2 })
+    const partial = await queueSfxPack(pack, packContext)
+    assert.equal(partial.status, 'partial')
+    assert.equal(native.attempts.length, 2, 'stop before attempting the third clip')
+    assert.equal(partial.taskIds.length, 1)
+    assert.equal(partial.artifacts[0].metadata.receipts.length, 1)
+    assert.equal(partial.error.details.nextClipIndex, 1)
+    assert.equal(partial.error.details.pendingIntentIds.length, 2)
+    native.recover()
+    const recovered = await queueSfxPack(pack, packContext)
+    assert.equal(recovered.status, 'queued')
+    assert.equal(native.receipts.size, 3)
+    assert.equal(recovered.taskIds[0], partial.taskIds[0])
+  })
+})
+
+test('SFX pack stops when the workspace changes and preserves the original task destination', async () => {
+  await withStudio(async () => {
+    const native = simulatedAdmissions({ changeWorkspace: true })
+    const result = await queueSfxPack(pack, packContext)
+    assert.equal(result.status, 'partial')
+    assert.equal(native.attempts.length, 1)
+    assert.equal(result.entities[0].workspaceId, 'sfx-output')
+    assert.equal(result.taskIds.length, 1)
+  })
+})
+
+test('SFX pack rejects an oversized parent before mutating or admitting and reports missing receipts as failure', async () => {
+  await withStudio(async () => {
+    const before = useStore.getState()
+    await assert.rejects(queueSfxPack(pack, { ...packContext, commandId: 'p'.repeat(160) }), /identif/i)
+    assert.equal(useStore.getState(), before)
+    useStore.setState({ startGeneration: async () => undefined })
+    const result = await queueSfxPack(pack, packContext)
+    assert.equal(result.status, 'failed')
+    assert.deepEqual(result.taskIds, [])
+    assert.equal(result.error.details.pendingIntentIds.length, 3)
+  })
+})
+
+test('registered Wizard SFX pack preserves partial results, every receipt and canonical task IDs', async () => {
+  await withStudio(async () => {
+    const { createDefaultApplicationAdapters } = await import('../src/features/agent/applicationAdapters.ts')
+    const { resolveAndRunRegisteredCapability } = await import('../src/features/agent/capabilityRunner.ts')
+    const native = simulatedAdmissions({ failAt: 3 })
+    const result = await resolveAndRunRegisteredCapability('queue_sfx_pack', {
+      type: 'queue_sfx_pack', confirm: true, model_type: 'mmaudio_v2', visual_style: 'test',
+      sfx_clips: pack.clips.map(clip => ({ name: clip.name, prompt: clip.prompt, duration_seconds: clip.durationSeconds })),
+    }, { workspace: 'sfx-output', adapters: createDefaultApplicationAdapters(), availability: {
+      location: { tab: 'studio' }, labs: { story: { project_id: '' }, series: { series_id: '', episode_id: '', shots: 0, approved: 0 } },
+    } })
+    assert.equal(result.report.state, 'partial')
+    assert.equal(result.commandResult.status, 'partial')
+    assert.equal(result.commandResult.taskIds.length, 2)
+    assert.equal(result.commandResult.artifacts[0].metadata.receipts.length, 2)
+    assert.equal(result.report.metadata.receipts.length, 2)
+    assert.equal(result.commandResult.error.code, 'sfx_pack_incomplete')
+    assert.equal(native.receipts.size, 2)
+  })
+})
+
+
+test('SFX pack parsing preserves literal descriptions and explicit empty negatives without language suffixes', async () => {
+  const raw = { type: 'queue_sfx_pack', confirm: true, negative_prompt: '',
+    sfx_clips: [{ name: 'rain', prompt: literal, duration_seconds: 3 }] }
+  const capability = getCapability('queue_sfx_pack')
+  const action = capability.resolve(raw)
+  const prepared = await capability.prepare({ ...action, languageIntent: {
+    conversationLanguage: 'es', contentLanguage: 'es', technicalPromptLanguage: 'en', verbatimSegments: [],
+  } })
+  assert.equal(prepared.clips[0].prompt, literal)
+  assert.equal(prepared.negativePrompt, '')
+  assert.equal(capability.resolve({ ...raw, sfx_clips: [...raw.sfx_clips, { name: 'invalid', prompt: '' }] }), null)
+  assert.equal(capability.resolve({ ...raw, sfx_clips: Array(13).fill(raw.sfx_clips[0]) }), null)
+  await withStudio(async () => {
+    const native = simulatedAdmissions()
+    await queueSfxPack(prepared, packContext)
+    assert.equal(native.attempts[0].params.MMAudio_prompt, literal)
+    assert.equal(native.attempts[0].params.MMAudio_neg_prompt, '')
+  })
+})
+
+test('Wizard keeps every admitted SFX receipt if final navigation fails', async () => {
+  await withStudio(async () => {
+    const { createDefaultApplicationAdapters } = await import('../src/features/agent/applicationAdapters.ts')
+    const native = simulatedAdmissions()
+    useStore.setState({ sidebarOpen: false, setSidebarOpen: () => undefined })
+    const outcome = await createDefaultApplicationAdapters().studio.queueSfxPack(pack, packContext)
+    assert.equal(outcome.report.state, 'queued')
+    assert.equal(outcome.commandResult.taskIds.length, 3)
+    assert.equal(outcome.metadata.receipts.length, 3)
+    assert.equal(typeof outcome.metadata.presentationWarning, 'string')
+    assert.equal(native.receipts.size, 3)
   })
 })

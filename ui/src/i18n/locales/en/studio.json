@@ -979,6 +979,11 @@
     "pendingInvalid": "The saved Tools upscale request could not be read. It has been preserved for recovery."
   },
   "sfxCommands": {
+    "packIdTooLong": "The pack identifier is too long; no effects were submitted.",
+    "packPartial": "{{count}} of {{total}} sound effects admitted. Submission stopped: {{error}}",
+    "packQueued": "{{count}} sound effects queued. Follow them in Activity.",
+    "packMissingReceipt": "No admission receipt was returned for {{name}}.",
+    "packPresentationFailed": "Studio could not show the result. Existing tasks remain available in Activity.",
     "prepared": "Sound effect prepared",
     "admitted": "Sound effect queued · {{id}}",
     "pending": "A sound effect request needs recovery",

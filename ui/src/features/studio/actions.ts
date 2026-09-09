@@ -13,7 +13,7 @@ import type {
   PrepareVideoCommand,
   QueueSfxPackCommand,
 } from './commands'
-import { newSfxGenerationIntentId } from '../../api/sfxGenerationCommands'
+import { sfxPackContexts, sfxPackResult } from './sfxPackResult'
 import {
   generationProvenancePayload,
   type GenerationSubmissionContext,
@@ -128,11 +128,16 @@ export async function selectAudioModel(
   return selectedModel?.name || selected
 }
 
-function sfxClipSubmissionContext(
-  context?: GenerationSubmissionContext,
-): GenerationSubmissionContext | undefined {
-  if (!context) return undefined
-  return { ...context, commandId: newSfxGenerationIntentId() }
+async function submitSfxPackClip(
+  clip: StudioSfxClip, negative: string, context: GenerationSubmissionContext,
+): Promise<GenerationReceiptLike> {
+  applySfxClip(clip, negative)
+  const before = new Set(useStore.getState().jobs)
+  const receipt = await useStore.getState().startGeneration(undefined, context)
+  // A replay may have no new UI job. Its durable receipt is authoritative.
+  if (receipt) return receipt
+  const failed = useStore.getState().jobs.find(job => !before.has(job) && job.status === 'failed')
+  throw new Error(failed?.error || failed?.message || i18n.t('studio:sfxCommands.packMissingReceipt', { name: clip.name }))
 }
 
 export async function queueSfxPack(
@@ -141,32 +146,21 @@ export async function queueSfxPack(
 ): Promise<CommandResult> {
   if (!action.confirm) throw new Error('Encolar el pack de SFX requiere confirm=true tras una petición explícita.')
   if (!action.clips.length) throw new Error('El pack de SFX no incluye clips.')
+  const contexts = sfxPackContexts(context, action.clips.length)
+  const workspace = workspaceId()
   openStudioAudio('sfx')
   await selectAudioModel(action.modelType, 'sfx')
-  const ids: string[] = []
-  const negative = action.negativePrompt || 'music, speech, talking, vocals, long melody'
-  for (const clip of action.clips) {
-    applySfxClip(clip, negative)
-    const before = new Set(useStore.getState().jobs)
-    // Wizard issues one commandId for the pack capability. Reusing it as
-    // every clip's generation.sfx intent_id 409s distinct prompts and
-    // silently replays the first receipt when prompts match.
-    await useStore.getState().startGeneration(undefined, sfxClipSubmissionContext(context))
-    const created = useStore.getState().jobs.find(job => !before.has(job))
-    if (!created) throw new Error(`HocusPocus no encoló el efecto ${clip.name}.`)
-    if (created.status === 'failed') throw new Error(created.error || created.message || `Falló ${clip.name}.`)
-    ids.push(`${clip.name}${created.id ? ` (${created.id})` : ''}`)
+  const receipts: GenerationReceiptLike[] = []
+  const negative = action.negativePrompt ?? 'music, speech, talking, vocals, long melody'
+  try {
+    for (const [index, clip] of action.clips.entries()) {
+      if (workspaceId() !== workspace) throw new Error(i18n.t('studio:sfxCommands.contextChanged'))
+      receipts.push(await submitSfxPackClip(clip, negative, contexts[index]))
+    }
+    return sfxPackResult(workspace, contexts, receipts)
+  } catch (error) {
+    return sfxPackResult(workspace, contexts, receipts, error instanceof Error ? error.message : String(error))
   }
-  return studioResult(
-    'audio',
-    'Audio → SFX',
-    [
-      `He encolado **${ids.length} efectos SFX** en Studio → Audio → SFX.`,
-      'Irán detrás de lo que ya use la GPU y aparecerán en la galería Audios al terminar.',
-      '',
-      ...ids.map(id => `- ${id}`),
-    ].join('\n'),
-  )
 }
 
 export function applySfxClip(clip: StudioSfxClip, negativePrompt: string): void {
@@ -175,7 +169,7 @@ export function applySfxClip(clip: StudioSfxClip, negativePrompt: string): void 
   state.setParams({
     prompt: clip.prompt,
     MMAudio_prompt: clip.prompt,
-    MMAudio_neg_prompt: negativePrompt || 'music, speech, talking, vocals, long melody',
+    MMAudio_neg_prompt: negativePrompt,
     video_guide: undefined,
   })
 }

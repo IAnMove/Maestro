@@ -91,7 +91,6 @@ test('keeps compute confirmation and exact reference/LoRA semantics', async () =
   const pack = sfx.resolve({
     type: 'queue_sfx_pack', confirm: true, visual_style: 'arcade', sfx_clips: [
       { name: 'hit', prompt: 'impact', duration_seconds: 3 },
-      { name: '', prompt: 'ignored' },
     ],
   })
   assert.deepEqual(pack, {
@@ -99,6 +98,12 @@ test('keeps compute confirmation and exact reference/LoRA semantics', async () =
     modelType: undefined, negativePrompt: undefined, confirm: true,
   })
   assert.deepEqual(sfx.validate(pack), [])
+  assert.equal(sfx.resolve({
+    type: 'queue_sfx_pack', confirm: true, sfx_clips: [
+      { name: 'hit', prompt: 'impact', duration_seconds: 3 },
+      { name: '', prompt: 'invalid' },
+    ],
+  }), null, 'an invalid clip rejects the pack instead of silently reducing its size')
 
   const references = definitions.get('attach_studio_references').resolve({
     type: 'attach_studio_references', reference_output_names: ['a.webp', 'b.webp'], reference_role: 'style',

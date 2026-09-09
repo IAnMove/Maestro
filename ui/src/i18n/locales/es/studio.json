@@ -979,6 +979,11 @@
     "pendingInvalid": "No se pudo leer la solicitud guardada de escalado de Tools. Se ha conservado para recuperarla."
   },
   "sfxCommands": {
+    "packIdTooLong": "El identificador del pack es demasiado largo; no se ha enviado ningún efecto.",
+    "packPartial": "{{count}} de {{total}} efectos admitidos. El envío se detuvo: {{error}}",
+    "packQueued": "{{count}} efectos de sonido en cola. Puedes seguirlos en Activity.",
+    "packMissingReceipt": "No se recibió un recibo de admisión para {{name}}.",
+    "packPresentationFailed": "Studio no pudo mostrar el resultado. Las tareas existentes siguen disponibles en Activity.",
     "prepared": "Efecto de sonido preparado",
     "admitted": "Efecto de sonido en cola · {{id}}",
     "pending": "Hay una solicitud de efecto de sonido pendiente de recuperar",

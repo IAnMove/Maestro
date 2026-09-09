@@ -157,3 +157,25 @@ selected guide), an explicit `null` (clear), and a canonical reference (replace)
 Replacing guide audio does not mean clearing the guide. This instructs the LLM;
 it is not a deterministic guarantee of natural-language interpretation. Parser
 and form tests verify each actual action's semantics separately from real runs.
+
+### Wizard packs and partial admission
+
+The Wizard pack uses one `generation.sfx` command per clip, with a distinct child
+intent derived from the full parent command ID and the clip's ordered index.
+Reusing that parent and input replays the same child receipts; a deliberate new
+parent creates another pack, including separate clips with identical prompts.
+An oversized parent that cannot fit the 160-character child intent limit fails
+before form mutation. Ordinary Wizard-generated IDs fit this limit.
+
+Receipts, all admitted task IDs and pending child IDs survive a later failure as
+a `partial` result. A receipt replay does not need to create a new UI tile.
+Changing workspace stops subsequent clips. Presentation failure retains those
+results and points to Activity. The registered runner retains the canonical
+result and does not turn partial admission into completed media. Pack descriptions
+and explicit empty negative prompts remain literal; invalid/oversized clip arrays
+are rejected without dropping entries. The existing pack duration clamp to 1–20 s
+remains separate from the single-SFX command contract.
+
+This does not add a server-side pack/workflow scheduler or persist automatic pack
+advancement after the browser closes; those remain P9. Each admitted child itself
+uses the shared durable queue and can be recovered independently through MCP.

@@ -1148,21 +1148,6 @@ function parseComicPages(value: unknown): AgentComicPage[] {
   }) : []
 }
 
-function parseSfxClips(value: unknown): AgentSfxClip[] {
-  return Array.isArray(value) ? value.slice(0, 12).flatMap(item => {
-    if (!item || typeof item !== 'object' || Array.isArray(item)) return []
-    const raw = item as Record<string, unknown>
-    const name = cleanString(raw.name, 80)
-    const prompt = cleanString(raw.prompt, 1_500)
-    if (!name || !prompt) return []
-    return [{
-      name,
-      prompt,
-      durationSeconds: optionalPositiveNumber(raw.duration_seconds, 1, 20) ?? 1,
-    }]
-  }) : []
-}
-
 function parseAction(value: unknown): AgentAction | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
   const raw = canonicalRecord(value as Record<string, unknown>)
@@ -1234,19 +1219,6 @@ function parseAction(value: unknown): AgentAction | null {
       modelType: cleanString(raw.model_type, 160) || undefined,
       preset: cleanString(raw.preset, 40) || undefined,
       seed: optionalNumber(raw.seed, -1, 2_147_483_647, true),
-    }
-  }
-  if (type === 'queue_sfx_pack') {
-    if (raw.confirm !== true) return null
-    const clips = parseSfxClips(raw.sfx_clips)
-    if (!clips.length) return null
-    return {
-      type: 'queue_sfx_pack',
-      style: cleanString(raw.visual_style, 2_000) || cleanString(raw.theme, 1_000),
-      clips,
-      modelType: cleanString(raw.model_type, 160) || undefined,
-      negativePrompt: cleanString(raw.negative_prompt, 2_000) || undefined,
-      confirm: true,
     }
   }
   if (type === 'start_generation') return raw.confirm === true ? { type: 'start_generation', confirm: true } : null
@@ -2720,18 +2692,6 @@ export const HOCUSPOCUS_AGENT_RESPONSE_SCHEMA: Record<string, unknown> = mergeRe
           audio_sub_mode: { type: 'string', enum: ['', 'speech', 'music', 'sfx'] },
           sfx_text_weight: { type: 'number', minimum: 0, maximum: 5 },
           preset: { type: 'string', maxLength: 40 },
-          sfx_clips: {
-            type: 'array', maxItems: 12,
-            items: {
-              type: 'object', additionalProperties: false,
-              properties: {
-                name: { type: 'string', maxLength: 80 },
-                prompt: { type: 'string', maxLength: 1_500 },
-                duration_seconds: { type: 'number', minimum: 0, maximum: 20 },
-              },
-              required: ['name', 'prompt', 'duration_seconds'],
-            },
-          },
           story_visual_selections: {
             type: 'array', maxItems: 40,
             items: {

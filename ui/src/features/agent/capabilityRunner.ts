@@ -172,7 +172,9 @@ export async function runRegisteredCapability(
     }),
   })
   const outputNames = [...new Set([...(report.outputNames || []), ...(report.assetIds || [])].filter(Boolean))]
-  const commandResult = normalizeCommandResult({
+  const commandResult = normalizeCommandResult(tracked.commandResult ? {
+    ...tracked.commandResult, commandId: envelope.commandId,
+  } : {
     commandId: envelope.commandId,
     status: resultStatus(report),
     entities: entity ? [entity] : [],
