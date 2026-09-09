@@ -196,6 +196,20 @@ test('music builder retains inactive sentinels but rejects active modes, TTS and
   )
 })
 
+test('music builder admits empty or omitted style captions', { concurrency: false }, () => {
+  const blank = command('music-blank-caption', { alt_prompt: '' })
+  assert.equal(blank.input.params.alt_prompt, '')
+  assert.equal(blank.input.params.prompt, nativeParams().prompt)
+
+  const { alt_prompt: _omitted, ...withoutCaption } = nativeParams()
+  const omitted = createStudioMusicGenerationCommand({
+    ...withoutCaption,
+    workspace: 'music-workspace',
+  }, 'music-omitted-caption')
+  assert.equal('alt_prompt' in omitted.input.params, false)
+  assert.equal(omitted.input.params.prompt, withoutCaption.prompt)
+})
+
 test('form projection preserves music text, language, refs and sentinels while rejecting active stale controls', { concurrency: false }, () => {
   const source = {
     ...nativeParams(),

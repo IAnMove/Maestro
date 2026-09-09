@@ -341,7 +341,9 @@ function assertMusicParams(value: unknown): asserts value is StudioMusicParams {
   }
   assertCatalogValue(value, paramsSchema, 'input.params')
   requiredText(value.prompt, 'input.params.prompt', MAX_PROMPT_LENGTH)
-  requiredText(value.alt_prompt, 'input.params.alt_prompt', MAX_PROMPT_LENGTH)
+  // alt_prompt is optional in the generated catalog (default ""). Requiring a
+  // non-blank caption blocked Studio Generate and Wizard start_generation
+  // when the user wrote lyrics or [Instrumental] without filling Style.
   requiredText(value.model_type, 'input.params.model_type', MAX_WORKSPACE_LENGTH)
   assertMusicSelectors(value)
   assertAudioReferences(value)
