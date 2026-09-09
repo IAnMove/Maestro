@@ -221,7 +221,14 @@ class ImageGenerationCommands:
     def _restore_recovery(self, workspaces):
         active = set(self.active_job_ids())
         for workspace in workspaces:
-            registry = self._registry(workspace)
+            try:
+                registry = self._registry(workspace)
+            except HTTPException as error:
+                # `_list_workspaces` includes every outputs/ subdirectory.
+                # A backup folder such as "old copy" must not 422 list/resume/discard.
+                if error.status_code == 422:
+                    continue
+                raise
             for entry in registry.command_recovery_candidates():
                 if entry["operation"] not in {"generation.image", *self.operations}:
                     # Another domain can share TaskRegistry without using
@@ -301,5 +308,8 @@ class ImageGenerationCommands:
             linked = self._recovery_task(record)
             if linked and linked[1] and linked[1]["status"] == "interrupted":
                 registry, task = linked
-                registry.update(task["id"], status="cancelled", phase="recovery_discarded",
-                                message="Recovery discarded", completed_at=time.time(), recoverable=False)
+                try:
+                    registry.update(task["id"], status="cancelled", phase="recovery_discarded",
+                                    message="Recovery discarded", completed_at=time.time(), recoverable=False)
+                except (OSError, sqlite3.Error) as error:
+                    raise command_error(503, "storage_unavailable", "Recovery storage is unavailable; no queue records were discarded") from error
