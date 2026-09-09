@@ -4987,7 +4987,8 @@ export const useStore = create<AppState>((set, get) => {
     // Voice clone (SeedVC) — only send if the user explicitly enabled
     // it AND provided at least one reference. Backend defaults all three
     // params to falsy if absent (postprocessing step is a no-op).
-    if (state.voiceCloneEnabled && state.voiceCloneRefs.length > 0) {
+    if (!(state.generationMode === 'audio' && state.audioSubMode === 'music')
+        && state.voiceCloneEnabled && state.voiceCloneRefs.length > 0) {
       const validRefs = state.voiceCloneRefs.filter(r => r && r.path)
       if (validRefs.length > 0) {
         params.voice_clone_enabled = true
@@ -5015,6 +5016,10 @@ export const useStore = create<AppState>((set, get) => {
       if (state.audioSubMode === 'music') {
         params._music_description = state.musicDescription || ''
         params._music_instrumental = !!state.musicInstrumental
+        params.video_length = 0
+        params.image_mode = 0
+        params.multi_prompts_gen_type = 2
+        params.duration_seconds = state.durationSeconds
       }
       if (state.audioSubMode === 'sfx') {
         // SFX mode: use MMAudio to generate sound effects
@@ -5049,8 +5054,8 @@ export const useStore = create<AppState>((set, get) => {
         delete params.sliding_window_size
         delete params.sliding_window_overlap
         delete params.sliding_window_discard_last_frames
-      } else {
-        // Speech/Music TTS mode
+      } else if (state.audioSubMode === 'speech') {
+        // Speech voice controls do not rename lyrics or replace music references.
         params.video_length = 0
         params.image_mode = 0
         params.multi_prompts_gen_type = 2  // Preserve full text as one prompt (don't split by newlines)

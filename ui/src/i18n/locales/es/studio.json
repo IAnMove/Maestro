@@ -950,5 +950,19 @@
     "panelUnavailable": "No se pudo mostrar la solicitud de voz. Abre Studio y vuelve a intentarlo.",
     "pendingInvalid": "No se pudo leer la solicitud de voz guardada. Se ha conservado para recuperarla.",
     "referenceFailed": "No se pudo preparar una referencia de audio seleccionada. No se ha enviado ninguna voz."
+  },
+  "musicCommands": {
+    "prepared": "Petición de música preparada",
+    "admitted": "Música admitida · {{id}}",
+    "pending": "Envío de música pendiente de confirmar",
+    "recover": "Recuperar este envío de música",
+    "resources": "{{references}} referencias de audio · {{loras}} LoRAs",
+    "contextChanged": "El formulario de música cambió antes del envío. Revisa los ajustes actuales e inténtalo de nuevo.",
+    "panelUnavailable": "No se pudo mostrar la petición de música. Abre Studio e inténtalo de nuevo.",
+    "pendingInvalid": "No se pudo leer el envío de música guardado. Se ha conservado para recuperarlo.",
+    "referenceFailed": "No se pudo preparar una referencia de audio seleccionada. No se envió ninguna petición de música.",
+    "lyrics": "Letra",
+    "caption": "Descripción musical",
+    "defaultDuration": "Duración predeterminada del modelo"
   }
 }
