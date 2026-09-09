@@ -7,7 +7,7 @@ Object.assign(globalThis, { window: dom.window, document: dom.window.document,
   localStorage: dom.window.localStorage, Event: dom.window.Event, CustomEvent: dom.window.CustomEvent })
 window.matchMedia = (() => ({ matches: false })) as typeof window.matchMedia
 const { useStore } = await import('../src/stores/useStore')
-const { createStudioSfxGenerationCommand, projectStudioSfxFormParams, neutralizeStudioSfxFormResidue } = await import('../src/features/studio/sfxGenerationSpec')
+const { createStudioSfxGenerationCommand, projectStudioSfxFormParams } = await import('../src/features/studio/sfxGenerationSpec')
 const { createStudioMusicGenerationCommand, projectStudioMusicFormParams } = await import('../src/features/studio/musicGenerationSpec')
 const speechRef = '/api/v1/file/voice.wav?workspace=speech-source'
 const musicRef = '/api/v1/file/beat.wav?workspace=music-source'
@@ -268,9 +268,9 @@ for (const nativeAlias of [true, false]) {
       assert.equal(state.params.sfx_text_weight, 0)
       assert.equal(state.params.guidance_scale, 0)
       assert.equal(state.durationSeconds, 7.5, 'audio duration is not derived from video frames')
-      const submitted = createStudioSfxGenerationCommand(neutralizeStudioSfxFormResidue(projectStudioSfxFormParams({
+      const submitted = createStudioSfxGenerationCommand(projectStudioSfxFormParams({
         ...state.params, workspace: state.activeWorkspace, duration_seconds: state.durationSeconds,
-      })), `restore-sfx-${nativeAlias}`)
+      }), `restore-sfx-${nativeAlias}`)
       assert.equal(submitted.input.params.MMAudio_prompt, literal)
       assert.equal(submitted.input.params.duration_seconds, 7.5)
     })

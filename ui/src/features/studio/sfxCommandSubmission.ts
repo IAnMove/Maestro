@@ -1,11 +1,11 @@
 import * as api from '../../api/client'
+import { assertSameAudioForm } from './audioFormSnapshot'
 import { canonicalVideoReference } from './videoCommandReferences'
 import { stableSerialize } from '../../lib/commandContract'
 import type { AppState } from '../../stores/useStore'
 import type { GenerationSubmissionContext } from './generationProvenance'
 import {
   createStudioSfxGenerationCommand,
-  neutralizeStudioSfxFormResidue,
   projectStudioSfxFormParams,
   type StudioSfxGenerationCommand,
 } from './sfxGenerationSpec'
@@ -27,23 +27,6 @@ export interface SfxSubmission {
   params: Record<string, unknown>
   receipt?: SfxGenerationReceipt
   submit: () => Promise<NativeReceipt>
-}
-
-/** Include all visible sfx inputs in the pre-admission guard. */
-function sfxFormFingerprint(state: StudioState): string {
-  return stableSerialize({
-    params: state.params, activeWorkspace: state.activeWorkspace,
-    generationMode: state.generationMode, audioSubMode: state.audioSubMode,
-    durationSeconds: state.durationSeconds,
-    settingsOpen: state.settingsOpen, dashboardOpen: state.dashboardOpen,
-    sidebarMode: state.sidebarMode,
-  })
-}
-
-function assertSameSfxForm(before: StudioState, current: StudioState): void {
-  if (sfxFormFingerprint(before) !== sfxFormFingerprint(current)) {
-    throw new Error(i18n.t('studio:sfxCommands.contextChanged'))
-  }
 }
 
 function nativeParams(command: StudioSfxGenerationCommand): Record<string, unknown> {
@@ -70,10 +53,10 @@ export async function prepareStudioSfxSubmission(
     // known video/H3 controls alongside the sfx fields. Project only that
     // explicit form residue; the command builder remains closed for direct
     // Wizard/MCP envelopes and rejects every other unknown key.
-    snapshotParams = neutralizeStudioSfxFormResidue(projectStudioSfxFormParams(snapshotParams))
-    assertSameSfxForm(before, current())
+    snapshotParams = projectStudioSfxFormParams(snapshotParams)
+    assertSameAudioForm(before, current())
     await canonicalVideoReference(snapshotParams)
-    assertSameSfxForm(before, current())
+    assertSameAudioForm(before, current())
     const command = createStudioSfxGenerationCommand(
       snapshotParams,
       context?.commandId || newSfxGenerationIntentId(),
@@ -85,9 +68,9 @@ export async function prepareStudioSfxSubmission(
           const receipt = await submitSfxGenerationCommand(command, {
             submissionContext: context,
             onSnapshotReady: async frozen => {
-              assertSameSfxForm(before, current())
+              assertSameAudioForm(before, current())
               await presentStudioSfxCommand(frozen)
-              assertSameSfxForm(before, current())
+              assertSameAudioForm(before, current())
             },
           })
           submission.receipt = receipt

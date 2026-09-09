@@ -17,7 +17,6 @@ const {
   submitSfxGenerationCommand,
 } = await import('../src/api/sfxGenerationCommands.ts')
 const {
-  neutralizeStudioSfxFormResidue,
   projectStudioSfxFormParams,
 } = await import('../src/features/studio/sfxGenerationSpec.ts')
 
@@ -223,7 +222,7 @@ test('Studio SFX form residue drops leftover Speech/Music lyrics when the SFX bo
     sfx_mode: true,
     num_inference_steps: 25,
   }
-  const cleaned = neutralizeStudioSfxFormResidue(projectStudioSfxFormParams(leftover))
+  const cleaned = projectStudioSfxFormParams(leftover)
   assert.equal('prompt' in cleaned, false)
   assert.equal('MMAudio_prompt' in cleaned, false)
   assert.throws(
@@ -231,10 +230,10 @@ test('Studio SFX form residue drops leftover Speech/Music lyrics when the SFX bo
     /literal sound description is required/,
   )
 
-  const authored = neutralizeStudioSfxFormResidue(projectStudioSfxFormParams({
+  const authored = projectStudioSfxFormParams({
     ...leftover,
     MMAudio_prompt: 'rain on tin',
-  }))
+  })
   const command = createStudioSfxGenerationCommand(authored, 'authored-sfx')
   assert.equal(command.input.params.MMAudio_prompt, 'rain on tin')
   assert.equal(command.input.params.prompt, 'rain on tin')

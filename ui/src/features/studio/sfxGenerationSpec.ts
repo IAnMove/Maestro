@@ -72,20 +72,15 @@ export function createStudioSfxGenerationCommand(fullParams: Record<string, unkn
     input: { workspace, ...(collectionId != null ? { workspace_collection_id: collectionId } : {}), params } })
 }
 
-/** SFX controls own a small subset of the shared Studio form. */
-export function projectStudioSfxFormParams(params: Record<string, unknown>): Record<string, unknown> {
-  return Object.fromEntries([...paramKeys, 'workspace', 'provenance']
-    .filter(key => params[key] !== undefined).map(key => [key, params[key]]))
-}
-
 /**
- * The SFX textarea owns `MMAudio_prompt`. Speech/Music leftovers stay in
- * `prompt` because audio sub-tabs share one Studio params map. A blank SFX
- * box must not admit those lyrics as the sound description.
+ * Project SFX controls from the shared Studio form. Only the SFX textarea
+ * (`MMAudio_prompt`) owns the sound description; a blank box must not admit
+ * Speech/Music text left in `prompt`. Direct command builders stay closed.
  */
-export function neutralizeStudioSfxFormResidue(params: Record<string, unknown>): Record<string, unknown> {
+export function projectStudioSfxFormParams(params: Record<string, unknown>): Record<string, unknown> {
   const native = typeof params.MMAudio_prompt === 'string' ? params.MMAudio_prompt : ''
-  const fields = Object.fromEntries(Object.entries(params)
-    .filter(([key]) => key !== 'prompt' && key !== 'MMAudio_prompt'))
+  const fields = Object.fromEntries([...paramKeys, 'workspace', 'provenance']
+    .filter(key => key !== 'prompt' && key !== 'MMAudio_prompt' && params[key] !== undefined)
+    .map(key => [key, params[key]]))
   return native.trim() ? { ...fields, prompt: native, MMAudio_prompt: native } : fields
 }
