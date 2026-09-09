@@ -1174,6 +1174,7 @@ These IDs are in `AGENT_ACTION_TYPES`. They are listed so L0 can prove every Wiz
 | `other.attach_studio_references` | `attach_studio_references` | `attachReferences` | `ui/src/features/agent/studioCapabilities.ts` | `studio.attachReferences` |
 | `other.configure_studio_loras` | `configure_studio_loras` | `configureLoras` | `ui/src/features/agent/studioCapabilities.ts` | `studio.configureLoras` |
 | `other.remove_background` | `remove_background` | `removeBackground` | `ui/src/features/agent/toolCapabilities.ts` | `tools.removeBackground` |
+| `other.upscale` | `upscale` | `upscale` | `ui/src/features/agent/toolCapabilities.ts` | `tools.upscale` |
 | `other.open_3d_scene` | `open_3d_scene` | `open` | `ui/src/features/agent/applicationAdapters.ts` | `video3d.open` |
 | `other.save_3d_scene` | `save_3d_scene` | `run` | `ui/src/features/agent/applicationAdapters.ts` | `video3d.run` |
 | `other.export_3d_scene` | `export_3d_scene` | `run` | `ui/src/features/agent/applicationAdapters.ts` | `video3d.run` |
