@@ -72,6 +72,28 @@ export async function seekSpeech(page: Page, seconds: number) {
   await page.getByLabel('Scene position', { exact: true }).fill(String(seconds))
 }
 export async function exportSpeech(page: Page, info: TestInfo) {
+  const aac = await page.evaluate(async () => typeof AudioEncoder !== 'undefined' && (await AudioEncoder.isConfigSupported({
+    codec: 'mp4a.40.2', sampleRate: 48000, numberOfChannels: 1, bitrate: 128000,
+  })).supported)
+  // Linux Chrome can decode AAC without providing an AAC encoder. A separate
+  // required Windows job must exercise the real MP4 path, never this fallback.
+  if (process.env.HOCUSPOCUS_REQUIRE_SPEECH_AAC === '1' || process.platform === 'win32') expect(aac, 'The real-export runner must provide AAC encoding').toBe(true)
+  if (!aac) {
+    let publications = 0
+    const observe = (request: import('@playwright/test').Request) => {
+      if (request.url().endsWith('/scenes/recordings') && request.method() === 'POST') publications++
+    }
+    page.on('request', observe)
+    try {
+      await page.getByTestId('world3d-export').click()
+      await expect(page.getByTestId('world3d-export-note')).toContainText('AAC audio')
+      await expect(page.getByTestId('world3d-export')).toBeEnabled()
+      await expect(page.getByTestId('scene3d-roundtrip')).toHaveText('ok')
+      expect(publications, 'Never silently publish a muted speech scene').toBe(0)
+      await info.attach('aac-unavailable.png', { body: await page.screenshot(), contentType: 'image/png' })
+      return { encoded: false as const }
+    } finally { page.off('request', observe) }
+  }
   const response = page.waitForResponse(r => r.url().endsWith('/scenes/recordings') && r.request().method() === 'POST', { timeout: 90000 })
   await page.getByTestId('world3d-export').click()
   expect((await response).ok()).toBeTruthy()
@@ -86,5 +108,5 @@ export async function exportSpeech(page: Page, info: TestInfo) {
   expect(proof.bytes.length).toBeGreaterThan(1000)
   expect(proof.rms).toBeGreaterThan(.05); expect(proof.rms).toBeLessThan(.13) // Original tone, not two copies.
   await info.attach('native-h264-aac.mp4', { body: Buffer.from(proof.bytes), contentType: 'video/mp4' })
-  return proof
+  return { encoded: true as const, ...proof }
 }

@@ -100,9 +100,15 @@ tres recorridos nuevos, todos sobre la aplicación nativa en `/`:
 
 El GLB y WAV de CI son procedurales y originales. Se simulan biblioteca,
 subida, Rhubarb y TTS; WebGL, reloj, reproducción, muxer, H.264 y AAC son reales.
-Edge en Windows / Chrome en Linux aportan los codecs. El test exporta y
+El test exporta y
 decodifica audio del MP4, y adjunta capturas, JSON y MP4 al resultado.
 CI conserva esos artefactos también cuando las pruebas pasan.
+Un trabajo obligatorio en Windows/Edge exige H.264 + AAC reales. El Chrome
+del runner Linux no proporciona codificador AAC: allí se comprueba el aviso
+explícito, la recuperación del editor y que no se publique un vídeo mudo.
+No se omite ninguno de los recorridos; el trabajo Windows no puede aprobar
+mediante esa alternativa. Disponibilidad de exportación sonora depende de
+los codecs del navegador y del sistema operativo.
 
 ```powershell
 $env:HOCUSPOCUS_API_TARGET = 'http://127.0.0.1:1'
@@ -149,6 +155,8 @@ anteriores `<digest>.vN.json`. API bajo el router de character-kits:
 
 - Audio fuente: hasta 10 min y 32 MB. Análisis local: fragmentos de hasta 90 s.
 - Exportación con sonido: hasta 180 segundos de resultado por plano.
+- Requiere un navegador con codificación AAC (verificado Windows/Edge).
+  Si falta el codec, el editor informa del problema y no publica una escena muda.
 - MP4 usa el mismo reloj que la boca; cambiar velocidad cambia también el tono.
 - Caras por proyección sobre materiales del GLB, no creación de morph targets
   ni rig facial universal. No requiere volver a gastar créditos en cada personaje.
