@@ -207,6 +207,18 @@ def test_duration_uses_native_slider_bounds_not_story_minimum(model_type, defini
     assert "duration_seconds" in error.value.detail["message"]
 
 
+def test_missing_duration_slider_uses_native_music_minimum():
+    definition = deepcopy(ACE_DEFINITION)
+    definition.pop("duration_slider")
+
+    with pytest.raises(HTTPException) as error:
+        invoke(frozen_params(duration_seconds=4), definition=definition)
+    assert "duration_seconds" in error.value.detail["message"]
+
+    (native, _), _, _ = invoke(frozen_params(duration_seconds=5), definition=definition)
+    assert native["duration_seconds"] == 5
+
+
 @pytest.mark.parametrize("field", ["num_inference_steps", "guidance_scale"])
 def test_nonfinite_or_invalid_sampling_fails_before_media(field):
     bad = raw_params(**{field: float("nan")}) if field == "guidance_scale" else raw_params(**{field: 0})

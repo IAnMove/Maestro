@@ -106,7 +106,11 @@ def _duration_bounds(model_type: str, definition: Mapping[str, Any]) -> tuple[fl
     # both local handlers currently accept 5s, and a future handler may have a
     # different bound.  Keep the catalog maximum as a safety ceiling while
     # never raising the native minimum to satisfy Story's longer cue policy.
-    lower = 0.0
+    # The two registered local handlers both declare a 5s native minimum. If
+    # an older catalog projection omits the slider, retain that handler-backed
+    # minimum rather than reopening the Story policy or accepting unsupported
+    # sub-five-second requests.
+    lower = 5.0
     upper = float(entry["duration_max"])
     if isinstance(slider, Mapping):
         if slider.get("min") is not None:
