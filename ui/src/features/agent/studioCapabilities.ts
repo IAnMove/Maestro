@@ -130,21 +130,29 @@ function imageAction(raw: Record<string, unknown>): AgentPrepareImageAction | nu
   }
 }
 
-function audioAction(raw: Record<string, unknown>): AgentPrepareAudioAction | null {
-  const subMode = text(raw.audio_sub_mode, 12) as AgentPrepareAudioAction['subMode']
-  const speech = subMode === 'speech'
-  const music = subMode === 'music'
-  // Speech text is authored content. Keep every character, including
-  // whitespace and newlines, and let the closed speech command schema reject
-  // anything beyond its native 200k limit instead of silently truncating it.
-  // Music lyrics have the same literal-text contract; its caption is handled
-  // separately below and must never be folded into the lyrics.
-  const prompt = speech || music ? literalText(raw.prompt, 200_000) : text(raw.prompt, 8_000)
+type ResolvedAudioText = Pick<AgentPrepareAudioAction, 'prompt' | 'negativePrompt'>
+type ResolvedMusicControls = Pick<
+  AgentPrepareAudioAction,
+  'durationSeconds' | 'seed' | 'inferenceSteps' | 'guidanceScale' | 'outputCount'
+>
+type ResolvedAudioExtras = Pick<
+  AgentPrepareAudioAction,
+  'altPrompt' | 'musicDescription' | 'musicInstrumental'
+>
+
+function resolveAudioText(raw: Record<string, unknown>, literal: boolean): ResolvedAudioText | null {
+  // Speech and Music are authored text. Keep every character, including
+  // whitespace and newlines, while SFX retains its short cleaned prompt.
+  const prompt = literal ? literalText(raw.prompt, 200_000) : text(raw.prompt, 8_000)
   if (!prompt?.trim()) return null
-  const negativePrompt = speech || music
+  const negativePrompt = literal
     ? (raw.negative_prompt === undefined ? undefined : literalText(raw.negative_prompt, 200_000))
     : text(raw.negative_prompt, 2_000) || undefined
   if (raw.negative_prompt !== undefined && negativePrompt === undefined) return null
+  return { prompt, negativePrompt }
+}
+
+function resolveAudioExtras(raw: Record<string, unknown>, music: boolean): ResolvedAudioExtras | null {
   const altPrompt = music
     ? (raw.alt_prompt === undefined ? undefined : literalText(raw.alt_prompt, 200_000))
     : undefined
@@ -154,34 +162,71 @@ function audioAction(raw: Record<string, unknown>): AgentPrepareAudioAction | nu
   if (raw.alt_prompt !== undefined && altPrompt === undefined) return null
   if (raw.music_description !== undefined && musicDescription === undefined) return null
   if (raw.music_instrumental !== undefined && typeof raw.music_instrumental !== 'boolean') return null
-  const durationSeconds = music
-    ? strictNumber(raw.duration_seconds, 5, 360)
-    : number(raw.duration_seconds, speech ? 0 : 1, speech ? 1_800 : 20)
-  const seed = music ? strictNumber(raw.seed, -1, 2_147_483_647, true) : undefined
-  const inferenceSteps = music ? strictNumber(raw.inference_steps, 1, 1_000, true) : undefined
-  const guidanceScale = music ? strictNumber(raw.guidance_scale, 0, 1_000) : undefined
-  const outputCount = music ? strictNumber(raw.output_count, 1, 1, true) : undefined
-  if (music && (
+  return {
+    altPrompt,
+    musicDescription,
+    musicInstrumental: music ? raw.music_instrumental as boolean | undefined : undefined,
+  }
+}
+
+function resolveMusicControls(raw: Record<string, unknown>): ResolvedMusicControls | null {
+  const durationSeconds = strictNumber(raw.duration_seconds, 5, 360)
+  const seed = strictNumber(raw.seed, -1, 2_147_483_647, true)
+  const inferenceSteps = strictNumber(raw.inference_steps, 1, 1_000, true)
+  const guidanceScale = strictNumber(raw.guidance_scale, 0, 1_000)
+  const outputCount = strictNumber(raw.output_count, 1, 1, true)
+  if (
     (raw.duration_seconds !== undefined && durationSeconds === undefined)
     || (raw.seed !== undefined && seed === undefined)
     || (raw.inference_steps !== undefined && inferenceSteps === undefined)
     || (raw.guidance_scale !== undefined && guidanceScale === undefined)
     || (raw.output_count !== undefined && outputCount === undefined)
-  )) return null
+  ) return null
+  return { durationSeconds, seed, inferenceSteps, guidanceScale, outputCount }
+}
+
+function resolveNonMusicControls(
+  raw: Record<string, unknown>,
+  speech: boolean,
+): ResolvedMusicControls {
+  return {
+    durationSeconds: number(raw.duration_seconds, speech ? 0 : 1, speech ? 1_800 : 20),
+    seed: undefined,
+    inferenceSteps: undefined,
+    guidanceScale: undefined,
+    outputCount: undefined,
+  }
+}
+
+function resolveAudioControls(
+  raw: Record<string, unknown>,
+  subMode: AgentPrepareAudioAction['subMode'],
+): ResolvedMusicControls | null {
+  return subMode === 'music'
+    ? resolveMusicControls(raw)
+    : resolveNonMusicControls(raw, subMode === 'speech')
+}
+
+function audioAction(raw: Record<string, unknown>): AgentPrepareAudioAction | null {
+  const subMode = text(raw.audio_sub_mode, 12) as AgentPrepareAudioAction['subMode']
+  const textFields = resolveAudioText(raw, subMode === 'speech' || subMode === 'music')
+  if (!textFields) return null
+  const extras = resolveAudioExtras(raw, subMode === 'music')
+  if (!extras) return null
+  const controls = resolveAudioControls(raw, subMode)
+  if (!controls) return null
   return {
     type: 'prepare_audio',
     subMode: AUDIO_SUB_MODES.has(subMode) ? subMode : 'sfx',
-    prompt,
+    prompt: textFields.prompt,
     modelType: text(raw.model_type, 160) || undefined,
-    durationSeconds,
-    negativePrompt,
-    altPrompt,
-    musicDescription,
-    musicInstrumental: music ? raw.music_instrumental as boolean | undefined : undefined,
-    seed,
-    inferenceSteps,
-    guidanceScale,
-    outputCount,
+    durationSeconds: controls.durationSeconds,
+    negativePrompt: textFields.negativePrompt,
+    ...extras,
+    seed: controls.seed,
+    inferenceSteps: controls.inferenceSteps,
+    guidanceScale: controls.guidanceScale,
+    outputCount: controls.outputCount,
   }
 }
 
