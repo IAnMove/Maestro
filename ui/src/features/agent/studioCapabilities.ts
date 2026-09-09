@@ -148,11 +148,13 @@ function sfxAction(raw: Record<string, unknown>): AgentQueueSfxPackAction | null
   if (raw.confirm !== true) return null
   const clips = sfxClips(raw.sfx_clips)
   if (!clips) return null
+  const modelType = text(raw.model_type, 160) || undefined
+  if (modelType && !['mmaudio_v2', 'mmaudio_nsfw'].includes(modelType)) return null
   const negativePrompt = raw.negative_prompt === undefined ? undefined : literalText(raw.negative_prompt, 2_000)
   if (raw.negative_prompt !== undefined && negativePrompt === undefined) return null
   return {
     type: 'queue_sfx_pack', style: text(raw.visual_style, 2_000) || text(raw.theme, 1_000),
-    clips, modelType: text(raw.model_type, 160) || undefined, negativePrompt, confirm: true,
+    clips, modelType, negativePrompt, confirm: true,
   }
 }
 

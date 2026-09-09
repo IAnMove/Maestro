@@ -179,3 +179,13 @@ remains separate from the single-SFX command contract.
 This does not add a server-side pack/workflow scheduler or persist automatic pack
 advancement after the browser closes; those remain P9. Each admitted child itself
 uses the shared durable queue and can be recovered independently through MCP.
+
+For an explicit SFX pack request, one complete JSON clip array on its own line
+(optionally prefixed with `sfx_clips:` or `sfx_clips=`) is authoritative. Its
+names, descriptions and order go through the registered pack parser even when
+the LLM omits or rewrites its proposal. Explicit `negative_prompt="..."` JSON
+strings and a single exact MMAudio model ID are retained. Multiple arrays or
+conflicting declarations are rejected without guessing. An explicit pack with
+no valid data must not fall through to Video merely because it mentions a guide.
+This bounded source recovery does not interpret arbitrary prose as structured
+clip data.

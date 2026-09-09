@@ -64,6 +64,7 @@ import {
   registeredCapabilitySchemas,
   reconcileProgrammaticVideoRequest,
   restoreAuthoredMusicFields,
+  authoredSfxPackInput,
   type AgentPrepareProgrammaticVideoAction,
   type AgentTab,
   type LanguageIntent,
@@ -2411,12 +2412,14 @@ export async function reconcileAgentTurnWithRequest(
     }
   }
   if (isExplicitSfxGenerationRequest(request)) {
-    const existing = turn.actions.find(
+    const authored = authoredSfxPackInput(request)
+    const proposed = turn.actions.find(
       (action): action is AgentQueueSfxPackAction => action.type === 'queue_sfx_pack',
     )
+    const existing = authored ? parseRegisteredCapability('queue_sfx_pack', authored) as AgentQueueSfxPackAction | null : proposed
     const clips = existing?.clips.length
       ? existing.clips
-      : GAME_SFX_HINT.test(request) ? ARCADE_HORDE_SFX_PACK : []
+      : !authored && GAME_SFX_HINT.test(request) ? ARCADE_HORDE_SFX_PACK : []
     if (clips.length) {
       return {
         reply: 'Prepararé Studio → Audio → SFX y encolaré el pack de efectos. Irán detrás de lo que ya use la GPU. La galería Audios solo muestra resultados cuando terminen. 🪄',
@@ -2428,6 +2431,12 @@ export async function reconcileAgentTurnWithRequest(
           confirm: true,
         }],
       }
+    }
+    if (authored || /\b(?:pack|paquete|lote|queue_sfx_pack|sfx_clips)\b/i.test(request)) {
+      // Missing pack data is not permission to invent a Video generation.
+      return { ...turn, reply: '', actions: [], rejections: [
+        ...(turn.rejections || []), rejectedWizardAction({ type: 'queue_sfx_pack' }, 0),
+      ] }
     }
   }
   if (isExplicitCancelRequest(request)) {

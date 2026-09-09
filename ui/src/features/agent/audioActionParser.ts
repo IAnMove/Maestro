@@ -240,3 +240,23 @@ export function restoreAuthoredMusicFields(
   }
   return { ...action, ...fields }
 }
+
+/** A complete JSON clip array on its own line is authored data, not LLM prose. */
+export function authoredSfxPackInput(request: string): Record<string, unknown> | undefined {
+  const arrays = request.split(/\r?\n/).map(line => line.trim())
+    .filter(line => /^(?:sfx_clips\s*[:=]\s*)?\[.*\]$/.test(line))
+  if (!arrays.length) return undefined
+  const raw: Record<string, unknown> = { type: 'queue_sfx_pack', confirm: true, sfx_clips: null }
+  if (arrays.length !== 1) return raw // Ambiguous data must not choose a winner.
+  try {
+    raw.sfx_clips = JSON.parse(arrays[0].replace(/^sfx_clips\s*[:=]\s*/, ''))
+    const negatives = [...request.matchAll(/\bnegative_prompt\s*=\s*("(?:[^"\\]|\\.)*")/g)]
+    const declaredModels = [...request.matchAll(/\bmodel_type\s*=\s*("(?:[^"\\]|\\.)*")/g)]
+    const models = [...new Set(request.match(/\bmmaudio_(?:v2|nsfw)\b/g) || [])]
+    if (negatives.length > 1 || declaredModels.length > 1 || models.length > 1) return { ...raw, sfx_clips: null }
+    if (negatives.length) raw.negative_prompt = JSON.parse(negatives[0][1])
+    if (declaredModels.length) raw.model_type = JSON.parse(declaredModels[0][1])
+    else if (models.length) raw.model_type = models[0]
+    return raw
+  } catch { return { ...raw, sfx_clips: null } }
+}

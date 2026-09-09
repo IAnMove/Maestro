@@ -303,3 +303,40 @@ test('explicit SFX pack reconciliation retains its chosen model and empty negati
   assert.equal(result.actions[0].negativePrompt, '')
   assert.deepEqual(result.actions[0].clips, pack.clips)
 })
+
+
+const authoredPackRequest = 'Create and enqueue an SFX pack using mmaudio_v2. Preserve these clips:\n'
+  + JSON.stringify(pack.clips.map(clip => ({ name: clip.name, prompt: clip.prompt, duration_seconds: clip.durationSeconds })))
+  + '\nUse negative_prompt="". Generate from text without a video guide.'
+
+test('an authored SFX JSON pack survives a missing or rewritten LLM proposal without video fallback', async () => {
+  const { reconcileAgentTurnWithRequest } = await import('../src/features/agent/agentActions.ts')
+  for (const actions of [[], [{ ...pack, clips: [{ name: 'wrong', prompt: 'rewritten', durationSeconds: 9 }] }]]) {
+    const turn = await reconcileAgentTurnWithRequest(authoredPackRequest, { reply: 'Old report', actions })
+    assert.deepEqual(turn.actions[0].clips, pack.clips)
+    assert.equal(turn.actions[0].modelType, 'mmaudio_v2')
+    assert.equal(turn.actions[0].negativePrompt, '')
+    assert.deepEqual(turn.actions.map(action => action.type), ['queue_sfx_pack'])
+  }
+})
+
+test('missing or ambiguous SFX pack data cannot launch a different media mode', async () => {
+  const { reconcileAgentTurnWithRequest } = await import('../src/features/agent/agentActions.ts')
+  for (const request of [
+    'Create an SFX pack without a video guide.',
+    authoredPackRequest + '\n[{"name":"second","prompt":"ambiguous","duration_seconds":1}]',
+  ]) {
+    const turn = await reconcileAgentTurnWithRequest(request, { reply: 'Generate video', actions: [] })
+    assert.deepEqual(turn.actions, [])
+    assert.equal(turn.rejections[0].actionType, 'queue_sfx_pack')
+  }
+})
+
+
+test('an explicit unsupported SFX model does not become the default model', async () => {
+  const { reconcileAgentTurnWithRequest } = await import('../src/features/agent/agentActions.ts')
+  const request = authoredPackRequest.replace('using mmaudio_v2', 'using model_type="unsupported-model"')
+  const turn = await reconcileAgentTurnWithRequest(request, { reply: 'Fallback', actions: [pack] })
+  assert.deepEqual(turn.actions, [])
+  assert.equal(turn.rejections[0].actionType, 'queue_sfx_pack')
+})
