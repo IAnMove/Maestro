@@ -16,6 +16,7 @@ REQUIRED = [
     "Clean-repo guard + Python checks=success",
     "UI tests + lint + type-check + build=success",
     "UI E2E boot (Chromium + simulated API)=success",
+    "Speech E2E Windows (real H.264 + AAC)=success",
 ]
 
 
@@ -24,6 +25,7 @@ def test_all_success_is_ok():
         "guard": "success",
         "ui": "success",
         "e2e": "success",
+        "speech_windows": "success",
     })
     assert ok is True
     assert failed == []
@@ -49,6 +51,13 @@ def test_cli_success_exit():
 def test_cli_failed_dependency_exit():
     pairs = list(REQUIRED)
     pairs[1] = "UI tests + lint + type-check + build=failure"
+    assert main(pairs) == 1
+
+
+@pytest.mark.parametrize("result", ["failure", "cancelled", "skipped", ""])
+def test_windows_speech_export_is_a_required_dependency(result):
+    pairs = list(REQUIRED)
+    pairs[3] = f"Speech E2E Windows (real H.264 + AAC)={result}"
     assert main(pairs) == 1
 
 
