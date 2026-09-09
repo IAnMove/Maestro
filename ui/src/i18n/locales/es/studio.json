@@ -938,5 +938,17 @@
     "pendingInvalid": "No se pudo leer la solicitud guardada. Se ha conservado para recuperarla.",
     "referenceFailed": "No se pudo preparar una referencia seleccionada. No se ha enviado ninguna imagen.",
     "conflictingGuides": "Hay guías de imagen distintas seleccionadas. Elige una imagen de control y una máscara antes de generar."
+  },
+  "speechCommands": {
+    "prepared": "Solicitud de voz preparada",
+    "admitted": "Voz en cola · {{id}}",
+    "pending": "Una solicitud de voz anterior necesita recuperación",
+    "recover": "Recuperar esta solicitud de voz",
+    "resources": "{{references}} referencias de audio · {{voices}} voces · {{loras}} LoRAs",
+    "autoDuration": "duración automática",
+    "contextChanged": "El formulario de voz cambió antes del envío. Revisa los ajustes actuales y vuelve a intentarlo.",
+    "panelUnavailable": "No se pudo mostrar la solicitud de voz. Abre Studio y vuelve a intentarlo.",
+    "pendingInvalid": "No se pudo leer la solicitud de voz guardada. Se ha conservado para recuperarla.",
+    "referenceFailed": "No se pudo preparar una referencia de audio seleccionada. No se ha enviado ninguna voz."
   }
 }

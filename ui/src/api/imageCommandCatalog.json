@@ -1646,7 +1646,7 @@
       "version": 1,
       "domain": "studio",
       "mutation": false,
-      "description": "Read an immutable image admission and its current canonical task in the exact original output workspace.",
+      "description": "Read an immutable generation admission and its current canonical task in the exact original output workspace.",
       "inputSchema": {
         "type": "object",
         "additionalProperties": false,

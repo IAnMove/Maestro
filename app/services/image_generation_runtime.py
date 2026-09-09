@@ -45,9 +45,11 @@ def create_image_generation_commands(runtime):
         validate_image_model(params, model_definition=runtime["wgp"].get_model_def,
                              model_downloaded=runtime["_check_model_downloaded"])
 
-    def resources():
+    def resources(media_kind="image"):
         from services.studio_image_resources import StudioImageResources
-        return StudioImageResources(
+        from services.studio_speech_resources import StudioSpeechResources
+        resource_type = StudioSpeechResources if media_kind == "audio" else StudioImageResources
+        return resource_type(
             workspace_dir=runtime["_workspace_dir"], uploads_dir=lambda: os.path.join(os.getcwd(), "uploads"),
             list_workspaces=runtime["_list_workspaces"], lora_search_dirs=runtime["wgp"].get_lora_search_dirs,
             lora_compatible=runtime["_lora_is_compatible_with_model"],
@@ -63,11 +65,30 @@ def create_image_generation_commands(runtime):
             validate_processors=processors.validate_selection, processor_settings=processors.validated_settings,
         )
 
+    def speech_operation():
+        from services.native_generation_operation import NativeGenerationOperation
+        from services.studio_speech_spec import freeze_studio_speech_spec
+        from services.studio_speech_preparation import prepare_studio_speech
+        from routers.studio_speech_commands import speech_command_catalog
+
+        def freeze(command):
+            frozen = freeze_studio_speech_spec(command)
+            effective = frozen["effective"]["input"]
+            return frozen, {**deepcopy(effective["params"]), "workspace": effective["workspace"]}
+
+        def prepare(params):
+            return prepare_studio_speech(params, model_definition=runtime["wgp"].get_model_def,
+                                         model_downloaded=runtime["_check_model_downloaded"],
+                                         resources=resources("audio"), execution_policy=execution_policy)
+
+        return NativeGenerationOperation(freeze=freeze, prepare=prepare, catalog=speech_command_catalog())
+
     service = ImageGenerationCommands(
         registry=runtime["_task_registry"], prepare=runtime["generate"], preflight=preflight,
         make_job=runtime["_new_generation_job"], task_fields=runtime["_generation_task_fields"],
         dispatch=dispatch, persist_recovery=persist, active_job_ids=lambda: runtime["_jobs"].keys(),
         prepare_studio=prepare_studio, runtime_defaults=lambda: {"mode": "", **runtime["wgp"].primary_settings},
+        operations={"generation.speech": speech_operation()},
     )
-    service.canonicalize_reference = lambda value: resources().canonicalize_legacy(value)
+    service.canonicalize_reference = lambda value, media_kind="image": resources(media_kind).canonicalize_legacy(value)
     return service

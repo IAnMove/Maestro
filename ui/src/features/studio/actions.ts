@@ -1,5 +1,5 @@
 import * as api from '../../api/client'
-import type { ImageGenerationReceipt } from '../../api/imageGenerationCommands'
+import type { GenerationReceiptLike } from '../../api/generationCommandClient'
 import i18n from '../../i18n'
 import { commandResultFromSlice, type CommandResult } from '../../lib/commandContract'
 import { getFamiliesForMode, getModelsForFamily, useStore } from '../../stores/useStore'
@@ -355,7 +355,7 @@ export async function prepareAudio(action: PrepareAudioCommand): Promise<Command
   )
 }
 
-function studioAdmissionResult(receipt: ImageGenerationReceipt): CommandResult {
+function studioAdmissionResult(receipt: GenerationReceiptLike): CommandResult {
   const entity = { kind: 'generation_task', id: receipt.result.task_id, workspaceId: receipt.result.workspace }
   return commandResultFromSlice({
     commandId: receipt.commandId, status: 'queued', entity, taskIds: receipt.taskIds,

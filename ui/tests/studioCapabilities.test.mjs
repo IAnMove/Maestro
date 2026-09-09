@@ -145,3 +145,41 @@ test('image prompts are accepted intact or rejected rather than silently truncat
   assert.equal(definition.resolve({ type: 'prepare_image', prompt: 'x'.repeat(200_001) }), null)
   assert.equal(definition.resolve({ type: 'prepare_image', prompt, negative_prompt: 'x'.repeat(200_001) }), null)
 })
+
+test('speech preparation preserves authored multiline text, language metadata and native duration', async () => {
+  const definitions = await registeredStudioCapabilities()
+  const definition = definitions.get('prepare_audio')
+  const prompt = '  Buenos días, Tentri.\nLee este diagnóstico exactamente.  '
+  const negative = '  No añadas una despedida.\nConserva los saltos.  '
+  const languageIntent = {
+    contentLanguage: 'es', technicalPromptLanguage: 'es',
+    verbatimSegments: [{ kind: 'spoken_text', text: prompt, language: 'es' }],
+  }
+
+  const parsedAtZero = definition.resolve({ type: 'prepare_audio', audio_sub_mode: 'speech',
+    prompt, negative_prompt: negative, model_type: 'kugelaudio_0_open', duration_seconds: 0 })
+  assert.equal(parsedAtZero.prompt, prompt)
+  assert.equal(parsedAtZero.negativePrompt, negative)
+  assert.equal(parsedAtZero.durationSeconds, 0)
+
+  const parsedAtSixty = definition.resolve({ type: 'prepare_audio', audio_sub_mode: 'speech',
+    prompt, model_type: 'kugelaudio_0_open', duration_seconds: 60 })
+  assert.equal(parsedAtSixty.durationSeconds, 60)
+
+  const prepared = await definition.prepare({ ...parsedAtSixty, languageIntent })
+  assert.equal(prepared.prompt, prompt)
+  assert.equal(prepared.negativePrompt, undefined)
+  assert.deepEqual(prepared.languageIntent, languageIntent)
+
+  let received
+  await definition.execute(prepared, { adapters: { studio: { async prepareAudio(action) {
+    received = action
+    return { message: 'Prepared speech' }
+  } } } })
+  assert.equal(received.prompt, prompt)
+  assert.deepEqual(received.languageIntent, languageIntent)
+  assert.equal(definition.resolve({ type: 'prepare_audio', audio_sub_mode: 'speech',
+    prompt: 'x'.repeat(200_001) }), null)
+  assert.equal(definition.resolve({ type: 'prepare_audio', audio_sub_mode: 'speech',
+    prompt, negative_prompt: 'x'.repeat(200_001) }), null)
+})

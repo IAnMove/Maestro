@@ -10870,7 +10870,8 @@ async def generate(request: Request):
         prepare_generation_inputs(body, _generation_model_def, requested_workspace,
                                   uploads_dir=os.path.join(os.getcwd(), "uploads"),
                                   workspace_dir=_workspace_dir(requested_workspace),
-                                  prepared_images=getattr(request, "prepared_studio_images", False) is True)
+                                  prepared_images=getattr(request, "prepared_studio_images", False) is True,
+                                  prepared_speech=getattr(request, "prepared_studio_speech", False) is True)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     try:
@@ -36863,7 +36864,8 @@ api.include_router(create_wangp_mcp_router(
               "generate": generate, "recast": recast_endpoint, "upscale": tools_upscale,
               **wangp_agent_handlers(api), **image_command_handlers(_image_generation_commands)},
     journal_path=os.path.join(os.path.dirname(__file__), "settings", "wangp-mcp-requests.sqlite3"),
-    command_operations=[*workspace_command_catalog()["operations"], *image_command_catalog()],
+    command_operations=[*workspace_command_catalog()["operations"], *image_command_catalog(
+        adapter.catalog for adapter in _image_generation_commands.operations.values())],
 ))
 
 # ============================================================================

@@ -118,16 +118,24 @@ function imageAction(raw: Record<string, unknown>): AgentPrepareImageAction | nu
 }
 
 function audioAction(raw: Record<string, unknown>): AgentPrepareAudioAction | null {
-  const prompt = text(raw.prompt, 8_000)
-  if (!prompt) return null
   const subMode = text(raw.audio_sub_mode, 12) as AgentPrepareAudioAction['subMode']
+  const speech = subMode === 'speech'
+  // Speech text is authored content. Keep every character, including
+  // whitespace and newlines, and let the closed speech command schema reject
+  // anything beyond its native 200k limit instead of silently truncating it.
+  const prompt = speech ? literalText(raw.prompt, 200_000) : text(raw.prompt, 8_000)
+  if (!prompt?.trim()) return null
+  const negativePrompt = speech
+    ? (raw.negative_prompt === undefined ? undefined : literalText(raw.negative_prompt, 200_000))
+    : text(raw.negative_prompt, 2_000) || undefined
+  if (raw.negative_prompt !== undefined && negativePrompt === undefined) return null
   return {
     type: 'prepare_audio',
     subMode: AUDIO_SUB_MODES.has(subMode) ? subMode : 'sfx',
     prompt,
     modelType: text(raw.model_type, 160) || undefined,
-    durationSeconds: number(raw.duration_seconds, 1, 20),
-    negativePrompt: text(raw.negative_prompt, 2_000) || undefined,
+    durationSeconds: number(raw.duration_seconds, speech ? 0 : 1, speech ? 1_800 : 20),
+    negativePrompt,
   }
 }
 
@@ -262,7 +270,12 @@ export function registerStudioCapabilities(register: typeof defineCapability): v
   resolve: audioAction,
   validate(action) { return action.prompt ? validType('prepare_audio', action) : ['prompt is required'] },
   async prepare(action) {
-    return compilePromptAction(action, action.subMode === 'speech' ? 'speech' : action.subMode === 'music' ? 'music' : 'sfx')
+    // Language intent remains workflow metadata. The speech native request
+    // carries authored text exactly; provider-side language handling belongs
+    // to its model/preflight contract, not this capability parser.
+    return action.subMode === 'speech'
+      ? action
+      : compilePromptAction(action, action.subMode === 'music' ? 'music' : 'sfx')
   },
   async execute(action, context) { return context.adapters.studio.prepareAudio(action) },
   correlate(_action, outcome) { return outcome.target }, async track(_action, outcome) { return outcome },

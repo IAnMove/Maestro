@@ -36,7 +36,7 @@ import {
   type GenerationSubmissionContext,
 } from '../features/studio/generationProvenance'
 import { storyDirectorSubmissionProvenance } from '../features/stories/provenance'
-import type { ImageGenerationReceipt } from '../api/imageGenerationCommands'
+import type { GenerationReceiptLike } from '../api/generationCommandClient'
 import { prepareStudioSubmission, studioUploadReference } from '../features/studio/studioSubmission'
 
 const DASHBOARD_PIPELINE_PAGE_SIZE = 8
@@ -1520,7 +1520,7 @@ export interface AppState extends LlmSlice, StudioConfigurationSlice {
   startGeneration: (
     scheduledPrompt?: ScheduledPromptSubmission,
     submissionContext?: GenerationSubmissionContext,
-  ) => Promise<void | ImageGenerationReceipt>
+  ) => Promise<void | GenerationReceiptLike>
   stopGeneration: (jobId?: string) => void
   dismissJob: (jobId: string) => void
   reconnectJobs: () => Promise<void>

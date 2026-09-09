@@ -1,4 +1,4 @@
-"""Shared image admission using native preparation, tasks and generation FIFO.
+"""Shared native admission using preparation, tasks and the generation FIFO.
 
 The receipt proves admission. TaskRegistry remains the progress authority and
 the native generation queue remains the sole execution/recovery mechanism.
@@ -37,7 +37,8 @@ def validate_image_model(params, *, model_definition, model_downloaded, allow_re
 
 class ImageGenerationCommands:
     def __init__(self, *, registry, prepare, preflight, make_job, task_fields,
-                 dispatch, persist_recovery, active_job_ids, prepare_studio=None, runtime_defaults=None):
+                 dispatch, persist_recovery, active_job_ids, prepare_studio=None, runtime_defaults=None,
+                 operations=None):
         self.registry = registry
         self.prepare = prepare
         self.preflight = preflight
@@ -48,6 +49,9 @@ class ImageGenerationCommands:
         self.active_job_ids = active_job_ids
         self.prepare_studio = prepare_studio
         self.runtime_defaults = runtime_defaults or (lambda: {})
+        self.operations = dict(operations or {})
+        if "generation.image" in self.operations:
+            raise ValueError("The existing image contract cannot be overridden")
         self.owner = uuid.uuid4().hex
 
     def _registry(self, workspace):
@@ -59,7 +63,7 @@ class ImageGenerationCommands:
 
     @staticmethod
     def _validate_replay(entry, frozen):
-        if (entry["operation"] != "generation.image" or entry["digest"] != frozen["fingerprint"]
+        if (entry["operation"] != frozen["original"]["operation"] or entry["digest"] != frozen["fingerprint"]
                 or entry["fingerprint_version"] != frozen["fingerprint_version"]):
             raise TaskCommandConflict("intent_id was already used with different parameters or preconditions")
 
@@ -101,7 +105,7 @@ class ImageGenerationCommands:
         effective["runtime"] = {"params": deepcopy(job["params"]), "workspace": workspace,
                                 "provenance": deepcopy(job["provenance"])}
         admitted = registry.admit_command_task(
-            intent_id=frozen["original"]["intent_id"], operation="generation.image",
+            intent_id=frozen["original"]["intent_id"], operation=frozen["original"]["operation"],
             digest=frozen["fingerprint"], original=frozen["original"], effective=effective,
             task_fields=self.task_fields(job), fingerprint_version=frozen["fingerprint_version"],
         )
@@ -116,7 +120,7 @@ class ImageGenerationCommands:
             if context and context.get(source):
                 command[target] = context[source]
         result = {"actor": "wizard" if trusted_tool == "wizard" else "user",
-                  "capability": "generation.image", "command": command}
+                  "capability": frozen["original"]["operation"], "command": command}
         collection = frozen["original"]["input"].get("workspace_collection_id")
         if collection is not None:
             result["workspace_id"] = collection
@@ -131,7 +135,11 @@ class ImageGenerationCommands:
                 self._validate_replay(previous, frozen)
                 self._dispatch_admitted(registry, previous)
                 return {"receipt": previous["receipt"], "replayed": True}
-            if command["version"] == 2:
+            adapter = self.operations.get(command["operation"])
+            if adapter is not None:
+                params, resources = adapter.prepare(params)
+                frozen["effective"]["resources"] = resources
+            elif command["version"] == 2:
                 if self.prepare_studio is None:
                     raise command_error(422, "unsupported_version", "Studio image commands are unavailable in this runtime")
                 params, resources = self.prepare_studio(params)
@@ -140,7 +148,8 @@ class ImageGenerationCommands:
                 self.preflight(params)
             request = JsonRequest({**deepcopy(params), "provenance": self._provenance(
                 frozen, trusted_tool, submission_context)}, trusted_tool=trusted_tool)
-            request.prepared_studio_images = command["version"] == 2
+            request.prepared_studio_images = command["operation"] == "generation.image" and command["version"] == 2
+            request.prepared_studio_speech = command["operation"] == "generation.speech"
             # This callback is an in-process capability, never a JSON option.
             # The native facade performs its ordinary validation first and then
             # transfers admission to the same canonical task/worker adapter.
@@ -153,8 +162,11 @@ class ImageGenerationCommands:
         except (OSError, sqlite3.Error) as error:
             raise command_error(503, "storage_unavailable", "Command storage is unavailable; retry with the same intention") from error
 
-    @staticmethod
-    def _freeze(command):
+    def _freeze(self, command):
+        if isinstance(command, dict) and isinstance(command.get("operation"), str):
+            adapter = self.operations.get(command["operation"])
+            if adapter is not None:
+                return adapter.freeze(command)
         if isinstance(command, dict) and type(command.get("version")) is int and command["version"] == 2:
             from services.studio_image_spec import freeze_studio_image_spec
             frozen = freeze_studio_image_spec(command)
@@ -183,6 +195,10 @@ class ImageGenerationCommands:
         for workspace in workspaces:
             registry = self._registry(workspace)
             for entry in registry.command_recovery_candidates():
+                if entry["operation"] not in {"generation.image", *self.operations}:
+                    # Another domain can share TaskRegistry without using
+                    # this runtime's native generation recovery projection.
+                    continue
                 task = registry.get(entry["task_id"])
                 if not task or task["status"] != "interrupted" or task["backend_job_id"] in active:
                     continue
@@ -194,13 +210,13 @@ class ImageGenerationCommands:
 
     def _recovery_task(self, record):
         provenance = record.get("provenance") or {}
-        if provenance.get("capability") != "generation.image":
+        if provenance.get("capability") not in {"generation.image", *self.operations}:
             return None
         registry = self._registry(record["workspace"])
         intent_id = provenance.get("command", {}).get("command_id")
         entry = registry.command_admission(intent_id)
         if entry is None or entry["receipt"]["result"]["job_id"] != record["id"]:
-            raise command_error(503, "recovery_mismatch", "Recovery does not match a durable image admission")
+            raise command_error(503, "recovery_mismatch", "Recovery does not match a durable generation admission")
         return registry, registry.get(entry["task_id"])
 
     def filter_recovery(self, records):
