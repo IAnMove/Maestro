@@ -450,3 +450,65 @@ test('Music form submission admits after leftover SFX prompt and weight', { conc
   assert.equal('MMAudio_prompt' in prepared.params, false)
   assert.equal('sfx_text_weight' in prepared.params, false)
 })
+
+test('Music admission preserves a newly selected reference while Speech keeps its voices', { concurrency: false }, async () => {
+  const { render, screen, waitFor, act, cleanup } = await import('@testing-library/react')
+  const reference = '/api/v1/file/music-reference.wav?workspace=original-music'
+  const params = { ...baseParams('retained-voices'), audio_prompt_type: 'A', audio_guide: reference }
+  const state = { ...formState(params), ttsVoiceCount: 2, ttsVoices: [
+    { name: 'Tentri', filename: 'voice.wav', path: '/api/v1/file/voice.wav?workspace=original-speech' },
+    { name: 'Narrator', filename: 'narrator.wav', path: '/api/v1/file/narrator.wav?workspace=original-speech' },
+  ] }
+  const original = structuredClone(params)
+  const posts: Record<string, unknown>[] = []
+  const resolved: string[][] = []
+  globalThis.fetch = (async (input, init) => {
+    const url = String(input)
+    const body = JSON.parse(String(init?.body)) as Record<string, unknown>
+    if (url.endsWith('/generation/commands/references')) {
+      assert.equal(body.media_kind, 'audio')
+      resolved.push(body.references as string[])
+      return jsonResponse({ references: body.references })
+    }
+    if (url.endsWith('/generation/commands')) {
+      posts.push(body)
+      return queuedResponse(body)
+    }
+    throw new Error(`unexpected fetch: ${url}`)
+  }) as typeof fetch
+  render(<StudioMusicCommandPanel workspace="music-panel-workspace" model="ace_step_v1_5_xl_sft_lm_4b" visible onRecovered={async () => undefined} />)
+  try {
+    const prepared = await prepareStudioMusicSubmission(params, state, () => state, {
+      actor: 'user', commandId: 'music-reference-with-speech-voices',
+    })
+    assert.equal(prepared.params.audio_guide, reference)
+    let submission!: ReturnType<typeof prepared.submit>
+    await act(async () => { submission = prepared.submit() })
+    await waitFor(() => assert.match(screen.getByRole('status').textContent || '', /1 audio references/))
+    assert.equal(posts.length, 0, 'the selected reference is visible before admission')
+    await act(async () => { await flushAnimationFrames() })
+    const receipt = await submission
+    assert.equal(receipt.status, 'queued')
+    assert.equal(posts.length, 1)
+    assert.deepEqual(resolved, [[reference]])
+    const submitted = (posts[0].input as Record<string, unknown>).params as Record<string, unknown>
+    assert.equal(submitted.audio_prompt_type, 'A')
+    assert.equal(submitted.audio_guide, reference)
+    assert.equal(submitted.prompt, params.prompt)
+    assert.equal(submitted.alt_prompt, params.alt_prompt)
+    assert.equal(submitted._tts_voice_count, 0)
+    assert.deepEqual(params, original)
+    assert.equal(state.ttsVoiceCount, 2)
+    assert.equal(state.ttsVoices[0].name, 'Tentri')
+  } finally {
+    cleanup()
+  }
+})
+
+test('Music form keeps an incomplete selected reference invalid despite retained Speech voices', { concurrency: false }, async () => {
+  const params = { ...baseParams('incomplete-reference'), audio_prompt_type: 'A' }
+  const state = { ...formState(params), ttsVoiceCount: 2 }
+  const prepared = await prepareStudioMusicSubmission(params, state, () => state)
+  assert.equal(prepared.params.audio_prompt_type, 'A')
+  await assert.rejects(prepared.submit(), /audio_guide requires/)
+})
