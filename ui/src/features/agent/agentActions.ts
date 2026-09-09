@@ -1830,9 +1830,20 @@ const EXPLICIT_CANCEL_REQUESTS = [
 ]
 const NEGATED_CANCEL_REQUEST = /\b(?:no|sin|don['’]?t|do\s+not)\b[^.!?\n]{0,24}\b(?:cancel|cancela|canceles|pares|detengas|stop|abort)\b/i
 
+function requestLooksLikeStudioGeneration(text: string): boolean {
+  // Quoted cancel/retry language inside a generate command is scene text,
+  // not permission to kill or relaunch the active GPU job.
+  return isExplicitVideoGenerationRequest(text)
+    || isExplicitImageGenerationRequest(text)
+    || isExplicitAudioGenerationRequest(text)
+    || isExplicit3dGenerationRequest(text)
+    || isExplicitSfxGenerationRequest(text)
+}
+
 export function isExplicitCancelRequest(request: string): boolean {
   const text = request.trim()
   if (!text || NEGATED_CANCEL_REQUEST.test(text) || isHowToGenerateQuestion(text)) return false
+  if (requestLooksLikeStudioGeneration(text)) return false
   return EXPLICIT_CANCEL_REQUESTS.some(pattern => pattern.test(text))
 }
 
@@ -1845,6 +1856,7 @@ const NEGATED_RETRY_REQUEST = /\b(?:no|sin|don['’]?t|do\s+not)\b[^.!?\n]{0,24}
 export function isExplicitRetryRequest(request: string): boolean {
   const text = request.trim()
   if (!text || NEGATED_RETRY_REQUEST.test(text) || isHowToGenerateQuestion(text)) return false
+  if (requestLooksLikeStudioGeneration(text)) return false
   return EXPLICIT_RETRY_REQUESTS.some(pattern => pattern.test(text))
 }
 

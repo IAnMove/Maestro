@@ -1803,6 +1803,53 @@ test('Spanish para-preposition does not cancel the active GPU task', async () =>
   }
 })
 
+test('quoted cancel or retry language inside a generate command does not hijack the GPU job', async () => {
+  const {
+    isExplicitCancelRequest,
+    isExplicitRetryRequest,
+    isExplicitVideoGenerationRequest,
+    isExplicitImageGenerationRequest,
+    reconcileAgentTurnWithRequest,
+  } = await import('../src/features/agent/agentActions.ts')
+
+  for (const request of [
+    'Generate a video of a director yelling "stop the video"',
+    'Generate a video of a director yelling stop the video',
+    'Generate a video showing a sign that reads "Cancel the generation"',
+    'Generate a video showing a sign that reads "Can I cancel the generation?"',
+    'Genera un vídeo de un director gritando "cancela el vídeo"',
+  ]) {
+    assert.equal(isExplicitVideoGenerationRequest(request), true, request)
+    assert.equal(isExplicitCancelRequest(request), false, request)
+    const turn = await reconcileAgentTurnWithRequest(request, { reply: 'Cancelo.', actions: [] })
+    assert.deepEqual(turn.actions.map(action => action.type), ['prepare_video', 'start_generation'], request)
+  }
+
+  for (const request of [
+    'Generate an image of a poster that says "retry the generation"',
+    'Hazme una imagen de un cartel que dice "reintenta la generación"',
+  ]) {
+    assert.equal(isExplicitImageGenerationRequest(request), true, request)
+    assert.equal(isExplicitRetryRequest(request), false, request)
+    const turn = await reconcileAgentTurnWithRequest(request, { reply: 'Reintento.', actions: [] })
+    assert.deepEqual(turn.actions.map(action => action.type), ['prepare_image', 'start_generation'], request)
+  }
+
+  for (const request of [
+    'cancel the generation',
+    'Can you cancel the generation?',
+    'retry the failed job',
+    'cancela el vídeo',
+  ]) {
+    const turn = await reconcileAgentTurnWithRequest(request, { reply: 'Vale.', actions: [] })
+    assert.equal(
+      turn.actions[0].type,
+      /retry|reintent/i.test(request) ? 'retry_task' : 'cancel_task',
+      request,
+    )
+  }
+})
+
 test('requires confirmation for retry and resolves an explicit latest failure request', async () => {
   const { parseAgentTurn, reconcileAgentTurnWithRequest } = await import('../src/features/agent/agentActions.ts')
   const unsigned = parseAgentTurn(JSON.stringify({
