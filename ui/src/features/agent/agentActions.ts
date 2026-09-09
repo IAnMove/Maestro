@@ -1856,7 +1856,7 @@ const NEGATED_CANCEL_REQUEST = /\b(?:no|sin|don['’]?t|do\s+not)\b[^.!?\n]{0,24
 
 export function isExplicitCancelRequest(request: string): boolean {
   const text = request.trim()
-  if (!text || NEGATED_CANCEL_REQUEST.test(text)) return false
+  if (!text || NEGATED_CANCEL_REQUEST.test(text) || isHowToGenerateQuestion(text)) return false
   return EXPLICIT_CANCEL_REQUESTS.some(pattern => pattern.test(text))
 }
 
@@ -2020,6 +2020,22 @@ const HOW_TO_GENERATE = [
   /\b(?:dime|expl[ií]came|descr[ií]beme|mu[eé]strame)\b[^.!?\n]{0,96}\b(?:c[oó]mo|pasos?(?:\s+para)?)\b/i,
   /\b(?:qu[eé])\s+pasos?\b[^.!?\n]{0,160}\b(?:gener|cre|lanz)/i,
   /\b(?:antes\s+de\s+(?:generar|crear|lanzar)|qu[eé]\s+(?:debo|deber[ií]a)\s+(?:configurar|saber|preparar))\b/i,
+  // Educational stop/cancel questions must not kill the active GPU job.
+  /\bhow\s+(?:can|do|would|should)\s+(?:i|we|you)\s+(?:stop|cancel|abort)\b/i,
+  /\bhow\s+to\s+(?:stop|cancel|abort)\b/i,
+  /\bwhen\s+(?:should|do|can|would)\s+(?:i|we|you)\s+(?:stop|cancel|abort)\b/i,
+  /\bshould\s+(?:i|we)\s+(?:stop|cancel|abort)\b/i,
+  /\b(?:what|why)\b[^.!?\n]{0,80}\b(?:stop|cancel|abort)\b/i,
+  /\b(?:explain|describe|tell\s+me)\b[^.!?\n]{0,96}\b(?:stop|cancel|abort)\b/i,
+  /\b(?:c[oó]mo(?:\s+(?:lo|la|las|los|puedo|se))?\s+(?:paro|parar|cancelo|cancelar|detengo|detener))\b/i,
+  /\b(?:cu[aá]ndo|por\s+qu[eé]|qu[eé]\s+pasa)\b[^.!?\n]{0,80}\b(?:paro|parar|cancelo|cancelar|detengo|detener|stop|cancel)\b/i,
+  /\b(?:puedo|podemos|podr[ií]a)\s+(?:cancelar|parar|detener)\b/i,
+  /\b(?:debo|deber[ií]a)\s+(?:cancelar|parar|detener)\b/i,
+  // UI-label questions mention "generate video" without being a launch command.
+  /\bwhat\s+does\b[^.!?\n]{0,80}\b(?:the\s+)?(?:generate|genera|launch|start)\b/i,
+  /\btell\s+me\s+about\b[^.!?\n]{0,64}\b(?:the\s+)?(?:generate\s+video|video\s+generation|generation\s+workflow)\b/i,
+  /\bexpli(?:ca|came)\b[^.!?\n]{0,80}\b(?:qu[eé]\s+)?(?:significa|hace)\b[^.!?\n]{0,48}\b(?:genera|generate)\b/i,
+  /\bqu[eé]\s+hace\b[^.!?\n]{0,80}\b(?:el\s+)?(?:bot[oó]n\s+)?(?:genera|generate)\b/i,
 ]
 
 export function isHowToGenerateQuestion(request: string): boolean {
