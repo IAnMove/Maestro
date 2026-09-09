@@ -245,3 +245,59 @@ for (const nativeAlias of [true, false]) {
     })
   })
 }
+
+function sfxMetadata(prompt: string) {
+  return { source: 'json', params: { model_type: 'mmaudio_v2', _audio_sub_mode: 'sfx',
+    prompt, MMAudio_prompt: prompt, duration_seconds: 3, num_inference_steps: 25 } }
+}
+
+test('Load Settings pins the clicked file even if gallery scrolling changes the selected output', async () => {
+  await withStudio(async () => {
+    useStore.setState({ outputs: [{ name: 'clicked.wav', type: 'audio' }, { name: 'scrolled.wav', type: 'audio' }] as never,
+      mediaFilter: 'all', selectedOutput: 0, selectedOutputMeta: sfxMetadata('Stale metadata') as never })
+    let finish!: (response: Response) => void
+    globalThis.fetch = input => {
+      assert.equal(String(input), '/api/v1/outputs/clicked.wav/metadata?workspace=audio-refs-test')
+      return new Promise(resolve => { finish = resolve })
+    }
+    const load = useStore.getState().loadSettingsFromOutput({ name: 'clicked.wav', workspace: 'audio-refs-test' })
+    await Promise.resolve()
+    assert.equal(typeof finish, 'function', 'the source must be fetched by its exact identity')
+    useStore.setState({ selectedOutput: 1, selectedOutputMeta: sfxMetadata('Scrolled metadata') as never })
+    finish(new Response(JSON.stringify(sfxMetadata('Clicked literal'))))
+    assert.equal(await load, true)
+    assert.equal(useStore.getState().params.MMAudio_prompt, 'Clicked literal')
+  })
+})
+
+test('a slower earlier Load Settings response cannot overwrite the newer clicked file', async () => {
+  await withStudio(async () => {
+    const responses = new Map<string, (value: Response) => void>()
+    globalThis.fetch = input => new Promise(resolve => { responses.set(String(input), resolve) })
+    const first = useStore.getState().loadSettingsFromOutput({ name: 'first.wav', workspace: 'audio-refs-test' })
+    const second = useStore.getState().loadSettingsFromOutput({ name: 'second.wav', workspace: 'audio-refs-test' })
+    await Promise.resolve()
+    assert.equal(responses.size, 2)
+    responses.get('/api/v1/outputs/second.wav/metadata?workspace=audio-refs-test')!(new Response(JSON.stringify(sfxMetadata('Newer click'))))
+    assert.equal(await second, true)
+    responses.get('/api/v1/outputs/first.wav/metadata?workspace=audio-refs-test')!(new Response(JSON.stringify(sfxMetadata('Older click'))))
+    assert.equal(await first, false)
+    assert.equal(useStore.getState().params.MMAudio_prompt, 'Newer click')
+  })
+})
+
+test('a workspace change during metadata fetch cancels reroll instead of generating elsewhere', async () => {
+  await withStudio(async () => {
+    let finish!: (value: Response) => void, generations = 0
+    globalThis.fetch = () => new Promise(resolve => { finish = resolve })
+    useStore.setState({ startGeneration: async () => { generations += 1 } })
+    const reroll = useStore.getState().rerollGeneration({ name: 'clicked.wav', workspace: 'audio-refs-test' })
+    await Promise.resolve()
+    assert.equal(typeof finish, 'function')
+    useStore.setState({ activeWorkspace: 'another-output', params: { ...useStore.getState().params, prompt: 'Current draft' } })
+    finish(new Response(JSON.stringify(sfxMetadata('Outdated file'))))
+    await reroll
+    assert.equal(generations, 0)
+    assert.equal(useStore.getState().params.prompt, 'Current draft')
+  })
+})

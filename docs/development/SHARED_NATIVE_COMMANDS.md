@@ -19,6 +19,12 @@ by this guarantee.
 5. If a submission response is lost, recover the saved request in the panel.
    Recovery reuses its intention; it must not silently create a new generation.
 
+Gallery Load Settings and Re-generate capture the clicked filename and source
+workspace. They fetch that file's metadata directly instead of waiting 50 ms and
+reading whichever item scrolling has selected. A newer restore request supersedes
+an older one; a workspace change cancels a pending restore before reroll can
+submit. Missing metadata cannot fall back to another clip's cached settings.
+
 The Generate button stays disabled while preparation/submission is pending and
 shows “Preparing…”, never an optimistic “Queued” based on the click alone. Rapid
 repeat clicks in that interval share the pending UI action. Admission and its

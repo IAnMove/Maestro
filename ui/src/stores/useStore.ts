@@ -40,6 +40,7 @@ import { storyDirectorSubmissionProvenance } from '../features/stories/provenanc
 import type { GenerationReceiptLike } from '../api/generationCommandClient'
 import { prepareStudioSubmission, studioUploadReference } from '../features/studio/studioSubmission'
 import { audioReferenceParams, restoreAudioReferences, stashAudioReferences, type AudioReferenceStash } from '../features/studio/audioReferenceState'
+import { beginOutputSettingsRestore, type OutputSettingsSource } from '../features/studio/outputSettingsRestore'
 
 const DASHBOARD_PIPELINE_PAGE_SIZE = 8
 const CIVIT_DOWNLOAD_POLL_MS = 2000
@@ -1650,8 +1651,8 @@ export interface AppState extends LlmSlice, StudioConfigurationSlice {
   selectedOutputMeta: OutputMetadata | null
   metadataLoading: boolean
   loadOutputMetadata: (name: string) => Promise<void>
-  loadSettingsFromOutput: () => Promise<boolean | void>
-  rerollGeneration: () => Promise<void>
+  loadSettingsFromOutput: (source?: OutputSettingsSource) => Promise<boolean | void>
+  rerollGeneration: (source?: OutputSettingsSource) => Promise<boolean | void>
   deleteSelectedOutput: () => Promise<void>
   rejoinClipGroup: (groupId: string) => Promise<void>
 
@@ -8659,29 +8660,10 @@ export const useStore = create<AppState>((set, get) => {
     set({ loraPickerSort: sort })
   },
 
-  loadSettingsFromOutput: async () => {
-    // Metadata is normally fetched in the background when an output is selected.
-    // On a slow/high-latency link (e.g. the user is remote over VPN) that fetch
-    // may not have landed — or may have failed — by the time "Load Settings" is
-    // clicked, leaving selectedOutputMeta null and this a silent no-op. Re-fetch
-    // on demand so the click is self-healing regardless of the background state.
-    let selectedOutputMeta = get().selectedOutputMeta
-    console.log('[LoadSettings] clicked — meta present:', !!selectedOutputMeta?.params,
-                '| metadataLoading:', get().metadataLoading, '| selectedOutput idx:', get().selectedOutput)
-    if (!selectedOutputMeta?.params) {
-      const pendingOutput = get().filteredOutputs()[get().selectedOutput]
-      console.log('[LoadSettings] no meta yet — on-demand fetch for:', pendingOutput?.name ?? '(no output at index)')
-      if (pendingOutput) {
-        await get().loadOutputMetadata(pendingOutput.name)
-        selectedOutputMeta = get().selectedOutputMeta
-        console.log('[LoadSettings] after on-demand fetch — params present:', !!selectedOutputMeta?.params,
-                    '| source:', selectedOutputMeta?.source)
-      }
-    }
-    if (!selectedOutputMeta?.params) {
-      console.warn('[LoadSettings] ABORT — no params available after fetch attempt; button is a no-op')
-      return false
-    }
+  loadSettingsFromOutput: async (source) => {
+    const restore = await beginOutputSettingsRestore(get, api.fetchOutputMetadata, source)
+    if (!restore) return false
+    const selectedOutputMeta = restore.metadata
     const { models } = get()
     const p = selectedOutputMeta.params as Record<string, unknown>
     if (get().generationMode === 'audio') {
@@ -8773,6 +8755,7 @@ export const useStore = create<AppState>((set, get) => {
     // Virtual SFX clears stale options locally without fetching an endpoint.
     if (!sfxModelTypes.has(modelType)) get().loadLoras(modelType)
     await get().loadModelOptions(modelType)
+    if (!restore.isCurrent()) return false
 
     // Detect I2V: if image_start was used or image_prompt_type contains "S"
     const hadStartImage = !!(p.image_start || (p.image_prompt_type as string || '').includes('S'))
@@ -8907,7 +8890,7 @@ export const useStore = create<AppState>((set, get) => {
     ) ? p.h3_window_plan as unknown as H3WindowPlan : null
 
     // Detect multi-clip output and reconstruct clips
-    const selectedName = get().filteredOutputs()[get().selectedOutput]?.name || ''
+    const selectedName = restore.name
     const loadFullSequence = isJoinedSequenceOutput(selectedName)
     if (p.multi_prompts_gen_type === 3 && Array.isArray(p.image_start) && loadFullSequence) {
       // Director Mode joins per-clip prompts with `\n---CLIP_BOUNDARY---\n`.
@@ -9410,13 +9393,14 @@ export const useStore = create<AppState>((set, get) => {
         }
       }
     }
-    return finishWangpRestore()
+    const restored = await finishWangpRestore()
+    return restore.isCurrent() && restored
   },
 
-  rerollGeneration: async () => {
+  rerollGeneration: async (source) => {
     // Await the (now async, self-healing) settings load before generating, so a
     // slow on-demand metadata fetch can't let the reroll fire with stale params.
-    if (await get().loadSettingsFromOutput() === false) return
+    if (await get().loadSettingsFromOutput(source) === false) return false
     await get().startGeneration()
   },
 

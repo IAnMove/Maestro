@@ -171,14 +171,14 @@ export function VideoInfoBar() {
         {params && (
           <>
             <button
-              onClick={loadSettingsFromOutput}
+              onClick={() => void loadSettingsFromOutput()}
               className="p-1.5 rounded-lg hover:bg-bg-hover text-text-secondary hover:text-text-primary transition-colors"
               title="Load settings"
             >
               <Pencil size={14} />
             </button>
             <button
-              onClick={rerollGeneration}
+              onClick={() => void rerollGeneration()}
               className="p-1.5 rounded-lg hover:bg-bg-hover text-text-secondary hover:text-text-primary transition-colors"
               title="Re-generate with same settings"
             >
