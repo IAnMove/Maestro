@@ -120,5 +120,11 @@
     "openSource": "Open source",
     "installManually": "install manually",
     "downloadStarted": "started ↓ (see download bar)"
+  },
+  "view": {
+    "label": "Gallery layout",
+    "feed": "One at a time",
+    "grid": "Grid",
+    "masonry": "Mosaic"
   }
 }

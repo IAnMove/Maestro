@@ -6,6 +6,7 @@ import { create } from 'zustand'
 import type { GenerateParams, OutputFile, MediaFilter, AspectRatio, ResolutionPreset, ScailResolutionProfile, GenerationDetails, GenerationJob, ModelFamily, ModelDef, GenerationMode, ModelOptions, SystemConfig, SettingsTab, OutputMetadata, MultiClip, ServicesConfig, ProductionProfile, AudioAnalysisResult, PlannedClip, ClipPlan, DirectorClipImage, DirectorImageGenProgress, SpeakerMapping, DirectorSkill, DirectorShotImageGuidance, ShortFilmCharacter, ShortFilmPath, MusicVideoTreatment, CivitAIModel, CivitAIDownload, PipelineListItem, PipelineRepairState, SavedPipelineState, SystemDetectResponse, SystemStats, RecastCharacterMapping, RepaintRegionMapping, H3WindowPlan, DirectorV2PlanJob, DirectorV2PlanResponse } from '../types'
 import { DEFAULT_DIRECT_VIDEO_MASTER_PROMPT } from '../types'
 import * as api from '../api/client'
+import type { GalleryView } from './gallerySlice'
 import i18n from '../i18n'
 import { type FamilyId, type ThemeMode, type ThemePrefs } from '../lib/theme'
 import { splitPromptSchedule } from '../lib/promptScheduler'
@@ -1619,6 +1620,9 @@ export interface AppState extends LlmSlice, StudioConfigurationSlice {
   selectedOutput: number
   setSelectedOutput: (i: number) => void
   mediaFilter: MediaFilter
+  /** Gallery layout preference — see gallerySlice. */
+  galleryView: GalleryView
+  setGalleryView: (view: GalleryView) => void
   outputSearchQuery: string
   galleryFeedAtTop: boolean
   galleryRefreshPending: boolean

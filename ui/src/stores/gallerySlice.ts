@@ -3,6 +3,20 @@ import { GALLERY_LIST_FILTERS, galleryListQuery } from '../lib/galleryListQuery'
 import type { MediaFilter, OutputFile, OutputMetadata } from '../types'
 import type { SliceCreator } from './storeApi'
 
+export type GalleryView = 'feed' | 'grid' | 'masonry'
+
+const GALLERY_VIEW_KEY = 'hocuspocus_gallery_view'
+const GALLERY_VIEWS: readonly GalleryView[] = ['feed', 'grid', 'masonry']
+
+function readStoredGalleryView(): GalleryView {
+  try {
+    const stored = localStorage.getItem(GALLERY_VIEW_KEY)
+    return GALLERY_VIEWS.includes(stored as GalleryView) ? stored as GalleryView : 'feed'
+  } catch {
+    return 'feed'
+  }
+}
+
 export type GallerySlice = {
   workspaces: Array<{ name: string; path: string; file_count?: number }>
   activeWorkspace: string
@@ -16,6 +30,11 @@ export type GallerySlice = {
   selectedOutput: number
   setSelectedOutput: (i: number) => void
   mediaFilter: MediaFilter
+  /** How the gallery lays its items out. A preference, not state derived
+   *  from the data: the same set of outputs is worth browsing densely one
+   *  moment and reviewing one-up the next. */
+  galleryView: GalleryView
+  setGalleryView: (view: GalleryView) => void
   outputSearchQuery: string
   galleryFeedAtTop: boolean
   galleryRefreshPending: boolean
@@ -302,6 +321,11 @@ export const createGallerySlice: SliceCreator<GallerySlice> = (set, get) => ({
     }
   },
   mediaFilter: 'all',
+  galleryView: readStoredGalleryView(),
+  setGalleryView: (view) => {
+    set({ galleryView: view })
+    try { localStorage.setItem(GALLERY_VIEW_KEY, view) } catch { /* private browsing */ }
+  },
   outputSearchQuery: '',
   galleryFeedAtTop: true,
   galleryRefreshPending: false,
