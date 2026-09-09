@@ -94,6 +94,21 @@ export function fetchWorkspaceCollection(workspaceId: string): Promise<Workspace
   return postCommand({ version: 1, operation: 'collections.get', input: { workspace_id: workspaceId } })
 }
 
+function validCollectionRecord(item: WorkspaceCollection | undefined): boolean {
+  return item?.schema === 'hocuspocus.workspace-record' && item.schema_version === 1
+    && typeof item.id === 'string' && Boolean(item.id) && Number.isInteger(item.revision) && item.revision > 0
+    && typeof item.name === 'string' && typeof item.description === 'string'
+    && [item.project_ids, item.asset_ids, item.production_ids].every(ids => Array.isArray(ids) && ids.every(id => typeof id === 'string'))
+}
+
+function assertCollectionReceipt(receipt: CollectionReceipt, command: CollectionCommand): void {
+  if (receipt?.version !== 1 || receipt.commandId !== command.intent_id || receipt.operation !== command.operation
+    || receipt.status !== 'completed' || !validCollectionRecord(receipt.result)
+    || (command.operation === 'collections.update' && receipt.result.id !== command.input.workspace_id)) {
+    throw new CollectionCommandError(i18n.t('workspaces:commands.invalidReceipt', { id: command.intent_id }), command.intent_id)
+  }
+}
+
 /** Transport retries retain the exact command. A new user action gets a new ID. */
 export async function submitCollectionCommand(command: CollectionCommand): Promise<CollectionReceipt> {
   retainPending(command)
@@ -108,16 +123,7 @@ export async function submitCollectionCommand(command: CollectionCommand): Promi
     throw new CollectionCommandError(i18n.t('workspaces:commands.failedWithIntent', { message: detail, id: command.intent_id }),
       command.intent_id, error instanceof CollectionCommandError ? error.status : undefined)
   }
-  const item = receipt?.result
-  const validRecord = item?.schema === 'hocuspocus.workspace-record' && item.schema_version === 1
-    && typeof item.id === 'string' && Boolean(item.id) && Number.isInteger(item.revision) && item.revision > 0
-    && typeof item.name === 'string' && typeof item.description === 'string'
-    && [item.project_ids, item.asset_ids, item.production_ids].every(ids => Array.isArray(ids) && ids.every(id => typeof id === 'string'))
-  if (receipt?.version !== 1 || receipt.commandId !== command.intent_id || receipt.operation !== command.operation
-    || receipt.status !== 'completed' || !validRecord
-    || (command.operation === 'collections.update' && item.id !== command.input.workspace_id)) {
-    throw new CollectionCommandError(i18n.t('workspaces:commands.invalidReceipt', { id: command.intent_id }), command.intent_id)
-  }
+  assertCollectionReceipt(receipt, command)
   // Presentation/local-storage failure after a commit must not erase its receipt.
   try { retainPending(command, true) } catch { /* Recovering the same ID remains safe. */ }
   return receipt

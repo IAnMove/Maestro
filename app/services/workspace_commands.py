@@ -90,6 +90,16 @@ def catalog() -> dict[str, Any]:
     return {"version": 1, "scope": "installation", "operations": operations}
 
 
+def _validate_collection_fields(data: dict[str, Any]) -> None:
+    if any(item is None for item in data.values()):
+        raise ValueError("Collection fields cannot be null; omit a field to preserve it")
+    if "name" in data and not data["name"].strip():
+        raise ValueError("Collection name cannot be blank")
+    for field in ("project_ids", "asset_ids", "production_ids"):
+        if field in data and len(set(data[field])) != len(data[field]):
+            raise ValueError(f"{field} must contain unique canonical IDs")
+
+
 def validate_command(value: Any) -> tuple[dict[str, Any], dict[str, Any]]:
     """Return original request and effective spec. Transport identity is not a digest."""
     try:
@@ -105,13 +115,7 @@ def validate_command(value: Any) -> tuple[dict[str, Any], dict[str, Any]]:
             raise ValueError("Read commands do not accept an execution intent_id")
         parsed = model.model_validate(request.input)
         data = parsed.model_dump(exclude_unset=request.operation == "collections.update")
-        if any(item is None for item in data.values()):
-            raise ValueError("Collection fields cannot be null; omit a field to preserve it")
-        if "name" in data and not data["name"].strip():
-            raise ValueError("Collection name cannot be blank")
-        for field in ("project_ids", "asset_ids", "production_ids"):
-            if field in data and len(set(data[field])) != len(data[field]):
-                raise ValueError(f"{field} must contain unique canonical IDs")
+        _validate_collection_fields(data)
         effective = {"version": 1, "operation": request.operation, "input": data}
         return deepcopy(value), {**effective, "intent_id": request.intent_id}
     except ValidationError as exc:

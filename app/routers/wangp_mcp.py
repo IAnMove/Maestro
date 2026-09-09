@@ -27,6 +27,18 @@ REQUEST_TOOLS = MUTATIONS | {'analyze'}
 GENERATION_MODES = ('image', 'video', 'audio', 'avatar')
 
 
+def _command_tool(operation):
+    # HTTP carries its operation explicitly; MCP carries it as the tool name.
+    # Derive the transport projection from the same source schema.
+    schema = operation['inputSchema']
+    schema = {**schema, 'properties': {key: value for key, value in schema['properties'].items() if key != 'operation'},
+              'required': [key for key in schema['required'] if key != 'operation']}
+    return {
+        'name': operation['name'], 'description': operation['description'], 'inputSchema': schema,
+        'annotations': {'readOnlyHint': not operation['mutation'], 'destructiveHint': False, 'idempotentHint': True},
+    }
+
+
 def tool_definitions(available=None):
     tools = []
     for name, description in [
@@ -80,17 +92,7 @@ def tool_definitions(available=None):
                       'annotations': {'readOnlyHint': name not in MUTATIONS, 'destructiveHint': False, 'idempotentHint': True}})
     for operation in command_catalog()['operations']:
         if available is not None and operation['name'] in available:
-            # HTTP carries its operation explicitly; MCP carries it as the tool
-            # name. Derive the transport projection from the same source schema.
-            schema = operation['inputSchema']
-            schema = {**schema, 'properties': {key: value for key, value in schema['properties'].items() if key != 'operation'},
-                      'required': [key for key in schema['required'] if key != 'operation']}
-            tools.append({
-                'name': operation['name'], 'description': operation['description'],
-                'inputSchema': schema,
-                'annotations': {'readOnlyHint': not operation['mutation'],
-                                'destructiveHint': False, 'idempotentHint': True},
-            })
+            tools.append(_command_tool(operation))
     return tools
 
 
