@@ -62,6 +62,9 @@ export const STUDIO_MUSIC_FORM_RESIDUAL_FIELDS = [
   // Image/video references and selectors restored by Load Settings.
   'image_start', 'image_end', 'image_refs', 'image_guide', 'image_mask',
   'video_guide', 'video_mask', 'video_source', 'video_prompt_type',
+  // Both registered music handlers hide flow_shift; the native settings
+  // filter drops it, but loadModelOptions still writes its shared default.
+  'flow_shift',
   'image_prompt_type', 'input_video_strength', 'denoising_strength',
   'masking_strength', 'video_guide_outpainting', 'frames_positions',
   'canonical_image_refs', 'image_fit_mode', 'image_refs_relative_size',
@@ -200,7 +203,15 @@ function isAlwaysInactiveResidual(key: string, value: unknown): boolean {
   return false
 }
 
+// Native Music disables these video controls even when model-options writes
+// shared numeric defaults. Source assets and active processors stay validated.
+const INACTIVE_MUSIC_MODEL_CONTROLS = new Set([
+  'flow_shift', 'sliding_window_size', 'sliding_window_overlap',
+  'sliding_window_discard_last_frames',
+])
+
 function isContextInactiveResidual(key: string, value: unknown, fullParams: Record<string, unknown>): boolean {
+  if (INACTIVE_MUSIC_MODEL_CONTROLS.has(key)) return typeof value === 'number' && Number.isFinite(value)
   if (key === 'cfg_zero_step') return value === -1
   if (key === 'skip_steps_multiplier' || key === 'skip_steps_start_step_perc') {
     return fullParams.skip_steps_cache_type === undefined || fullParams.skip_steps_cache_type === ''
