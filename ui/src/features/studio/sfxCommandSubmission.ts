@@ -5,6 +5,7 @@ import type { AppState } from '../../stores/useStore'
 import type { GenerationSubmissionContext } from './generationProvenance'
 import {
   createStudioSfxGenerationCommand,
+  neutralizeStudioSfxFormResidue,
   projectStudioSfxFormParams,
   type StudioSfxGenerationCommand,
 } from './sfxGenerationSpec'
@@ -69,7 +70,7 @@ export async function prepareStudioSfxSubmission(
     // known video/H3 controls alongside the sfx fields. Project only that
     // explicit form residue; the command builder remains closed for direct
     // Wizard/MCP envelopes and rejects every other unknown key.
-    snapshotParams = projectStudioSfxFormParams(snapshotParams)
+    snapshotParams = neutralizeStudioSfxFormResidue(projectStudioSfxFormParams(snapshotParams))
     assertSameSfxForm(before, current())
     await canonicalVideoReference(snapshotParams)
     assertSameSfxForm(before, current())

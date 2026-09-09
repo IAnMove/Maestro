@@ -314,3 +314,25 @@ test('store SFX submission keeps defaults and literal prompt while ignoring stal
     useStore.setState(before)
   }
 })
+
+test('Studio SFX submission rejects leftover Speech lyrics when MMAudio_prompt is empty', { concurrency: false }, async () => {
+  const leftover = {
+    ...baseParams('leftover-speech'),
+    prompt: 'Speaker 1: leftover speech that must not become SFX',
+  }
+  delete leftover.MMAudio_prompt
+  leftover.duration_seconds = 15
+  const state = formState(leftover)
+  let generationCalls = 0
+  globalThis.fetch = (async input => {
+    if (String(input).endsWith('/generation/commands')) generationCalls += 1
+    return jsonResponse({})
+  }) as typeof fetch
+
+  const prepared = await prepareStudioSfxSubmission(leftover, state, () => state, {
+    actor: 'user', commandId: 'sfx-leftover-speech',
+  })
+  await assert.rejects(prepared.submit(), /literal sound description is required/)
+  assert.equal(generationCalls, 0)
+  assert.deepEqual(pendingSfxGenerationCommands(), [])
+})
