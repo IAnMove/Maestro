@@ -31,7 +31,8 @@ test('recognizes the literal Studio music execution request and repairs a video 
   const repaired = await reconcileAgentTurnWithRequest(musicRequest, badVideoTurn)
   assert.deepEqual(repaired.actions.map(action => action.type), ['prepare_audio', 'start_generation'])
   assert.equal(repaired.actions[0].subMode, 'music')
-  assert.equal(repaired.actions[0].prompt, musicRequest)
+  assert.equal(repaired.actions[0].prompt, '[Verse]\nThe city listens\nEvery light replies')
+  assert.equal(repaired.actions[0].altPrompt, 'Soft drums, luminous synths.\nA quiet chorus.')
 })
 
 test('accepts explicit English and Spanish Studio music commands', async () => {
@@ -62,4 +63,28 @@ test('keeps educational, negated, Story and music-video requests out of Studio g
     const result = await reconcileAgentTurnWithRequest(request, { reply: 'I will generate it.', actions: [] })
     assert.deepEqual(result.actions, [], request)
   }
+})
+
+test('restores explicitly bounded Music fields after a provider collapses newlines', async () => {
+  const { reconcileAgentTurnWithRequest } = await import('../src/features/agent/agentActions.ts')
+  const action = { type: 'prepare_audio', subMode: 'music', prompt: 'rewritten lyrics',
+    altPrompt: 'Soft drums, luminous synths. A quiet chorus.', musicDescription: 'rewritten description', seed: 42 }
+  const repaired = await reconcileAgentTurnWithRequest(musicRequest, { reply: 'Prepared', actions: [action] })
+  assert.equal(repaired.actions[0].prompt, '[Verse]\nThe city listens\nEvery light replies')
+  assert.equal(repaired.actions[0].altPrompt, 'Soft drums, luminous synths.\nA quiet chorus.')
+  assert.equal(repaired.actions[0].musicDescription, 'A supervisor watches the city.')
+  assert.equal(repaired.actions[0].seed, 42)
+  assert.equal(action.prompt, 'rewritten lyrics')
+})
+
+test('literal Music recovery preserves spaces and declines ambiguous or unbounded blocks', async () => {
+  const { restoreAuthoredMusicFields: restore } = await import('../src/features/agent/audioActionParser.ts')
+  const action = { type: 'prepare_audio', subMode: 'music', prompt: 'initial', altPrompt: 'initial caption' }
+  const request = 'prompt:\n  authored lyrics  \n\nalt_prompt:\n  caption\r\nwith lines  \nmusic_description: metadata'
+  assert.equal(restore(request, action).prompt, '  authored lyrics  \n')
+  assert.equal(restore(request, action).altPrompt, '  caption\r\nwith lines  ')
+  assert.deepEqual(restore('alt_prompt:\nambiguous prose with no end marker', action), action)
+  assert.equal(restore('prompt: first\nprompt: second', action), action)
+  const speech = { ...action, subMode: 'speech' }
+  assert.equal(restore(request, speech), speech)
 })

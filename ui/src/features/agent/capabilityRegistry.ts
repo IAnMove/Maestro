@@ -42,6 +42,7 @@ import type { AgentCreateVideoEditorProjectAction, AgentOpenVideoEditorProjectAc
 import type { AgentAttachVideoclipAlternativeSongAction, AgentMountVideoclipAlternativeSongAction } from './alternativeSongActions'
 import type { AgentApplyCharacterKitPresetAction, AgentAttachCharacterKitReferencesAction, AgentBuildCharacterKitAction, AgentCreateCharacterKitAction, AgentOpenCharacterKitAction, AgentOpenCharacterKitRigAction, AgentTrackCharacterKitJobAction } from './characterKitActions'
 import { registerStudioCapabilities } from './studioCapabilities'
+export { restoreAuthoredMusicFields } from './audioActionParser'
 import { registerNavigationQueueCapabilities } from './navigationQueueCapabilities'
 import { registerEditorAuxCapabilities } from './editorAuxCapabilities'
 import { registerToolCapabilities } from './toolCapabilities'
