@@ -63,13 +63,13 @@ import {
   parseRegisteredCapability,
   registeredCapabilitySchemas,
   reconcileProgrammaticVideoRequest,
+  restoreAuthoredMusicFields,
   type AgentPrepareProgrammaticVideoAction,
   type AgentTab,
   type LanguageIntent,
 } from './capabilityRegistry'
 import { defaultApplicationAdapters } from './applicationAdapters'
 import { runRegisteredCapability } from './capabilityRunner'
-import { parsePrepareAudioAction } from './audioActionParser'
 import {
   applySongLanguageIntent,
   extractRequestedSongLanguage,
@@ -1221,7 +1221,6 @@ function parseAction(value: unknown): AgentAction | null {
       outputCount: optionalPositiveNumber(raw.output_count, 1, 8, true),
     }
   }
-  if (type === 'prepare_audio') return parsePrepareAudioAction(raw)
   if (type === 'prepare_3d') {
     const prompt = cleanString(raw.prompt, 8_000)
     if (!prompt) return null
@@ -2491,7 +2490,7 @@ export async function reconcileAgentTurnWithRequest(
       } satisfies AgentPrepareAudioAction
     return {
       reply: 'Prepararé Studio → Audio con los valores visibles y enviaré la generación a la cola. 🪄',
-      actions: [...navigation, prepare, { type: 'start_generation', confirm: true }],
+      actions: [...navigation, restoreAuthoredMusicFields(request, prepare), { type: 'start_generation', confirm: true }],
     }
   }
   if (isExplicitVideoGenerationRequest(request)) {

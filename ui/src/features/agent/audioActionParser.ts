@@ -152,3 +152,36 @@ export function parsePrepareAudioAction(raw: Record<string, unknown>): AgentPrep
     outputCount: controls.outputCount,
   }
 }
+
+// Only explicitly named, bounded fields in the user's request are authoritative.
+// A multiline value needs the next named header; never guess where prose ends.
+const AUTHORED_MUSIC_HEADER = /^(?:Native[ \t]+)?(lyrics\/prompt|prompt|alt_prompt|music_description)(?:[ \t]+\(including line breaks\))?:[ \t]*(\r?\n)?/gim
+const MUSIC_TEXT_FIELDS = {
+  'lyrics/prompt': 'prompt', prompt: 'prompt',
+  alt_prompt: 'altPrompt', music_description: 'musicDescription',
+} as const
+
+export function restoreAuthoredMusicFields(
+  request: string,
+  action: AgentPrepareAudioAction,
+): AgentPrepareAudioAction {
+  if (action.subMode !== 'music') return action
+  const headers = [...request.matchAll(AUTHORED_MUSIC_HEADER)]
+  const fields: Partial<Pick<AgentPrepareAudioAction, 'prompt' | 'altPrompt' | 'musicDescription'>> = {}
+  const seen = new Set<string>()
+  for (const [index, header] of headers.entries()) {
+    const field = MUSIC_TEXT_FIELDS[header[1].toLowerCase() as keyof typeof MUSIC_TEXT_FIELDS]
+    // Ambiguous duplicate labels must not silently pick a winner.
+    if (seen.has(field)) return action
+    seen.add(field)
+    const start = header.index + header[0].length
+    const next = headers[index + 1]
+    if (header[2] && !next) continue
+    const end = header[2] ? next.index : request.indexOf('\n', start)
+    const value = request.slice(start, end < 0 ? undefined : end)
+      .replace(header[2] ? /\r?\n$/ : /\r$/, '')
+    if (value.length > 200_000 || (field === 'prompt' && !value.trim())) continue
+    fields[field] = value
+  }
+  return { ...action, ...fields }
+}

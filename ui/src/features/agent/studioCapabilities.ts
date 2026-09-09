@@ -7,6 +7,7 @@
  * parent capability registry imports this file as a side effect.
  */
 import type { defineCapability, CapabilityDefinition } from './capabilityRegistry'
+import { parsePrepareAudioAction } from './audioActionParser'
 import type {
   AgentAction,
   AgentAttachStudioReferencesAction,
@@ -44,19 +45,6 @@ function number(
   if (typeof value !== 'number' || !Number.isFinite(value)) return undefined
   const bounded = Math.max(minimum, Math.min(maximum, value))
   return integer ? Math.round(bounded) : bounded
-}
-
-/** Validate a Music control without silently changing the requested value. */
-function strictNumber(
-  value: unknown,
-  minimum: number,
-  maximum: number,
-  integer = false,
-): number | undefined {
-  if (value === undefined) return undefined
-  if (typeof value !== 'number' || !Number.isFinite(value)) return undefined
-  if (value < minimum || value > maximum || (integer && !Number.isInteger(value))) return undefined
-  return value
 }
 
 function stringArray(value: unknown, maxItems: number, maxLength: number): string[] {
@@ -127,106 +115,6 @@ function imageAction(raw: Record<string, unknown>): AgentPrepareImageAction | nu
     guidanceScale: typeof raw.guidance_scale === 'number' && raw.guidance_scale >= 0
       ? number(raw.guidance_scale, 0, 30) : undefined,
     outputCount: number(raw.output_count, 1, 8, true),
-  }
-}
-
-type ResolvedAudioText = Pick<AgentPrepareAudioAction, 'prompt' | 'negativePrompt'>
-type ResolvedMusicControls = Pick<
-  AgentPrepareAudioAction,
-  'durationSeconds' | 'seed' | 'inferenceSteps' | 'guidanceScale' | 'outputCount'
->
-type ResolvedAudioExtras = Pick<
-  AgentPrepareAudioAction,
-  'altPrompt' | 'musicDescription' | 'musicInstrumental'
->
-
-function resolveAudioText(raw: Record<string, unknown>, literal: boolean): ResolvedAudioText | null {
-  // Speech and Music are authored text. Keep every character, including
-  // whitespace and newlines, while SFX retains its short cleaned prompt.
-  const prompt = literal ? literalText(raw.prompt, 200_000) : text(raw.prompt, 8_000)
-  if (!prompt?.trim()) return null
-  const negativePrompt = literal
-    ? (raw.negative_prompt === undefined ? undefined : literalText(raw.negative_prompt, 200_000))
-    : text(raw.negative_prompt, 2_000) || undefined
-  if (raw.negative_prompt !== undefined && negativePrompt === undefined) return null
-  return { prompt, negativePrompt }
-}
-
-function resolveAudioExtras(raw: Record<string, unknown>, music: boolean): ResolvedAudioExtras | null {
-  const altPrompt = music
-    ? (raw.alt_prompt === undefined ? undefined : literalText(raw.alt_prompt, 200_000))
-    : undefined
-  const musicDescription = music
-    ? (raw.music_description === undefined ? undefined : literalText(raw.music_description, 200_000))
-    : undefined
-  if (raw.alt_prompt !== undefined && altPrompt === undefined) return null
-  if (raw.music_description !== undefined && musicDescription === undefined) return null
-  if (raw.music_instrumental !== undefined && typeof raw.music_instrumental !== 'boolean') return null
-  return {
-    altPrompt,
-    musicDescription,
-    musicInstrumental: music ? raw.music_instrumental as boolean | undefined : undefined,
-  }
-}
-
-function resolveMusicControls(raw: Record<string, unknown>): ResolvedMusicControls | null {
-  const durationSeconds = strictNumber(raw.duration_seconds, 5, 360)
-  const seed = strictNumber(raw.seed, -1, 2_147_483_647, true)
-  const inferenceSteps = strictNumber(raw.inference_steps, 1, 1_000, true)
-  const guidanceScale = strictNumber(raw.guidance_scale, 0, 1_000)
-  const outputCount = strictNumber(raw.output_count, 1, 1, true)
-  if (
-    (raw.duration_seconds !== undefined && durationSeconds === undefined)
-    || (raw.seed !== undefined && seed === undefined)
-    || (raw.inference_steps !== undefined && inferenceSteps === undefined)
-    || (raw.guidance_scale !== undefined && guidanceScale === undefined)
-    || (raw.output_count !== undefined && outputCount === undefined)
-  ) return null
-  return { durationSeconds, seed, inferenceSteps, guidanceScale, outputCount }
-}
-
-function resolveNonMusicControls(
-  raw: Record<string, unknown>,
-  speech: boolean,
-): ResolvedMusicControls {
-  return {
-    durationSeconds: number(raw.duration_seconds, speech ? 0 : 1, speech ? 1_800 : 20),
-    seed: undefined,
-    inferenceSteps: undefined,
-    guidanceScale: undefined,
-    outputCount: undefined,
-  }
-}
-
-function resolveAudioControls(
-  raw: Record<string, unknown>,
-  subMode: AgentPrepareAudioAction['subMode'],
-): ResolvedMusicControls | null {
-  return subMode === 'music'
-    ? resolveMusicControls(raw)
-    : resolveNonMusicControls(raw, subMode === 'speech')
-}
-
-function audioAction(raw: Record<string, unknown>): AgentPrepareAudioAction | null {
-  const subMode = text(raw.audio_sub_mode, 12) as AgentPrepareAudioAction['subMode']
-  const textFields = resolveAudioText(raw, subMode === 'speech' || subMode === 'music')
-  if (!textFields) return null
-  const extras = resolveAudioExtras(raw, subMode === 'music')
-  if (!extras) return null
-  const controls = resolveAudioControls(raw, subMode)
-  if (!controls) return null
-  return {
-    type: 'prepare_audio',
-    subMode: AUDIO_SUB_MODES.has(subMode) ? subMode : 'sfx',
-    prompt: textFields.prompt,
-    modelType: text(raw.model_type, 160) || undefined,
-    durationSeconds: controls.durationSeconds,
-    negativePrompt: textFields.negativePrompt,
-    ...extras,
-    seed: controls.seed,
-    inferenceSteps: controls.inferenceSteps,
-    guidanceScale: controls.guidanceScale,
-    outputCount: controls.outputCount,
   }
 }
 
@@ -358,7 +246,7 @@ export function registerStudioCapabilities(register: typeof defineCapability): v
   parameters: ['audio_sub_mode', 'prompt', 'model_type', 'duration_seconds', 'negative_prompt', 'alt_prompt', 'music_description', 'music_instrumental', 'seed', 'inference_steps', 'guidance_scale', 'output_count'],
   inputSchema: { type: 'object', additionalProperties: false, properties: { type: { const: 'prepare_audio' }, audio_sub_mode: { type: 'string', enum: [...AUDIO_SUB_MODES] }, prompt: { type: 'string', minLength: 1, maxLength: 200_000 }, model_type: { type: 'string' }, duration_seconds: { type: 'number', minimum: 0, maximum: 1_800 }, negative_prompt: { type: 'string', maxLength: 200_000 }, alt_prompt: { type: 'string', maxLength: 200_000 }, music_description: { type: 'string', maxLength: 200_000 }, music_instrumental: { type: 'boolean' }, seed: { type: 'integer', minimum: -1, maximum: 2_147_483_647 }, inference_steps: { type: 'integer', minimum: 1, maximum: 1_000 }, guidance_scale: { type: 'number', minimum: 0, maximum: 1_000 }, output_count: { type: 'integer', minimum: 1, maximum: 1 } }, required: ['type', 'prompt'] },
   risk: 'edit', confirmation: 'none', progress: 'Rellenando Studio → Audio…',
-  resolve: audioAction,
+  resolve: parsePrepareAudioAction,
   validate(action) { return action.prompt ? validType('prepare_audio', action) : ['prompt is required'] },
   async prepare(action) {
     // Language intent remains workflow metadata. The speech native request

@@ -112,3 +112,13 @@ The native facade remains responsible for final handler validation and actual
 generation. Provider-free tests prove the contract, model capability guards,
 reference/LoRA boundaries and input immutability; they do not prove GPU
 inference or audio quality.
+
+## Wizard authored fields
+
+Studio and the Wizard capability use the same audio action parser. For an
+explicit Studio Music execution request, named `prompt` (or `Lyrics/prompt`),
+`alt_prompt` and `music_description` sections in the user message take precedence
+over an LLM rewrite. A multiline section must end at the next named section;
+inline fields end at the newline. Duplicate labels are ambiguous and are not
+reconciled. This preserves spaces and line breaks for these bounded fields; it
+is not a guarantee of literal extraction from arbitrary prose.
