@@ -31,7 +31,7 @@ import { WizardVisualInput, type WizardVisualMedia } from './WizardVisualInput'
 import type { VisualEvidence } from './visualEvidence'
 import { WizardVisualEvidence } from './WizardVisualEvidence'
 import { reconcileWizardMediaTurn } from './wizardVisualPolicy'
-import { formatWizardTurnReply } from './wizardTurnReport'
+import { formatWizardTurnReply, normalizeWizardResult, wizardTurnVisualState } from './wizardTurnReport'
 
 export { AgentAvatar, type AgentVisualState } from './AgentAvatar'
 
@@ -486,19 +486,20 @@ export function AgentAssistantPanel({ workspace, tasks, onClose, embedded = fals
         results,
       })
       if (!mountedRef.current) return
+      results = results.map(normalizeWizardResult)
       const cards = cardsFromResults(results)
       const assistantMessage: AgentMessage = {
         id: newId(),
         role: 'assistant',
         text: formatWizardTurnReply({ ...turn, reply: humanReply(turn.reply || '') }, results,
-          (key, options) => String(t(key, options))),
+          (key, options) => String(t(key, options)), question),
         createdAt: Date.now(),
         language: turn.conversationLanguage || undefined,
         mediaEvidence,
         cards: cards.length ? cards : undefined,
       }
       setMessages(current => [...current, assistantMessage].slice(-40))
-      setState(turn.rejections?.length || results.some(result => !result.ok) ? 'error' : 'success')
+      setState(wizardTurnVisualState(turn, results))
     } catch (error) {
       if (!mountedRef.current) return
       const message = error instanceof Error ? error.message : String(error)

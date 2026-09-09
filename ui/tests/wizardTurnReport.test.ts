@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { JSDOM } from 'jsdom'
 import i18n from '../src/i18n/index.ts'
-import { formatWizardTurnReply, rejectedWizardAction, withWizardRejections } from '../src/features/agent/wizardTurnReport.ts'
+import { formatWizardTurnReply, normalizeWizardResult, rejectedWizardAction, withWizardRejections, wizardTurnVisualState } from '../src/features/agent/wizardTurnReport.ts'
 import type { AgentActionResult, AgentTurn } from '../src/features/agent/agentActions.ts'
 
 const dom = new JSDOM('<!doctype html><html><body /></html>', { url: 'http://localhost/' })
@@ -62,11 +62,18 @@ test('media policy and request reconciliation retain exclusions instead of silen
   assert.doesNotMatch(formatWizardTurnReply(explanation, [], t), /Generated a video/)
 })
 
-test('reconciliation counts repeated action types and keeps prior parser diagnostics', () => {
+test('reconciliation matches full action identity and keeps original indices and diagnostics', () => {
   const before: AgentTurn = { reply: 'Done', actions: [{ type: 'open_tab', tab: 'studio' }, { type: 'open_tab', tab: 'comics' }],
     rejections: [rejectedWizardAction({ type: 'invalid' }, 9)] }
-  const actual = withWizardRejections(before, { reply: 'Navigating', actions: before.actions.slice(0, 1) }, 'request_policy')
+  const actual = withWizardRejections(before, { reply: 'Navigating', actions: before.actions.slice(1) }, 'request_policy')
   assert.deepEqual(actual.rejections?.map(item => item.actionType), ['invalid', 'open_tab'])
+  assert.equal(actual.rejections?.[1].index, 0)
+  const parsed = parseAgentTurn(JSON.stringify({ reply: '', actions: [{ type: 'unknown' }, { type: 'prepare_image', prompt: 'A' }] }))
+  const replaced = withWizardRejections(parsed, { reply: '', actions: [{ type: 'prepare_image', prompt: 'B' }] }, 'request_policy')
+  assert.deepEqual(replaced.rejections?.map(item => item.index), [0, 1])
+  assert.equal(replaced.rejections?.[1].code, 'request_policy')
+  const newlyRejected = withWizardRejections(before, { ...before, rejections: [rejectedWizardAction(null, 4)] }, 'request_policy')
+  assert.deepEqual(newlyRejected.rejections?.map(item => item.index), [9, 4])
 })
 
 test('a queued receipt cannot be labelled completed by model prose or an ok flag', () => {
@@ -90,10 +97,58 @@ test('failed and awaiting-input results keep real messages without an invented s
   assert.match(formatWizardTurnReply({ reply: '', actions: [action] }, [failed], t), /Failed.*Model unavailable/)
 })
 
-test('informational conversation and navigation explanations are preserved', () => {
+test('informational conversation is preserved while navigation requires its own result', () => {
   const reply = 'Collections group existing assets.'
-  assert.equal(formatWizardTurnReply({ reply, actions: [] }, [], t), reply)
-  assert.equal(formatWizardTurnReply({ reply, actions: [{ type: 'open_tab', tab: 'workspaces' }] }, [], t), reply)
+  assert.equal(formatWizardTurnReply({ reply, actions: [] }, [], t, 'What are collections?'), reply)
+  assert.equal(formatWizardTurnReply({ reply, actions: [] }, [], t, '¿Cómo funcionan las colecciones?'), reply)
+  assert.match(formatWizardTurnReply({ reply, actions: [{ type: 'open_tab', tab: 'workspaces' }] }, [], t), /No action was executed/)
+})
+
+test('empty and omitted actions never claim creation in response to an action request', () => {
+  for (const payload of [{ actions: [] }, {}]) {
+    const turn = parseAgentTurn(JSON.stringify({ reply: 'Created invented-999.', ...payload }))
+    for (const request of ['Create Nightwatch using my settings.', 'Can you create a collection?', 'Crea un proyecto Nightwatch.']) {
+      const reply = formatWizardTurnReply(turn, [], t, request)
+      assert.match(reply, /No action was executed/)
+      assert.doesNotMatch(reply, /invented-999|Created/)
+    }
+  }
+})
+
+test('navigation cannot certify unrelated creation or claim success when it failed', () => {
+  const action = { type: 'open_tab' as const, tab: 'studio' as const }
+  for (const ok of [true, false]) {
+    const result = { action, ok, message: ok ? 'Studio selected.' : 'Studio unavailable.' }
+    const reply = formatWizardTurnReply({ reply: 'I opened Studio and created invented-999.', actions: [action] }, [result], t)
+    assert.doesNotMatch(reply, /I opened|invented-999/)
+    assert.match(reply, ok ? /Reported.*Studio selected/ : /Failed.*Studio unavailable/)
+  }
+})
+
+test('inconsistent result states are normalized for text, cards and avatar without losing IDs', () => {
+  const action = { type: 'start_generation' as const, confirm: true as const }
+  const turn = { reply: 'Done', actions: [action] }
+  const result: AgentActionResult = { action, ok: false, message: 'Admission failed.',
+    commandResult: { commandId: 'cmd-real', status: 'completed', entities: [], artifacts: [], taskIds: ['task-real'], pipelineIds: [] },
+    report: { state: 'completed', message: 'Admission failed.', recoverable: true },
+  }
+  const failed = normalizeWizardResult(result)
+  assert.equal(failed.commandResult?.status, 'failed')
+  assert.equal(failed.report?.state, 'failed')
+  assert.deepEqual(failed.commandResult?.taskIds, ['task-real'])
+  assert.equal(wizardTurnVisualState(turn, [failed]), 'error')
+  assert.match(formatWizardTurnReply(turn, [failed], t), /Failed/)
+  for (const state of ['queued', 'running', 'prepared', 'awaiting_input', 'failed', 'completed'] as const) {
+    const actual = normalizeWizardResult({ ...result, ok: true, commandResult: undefined, report: { ...result.report!, state } })
+    const expected = state === 'failed' ? 'error' : state === 'completed' ? 'success' : ['queued', 'running'].includes(state) ? 'acting' : 'idle'
+    assert.equal(wizardTurnVisualState(turn, [actual]), expected)
+  }
+})
+
+test('mixed action explanations deliberately use local validation feedback', () => {
+  const turn = parseAgentTurn(JSON.stringify({ reply: 'I did not create it because the premise is missing.', actions: [{ type: 'create_story', title: 'Nightwatch' }] }))
+  assert.match(formatWizardTurnReply(turn, [], t), /missing required parameters/)
+  assert.doesNotMatch(formatWizardTurnReply(turn, [], t), /I did not create it/)
 })
 
 test('rejection copy is translated in Spanish', () => {

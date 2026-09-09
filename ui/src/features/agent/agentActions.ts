@@ -679,6 +679,8 @@ export interface AgentTurn {
   actions: AgentAction[]
   /** Locally derived validation/policy diagnostics, never trusted from the model. */
   rejections?: WizardActionRejection[]
+  /** Original proposal positions when parser exclusions shifted action indices. */
+  proposalIndices?: number[]
   /** ISO language tag inferred from the user's final message, not the UI. */
   conversationLanguage?: string
 }
@@ -1767,6 +1769,7 @@ export function parseAgentTurn(raw: string): AgentTurn {
     rejections.push(rejectedWizardAction(null, MAX_ACTIONS, 'action_limit'))
   }
   const actions: AgentAction[] = []
+  const proposalIndices: number[] = []
   let preparedStudio = false
   let startedGeneration = false
   for (const [index, value] of proposed.entries()) {
@@ -1782,11 +1785,13 @@ export function parseAgentTurn(raw: string): AgentTurn {
     }
     if (action.type === 'start_generation') startedGeneration = true
     actions.push(action)
+    proposalIndices.push(index)
   }
   const conversationLanguage = normalizeConversationLanguageTag(object.conversation_language)
   return {
     reply: reply || (actions.length ? 'El hechizo está trazado; voy a mover HocusPocus.' : humanReply(raw.trim())),
     actions,
+    ...(proposalIndices.some((index, position) => index !== position) ? { proposalIndices } : {}),
     ...(rejections.length ? { rejections } : {}),
     ...(conversationLanguage ? { conversationLanguage } : {}),
   }

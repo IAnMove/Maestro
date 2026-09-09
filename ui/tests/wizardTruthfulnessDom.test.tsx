@@ -17,7 +17,11 @@ window.matchMedia = () => ({ matches: false }) as MediaQueryList
 window.requestAnimationFrame = callback => { callback(0); return 1 }
 window.cancelAnimationFrame = () => undefined
 
-test('Wizard chat displays a rejected create_story and persists no invented success', { concurrency: false }, async () => {
+for (const proposal of [
+  { label: 'rejected create_story', actions: [{ type: 'create_story', title: 'Nightwatch' }], rejected: true },
+  { label: 'empty actions', actions: [], rejected: false },
+  { label: 'omitted actions', rejected: false },
+]) test(`Wizard chat with ${proposal.label} persists no invented success`, { concurrency: false }, async () => {
   const { render, screen, fireEvent, waitFor, cleanup } = await import('@testing-library/react')
   const { AgentAssistantPanel } = await import('../src/features/agent/AgentAssistantPanel.tsx')
   const { useStore } = await import('../src/stores/useStore.ts')
@@ -27,6 +31,7 @@ test('Wizard chat displays a rejected create_story and persists no invented succ
   let revision = 0
   const effects: string[] = []
   const question = 'Create a Story Lab project named Nightwatch using my settings.'
+  window.__HOCUSPOCUS_WIZARD_TRACE__ = []
   Object.defineProperty(globalThis, 'EventSource', { configurable: true, value: class { addEventListener() {} close() {} } })
   const respond = (value: unknown) => new Response(JSON.stringify(value), { headers: { 'content-type': 'application/json' } })
   globalThis.fetch = async (input, init) => {
@@ -41,7 +46,7 @@ test('Wizard chat displays a rejected create_story and persists no invented succ
     if (url.includes('/api/v1/assets')) return respond({ assets: [], total: 0 })
     if (url.includes('/api/v1/llm/generate')) return respond({ text: JSON.stringify({
       reply: 'I created story-invented-999 successfully.', conversation_language: 'en',
-      actions: [{ type: 'create_story', title: 'Nightwatch' }],
+      ...('actions' in proposal ? { actions: proposal.actions } : {}),
     }) })
     effects.push(`${method} ${url}`)
     throw new Error(`Unexpected effect: ${method} ${url}`)
@@ -54,11 +59,11 @@ test('Wizard chat displays a rejected create_story and persists no invented succ
     fireEvent.submit(textarea.closest('form')!)
     await waitFor(() => assert.ok(window.__HOCUSPOCUS_WIZARD_TRACE__?.some(item => item.question === question && item.results)))
     await waitFor(() => assert.match(document.body.textContent || '', /No action was executed in this turn/))
-    assert.match(document.body.textContent || '', /Actions not executed/)
+    if (proposal.rejected) assert.match(document.body.textContent || '', /Actions not executed/)
     assert.doesNotMatch(document.body.textContent || '', /story-invented-999|successfully/)
     const trace = window.__HOCUSPOCUS_WIZARD_TRACE__!.find(item => item.question === question)!
     assert.deepEqual(trace.results, [])
-    assert.equal((trace.turn as { rejections: { code: string }[] }).rejections[0].code, 'invalid_action')
+    if (proposal.rejected) assert.equal((trace.turn as { rejections: { code: string }[] }).rejections[0].code, 'invalid_action')
     assert.deepEqual(effects, [])
     await waitFor(() => assert.ok(JSON.stringify(writes).includes('No action was executed')))
     assert.doesNotMatch(JSON.stringify(writes), /story-invented-999/)
