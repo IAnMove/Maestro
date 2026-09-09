@@ -764,7 +764,13 @@ input[type="range"]::-webkit-slider-thumb {
   position: absolute;
   left: 0;
   bottom: 0;
-  width: min(100dvh, 66vw);
+  /* Una sola medida gobierna la escena: el tamaño del arte. Las motas se
+     dimensionan y viajan contra ella, así la coreografía es la misma en un
+     móvil y en un 4K en vez de moverse un número fijo de píxeles.
+     `svh` y no `dvh` porque la barra de direcciones del móvil cambia `dvh`
+     a media animación y la caja daba un salto. */
+  --hp-intro-art: min(100svh, 66vw);
+  width: var(--hp-intro-art);
   aspect-ratio: 1 / 1;
   isolation: isolate;
 }
@@ -861,7 +867,8 @@ input[type="range"]::-webkit-slider-thumb {
   .hp-intro-artbox {
     left: 50%;
     bottom: -4%;
-    width: min(112vw, 78dvh);
+    --hp-intro-art: min(112vw, 78svh);
+    width: var(--hp-intro-art);
     transform: translateX(-50%);
   }
   .hp-intro-scrim {
@@ -885,8 +892,10 @@ input[type="range"]::-webkit-slider-thumb {
 .hp-intro-mote {
   position: absolute;
   z-index: 3;
-  width: 3px;
-  height: 3px;
+  /* Proporcionales al arte, con un suelo para que no desaparezcan. El factor
+     sale de los 3px originales medidos sobre un arte de 1080px. */
+  width: max(2px, calc(var(--hp-intro-art) * 0.0028));
+  height: max(2px, calc(var(--hp-intro-art) * 0.0028));
   border-radius: 999px;
   background: rgba(255, 214, 150, 0.9);
   box-shadow: 0 0 7px rgba(255, 186, 92, 0.7);
@@ -943,9 +952,13 @@ input[type="range"]::-webkit-slider-thumb {
   from { opacity: 0.7; transform: translate(-50%, -50%) scale(0.92); }
   to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 }
+/* Solo opacidad. El bloom se compone con mix-blend-mode: screen, y escalar
+   un elemento mezclado obliga al compositor a re-rasterizar el degradado y
+   rehacer la mezcla en cada fotograma. A 3,5% de escala la diferencia no se
+   ve; el coste sí se notaba en pantallas grandes. */
 @keyframes hp-intro-breathe {
-  0%, 100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-  50% { opacity: 0.82; transform: translate(-50%, -50%) scale(1.035); }
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.78; }
 }
 /* The wordmark resolves out of the glow: each glyph starts out at its
    wide-tracked position and low, then slides home. Offsets come from the
@@ -959,7 +972,10 @@ input[type="range"]::-webkit-slider-thumb {
   0% { opacity: 0; transform: translate3d(0, 0, 0) scale(0.55); }
   16% { opacity: 0.8; }
   72% { opacity: 0.42; }
-  100% { opacity: 0; transform: translate3d(var(--mote-drift), -190px, 0) scale(1); }
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--mote-drift), calc(var(--hp-intro-art) * -0.176), 0) scale(1);
+  }
 }
 @keyframes hp-intro-draw {
   from { opacity: 0; transform: scaleX(0); }
