@@ -5,7 +5,8 @@ type Inputs = Parameters<Preparation>
 type Loader = () => Promise<{ prepareStudioSubmission: Preparation }>
 type SpeechPreparation = typeof import('./speechCommandSubmission').prepareStudioSpeechSubmission
 type MusicPreparation = typeof import('./musicCommandSubmission').prepareStudioMusicSubmission
-type StudioSubmission = Awaited<ReturnType<Preparation>> | Awaited<ReturnType<SpeechPreparation>> | Awaited<ReturnType<MusicPreparation>>
+type SfxPreparation = typeof import('./sfxCommandSubmission').prepareStudioSfxSubmission
+type StudioSubmission = Awaited<ReturnType<Preparation>> | Awaited<ReturnType<SpeechPreparation>> | Awaited<ReturnType<MusicPreparation>> | Awaited<ReturnType<SfxPreparation>>
 
 /** Preserve the legacy path and surface image chunk failures in the job tile. */
 export async function prepareStudioSubmission(
@@ -36,6 +37,14 @@ export async function prepareStudioSubmission(
     try {
       const implementation = await import('./musicCommandSubmission')
       return await implementation.prepareStudioMusicSubmission(params, before, current, context, referenceErrors)
+    } catch (error) {
+      return { params, submit: () => Promise.reject(error) }
+    }
+  }
+  if (before.generationMode === 'audio' && before.audioSubMode === 'sfx') {
+    try {
+      const implementation = await import('./sfxCommandSubmission')
+      return await implementation.prepareStudioSfxSubmission(params, before, current, context, referenceErrors)
     } catch (error) {
       return { params, submit: () => Promise.reject(error) }
     }

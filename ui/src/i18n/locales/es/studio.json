@@ -976,5 +976,16 @@
     "contextChanged": "El formulario de Tools cambió antes del envío. Revisa el origen y los ajustes y vuelve a intentarlo.",
     "panelUnavailable": "No se pudo mostrar la solicitud de escalado de Tools. Abre Tools y vuelve a intentarlo.",
     "pendingInvalid": "No se pudo leer la solicitud guardada de escalado de Tools. Se ha conservado para recuperarla."
+  },
+  "sfxCommands": {
+    "prepared": "Efecto de sonido preparado",
+    "admitted": "Efecto de sonido en cola · {{id}}",
+    "pending": "Hay una solicitud de efecto de sonido pendiente de recuperar",
+    "recover": "Recuperar esta solicitud",
+    "pendingInvalid": "No se ha podido leer la solicitud guardada del efecto de sonido.",
+    "contextChanged": "El contexto de Studio ha cambiado. Prepara de nuevo esta solicitud.",
+    "panelUnavailable": "El panel de efectos de sonido no está disponible. Abre Audio → SFX y vuelve a intentarlo.",
+    "duration": "Duración: {{seconds}} s",
+    "videoDuration": "El vídeo de salida conserva la duración del vídeo fuente y sustituye su audio."
   }
 }

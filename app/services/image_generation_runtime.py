@@ -48,7 +48,9 @@ def create_image_generation_commands(runtime):
     def resources(media_kind="image"):
         from services.studio_image_resources import StudioImageResources
         from services.studio_speech_resources import StudioSpeechResources
-        resource_type = StudioSpeechResources if media_kind == "audio" else StudioImageResources
+        from services.studio_sfx_resources import StudioSfxResources
+        resource_type = {"image": StudioImageResources, "audio": StudioSpeechResources,
+                         "video": StudioSfxResources}[media_kind]
         return resource_type(
             workspace_dir=runtime["_workspace_dir"], uploads_dir=lambda: os.path.join(os.getcwd(), "uploads"),
             list_workspaces=runtime["_list_workspaces"], lora_search_dirs=runtime["wgp"].get_lora_search_dirs,
@@ -91,6 +93,12 @@ def create_image_generation_commands(runtime):
         "generation.speech": audio_operation(freeze_studio_speech_spec, prepare_studio_speech, speech_command_catalog),
         "generation.music": audio_operation(freeze_studio_music_spec, prepare_studio_music, music_command_catalog),
     }
+
+    if callable(runtime.get("_run_generation")):
+        from services.studio_sfx_commands import create_sfx_operation
+        operations["generation.sfx"] = create_sfx_operation(
+            runtime, resources=lambda: resources("video"), execution_policy=execution_policy,
+        )
 
     if callable(runtime.get("tools_upscale")) and callable(runtime.get("_run_tool_upscale")):
         from services.tools_upscale_commands import create_tools_upscale_operation

@@ -5000,7 +5000,7 @@ export const useStore = create<AppState>((set, get) => {
     // Voice clone (SeedVC) — only send if the user explicitly enabled
     // it AND provided at least one reference. Backend defaults all three
     // params to falsy if absent (postprocessing step is a no-op).
-    if (!(state.generationMode === 'audio' && state.audioSubMode === 'music')
+    if (!(state.generationMode === 'audio' && state.audioSubMode !== 'speech')
         && state.voiceCloneEnabled && state.voiceCloneRefs.length > 0) {
       const validRefs = state.voiceCloneRefs.filter(r => r && r.path)
       if (validRefs.length > 0) {
@@ -5035,38 +5035,17 @@ export const useStore = create<AppState>((set, get) => {
         params.duration_seconds = state.durationSeconds
       }
       if (state.audioSubMode === 'sfx') {
-        // SFX mode: use MMAudio to generate sound effects
-        // MMAudio runs as post-processing on a video model, so use a video model as carrier
+        // The SFX command keeps the real MMAudio selector; no video carrier
+        // is generated. These are the controls consumed by the native worker.
         const sfxModel = params.model_type as string
-        const isSfxVirtual = sfxModel.startsWith('mmaudio_')
-        if (isSfxVirtual) {
-          // Swap virtual MMAudio model for a real video model; backend uses MMAudio params
-          params.model_type = 'ltx2_22B_distilled_1_1'
-          // Keep the virtual id so Load Settings can restore the SFX tab's
-          // model selection (the sidecar otherwise records only the carrier).
-          params._sfx_virtual_model = sfxModel
-        }
         params.MMAudio_setting = 1
-        // Always set MMAudio variant explicitly so backend doesn't fall back to server config
         params._mmaudio_variant = sfxModel === 'mmaudio_nsfw' ? 'nsfw' : 'v2'
-        // Copy MMAudio prompt into main prompt field (for API validation & metadata)
-        if (!params.prompt && params.MMAudio_prompt) {
-          params.prompt = params.MMAudio_prompt
-        }
+        params.prompt = params.MMAudio_prompt ?? params.prompt
         params.sfx_mode = true
         params.duration_seconds = state.durationSeconds
-        // Generate a minimal video if no video_guide uploaded (1 frame), then run MMAudio
-        if (!params.video_guide) {
-          params.video_length = 17  // Minimum viable video for MMAudio (~1s)
-          params.num_inference_steps = 4
-        } else {
-          params.video_length = 0  // No video gen needed — just run MMAudio on uploaded video
-        }
+        params.video_length = 0
+        params.num_inference_steps = 25
         params.image_mode = 0
-        // Clear video-specific params
-        delete params.sliding_window_size
-        delete params.sliding_window_overlap
-        delete params.sliding_window_discard_last_frames
       } else if (state.audioSubMode === 'speech') {
         // Speech voice controls do not rename lyrics or replace music references.
         params.video_length = 0

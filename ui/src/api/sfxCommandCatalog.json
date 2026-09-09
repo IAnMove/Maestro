@@ -1,0 +1,535 @@
+{
+  "version": 2,
+  "operations": [
+    {
+      "name": "generation.sfx",
+      "version": 2,
+      "supportedVersions": [
+        2
+      ],
+      "domain": "studio",
+      "mutation": true,
+      "description": "Generate sound effects with installed MMAudio files in an explicit output workspace. Preserve literal prompts. Text-only requests produce audio with a duration up to 20 seconds; video-guided requests use the inspected video duration and produce a video with new audio. Sources require canonical references. Reuse intent_id only to recover an existing admission; follow its task for completion.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "$defs": {
+          "StudioSfxParams": {
+            "additionalProperties": false,
+            "description": "Typed native SFX parameters emitted by Studio.",
+            "properties": {
+              "prompt": {
+                "anyOf": [
+                  {
+                    "maxLength": 200000,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Prompt"
+              },
+              "MMAudio_prompt": {
+                "anyOf": [
+                  {
+                    "maxLength": 200000,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Mmaudio Prompt"
+              },
+              "MMAudio_neg_prompt": {
+                "default": "",
+                "maxLength": 200000,
+                "title": "Mmaudio Neg Prompt",
+                "type": "string"
+              },
+              "model_type": {
+                "enum": [
+                  "mmaudio_v2",
+                  "mmaudio_nsfw"
+                ],
+                "title": "Model Type",
+                "type": "string"
+              },
+              "_mmaudio_variant": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "v2",
+                      "nsfw"
+                    ],
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Mmaudio Variant"
+              },
+              "duration_seconds": {
+                "exclusiveMinimum": 0.0,
+                "title": "Duration Seconds",
+                "type": "number"
+              },
+              "seed": {
+                "default": -1,
+                "maximum": 9223372036854775807,
+                "minimum": -9223372036854775808,
+                "title": "Seed",
+                "type": "integer"
+              },
+              "guidance_scale": {
+                "default": 4.5,
+                "maximum": 1000.0,
+                "minimum": 0.0,
+                "title": "Guidance Scale",
+                "type": "number"
+              },
+              "sfx_text_weight": {
+                "default": 1.0,
+                "maximum": 5.0,
+                "minimum": 0.0,
+                "title": "Sfx Text Weight",
+                "type": "number"
+              },
+              "num_inference_steps": {
+                "default": 25,
+                "maximum": 25,
+                "minimum": 25,
+                "title": "Num Inference Steps",
+                "type": "integer"
+              },
+              "video_guide": {
+                "anyOf": [
+                  {
+                    "maxLength": 8192,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "enum": [
+                      "",
+                      null
+                    ]
+                  }
+                ],
+                "default": null,
+                "title": "Video Guide"
+              },
+              "generation_mode": {
+                "const": "audio",
+                "default": "audio",
+                "title": "Generation Mode",
+                "type": "string"
+              },
+              "_audio_sub_mode": {
+                "const": "sfx",
+                "default": "sfx",
+                "title": "Audio Sub Mode",
+                "type": "string"
+              },
+              "image_mode": {
+                "default": 0,
+                "maximum": 0,
+                "minimum": 0,
+                "title": "Image Mode",
+                "type": "integer"
+              },
+              "video_length": {
+                "default": 0,
+                "maximum": 0,
+                "minimum": 0,
+                "title": "Video Length",
+                "type": "integer"
+              },
+              "MMAudio_setting": {
+                "anyOf": [
+                  {
+                    "const": 1,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Mmaudio Setting"
+              },
+              "sfx_mode": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Sfx Mode"
+              }
+            },
+            "required": [
+              "model_type",
+              "duration_seconds"
+            ],
+            "title": "StudioSfxParams",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "version": {
+            "type": "integer",
+            "const": 2
+          },
+          "operation": {
+            "const": "generation.sfx"
+          },
+          "intent_id": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Intent Id",
+            "type": "string"
+          },
+          "input": {
+            "additionalProperties": false,
+            "properties": {
+              "workspace": {
+                "maxLength": 240,
+                "minLength": 1,
+                "pattern": "^(?:default|[A-Za-z0-9][A-Za-z0-9_-]*)$",
+                "title": "Workspace",
+                "type": "string"
+              },
+              "workspace_collection_id": {
+                "anyOf": [
+                  {
+                    "maxLength": 200,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Workspace Collection Id"
+              },
+              "params": {
+                "$ref": "#/$defs/StudioSfxParams"
+              }
+            },
+            "required": [
+              "workspace",
+              "params"
+            ],
+            "title": "StudioSfxInput",
+            "type": "object"
+          }
+        },
+        "required": [
+          "version",
+          "operation",
+          "intent_id",
+          "input"
+        ]
+      }
+    }
+  ],
+  "studio": {
+    "version": 2,
+    "operation": "generation.sfx",
+    "intent_id": {
+      "maxLength": 160,
+      "minLength": 1,
+      "title": "Intent Id",
+      "type": "string"
+    },
+    "input": {
+      "$defs": {
+        "StudioSfxParams": {
+          "additionalProperties": false,
+          "description": "Typed native SFX parameters emitted by Studio.",
+          "properties": {
+            "prompt": {
+              "anyOf": [
+                {
+                  "maxLength": 200000,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Prompt"
+            },
+            "MMAudio_prompt": {
+              "anyOf": [
+                {
+                  "maxLength": 200000,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Mmaudio Prompt"
+            },
+            "MMAudio_neg_prompt": {
+              "default": "",
+              "maxLength": 200000,
+              "title": "Mmaudio Neg Prompt",
+              "type": "string"
+            },
+            "model_type": {
+              "enum": [
+                "mmaudio_v2",
+                "mmaudio_nsfw"
+              ],
+              "title": "Model Type",
+              "type": "string"
+            },
+            "_mmaudio_variant": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "v2",
+                    "nsfw"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Mmaudio Variant"
+            },
+            "duration_seconds": {
+              "exclusiveMinimum": 0.0,
+              "title": "Duration Seconds",
+              "type": "number"
+            },
+            "seed": {
+              "default": -1,
+              "maximum": 9223372036854775807,
+              "minimum": -9223372036854775808,
+              "title": "Seed",
+              "type": "integer"
+            },
+            "guidance_scale": {
+              "default": 4.5,
+              "maximum": 1000.0,
+              "minimum": 0.0,
+              "title": "Guidance Scale",
+              "type": "number"
+            },
+            "sfx_text_weight": {
+              "default": 1.0,
+              "maximum": 5.0,
+              "minimum": 0.0,
+              "title": "Sfx Text Weight",
+              "type": "number"
+            },
+            "num_inference_steps": {
+              "default": 25,
+              "maximum": 25,
+              "minimum": 25,
+              "title": "Num Inference Steps",
+              "type": "integer"
+            },
+            "video_guide": {
+              "anyOf": [
+                {
+                  "maxLength": 8192,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "enum": [
+                    "",
+                    null
+                  ]
+                }
+              ],
+              "default": null,
+              "title": "Video Guide"
+            },
+            "generation_mode": {
+              "const": "audio",
+              "default": "audio",
+              "title": "Generation Mode",
+              "type": "string"
+            },
+            "_audio_sub_mode": {
+              "const": "sfx",
+              "default": "sfx",
+              "title": "Audio Sub Mode",
+              "type": "string"
+            },
+            "image_mode": {
+              "default": 0,
+              "maximum": 0,
+              "minimum": 0,
+              "title": "Image Mode",
+              "type": "integer"
+            },
+            "video_length": {
+              "default": 0,
+              "maximum": 0,
+              "minimum": 0,
+              "title": "Video Length",
+              "type": "integer"
+            },
+            "MMAudio_setting": {
+              "anyOf": [
+                {
+                  "const": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Mmaudio Setting"
+            },
+            "sfx_mode": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Sfx Mode"
+            }
+          },
+          "required": [
+            "model_type",
+            "duration_seconds"
+          ],
+          "title": "StudioSfxParams",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "workspace": {
+          "maxLength": 240,
+          "minLength": 1,
+          "pattern": "^(?:default|[A-Za-z0-9][A-Za-z0-9_-]*)$",
+          "title": "Workspace",
+          "type": "string"
+        },
+        "workspace_collection_id": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Workspace Collection Id"
+        },
+        "params": {
+          "$ref": "#/$defs/StudioSfxParams"
+        }
+      },
+      "required": [
+        "workspace",
+        "params"
+      ],
+      "title": "StudioSfxInput",
+      "type": "object"
+    },
+    "supported_input_fields": [
+      "prompt",
+      "MMAudio_prompt",
+      "MMAudio_neg_prompt",
+      "model_type",
+      "_mmaudio_variant",
+      "duration_seconds",
+      "seed",
+      "guidance_scale",
+      "sfx_text_weight",
+      "video_guide",
+      "generation_mode",
+      "_audio_sub_mode",
+      "image_mode",
+      "video_length",
+      "num_inference_steps",
+      "MMAudio_setting",
+      "sfx_mode"
+    ],
+    "sfx_model_types": [
+      "mmaudio_nsfw",
+      "mmaudio_v2"
+    ],
+    "variants": [
+      "nsfw",
+      "v2"
+    ],
+    "effects": {
+      "generation_mode": "audio",
+      "_audio_sub_mode": "sfx",
+      "image_mode": 0,
+      "video_length": 0,
+      "num_inference_steps": 25,
+      "guidance_scale": 4.5,
+      "seed": -1,
+      "MMAudio_neg_prompt": "",
+      "sfx_text_weight": 1.0,
+      "MMAudio_setting": 1,
+      "sfx_mode": true
+    },
+    "limits": {
+      "text_duration_seconds": {
+        "exclusive_minimum": 0,
+        "maximum": 20
+      },
+      "video_duration_seconds": "derived from inspected video_guide",
+      "video_requested_duration_seconds": {
+        "exclusive_minimum": 0
+      }
+    },
+    "inactive": [
+      "generation_mode=audio",
+      "_audio_sub_mode=sfx",
+      "image_mode=0",
+      "video_length=0",
+      "audio_source=empty_or_null",
+      "video_source=empty_or_null",
+      "video_mask=empty_or_null",
+      "MMAudio_setting=1 (server-derived marker)",
+      "sfx_mode=true (server-derived marker)"
+    ],
+    "excluded": [
+      "actor",
+      "client",
+      "permission",
+      "provenance",
+      "filesystem paths",
+      "remote URLs",
+      "free-form provider payloads",
+      "video carrier model selection",
+      "download controls",
+      "queue or recovery controls"
+    ]
+  }
+}
