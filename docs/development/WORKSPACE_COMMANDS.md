@@ -117,6 +117,10 @@ authority even if browser storage cannot be updated after a successful commit.
 
 The existing opt-in MCP endpoint and its token/origin checks are retained.
 The five catalog operations appear as tools when their handlers are mounted.
+The MCP factory also accepts a trusted application-supplied `command_operations`
+catalog so later domains can reuse the same discovery, argument forwarding and
+structured results. The default remains these five collection operations;
+entries without a mounted handler are never published.
 For `tools/call`, use the operation name as the tool name and put `version`,
 `input` and (for mutations) `intent_id` in `arguments`; omit `operation` there.
 Responses expose structured content and readable JSON. Command errors set

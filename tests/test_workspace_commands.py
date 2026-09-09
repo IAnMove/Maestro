@@ -244,3 +244,27 @@ def test_legacy_opaque_request_ids_remain_valid_for_new_collection_effects(tmp_p
     result = mcp_call(client, "organize", arguments).json()["result"]
     assert result["isError"] is False
     assert registry.command_receipt(arguments["request_id"])["result"]["name"] == "Campaign"
+
+
+def test_mcp_uses_the_supplied_executable_domain_catalog_for_discovery_and_dispatch(tmp_path):
+    operation = {"name": "example.inspect", "description": "Read a test domain", "mutation": False,
+                 "inputSchema": {"type": "object", "additionalProperties": False,
+                                 "properties": {"version": {"const": 1}, "operation": {"const": "example.inspect"},
+                                                "input": {"type": "object"}},
+                                 "required": ["version", "operation", "input"]}}
+    unavailable = {**operation, "name": "example.unavailable"}
+    app = FastAPI()
+    app.include_router(create_wangp_mcp_router(
+        handlers={"example.inspect": lambda arguments: {"observed": arguments["input"]}},
+        command_operations=[operation, unavailable], journal_path=tmp_path / "journal.sqlite",
+        token_getter=lambda: "test-token"))
+    client = TestClient(app)
+    discovered = client.post("/api/v1/wangp/mcp", headers={"Authorization": "Bearer test-token"},
+                             json={"jsonrpc": "2.0", "id": 0, "method": "tools/list"}).json()["result"]["tools"]
+    names = {tool["name"] for tool in discovered}
+    assert "example.inspect" in names
+    assert "example.unavailable" not in names
+    assert "collections.create" not in names
+    result = mcp_call(client, "example.inspect", {"version": 1, "input": {"id": "exact-id"}}).json()["result"]
+    assert result["structuredContent"] == {"observed": {"id": "exact-id"}}
+    assert not (tmp_path / "journal.sqlite").exists()

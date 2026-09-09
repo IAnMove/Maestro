@@ -16,7 +16,7 @@ import sqlite3
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse, Response
 from services.wangp_submission import JsonRequest
-from services.workspace_commands import OPERATIONS, catalog as command_catalog
+from services.workspace_commands import catalog as command_catalog
 
 PROTOCOL = '2025-03-26'
 MUTATIONS = {'generate', 'recast', 'upscale', 'organize'}
@@ -39,7 +39,7 @@ def _command_tool(operation):
     }
 
 
-def tool_definitions(available=None):
+def tool_definitions(available=None, command_operations=None):
     tools = []
     for name, description in [
         ('models', 'Discover exact model identifiers and capabilities.'),
@@ -90,7 +90,8 @@ def tool_definitions(available=None):
         tools.append({'name': name, 'description': description,
                       'inputSchema': {'type': 'object', 'properties': properties, 'required': required, 'additionalProperties': False},
                       'annotations': {'readOnlyHint': name not in MUTATIONS, 'destructiveHint': False, 'idempotentHint': True}})
-    for operation in command_catalog()['operations']:
+    operations = command_catalog()['operations'] if command_operations is None else command_operations
+    for operation in operations:
         if available is not None and operation['name'] in available:
             tools.append(_command_tool(operation))
     return tools
@@ -160,15 +161,18 @@ def _prepare_generate_params(params):
         params['image_mode'] = 1 if params.get('generation_mode') == 'image' else 0
 
 
-def create_wangp_mcp_router(*, handlers, journal_path, token_getter=None):
+def create_wangp_mcp_router(*, handlers, journal_path, token_getter=None, command_operations=None):
     router = APIRouter()
     journal = RequestJournal(journal_path)
     token_getter = token_getter or (lambda: os.environ.get('HOCUS_MCP_TOKEN', ''))
 
+    operations = command_catalog()['operations'] if command_operations is None else command_operations
+    operation_names = frozenset(item['name'] for item in operations)
+
     async def call_tool(name, arguments):
         if not isinstance(name, str) or name not in handlers or not isinstance(arguments, dict):
             raise ValueError('Unknown tool or invalid arguments')
-        if name in OPERATIONS:
+        if name in operation_names:
             result = handlers[name](arguments)
             return await result if inspect.isawaitable(result) else result
         if name in REQUEST_TOOLS:
@@ -238,7 +242,7 @@ def create_wangp_mcp_router(*, handlers, journal_path, token_getter=None):
             elif method == 'ping':
                 result = {}
             elif method == 'tools/list':
-                result = {'tools': tool_definitions(handlers)}
+                result = {'tools': tool_definitions(handlers, operations)}
             elif method == 'tools/call':
                 params = message.get('params') or {}
                 if not isinstance(params, dict):
@@ -248,7 +252,7 @@ def create_wangp_mcp_router(*, handlers, journal_path, token_getter=None):
                     'content': [{'type': 'text', 'text': json.dumps(value, ensure_ascii=False)}],
                     'isError': _tool_result_is_error(value),
                 }
-                if params.get('name') in OPERATIONS and isinstance(value, dict):
+                if params.get('name') in operation_names and isinstance(value, dict):
                     result['structuredContent'] = value
             else:
                 return {'jsonrpc': '2.0', 'id': request_id, 'error': {'code': -32601, 'message': 'Method not found'}}
@@ -256,7 +260,7 @@ def create_wangp_mcp_router(*, handlers, journal_path, token_getter=None):
         except (ValueError, KeyError, TypeError, HTTPException) as error:
             detail = error.detail if isinstance(error, HTTPException) else str(error)
             params = message.get('params') or {}
-            if method == 'tools/call' and isinstance(params, dict) and isinstance(params.get('name'), str) and params['name'] in OPERATIONS:
+            if method == 'tools/call' and isinstance(params, dict) and isinstance(params.get('name'), str) and params['name'] in operation_names:
                 problem = detail if isinstance(detail, dict) else {'code': 'invalid_command', 'message': str(detail), 'retryable': False}
                 failed = {'version': 1, 'status': 'failed', 'error': problem}
                 return {'jsonrpc': '2.0', 'id': request_id, 'result': {
