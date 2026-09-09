@@ -199,9 +199,9 @@ jobs:
       - name: Install UI deps
         working-directory: ui
         run: npm ci
-      - name: Install Edge for native AAC encoding
+      - name: Install Chromium for screen regression and Edge for native AAC
         working-directory: ui
-        run: npx playwright install msedge
+        run: npx playwright install chromium msedge
       - name: Speech E2E with real export required
         working-directory: ui
         run: npm run test:e2e -- scene3d-speech.spec.ts scene3d-media-screen.spec.ts --workers=1
