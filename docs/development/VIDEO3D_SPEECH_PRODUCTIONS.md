@@ -6,6 +6,8 @@
 - Base explícita: `codex/3d-lipsync-scenes`, checkpoint `dedd3ee`.
 - Actualizada con `development` `735e7eb` mediante el merge `c187c2b`: se
   conservan tanto lip-sync como pantallas multimedia y exportación asíncrona.
+  Después se incorpora también `development` `f2ef220` en `18e7f81`,
+  manteniendo las correcciones recientes de MCP y escalado de imágenes.
   No se modifica el checkout original ni se fusiona esta PR en development.
 - Integra el motor facial existente en **Estudios → Vídeo 3D**. No crea otra
   web, otro formato de escena ni un renderizador paralelo.
@@ -196,7 +198,9 @@ archivos limpios correctos. Entrada JS: 325.266 B gzip / 327.680 B permitidos.
 
 ## Validación de la ampliación (9 de septiembre)
 
-- 1.243 tests UI y los tres E2E nuevos pasan. Sumando navegación anterior y
+- 1.243 tests UI en la batería completa local y una regresión adicional de
+  sustitución de ficha (1.244 tests en total). Los tres E2E nuevos pasan.
+  Sumando navegación anterior y
   pantalla multimedia, el recorrido seleccionado da **5 E2E correctos**.
 - 63 tests Python de biblioteca, limpieza facial, definición reutilizable,
   perfiles, análisis de voz y Series pasan en la última repetición, incluida
@@ -210,9 +214,18 @@ archivos limpios correctos. Entrada JS: 325.266 B gzip / 327.680 B permitidos.
   `personaje-reutilizable-integrado.jpg`, `dialogo-reutilizable-integrado.jpg`,
   `mira-parpadeo.png` y `dialogo-reutilizable.mp4` están en el directorio
   ignorado de revisión. No se ha borrado material anterior.
+- Al aplicar una ficha todavía sin calibración, se restablece su apariencia
+  predeterminada: no hereda el atlas de otro personaje. Dos actores que usan
+  una misma ficha mantienen IDs de instancia distintos y sus propios turnos.
 - El control de complejidad pasa contra la base de la PR sin cambiar su
   política. TypeScript, lint y presupuesto de entrada JS: 325.399 B gzip
   de 327.680 B permitidos.
+
+Coste de esta ampliación hasta el checkpoint de corrección: unos 80 minutos
+medidos desde 05:16:26 UTC. 0 llamadas LLM externas de la aplicación, 0
+generaciones IA y 0 créditos Meshy/Hi3D. Tokens Codex: N/A. Solo análisis
+Rhubarb y render local con archivos existentes; el contrato TTS se simula.
+CI remoto y revisión independiente se informan separadamente en la PR.
 
 ## Coste del checkpoint anterior
 

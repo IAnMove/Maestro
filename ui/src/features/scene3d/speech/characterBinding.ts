@@ -3,7 +3,7 @@ import type { Scene3DSlot } from '../types'
 import { parseCharacterVoice } from '../../../lib/characterVoice'
 import { parseScene3DSourceRef } from '../slotSource'
 import { defaultSpeech } from './types'
-import { faceSettings, modelDigest, type FaceSettings } from './profiles'
+import { faceSettings, modelDigest } from './profiles'
 import { parseSpeech } from './track'
 
 /** Resolve by canonical id, verify model bytes, then freeze an independent scene snapshot. */
@@ -11,9 +11,10 @@ export async function characterSlotPatch(kit: CharacterKit, workspace: string, r
   const model = parseScene3DSourceRef(kit.speech3d?.model)
   if (!model || !/\.glb$/i.test(model.filename)) throw new Error('This character needs a saved GLB.')
   if (await modelDigest(model.url) !== kit.speech3d?.digest) throw new Error('The character model changed. Recalibrate and save its new version.')
-  const settings: Partial<FaceSettings> = kit.speech3d.settings ? faceSettings(parseSpeech({ ...defaultSpeech(), ...kit.speech3d.settings })!) : {}
+  // Even an uncalibrated replacement owns its appearance; only scene turns survive.
+  const settings = faceSettings(parseSpeech({ ...defaultSpeech(), ...kit.speech3d.settings })!)
   return { sourceUrl: model.url, sourceRef: model, media: 'model3d', clip: null,
-    character: { id: slot?.character?.id ?? kit.id, name: kit.name, kitRef: { id: kit.id, workspace },
+    character: { id: slot?.character?.id ?? slot?.id ?? kit.id, name: kit.name, kitRef: { id: kit.id, workspace },
       libraryRevision: revision, voice: parseCharacterVoice(kit.voice) },
     speech: { ...defaultSpeech(), ...slot?.speech, ...settings, face: settings.face } }
 }

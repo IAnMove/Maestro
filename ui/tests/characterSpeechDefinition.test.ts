@@ -53,6 +53,29 @@ test('explicit generation sends literal text and voice parameters to the existin
   assert.equal(requests[0].workspace, 'one')
   assert.equal(result.filename, 'clip.wav')
 })
+
+test('an uncalibrated replacement clears old facial artwork without merging actor identities or turns', async () => {
+  const fetch = globalThis.fetch
+  globalThis.fetch = async () => new Response('replacement-bytes')
+  try {
+    const kit = { ...createCharacterKit('New character'), speech3d: {
+      model: { ...model, url: '/uncalibrated-replacement.glb' }, digest: createHash('sha256').update('replacement-bytes').digest('hex') } }
+    const doc = buildSpeechProduction({ kind: 'dialogue', title: 'Two actors', workspace: 'one', duration: 4, offset: 0,
+      cast: [{ id: 'actor-a', name: 'A', model }, { id: 'actor-b', name: 'B', model }] })
+    const patches = await Promise.all(doc.slots.map(slot => characterSlotPatch(kit, 'one', 1, { ...slot, character: undefined,
+      speech: { ...slot.speech!, face, atlas: { ...model, filename: 'old.png', url: '/old.png' }, style: 'pixel', expression: 'angry' } })))
+    assert.notEqual(patches[0].character?.id, patches[1].character?.id)
+    for (const [i, patch] of patches.entries()) {
+      assert.equal(patch.character?.id, doc.slots[i].id)
+      assert.equal(patch.character?.kitRef?.id, kit.id)
+      assert.equal(patch.speech?.face, undefined)
+      assert.equal(patch.speech?.atlas, undefined)
+      assert.equal(patch.speech?.style, defaultSpeech().style)
+      assert.equal(patch.speech?.expression, 'neutral')
+      assert.deepEqual(patch.speech?.clips, doc.slots[i].speech?.clips)
+    }
+  } finally { globalThis.fetch = fetch }
+})
 test('aborting after submit cancels only this request and never submits a replacement', async () => {
   const abort = new AbortController(), cancelled: string[] = []
   await assert.rejects(generateSceneSpeechClip({ model: voice.model, voice, prompt: 'Hello', durationSeconds: 3, signal: abort.signal }, {
