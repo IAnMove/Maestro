@@ -3979,16 +3979,16 @@ export const useStore = create<AppState>((set, get) => {
 
     try {
       const result = tool === 'upscale'
-        ? await api.submitToolUpscale({
-          source,
-          source_kind: s.toolsSourceKind as 'image' | 'video',
-          asset_id: s.toolsSourceAssetId || undefined,
-          source_workspace: s.toolsSourceWorkspace || undefined,
-          method: s.toolsUpscaleMethod,
-          wangp_processor_settings: s.params.wangp_processor_settings,
-          workspace: s.activeWorkspace,
-          provenance: { actor: 'user' },
-        })
+        ? await (async () => {
+          const { prepareStudioToolsUpscaleSubmission, toolsUpscaleParamsFromState } =
+            await import('../features/studio/toolsCommandSubmission')
+          return (await prepareStudioToolsUpscaleSubmission(
+            toolsUpscaleParamsFromState(s),
+            s,
+            get,
+            { actor: 'user', capability: 'tools.upscale' },
+          )).submit()
+        })()
         : tool === 'revoice'
           ? await api.submitToolRevoice({ video_path: source, voice_ref_paths: refPaths, mode: s.toolsRevoiceMode, workspace: s.activeWorkspace })
           : await api.submitToolRemoveBackground({
@@ -4000,10 +4000,14 @@ export const useStore = create<AppState>((set, get) => {
             provenance: { actor: 'user' },
           })
 
+      const taskId = 'task_id' in result && typeof result.task_id === 'string'
+        ? result.task_id
+        : result.job_id
       set(st => ({
         jobs: st.jobs.map(j => j === newJob ? {
           ...j,
           id: result.job_id,
+          taskId,
           status: 'queued',
           message: removingBackground ? i18n.t('tools.queuedRemoveBackground', { ns: 'studio' }) : 'Queued...',
         } : j),

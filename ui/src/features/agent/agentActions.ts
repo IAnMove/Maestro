@@ -4,7 +4,7 @@ import { comicArtworkInventory } from '../comics/generateArtwork'
 import { buildWizardContextSnapshot, buildWizardLabSnapshots, comicLabSnapshot, type BuildWizardContextOptions, type WizardContextSnapshot } from './wizardContext'
 import type { AspectRatio, ResolutionPreset } from '../../types'
 import type { AgentExecutionReport, AgentExecutionTarget } from './agentContract'
-import type { AgentRemoveBackgroundAction } from './toolCapabilities'
+import type { AgentRemoveBackgroundAction, AgentUpscaleAction } from './toolCapabilities'
 import type { CommandEnvelope, CommandResult } from './commandContract'
 import {
   bindDirectorProductionTarget,
@@ -79,7 +79,7 @@ import {
 
 export { isNewMusicVideoSongRequest } from '../stories/musicVideoLook'
 export type { ExampleConversation }
-export type { AgentRemoveBackgroundAction } from './toolCapabilities'
+export type { AgentRemoveBackgroundAction, AgentUpscaleAction } from './toolCapabilities'
 export { AGENT_TABS }
 export type { AgentTab }
 
@@ -646,6 +646,7 @@ export type AgentAction = AgentOpenTabAction
   | AgentAttachStudioReferencesAction
   | AgentConfigureStudioLorasAction
   | AgentRemoveBackgroundAction
+  | AgentUpscaleAction
   | AgentInspectQueueAction
   | AgentCancelTaskAction
   | AgentResumeTaskAction

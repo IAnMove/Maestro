@@ -13,7 +13,11 @@ function installDom() {
     HTMLInputElement: dom.window.HTMLInputElement,
     HTMLImageElement: dom.window.HTMLImageElement,
     Event: dom.window.Event,
+    CustomEvent: dom.window.CustomEvent,
     MutationObserver: dom.window.MutationObserver,
+    requestAnimationFrame: (callback: FrameRequestCallback) => setTimeout(() => callback(Date.now()), 0),
+    cancelAnimationFrame: (handle: number) => clearTimeout(handle),
+    localStorage: dom.window.localStorage,
     ResizeObserver: class { observe() {} disconnect() {} },
   })
   Object.defineProperty(globalThis, 'navigator', { configurable: true, value: dom.window.navigator })
@@ -68,12 +72,12 @@ test('Tools exposes exact library images for background removal', { concurrency:
 })
 
 test('upscale accepts an image while revoice remains video-only', { concurrency: false }, async () => {
-  const { render, screen, fireEvent, cleanup } = await import('@testing-library/react')
+  const { render, screen, fireEvent, cleanup, waitFor } = await import('@testing-library/react')
   const { ToolsPanel } = await import('../src/components/Sidebar/ToolsPanel.tsx')
   const { useStore } = await import('../src/stores/useStore.ts')
   const previousFetch = globalThis.fetch
   const previousSetInterval = globalThis.setInterval
-  const toolPosts: Array<{ url: string; body?: Record<string, unknown> }> = []
+  const commandPosts: Array<{ url: string; body?: Record<string, unknown> }> = []
   globalThis.fetch = async (input, init) => {
     const requestUrl = typeof input === 'string' ? input : (input as Request).url || String(input)
     if (requestUrl.includes('/api/v1/assets')) {
@@ -81,9 +85,27 @@ test('upscale accepts an image while revoice remains video-only', { concurrency:
         status: 200, headers: { 'Content-Type': 'application/json' },
       })
     }
-    if (requestUrl.includes('/api/v1/tools/')) {
-      toolPosts.push({ url: requestUrl, body: init?.body ? JSON.parse(String(init.body)) : undefined })
-      return new Response(JSON.stringify({ job_id: 'image-upscale-1' }), {
+    if (requestUrl.includes('/api/v1/generation/commands')) {
+      const body = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : undefined
+      commandPosts.push({ url: requestUrl, body })
+      const commandId = String(body?.intent_id || '')
+      return new Response(JSON.stringify({
+        version: 1,
+        commandId,
+        operation: 'tools.upscale',
+        status: 'queued',
+        entities: [],
+        artifacts: [],
+        taskIds: ['task-upscale-1'],
+        pipelineIds: [],
+        result: {
+          job_id: 'image-upscale-1', task_id: 'task-upscale-1',
+          workspace: 'default', status: 'queued',
+        },
+        commandVersion: 2,
+        contentFingerprint: 'a'.repeat(64),
+        fingerprintVersion: 2,
+      }), {
         status: 200, headers: { 'Content-Type': 'application/json' },
       })
     }
@@ -100,6 +122,7 @@ test('upscale accepts an image while revoice remains video-only', { concurrency:
     toolsRevoiceRefs: [{ filename: 'voice.wav', path: '/tmp/voice.wav' }, null],
     jobs: [],
     activeWorkspace: 'default',
+    generationMode: 'tools',
     outputs: [],
     selectedOutput: -1,
   } as never)
@@ -112,12 +135,19 @@ test('upscale accepts an image while revoice remains video-only', { concurrency:
     const upscaleButton = screen.getByRole('button', { name: 'Upscale Image' })
     assert.equal(upscaleButton.disabled, false)
     fireEvent.click(upscaleButton)
-    await useStore.getState().runTool()
-    assert.equal(toolPosts.length, 1)
-    assert.equal(toolPosts[0].url, '/api/v1/tools/upscale')
-    assert.equal(toolPosts[0].body?.source, 'hero.png')
-    assert.equal(toolPosts[0].body?.source_kind, 'image')
-    assert.equal(toolPosts[0].body?.video_path, undefined)
+    await waitFor(() => assert.equal(commandPosts.length, 1), { timeout: 2000 })
+    assert.equal(commandPosts.length, 1)
+    assert.equal(commandPosts[0].url, '/api/v1/generation/commands')
+    assert.equal(commandPosts[0].body?.version, 2)
+    assert.equal(commandPosts[0].body?.operation, 'tools.upscale')
+    const commandInput = commandPosts[0].body?.input as Record<string, unknown>
+    const commandParams = commandInput.params as Record<string, unknown>
+    assert.equal(commandInput.workspace, 'default')
+    assert.equal(commandParams.source, 'asset-hero')
+    assert.equal(commandParams.source_workspace, 'default')
+    assert.equal(commandParams.source_kind, 'image')
+    assert.equal(commandParams.method, 'flashvsr2')
+    assert.equal(commandParams.video_path, undefined)
 
     fireEvent.click(screen.getByRole('button', { name: 'Revoice' }))
     assert.equal(useStore.getState().toolsTool, 'revoice')
@@ -125,7 +155,7 @@ test('upscale accepts an image while revoice remains video-only', { concurrency:
     assert.equal(revoiceButton.disabled, true)
     fireEvent.click(revoiceButton)
     await useStore.getState().runTool()
-    assert.equal(toolPosts.length, 1)
+    assert.equal(commandPosts.length, 1)
 
     fireEvent.click(screen.getByRole('button', { name: /^Remove background$/ }))
     await new Promise(resolve => setTimeout(resolve, 0))

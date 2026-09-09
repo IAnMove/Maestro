@@ -950,5 +950,17 @@
     "panelUnavailable": "No se pudo mostrar la solicitud de voz. Abre Studio y vuelve a intentarlo.",
     "pendingInvalid": "No se pudo leer la solicitud de voz guardada. Se ha conservado para recuperarla.",
     "referenceFailed": "No se pudo preparar una referencia de audio seleccionada. No se ha enviado ninguna voz."
+  },
+  "toolsCommands": {
+    "prepared": "Solicitud de escalado de Tools preparada",
+    "admitted": "Escalado de Tools en cola · {{id}}",
+    "queued": "En cola; consulta Actividad para ver cuándo termina.",
+    "pending": "Una solicitud anterior de escalado de Tools necesita recuperación",
+    "recover": "Recuperar esta solicitud de escalado de Tools",
+    "destination": "Workspace de salida: {{workspace}}",
+    "sourceWorkspace": "Workspace de origen: {{workspace}}",
+    "contextChanged": "El formulario de Tools cambió antes del envío. Revisa el origen y los ajustes y vuelve a intentarlo.",
+    "panelUnavailable": "No se pudo mostrar la solicitud de escalado de Tools. Abre Tools y vuelve a intentarlo.",
+    "pendingInvalid": "No se pudo leer la solicitud guardada de escalado de Tools. Se ha conservado para recuperarla."
   }
 }

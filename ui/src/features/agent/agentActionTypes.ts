@@ -61,6 +61,7 @@ export const AGENT_ACTION_TYPES = [
   'attach_studio_references',
   'configure_studio_loras',
   'remove_background',
+  'upscale',
   'inspect_queue',
   'cancel_task',
   'resume_task',
