@@ -92,7 +92,6 @@ def create_image_generation_commands(runtime):
         "generation.music": audio_operation(freeze_studio_music_spec, prepare_studio_music, music_command_catalog),
     }
 
-    operations = {"generation.speech": speech_operation()}
     if callable(runtime.get("tools_upscale")) and callable(runtime.get("_run_tool_upscale")):
         from services.tools_upscale_commands import create_tools_upscale_operation
         operations["tools.upscale"] = create_tools_upscale_operation(runtime)
