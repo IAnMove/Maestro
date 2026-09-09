@@ -43,7 +43,8 @@ type Translate = (key: string, options?: Record<string, unknown>) => string
 
 /** Conservative presentation policy, not an authorization or execution classifier. */
 function allowsExplanation(request: string): boolean {
-  const text = request.trim().replace(/^[¿¡]+/, '')
+  // JS `\b` is ASCII-only. Fold accents so "Qué" / "por qué" keep a word boundary.
+  const text = request.trim().replace(/^[¿¡]+/, '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
   if (/^(?:hola|hello|hi|gracias|thanks)[\s!.]*$/i.test(text)) return true
   // An informational prefix does not erase a later imperative in a mixed turn.
   if (/(?:[,;.!?\n]|\b(?:and|then|also|y|luego|despu[eé]s))\s*(?:(?:please|por favor)[,\s]+)?(?:create|generate|make|update|delete|remove|add|save|export|start|retry|run|open|select|crea\w*|genera\w*|haz\w*|actualiza\w*|elimina\w*|borra\w*|a[nñ]ade\w*|guarda\w*|exporta\w*|inicia\w*|reintenta\w*|ejecuta\w*|abre|selecciona\w*)\b/i.test(text)) return false

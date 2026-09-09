@@ -99,7 +99,9 @@ class ImageGenerationCommands:
         registry = self._registry(workspace)
         provenance = deepcopy(provenance)
         provenance["command"]["command_id"] = frozen["original"]["intent_id"]
-        native_params = {**deepcopy(self.runtime_defaults()), **deepcopy(body)}
+        adapter = self.operations.get(frozen["original"]["operation"])
+        defaults = self.runtime_defaults() if adapter is None or adapter.use_generation_defaults else {}
+        native_params = {**deepcopy(defaults), **deepcopy(body)}
         job = self.make_job(native_params, workspace, reserve_generation=False, publish_task=False, provenance=provenance)
         effective = deepcopy(frozen["effective"])
         effective["runtime"] = {"params": deepcopy(job["params"]), "workspace": workspace,
@@ -155,7 +157,8 @@ class ImageGenerationCommands:
             # The native facade performs its ordinary validation first and then
             # transfers admission to the same canonical task/worker adapter.
             request.admit_generation_command = lambda body, workspace, provenance: self._admit(frozen, body, workspace, provenance)
-            return await self.prepare(request)
+            prepare_request = adapter.prepare_request if adapter and adapter.prepare_request else self.prepare
+            return await prepare_request(request)
         except ImageGenerationSpecError as error:
             raise command_error(422, "invalid_command", str(error)) from error
         except TaskCommandConflict as error:
@@ -189,6 +192,25 @@ class ImageGenerationCommands:
             return {"receipt": entry["receipt"], "task": registry.get(entry["task_id"])}
         except (OSError, sqlite3.Error) as error:
             raise command_error(503, "storage_unavailable", "Command storage is unavailable") from error
+
+    def native_worker(self, job):
+        """Select a tool worker only for its real durable admission.
+
+        Public generation JSON and legacy provenance can never select a tool
+        by themselves. Both normal dispatch and queue recovery check the
+        existing canonical receipt before entering the registered worker.
+        """
+        provenance = job.get("provenance")
+        if not isinstance(provenance, dict) or not isinstance(provenance.get("capability"), str):
+            return None
+        operation = provenance["capability"]
+        adapter = self.operations.get(operation)
+        if adapter is None or adapter.worker is None:
+            return None
+        linked = self._recovery_task(job)
+        if not linked or linked[1] is None:
+            raise command_error(503, "recovery_mismatch", "Tool worker requires its canonical task")
+        return adapter.worker
 
     def restore_recovery(self, workspaces):
         """Rebuild only the existing recovery projection; never start inference."""
@@ -259,7 +281,8 @@ class ImageGenerationCommands:
         try:
             registry = self._registry(record.get("workspace"))
             entry = registry.command_admission(intent_id)
-            if entry is None or entry["receipt"]["result"]["job_id"] != record.get("id"):
+            if (entry is None or entry["operation"] != record["provenance"]["capability"]
+                    or entry["receipt"]["result"]["job_id"] != record.get("id")):
                 return False
             return registry, registry.get(entry["task_id"])
         except HTTPException as error:

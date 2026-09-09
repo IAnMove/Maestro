@@ -964,5 +964,17 @@
     "lyrics": "Lyrics",
     "caption": "Musical description",
     "defaultDuration": "Model default duration"
+  },
+  "toolsCommands": {
+    "prepared": "Tools upscale request ready",
+    "admitted": "Tools upscale queued · {{id}}",
+    "queued": "Queued; inspect Activity for completion.",
+    "pending": "A previous Tools upscale submission needs recovery",
+    "recover": "Recover this Tools upscale submission",
+    "destination": "Output workspace: {{workspace}}",
+    "sourceWorkspace": "Source workspace: {{workspace}}",
+    "contextChanged": "The Tools form changed before submission. Review the current source and settings, then try again.",
+    "panelUnavailable": "The Tools upscale request could not be shown. Open Tools and try again.",
+    "pendingInvalid": "The saved Tools upscale request could not be read. It has been preserved for recovery."
   }
 }

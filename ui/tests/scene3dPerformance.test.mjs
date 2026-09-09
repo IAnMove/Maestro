@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
+import { accessSync, constants, mkdtempSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -11,6 +11,15 @@ import { createDefaultScene3DDocument, parseScene3DDocument } from '../src/featu
 import { bindMixer, seekBoundMixer } from '../src/features/scene3d/gpu.ts'
 import { remountScene3DTemplate } from '../src/features/scene3d/templates.ts'
 import { numberedShots } from '../../pinokio_agent/skills/api/Maestro-next.git/clients/shot_plan.mjs'
+
+function pythonExecutable() {
+ const candidate = process.env.PYTHON
+ if (candidate && (!candidate.includes('/') && !candidate.includes('\\'))) return candidate
+ if (candidate) {
+  try { accessSync(candidate, constants.X_OK); return candidate } catch { /* use PATH fallback */ }
+ }
+ return process.platform === 'win32' ? 'python' : 'python3'
+}
 
 test('fitting root motion prevents a four-second animation jumping inside a longer shot', () => {
  const root=new Object3D();const clip=new AnimationClip('Advance',4,[new NumberKeyframeTrack('.position[z]',[0,4],[0,2.4])]);
@@ -43,7 +52,7 @@ test('the assembler resolves the same clean identities and rejects duplicates be
  const script=fileURLToPath(new URL('../../pinokio_agent/skills/api/Maestro-next.git/clients/world3d_assemble.py',import.meta.url));
  const run=shots=>{
   writeFileSync(join(directory,'plan.json'),JSON.stringify({shots}));
-  return spawnSync(process.env.PYTHON || (process.platform === 'win32' ? 'python' : 'python3'),[script,'--base-url','http://127.0.0.1:1','--plan',join(directory,'plan.json'),'--render-dir',directory,'--workspace','test','--output',join(directory,'out.mp4')],{encoding:'utf8'});
+  return spawnSync(pythonExecutable(),[script,'--base-url','http://127.0.0.1:1','--plan',join(directory,'plan.json'),'--render-dir',directory,'--workspace','test','--output',join(directory,'out.mp4')],{encoding:'utf8'});
  };
  try {
   for(const [shot,expected] of [[{document:{}},'clip-01'],[{number:6,document:{clipNumber:16}},'clip-06'],[{document:{clipNumber:16}},'clip-16']]){

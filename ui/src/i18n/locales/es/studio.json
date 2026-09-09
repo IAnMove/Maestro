@@ -964,5 +964,17 @@
     "lyrics": "Letra",
     "caption": "Descripción musical",
     "defaultDuration": "Duración predeterminada del modelo"
+  },
+  "toolsCommands": {
+    "prepared": "Solicitud de escalado de Tools preparada",
+    "admitted": "Escalado de Tools en cola · {{id}}",
+    "queued": "En cola; consulta Actividad para ver cuándo termina.",
+    "pending": "Una solicitud anterior de escalado de Tools necesita recuperación",
+    "recover": "Recuperar esta solicitud de escalado de Tools",
+    "destination": "Workspace de salida: {{workspace}}",
+    "sourceWorkspace": "Workspace de origen: {{workspace}}",
+    "contextChanged": "El formulario de Tools cambió antes del envío. Revisa el origen y los ajustes y vuelve a intentarlo.",
+    "panelUnavailable": "No se pudo mostrar la solicitud de escalado de Tools. Abre Tools y vuelve a intentarlo.",
+    "pendingInvalid": "No se pudo leer la solicitud guardada de escalado de Tools. Se ha conservado para recuperarla."
   }
 }

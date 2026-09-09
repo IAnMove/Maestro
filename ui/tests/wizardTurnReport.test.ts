@@ -101,6 +101,11 @@ test('informational conversation is preserved while navigation requires its own 
   const reply = 'Collections group existing assets.'
   assert.equal(formatWizardTurnReply({ reply, actions: [] }, [], t, 'What are collections?'), reply)
   assert.equal(formatWizardTurnReply({ reply, actions: [] }, [], t, '¿Cómo funcionan las colecciones?'), reply)
+  // Accented qué/por qué used to fail JS `\b` and show a false empty-turn receipt.
+  assert.equal(formatWizardTurnReply({ reply, actions: [] }, [], t, 'Qué son las colecciones?'), reply)
+  assert.equal(formatWizardTurnReply({ reply, actions: [] }, [], t, '¿Qué son las colecciones?'), reply)
+  assert.equal(formatWizardTurnReply({ reply, actions: [] }, [], t, 'Por qué no aparecen las colecciones?'), reply)
+  assert.equal(formatWizardTurnReply({ reply, actions: [] }, [], t, '¿Por qué falló la generación?'), reply)
   assert.match(formatWizardTurnReply({ reply, actions: [{ type: 'open_tab', tab: 'workspaces' }] }, [], t), /No action was executed/)
 })
 
@@ -110,7 +115,7 @@ test('empty and omitted actions never claim creation in response to an action re
     for (const request of ['Create Nightwatch using my settings.', 'Can you create a collection?', 'Crea un proyecto Nightwatch.',
       'Hola, crea un proyecto Nightwatch.', 'Hi, create Nightwatch.',
       'Can you explain collections and create Nightwatch?', 'What are collections? Create one named Nightwatch.',
-      'Explica las colecciones y crea Nightwatch.', '']) {
+      'Explica las colecciones y crea Nightwatch.', 'Qué son las colecciones? Crea una llamada Nightwatch.', '']) {
       const reply = formatWizardTurnReply(turn, [], t, request)
       assert.match(reply, /No action was executed/)
       assert.doesNotMatch(reply, /invented-999|Created/)

@@ -61,6 +61,11 @@ function workspaceMemoryPersistence() {
       holdSave?.release()
       holdSave = null
     },
+    injectWorkflow(workspace, workflow) {
+      const collection = store(workspace)
+      collection.workflows = [...collection.workflows, clone(workflow)]
+      collection.revision += 1
+    },
   }
 }
 
@@ -433,4 +438,70 @@ test('a step that finishes after open() still persists to the source workspace',
   assert.deepEqual(source.workflows[0].outputRefs, ['song.wav', 'final.mp4'])
   assert.equal(runtime.get('workflow-a'), undefined)
   assert.equal(runtime.get('workflow-b').workspace, 'workspace-b')
+})
+
+test('a CAS merge during advance keeps sibling workflows on later persists', async () => {
+  const { WizardWorkflowRuntime } = await import('../src/features/agent/wizardWorkflowRuntime.ts')
+  const persistence = workspaceMemoryPersistence()
+  const runtime = new WizardWorkflowRuntime(persistence)
+  runtime.register({
+    type: 'keeper',
+    steps: [{
+      stepId: 'wait', kind: 'wait for task',
+      async execute() { return { state: 'waiting', taskId: 'task-keep' } },
+    }],
+  })
+  runtime.register({
+    type: 'two_step',
+    steps: [{
+      stepId: 'first', kind: 'first step',
+      async execute() {
+        persistence.injectWorkflow('demo', {
+          workflowId: 'workflow-other-tab',
+          type: 'keeper',
+          workspace: 'demo',
+          userRequest: 'Added by another tab',
+          state: 'completed',
+          currentStep: 1,
+          steps: [],
+          resolvedEntityIds: {},
+          inputSnapshot: {},
+          taskIds: [],
+          pipelineIds: [],
+          outputRefs: [],
+          confirmationScope: [],
+          processedEventIds: [],
+          attempts: 0,
+          createdAt: 1,
+          updatedAt: Date.now(),
+          recoverableError: '',
+          cancelRequested: false,
+          resumeRequested: false,
+          pendingInput: null,
+        })
+        return { state: 'completed', outputRefs: ['first.bin'] }
+      },
+    }, {
+      stepId: 'second', kind: 'second step',
+      async execute() { return { state: 'completed', outputRefs: ['second.bin'] } },
+    }],
+  })
+
+  await runtime.open('demo')
+  await runtime.start({
+    workflowId: 'workflow-keep', type: 'keeper', workspace: 'demo',
+    userRequest: 'Keep the existing checkpoint',
+  })
+  await runtime.start({
+    workflowId: 'workflow-advance', type: 'two_step', workspace: 'demo',
+    userRequest: 'Finish both steps after a sibling merge',
+  })
+
+  const storedIds = persistence.snapshot('demo').workflows.map(item => item.workflowId).sort()
+  assert.deepEqual(storedIds, ['workflow-advance', 'workflow-keep', 'workflow-other-tab'])
+  assert.equal(runtime.get('workflow-keep').state, 'waiting')
+  assert.equal(runtime.get('workflow-other-tab').state, 'completed')
+  const advanced = runtime.get('workflow-advance')
+  assert.equal(advanced.state, 'completed')
+  assert.deepEqual(advanced.outputRefs, ['first.bin', 'second.bin'])
 })

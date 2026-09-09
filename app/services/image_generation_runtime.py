@@ -92,6 +92,10 @@ def create_image_generation_commands(runtime):
         "generation.music": audio_operation(freeze_studio_music_spec, prepare_studio_music, music_command_catalog),
     }
 
+    if callable(runtime.get("tools_upscale")) and callable(runtime.get("_run_tool_upscale")):
+        from services.tools_upscale_commands import create_tools_upscale_operation
+        operations["tools.upscale"] = create_tools_upscale_operation(runtime)
+
     service = ImageGenerationCommands(
         registry=runtime["_task_registry"], prepare=runtime["generate"], preflight=preflight,
         make_job=runtime["_new_generation_job"], task_fields=runtime["_generation_task_fields"],
