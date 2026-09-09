@@ -158,7 +158,8 @@ function isEmptyList(value: unknown): boolean {
 }
 
 const RESIDUAL_TEXT_FIELDS = new Set([
-  'viggle_audio_mode', 'video_prompt_type', 'image_prompt_type', 'video_guide_outpainting',
+  'viggle_audio_mode', 'video_prompt_type', 'image_prompt_type', 'video_guide',
+  'video_guide_outpainting',
   'image_fit_mode', 'force_fps', 'skip_steps_cache_type', 'keyframe_conditioning_mode',
   'keyframe_inject_mode', 'matanyone_version', 'output_filename', 'voice_clone_mode',
   'voice_reference', 'sfx_mode', '_sfx_virtual_model', '_mmaudio_variant',

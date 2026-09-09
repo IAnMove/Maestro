@@ -27,7 +27,7 @@ Music keeps the lyrics and Music Caption as distinct literal fields and does
 not inherit speech voices. Its native model controls determine the accepted
 duration; the Story song workflow retains its own contract.
 
-Audio reference selectors, source URLs and displayed filenames belong to their
+Audio reference selectors, source URLs, SFX video guides and displayed filenames belong to their
 Speech, Music or SFX tab. Switching tabs starts an unused tab without inherited
 audio references and restores that tab's own references when returning. Loading
 an output's settings first retains the previous tab's references, then restores

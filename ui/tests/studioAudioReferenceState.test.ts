@@ -7,9 +7,10 @@ Object.assign(globalThis, { window: dom.window, document: dom.window.document,
   localStorage: dom.window.localStorage, Event: dom.window.Event, CustomEvent: dom.window.CustomEvent })
 window.matchMedia = (() => ({ matches: false })) as typeof window.matchMedia
 const { useStore } = await import('../src/stores/useStore')
-const { createStudioMusicGenerationCommand } = await import('../src/features/studio/musicGenerationSpec')
+const { createStudioMusicGenerationCommand, projectStudioMusicFormParams } = await import('../src/features/studio/musicGenerationSpec')
 const speechRef = '/api/v1/file/voice.wav?workspace=speech-source'
 const musicRef = '/api/v1/file/beat.wav?workspace=music-source'
+const sfxGuide = '/api/v1/file/clip.mp4?workspace=sfx-source'
 const voice = { name: 'Tentri', filename: 'voice.wav', path: speechRef }
 
 async function withStudio(run: () => Promise<void> | void) {
@@ -54,6 +55,20 @@ function musicCommand() {
     _tts_speaker_name1: state.params._tts_speaker_name1,
   })), 'audio-reference-command')
 }
+
+/** Same leftover the real Generate adapter sees: live form video_guide, not a curated omit. */
+function musicFormCommand() {
+  const state = useStore.getState()
+  return createStudioMusicGenerationCommand(projectStudioMusicFormParams({
+    workspace: state.activeWorkspace, model_type: 'ace_step_v1_5_xl_sft_lm_4b',
+    prompt: '  [Verse]\nTentri: watches over the city  ', alt_prompt: '',
+    duration_seconds: 20, generation_mode: 'audio', _audio_sub_mode: 'music',
+    audio_prompt_type: state.params.audio_prompt_type, audio_guide: state.params.audio_guide,
+    video_guide: state.params.video_guide, _tts_voice_count: state.params._tts_voice_count,
+    _tts_speaker_name1: state.params._tts_speaker_name1,
+  }).params, 'audio-reference-form')
+}
+
 
 function chooseMusicReference() {
   useStore.getState().setParams({ audio_prompt_type: 'A', audio_guide: musicRef })
@@ -148,13 +163,29 @@ test('Load Settings for Music preserves the previous Speech references and the n
     await useStore.getState().loadSettingsFromOutput()
     assert.equal(useStore.getState().audioSubMode, 'music')
     assert.equal(useStore.getState().params.audio_guide, musicRef)
+    assert.equal(useStore.getState().params.video_guide, undefined)
     assert.equal(musicCommand().input.params.audio_guide, musicRef)
+    assert.equal(musicFormCommand().input.params.audio_guide, musicRef)
     useStore.getState().setAudioSubMode('speech')
     assert.equal(useStore.getState().params.audio_guide, speechRef)
     assert.deepEqual(useStore.getState().ttsVoices, [voice])
     useStore.getState().setAudioSubMode('music')
     assert.equal(useStore.getState().params.audio_guide, musicRef)
     assert.equal(useStore.getState().audioGuideFilename, 'beat.wav')
+  })
+})
+
+test('an SFX video guide does not block Music or Speech and returns on the SFX tab', async () => {
+  await withStudio(() => {
+    useStore.getState().setAudioSubMode('sfx')
+    useStore.getState().setParams({ video_guide: sfxGuide })
+    useStore.getState().setAudioSubMode('music')
+    assert.equal(useStore.getState().params.video_guide, undefined)
+    assert.equal(musicFormCommand().input.params.video_guide, undefined)
+    useStore.getState().setAudioSubMode('speech')
+    assert.equal(useStore.getState().params.video_guide, undefined)
+    useStore.getState().setAudioSubMode('sfx')
+    assert.equal(useStore.getState().params.video_guide, sfxGuide)
   })
 })
 

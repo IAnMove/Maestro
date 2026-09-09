@@ -250,6 +250,15 @@ test('form projection preserves music text, language, refs and sentinels while r
     () => projectStudioMusicFormParams({ ...source, unknown_music_field: true }),
     /unknown_music_field is not supported/,
   )
+  const emptyGuide = projectStudioMusicFormParams({ ...source, video_guide: '' })
+  assert.ok(emptyGuide.droppedFields.includes('video_guide'))
+  assert.equal('video_guide' in emptyGuide.params, false)
+  assert.throws(
+    () => projectStudioMusicFormParams({
+      ...source, video_guide: '/api/v1/file/clip.mp4?workspace=sfx-source',
+    }),
+    /video_guide is active and incompatible/,
+  )
   assert.throws(
     () => createStudioMusicGenerationCommand(source, 'music-direct-closed'),
     /skip_steps_cache_type|image_refs|voice_clone_enabled/,

@@ -8849,7 +8849,12 @@ export const useStore = create<AppState>((set, get) => {
     // pencil restored only the lyrics — clear when absent so a stale
     // caption can't leak into an unrelated restore.
     newParams.alt_prompt = (p.alt_prompt as string) || ''
-    newParams.video_guide = (p.video_guide as string) || ''
+    // Audio tabs own video_guide via audioReferenceParams. Forcing '' here
+    // after a Music/Speech restore makes generation.music treat the empty
+    // residual as active. Video/Edit still clear an absent guide.
+    if (get().generationMode !== 'audio') {
+      newParams.video_guide = (p.video_guide as string) || ''
+    }
     newParams.image_refs = Array.isArray(p.image_refs) ? (p.image_refs as string[]) : []
     newParams.h3_ref_videos = Array.isArray(p.h3_ref_videos) ? (p.h3_ref_videos as string[]) : []
     newParams.h3_ref_audios = Array.isArray(p.h3_ref_audios) ? (p.h3_ref_audios as string[]) : []
