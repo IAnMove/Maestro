@@ -5057,7 +5057,9 @@ export const useStore = create<AppState>((set, get) => {
         const sfxModel = params.model_type as string
         params.MMAudio_setting = 1
         params._mmaudio_variant = sfxModel === 'mmaudio_nsfw' ? 'nsfw' : 'v2'
-        params.prompt = params.MMAudio_prompt ?? params.prompt
+        // SFX owns MMAudio_prompt. Do not admit leftover Speech/Music lyrics
+        // from the shared `prompt` field when the SFX box was never filled.
+        params.prompt = typeof params.MMAudio_prompt === 'string' ? params.MMAudio_prompt : ''
         params.sfx_mode = true
         params.duration_seconds = state.durationSeconds
         params.video_length = 0

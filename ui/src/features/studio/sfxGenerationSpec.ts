@@ -77,3 +77,19 @@ export function projectStudioSfxFormParams(params: Record<string, unknown>): Rec
   return Object.fromEntries([...paramKeys, 'workspace', 'provenance']
     .filter(key => params[key] !== undefined).map(key => [key, params[key]]))
 }
+
+/**
+ * The SFX textarea owns `MMAudio_prompt`. Speech/Music leftovers stay in
+ * `prompt` because audio sub-tabs share one Studio params map. A blank SFX
+ * box must not admit those lyrics as the sound description.
+ */
+export function neutralizeStudioSfxFormResidue(params: Record<string, unknown>): Record<string, unknown> {
+  const native = typeof params.MMAudio_prompt === 'string' ? params.MMAudio_prompt : ''
+  if (!native.trim()) {
+    const next = { ...params }
+    delete next.prompt
+    delete next.MMAudio_prompt
+    return next
+  }
+  return { ...params, prompt: native, MMAudio_prompt: native }
+}

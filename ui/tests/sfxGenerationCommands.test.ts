@@ -16,6 +16,10 @@ const {
   pendingSfxGenerationCommands,
   submitSfxGenerationCommand,
 } = await import('../src/api/sfxGenerationCommands.ts')
+const {
+  neutralizeStudioSfxFormResidue,
+  projectStudioSfxFormParams,
+} = await import('../src/features/studio/sfxGenerationSpec.ts')
 
 const originalFetch = globalThis.fetch
 
@@ -203,4 +207,43 @@ test('an explicitly blank prompt alias cannot override the other literal', () =>
       assert.equal(params[field], blank)
     }
   }
+})
+
+test('Studio SFX form residue drops leftover Speech/Music lyrics when the SFX box is empty', () => {
+  const leftover = {
+    workspace: 'sfx-output',
+    prompt: 'Speaker 1: leftover speech lyrics for a song',
+    model_type: 'mmaudio_v2',
+    duration_seconds: 15,
+    generation_mode: 'audio',
+    _audio_sub_mode: 'sfx',
+    image_mode: 0,
+    video_length: 0,
+    MMAudio_setting: 1,
+    sfx_mode: true,
+    num_inference_steps: 25,
+  }
+  const cleaned = neutralizeStudioSfxFormResidue(projectStudioSfxFormParams(leftover))
+  assert.equal('prompt' in cleaned, false)
+  assert.equal('MMAudio_prompt' in cleaned, false)
+  assert.throws(
+    () => createStudioSfxGenerationCommand(cleaned, 'leftover-speech'),
+    /literal sound description is required/,
+  )
+
+  const authored = neutralizeStudioSfxFormResidue(projectStudioSfxFormParams({
+    ...leftover,
+    MMAudio_prompt: 'rain on tin',
+  }))
+  const command = createStudioSfxGenerationCommand(authored, 'authored-sfx')
+  assert.equal(command.input.params.MMAudio_prompt, 'rain on tin')
+  assert.equal(command.input.params.prompt, 'rain on tin')
+})
+
+test('direct SFX envelopes still admit a prompt-only MCP payload', () => {
+  const params = { ...baseParams('mcp-prompt-only') }
+  delete params.MMAudio_prompt
+  const command = createStudioSfxGenerationCommand(params, 'mcp-prompt-only')
+  assert.equal(command.input.params.prompt, params.prompt)
+  assert.equal(command.input.params.MMAudio_prompt, undefined)
 })
