@@ -1,4 +1,5 @@
 import type { AgentPrepareAudioAction } from './agentActions'
+import { assertCanonicalAudioReference } from '../../lib/canonicalAudioReference'
 
 const AUDIO_SUB_MODES = new Set<AgentPrepareAudioAction['subMode']>(['speech', 'music', 'sfx'])
 
@@ -52,8 +53,59 @@ type ParsedMusicControls = Pick<
 type ParsedAudioControls = Pick<
   AgentPrepareAudioAction,
   'durationSeconds' | 'altPrompt' | 'musicDescription' | 'musicInstrumental'
-  | 'seed' | 'inferenceSteps' | 'guidanceScale' | 'outputCount'
+  | 'seed' | 'inferenceSteps' | 'guidanceScale' | 'outputCount' | 'sfxTextWeight' | 'videoGuide'
 >
+
+type ParsedSfxReference = { valid: true; value?: string | null } | { valid: false }
+
+function parseSfxReference(raw: Record<string, unknown>): ParsedSfxReference {
+  if (!Object.prototype.hasOwnProperty.call(raw, 'video_guide')) return { valid: true }
+  const value = raw.video_guide
+  // An explicit null is the only action-level clear operation. An omitted
+  // field lets the Studio form retain its currently selected guide.
+  if (value === null) return { valid: true, value: null }
+  if (typeof value !== 'string' || value.length === 0) return { valid: false }
+  try {
+    assertCanonicalAudioReference(value, 'video_guide', 'video')
+    return { valid: true, value }
+  } catch {
+    return { valid: false }
+  }
+}
+
+type SfxNumericRule = { minimum: number; maximum: number; fallback: number; integer?: boolean }
+const SFX_NUMERIC_RULES: Record<string, SfxNumericRule> = {
+  seed: { minimum: -1, maximum: 2_147_483_647, fallback: -1, integer: true },
+  guidance_scale: { minimum: 0, maximum: 1_000, fallback: 4.5 },
+  inference_steps: { minimum: 25, maximum: 25, fallback: 25, integer: true },
+  output_count: { minimum: 1, maximum: 1, fallback: 1, integer: true },
+  sfx_text_weight: { minimum: 0, maximum: 5, fallback: 1 },
+}
+
+function parseSfxNumbers(raw: Record<string, unknown>): Record<string, number> | null {
+  const values: Record<string, number> = {}
+  for (const [field, rule] of Object.entries(SFX_NUMERIC_RULES)) {
+    const value = raw[field] === undefined ? rule.fallback
+      : strictNumber(raw[field], rule.minimum, rule.maximum, rule.integer)
+    if (value === undefined) return null
+    values[field] = value
+  }
+  return values
+}
+
+function parseSfxControls(raw: Record<string, unknown>): ParsedAudioControls | null {
+  const reference = parseSfxReference(raw)
+  const values = parseSfxNumbers(raw)
+  if (!reference.valid || !values) return null
+  const durationSeconds = strictNumber(raw.duration_seconds, Number.MIN_VALUE, 1_800)
+  if (raw.duration_seconds !== undefined && durationSeconds === undefined) return null
+  if (reference.value === null && durationSeconds !== undefined && durationSeconds > 20) return null
+  return {
+    durationSeconds, seed: values.seed, inferenceSteps: values.inference_steps,
+    guidanceScale: values.guidance_scale, outputCount: values.output_count,
+    sfxTextWeight: values.sfx_text_weight, videoGuide: reference.value,
+  }
+}
 
 function parseAudioText(raw: Record<string, unknown>, literal: boolean): ParsedAudioText | null {
   const prompt = literal ? literalString(raw.prompt, 200_000) : cleanString(raw.prompt, 8_000)
@@ -62,7 +114,7 @@ function parseAudioText(raw: Record<string, unknown>, literal: boolean): ParsedA
     ? (raw.negative_prompt === undefined ? undefined : literalString(raw.negative_prompt, 200_000))
     : cleanString(raw.negative_prompt, 2_000) || undefined
   if (raw.negative_prompt !== undefined && negativePrompt === undefined) return null
-  return { prompt, negativePrompt: negativePrompt || undefined }
+  return { prompt, negativePrompt: literal ? negativePrompt : negativePrompt || undefined }
 }
 
 function parseMusicControls(raw: Record<string, unknown>): ParsedMusicControls | null {
@@ -120,6 +172,7 @@ function parseAudioControls(
   raw: Record<string, unknown>,
   subMode: AgentPrepareAudioAction['subMode'],
 ): ParsedAudioControls | null {
+  if (subMode === 'sfx') return parseSfxControls(raw)
   const music = subMode === 'music'
   const extras = parseAudioExtras(raw, music)
   if (!extras) return null
@@ -131,14 +184,15 @@ function parseAudioControls(
 }
 
 export function parsePrepareAudioAction(raw: Record<string, unknown>): AgentPrepareAudioAction | null {
-  const subMode = cleanString(raw.audio_sub_mode, 12) as AgentPrepareAudioAction['subMode']
-  const text = parseAudioText(raw, subMode === 'speech' || subMode === 'music')
+  const requestedSubMode = cleanString(raw.audio_sub_mode, 12) as AgentPrepareAudioAction['subMode']
+  const subMode = AUDIO_SUB_MODES.has(requestedSubMode) ? requestedSubMode : 'sfx'
+  const text = parseAudioText(raw, subMode === 'speech' || subMode === 'music' || subMode === 'sfx')
   if (!text) return null
   const controls = parseAudioControls(raw, subMode)
   if (!controls) return null
   return {
     type: 'prepare_audio',
-    subMode: AUDIO_SUB_MODES.has(subMode) ? subMode : 'sfx',
+    subMode,
     prompt: text.prompt,
     modelType: cleanString(raw.model_type, 160) || undefined,
     durationSeconds: controls.durationSeconds,
@@ -150,5 +204,6 @@ export function parsePrepareAudioAction(raw: Record<string, unknown>): AgentPrep
     inferenceSteps: controls.inferenceSteps,
     guidanceScale: controls.guidanceScale,
     outputCount: controls.outputCount,
+    ...(subMode === 'sfx' ? { sfxTextWeight: controls.sfxTextWeight, videoGuide: controls.videoGuide } : {}),
   }
 }

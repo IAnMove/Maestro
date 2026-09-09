@@ -329,16 +329,37 @@ export async function prepare3d(action: Prepare3dCommand): Promise<CommandResult
   )
 }
 
+async function prepareSfxForm(action: PrepareAudioCommand): Promise<Record<string, unknown>> {
+  const state = useStore.getState()
+  const { createStudioSfxGenerationCommand } = await import('./sfxGenerationSpec')
+  const modelType = action.modelType ?? (
+    String(state.params.model_type).startsWith('mmaudio_') ? state.params.model_type : 'mmaudio_v2'
+  )
+  const videoGuide = action.videoGuide === undefined ? state.params.video_guide : action.videoGuide
+  // Validate before navigation/model loading can mutate the form. The same
+  // closed contract validates direct commands and these Wizard form controls.
+  const command = createStudioSfxGenerationCommand({
+    workspace: workspaceId(), model_type: modelType,
+    prompt: action.prompt, MMAudio_prompt: action.prompt,
+    MMAudio_neg_prompt: action.negativePrompt ?? '',
+    duration_seconds: action.durationSeconds ?? 2,
+    seed: action.seed ?? -1, guidance_scale: action.guidanceScale ?? 4.5,
+    num_inference_steps: action.inferenceSteps ?? 25,
+    repeat_generation: action.outputCount ?? 1, sfx_text_weight: action.sfxTextWeight ?? 1,
+    ...(videoGuide ? { video_guide: videoGuide } : {}),
+  }, 'wizard-sfx-form-validation')
+  return { ...command.input.params, video_guide: videoGuide ?? undefined }
+}
+
 export async function prepareAudio(action: PrepareAudioCommand): Promise<CommandResult> {
+  const sfxParams = action.subMode === 'sfx' ? await prepareSfxForm(action) : undefined
   openStudioAudio(action.subMode)
   const modelName = await selectAudioModel(action.modelType, action.subMode)
   const state = useStore.getState()
-  if (action.subMode === 'sfx') {
-    applySfxClip({
-      name: 'sfx',
-      prompt: action.prompt,
-      durationSeconds: action.durationSeconds ?? 2,
-    }, action.negativePrompt || '')
+  if (sfxParams) {
+    state.setDurationSeconds(sfxParams.duration_seconds as number)
+    state.setOutputCount(1)
+    state.setParams(sfxParams)
   } else {
     state.setDurationSeconds(action.durationSeconds ?? state.durationSeconds)
     const music = action.subMode === 'music'

@@ -333,3 +333,39 @@ test('generated IDs are only a creation helper; submit never changes an explicit
   assert.equal(sentIds.length, 1)
   assert.equal(sentIds[0], generated)
 })
+
+test('a corrupt pending hint does not hide valid recovery rows or overwrite its bytes', { concurrency: false }, async () => {
+  const prefix = 'hocuspocus.generation.image-commands.v1:'
+  const damagedKey = `${prefix}damaged-intent`
+  const damagedBytes = '{incomplete-json'
+  dom.window.localStorage.setItem(damagedKey, damagedBytes)
+  const healthy = command('healthy-intent', 'workspace-a')
+  let posts = 0
+  globalThis.fetch = (async () => { posts += 1; throw new Error('response lost') }) as typeof fetch
+  await assert.rejects(submitImageGenerationCommand(healthy), /response lost/)
+  assert.deepEqual(pendingImageGenerationCommands('workspace-a'), [healthy])
+  assert.deepEqual(pendingImageGenerationCommands('workspace-b'), [])
+  assert.equal(dom.window.localStorage.getItem(damagedKey), damagedBytes)
+  assert.throws(() => pendingImageGenerationCommand('damaged-intent'), error => (
+    error instanceof ImageGenerationCommandError && error.code === 'invalid_pending_command'
+  ))
+  await assert.rejects(submitImageGenerationCommand(command('damaged-intent')), error => (
+    error instanceof ImageGenerationCommandError && error.code === 'invalid_pending_command'
+  ))
+  assert.equal(posts, 1, 'Inspecting or rejecting a corrupt hint must not admit a replacement')
+  assert.equal(dom.window.localStorage.getItem(damagedKey), damagedBytes)
+})
+
+test('pending recovery still exposes storage access failures', { concurrency: false }, () => {
+  const area = dom.window.localStorage
+  const healthy = command('unreadable-intent')
+  area.setItem('hocuspocus.generation.image-commands.v1:unreadable-intent', JSON.stringify(healthy))
+  const prototype = Object.getPrototypeOf(area)
+  const original = prototype.getItem
+  prototype.getItem = () => { throw new Error('storage access denied') }
+  try {
+    assert.throws(() => pendingImageGenerationCommands(), /storage access denied/)
+  } finally {
+    prototype.getItem = original
+  }
+})

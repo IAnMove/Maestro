@@ -142,6 +142,10 @@ export interface AgentPrepareAudioAction extends AgentLanguageAwareAction {
   guidanceScale?: number
   /** Music native generation currently admits one output per command. */
   outputCount?: number
+  /** Native MMAudio SFX text-conditioning weight (0..5). */
+  sfxTextWeight?: number
+  /** Canonical SFX video reference; omitted preserves the selected guide, null removes it. */
+  videoGuide?: string | null
 }
 
 export interface AgentDownloadModelAction {
@@ -1032,7 +1036,7 @@ const CANONICAL_FIELD_NAMES = [
   'scene_name', 'layer_name', 'audio_output_name', 'videoclip_name', 'cue_source', 'rhythm_profile', 'intensity',
   'confirm', 'characters', 'locations', 'outline_beats', 'story_visual_selections', 'story_visual_scope', 'target_names',
   'target_kind', 'target_name', 'asset_name', 'primary',
-  'audio_sub_mode', 'alt_prompt', 'music_description', 'music_instrumental', 'sfx_clips', 'name', 'preset', 'comic_panels', 'comic_pages', 'caption', 'stage', 'image_provider',
+  'audio_sub_mode', 'alt_prompt', 'music_description', 'music_instrumental', 'sfx_text_weight', 'video_guide', 'sfx_clips', 'name', 'preset', 'comic_panels', 'comic_pages', 'caption', 'stage', 'image_provider',
   'page_number', 'panel_number', 'page_numbers', 'pilot',
   'factual_biography', 'biography_review',
   'kit_name', 'look_notes', 'preset_id',
@@ -2715,6 +2719,8 @@ export const HOCUSPOCUS_AGENT_RESPONSE_SCHEMA: Record<string, unknown> = mergeRe
             },
           },
           audio_sub_mode: { type: 'string', enum: ['', 'speech', 'music', 'sfx'] },
+          sfx_text_weight: { type: 'number', minimum: 0, maximum: 5 },
+          video_guide: { anyOf: [{ type: 'string', minLength: 1, maxLength: 8_192 }, { type: 'null' }] },
           preset: { type: 'string', maxLength: 40 },
           sfx_clips: {
             type: 'array', maxItems: 12,

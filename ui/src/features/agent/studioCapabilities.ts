@@ -355,18 +355,15 @@ export function registerStudioCapabilities(register: typeof defineCapability): v
   title: 'Prepare Studio audio',
   description: 'Open Studio → Audio and fill Speech, Music or SFX.',
   useWhen: 'The user asks to prepare, show or fill a Studio audio form.',
-  parameters: ['audio_sub_mode', 'prompt', 'model_type', 'duration_seconds', 'negative_prompt', 'alt_prompt', 'music_description', 'music_instrumental', 'seed', 'inference_steps', 'guidance_scale', 'output_count'],
-  inputSchema: { type: 'object', additionalProperties: false, properties: { type: { const: 'prepare_audio' }, audio_sub_mode: { type: 'string', enum: [...AUDIO_SUB_MODES] }, prompt: { type: 'string', minLength: 1, maxLength: 200_000 }, model_type: { type: 'string' }, duration_seconds: { type: 'number', minimum: 0, maximum: 1_800 }, negative_prompt: { type: 'string', maxLength: 200_000 }, alt_prompt: { type: 'string', maxLength: 200_000 }, music_description: { type: 'string', maxLength: 200_000 }, music_instrumental: { type: 'boolean' }, seed: { type: 'integer', minimum: -1, maximum: 2_147_483_647 }, inference_steps: { type: 'integer', minimum: 1, maximum: 1_000 }, guidance_scale: { type: 'number', minimum: 0, maximum: 1_000 }, output_count: { type: 'integer', minimum: 1, maximum: 1 } }, required: ['type', 'prompt'] },
+  parameters: ['audio_sub_mode', 'prompt', 'model_type', 'duration_seconds', 'negative_prompt', 'alt_prompt', 'music_description', 'music_instrumental', 'seed', 'inference_steps', 'guidance_scale', 'output_count', 'sfx_text_weight', 'video_guide'],
+  inputSchema: { type: 'object', additionalProperties: false, properties: { type: { const: 'prepare_audio' }, audio_sub_mode: { type: 'string', enum: [...AUDIO_SUB_MODES] }, prompt: { type: 'string', minLength: 1, maxLength: 200_000 }, model_type: { type: 'string' }, duration_seconds: { type: 'number', minimum: 0, maximum: 1_800 }, negative_prompt: { type: 'string', maxLength: 200_000 }, alt_prompt: { type: 'string', maxLength: 200_000 }, music_description: { type: 'string', maxLength: 200_000 }, music_instrumental: { type: 'boolean' }, seed: { type: 'integer', minimum: -1, maximum: 2_147_483_647 }, inference_steps: { type: 'integer', minimum: 1, maximum: 1_000 }, guidance_scale: { type: 'number', minimum: 0, maximum: 1_000 }, output_count: { type: 'integer', minimum: 1, maximum: 1 }, sfx_text_weight: { type: 'number', minimum: 0, maximum: 5 }, video_guide: { anyOf: [{ type: 'string', minLength: 1, maxLength: 8_192 }, { type: 'null' }] } }, required: ['type', 'prompt'] },
   risk: 'edit', confirmation: 'none', progress: 'Rellenando Studio → Audio…',
   resolve: audioAction,
   validate(action) { return action.prompt ? validType('prepare_audio', action) : ['prompt is required'] },
   async prepare(action) {
-    // Language intent remains workflow metadata. The speech native request
-    // carries authored text exactly; provider-side language handling belongs
-    // to its model/preflight contract, not this capability parser.
-    return action.subMode === 'speech' || action.subMode === 'music'
-      ? action
-      : compilePromptAction(action, 'sfx')
+    // Authored audio descriptions stay literal for every native submode.
+    // Language intent remains workflow metadata.
+    return action
   },
   async execute(action, context) { return context.adapters.studio.prepareAudio(action) },
   correlate(_action, outcome) { return outcome.target }, async track(_action, outcome) { return outcome },

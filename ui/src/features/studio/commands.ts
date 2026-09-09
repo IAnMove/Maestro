@@ -48,6 +48,10 @@ export type PrepareAudioCommand = {
   guidanceScale?: number
   /** Music's native command currently admits one output. */
   outputCount?: number
+  /** Native MMAudio SFX text-conditioning weight (0..5). */
+  sfxTextWeight?: number
+  /** Canonical SFX video reference; omitted preserves the selected guide, null removes it. */
+  videoGuide?: string | null
 }
 
 export type Prepare3dCommand = {
