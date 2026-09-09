@@ -21,6 +21,7 @@ import uuid
 from typing import Any, Iterator, TypedDict
 
 from services.operation_logging import log_operation
+from services.task_command_admission import TaskCommandAdmission
 
 
 _LOGGER = logging.getLogger("loreframe.operations.tasks")
@@ -33,7 +34,7 @@ TASK_RETENTION_MAX_EVENTS_ENV = "LOREFRAME_TASK_RETENTION_MAX_EVENTS"
 DEFAULT_TASK_RETENTION_MAX_AGE_SECONDS = 30 * 24 * 60 * 60
 DEFAULT_TASK_RETENTION_MAX_TERMINAL_TASKS = 1_000
 DEFAULT_TASK_RETENTION_MAX_EVENTS = 10_000
-TASK_SCHEMA_VERSION = 2
+TASK_SCHEMA_VERSION = 3
 _PRUNED_THROUGH_META_KEY = "events_pruned_through"
 _SCHEMA_VERSION_META_KEY = "schema_version"
 ACTIVE_STATUSES = frozenset({"created", "queued", "waiting_resource", "running"})
@@ -301,7 +302,7 @@ def run_with_task_context(context: dict[str, Any], callback, *args, **kwargs):
         return callback(*args, **kwargs)
 
 
-class TaskRegistry:
+class TaskRegistry(TaskCommandAdmission):
     def __init__(self, workspace_dir: str, *, interrupt_stale: bool = True):
         self.workspace_dir = os.path.realpath(os.path.abspath(workspace_dir))
         os.makedirs(self.workspace_dir, exist_ok=True)
@@ -358,6 +359,7 @@ class TaskRegistry:
                 );
             """)
             self._migrate_task_events_to_durable_log(connection)
+            self._initialize_command_admissions(connection)
             self._record_schema_version(connection)
 
     @staticmethod
@@ -473,12 +475,8 @@ class TaskRegistry:
         )
         return int(cursor.lastrowid)
 
-    def create(
-        self,
-        *,
-        event_exclude_fields: set[str] | frozenset[str] | None = None,
-        **fields: Any,
-    ) -> dict:
+    @staticmethod
+    def _build_task(fields: dict[str, Any]) -> dict:
         now = _now()
         task_id = str(fields.get("id") or new_task_id(str(fields.get("kind") or "task")))[:200]
         root_id = str(fields.get("root_id") or task_id)[:200]
@@ -531,31 +529,42 @@ class TaskRegistry:
             "result_refs": _bounded(fields.get("result_refs") or []),
             "metadata": _bounded(fields.get("metadata") or {}),
         }
+        return task
+
+    def _insert_task(self, connection, task: dict, event_exclude_fields=None) -> None:
+        connection.execute(
+            """INSERT INTO tasks
+               (id, root_id, parent_id, workspace, status, kind, workflow, created_at, updated_at, snapshot)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (task["id"], task["root_id"], task["parent_id"], task["workspace"], task["status"],
+             task["kind"], task["workflow"], task["created_at"], task["updated_at"], _json(task)),
+        )
+        excluded = set(event_exclude_fields or ())
+        event_snapshot = {key: value for key, value in task.items() if key not in excluded}
+        self._append_event(connection, task, "task.created", event_snapshot)
+
+    def _after_task_created(self, task: dict) -> None:
+        _update_cancellation_token(self.workspace_dir, task["id"], status=task["status"], phase=task["phase"])
+        self._notify()
+
+    def create(
+        self,
+        *,
+        event_exclude_fields: set[str] | frozenset[str] | None = None,
+        **fields: Any,
+    ) -> dict:
+        task = self._build_task(fields)
         with self._write_lock, self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             existing = self._decode(connection.execute(
-                "SELECT snapshot FROM tasks WHERE id = ?", (task_id,),
+                "SELECT snapshot FROM tasks WHERE id = ?", (task["id"],),
             ).fetchone())
             if existing is not None:
                 connection.rollback()
                 return existing
-            connection.execute(
-                """INSERT INTO tasks
-                   (id, root_id, parent_id, workspace, status, kind, workflow, created_at, updated_at, snapshot)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    task_id, root_id, parent_id, task["workspace"], status, task["kind"],
-                    task["workflow"], task["created_at"], now, _json(task),
-                ),
-            )
-            excluded = set(event_exclude_fields or ())
-            event_snapshot = {
-                key: value for key, value in task.items() if key not in excluded
-            }
-            self._append_event(connection, task, "task.created", event_snapshot)
+            self._insert_task(connection, task, event_exclude_fields)
             connection.commit()
-        _update_cancellation_token(self.workspace_dir, task_id, status=status, phase=task["phase"])
-        self._notify()
+        self._after_task_created(task)
         return copy.deepcopy(task)
 
     def get(self, task_id: str) -> dict | None:

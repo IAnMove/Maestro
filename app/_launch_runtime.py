@@ -608,6 +608,7 @@ def _new_generation_job(
     recovered: bool = False,
     reserve_generation: bool = True,
     provenance: dict | None = None,
+    publish_task: bool = True,
 ) -> dict:
     frozen_params = copy.deepcopy(params)
     execution_mode.validate_generation(workspace)
@@ -679,7 +680,7 @@ def _new_generation_job(
     if reserve_generation:
         register_generation_job(_gen_lock, job)
     publisher = globals().get("_publish_generation_task")
-    if callable(publisher):
+    if publish_task and callable(publisher):
         try:
             task = publisher(job)
             if isinstance(task, dict):
@@ -11309,6 +11310,9 @@ async def generate(request: Request):
 
     # Capture workspace at submission time — NOT at execution time
     workspace = body.pop("workspace", None) or _get_active_workspace()
+    admission = getattr(request, "admit_generation_command", None)
+    if callable(admission):
+        return admission(body, workspace, provenance)
     job_out_dir = _workspace_dir(workspace)
 
     h3_preplan_pending = isinstance(
@@ -26297,7 +26301,10 @@ def _recovery_job_summary(record: dict) -> dict:
 @api.get("/api/v1/jobs/recovery")
 def get_generation_queue_recovery():
     """Return crash leftovers that are not active in this server process."""
-    candidates = _durable_generation_queue.list(exclude_ids=_jobs.keys())
+    with _queue_recovery_lock:
+        _image_generation_commands.restore_recovery(item["name"] for item in _list_workspaces())
+        candidates = _image_generation_commands.filter_recovery(
+            _durable_generation_queue.list(exclude_ids=_jobs.keys()))
     return {"jobs": [_recovery_job_summary(record) for record in candidates]}
 
 
@@ -26311,7 +26318,9 @@ def resume_generation_queue():
     resumed: list[dict] = []
     threads: list[threading.Thread] = []
     with _queue_recovery_lock:
-        candidates = _durable_generation_queue.list(exclude_ids=_jobs.keys())
+        _image_generation_commands.restore_recovery(item["name"] for item in _list_workspaces())
+        candidates = _image_generation_commands.filter_recovery(
+            _durable_generation_queue.list(exclude_ids=_jobs.keys()))
         for record in candidates:
             job_id = str(record.get("id") or "").strip()
             params = record.get("params")
@@ -26357,6 +26366,9 @@ def resume_generation_queue():
 def discard_generation_queue():
     """Clear only inactive recovery candidates; never cancel live work."""
     with _queue_recovery_lock:
+        _image_generation_commands.restore_recovery(item["name"] for item in _list_workspaces())
+        _image_generation_commands.discard_recovery(
+            _durable_generation_queue.list(exclude_ids=_jobs.keys()))
         removed = _durable_generation_queue.discard(exclude_ids=_jobs.keys())
     return {"discarded": removed}
 
@@ -36150,7 +36162,7 @@ def _upsert_canonical_task(
     return existing
 
 
-def _publish_generation_task(job: dict) -> dict:
+def _generation_task_fields(job: dict) -> dict:
     legacy_id = str(job.get("id") or "")
     workspace = str(job.get("workspace") or "default")
     details = _public_generation_details(job.get("params"))
@@ -36214,9 +36226,9 @@ def _publish_generation_task(job: dict) -> dict:
         task_title = "Tools · Upscale"
     elif str(provenance.get("capability") or "") == "revoice":
         task_title = "Tools · Revoice"
-    return _upsert_canonical_task(
-        workspace,
-        task_id,
+    return dict(
+        workspace=workspace,
+        id=task_id,
         root_id=root_task_id,
         parent_id=parent_task_id,
         kind=mode,
@@ -36247,6 +36259,12 @@ def _publish_generation_task(job: dict) -> dict:
         **task_identity,
         metadata=task_metadata,
     )
+
+
+def _publish_generation_task(job: dict) -> dict:
+    fields = _generation_task_fields(job)
+    workspace, task_id = fields.pop("workspace"), fields.pop("id")
+    return _upsert_canonical_task(workspace, task_id, **fields)
 
 
 def _observe_generation_job_state(record: dict) -> None:
@@ -36831,11 +36849,20 @@ except Exception as e:
 # Optional external agents use exactly the same admission endpoints and task IDs.
 from routers.wangp_mcp import create_wangp_mcp_router
 from services.wangp_agent_adapters import application_handlers as wangp_agent_handlers
+from services.image_generation_runtime import create_image_generation_commands
+from routers.image_generation_commands import (
+    create_image_generation_commands_router, image_command_catalog, image_command_handlers,
+)
+from services.workspace_commands import catalog as workspace_command_catalog
+
+_image_generation_commands = create_image_generation_commands(globals())
+api.include_router(create_image_generation_commands_router(_image_generation_commands))
 api.include_router(create_wangp_mcp_router(
     handlers={"models": lambda args: get_model_options(args['model_type']) if args.get('model_type') else list_models(), "processors": wangp_capabilities, "status": get_status,
               "generate": generate, "recast": recast_endpoint, "upscale": tools_upscale,
-              **wangp_agent_handlers(api)},
+              **wangp_agent_handlers(api), **image_command_handlers(_image_generation_commands)},
     journal_path=os.path.join(os.path.dirname(__file__), "settings", "wangp-mcp-requests.sqlite3"),
+    command_operations=[*workspace_command_catalog()["operations"], *image_command_catalog()],
 ))
 
 # ============================================================================
