@@ -50,7 +50,7 @@ export function pendingCollectionCommands(): CollectionCommand[] {
   return pending
 }
 
-function retainPending(command: CollectionCommand, done = false): void {
+function retainPending(command: CollectionCommand, done = false): boolean {
   const pending = pendingCollectionCommands()
   const existing = pending.find(item => item.intent_id === command.intent_id)
   if (existing && stableSerialize(existing) !== stableSerialize(command)) {
@@ -62,6 +62,7 @@ function retainPending(command: CollectionCommand, done = false): void {
   if (done) localStorage.removeItem(key)
   else localStorage.setItem(key, JSON.stringify(command))
   window.dispatchEvent(new Event(changedEvent))
+  return Boolean(existing)
 }
 
 export class CollectionCommandError extends Error {
@@ -111,14 +112,16 @@ function assertCollectionReceipt(receipt: CollectionReceipt, command: Collection
 
 /** Transport retries retain the exact command. A new user action gets a new ID. */
 export async function submitCollectionCommand(command: CollectionCommand): Promise<CollectionReceipt> {
-  retainPending(command)
+  const recovering = retainPending(command)
   let receipt: CollectionReceipt
   try {
     receipt = await postCommand<CollectionReceipt>({ ...command })
   } catch (error) {
     // A rejected request is known not to have committed. An uncertain transport
     // or storage response remains available for explicit recovery by the user.
-    if (error instanceof CollectionCommandError && error.status && error.status < 500) retainPending(command, true)
+    // Rejection of a retry does not prove the earlier uncertain attempt failed
+    // to commit (for example, authentication may have expired meanwhile).
+    if (!recovering && error instanceof CollectionCommandError && error.status && error.status < 500) retainPending(command, true)
     const detail = error instanceof Error ? error.message : String(error)
     throw new CollectionCommandError(i18n.t('workspaces:commands.failedWithIntent', { message: detail, id: command.intent_id }),
       command.intent_id, error instanceof CollectionCommandError ? error.status : undefined)

@@ -119,6 +119,22 @@ test('a known pre-admission rejection clears the recovery hint and does not retr
   assert.deepEqual(pendingCollectionCommands(), [])
 })
 
+test('a rejected recovery does not erase an earlier uncertain admission', { concurrency: false }, async () => {
+  const value = command('intent-auth-expired-after-admission')
+  let attempt = 0
+  globalThis.fetch = (async () => {
+    attempt += 1
+    if (attempt === 1) return response({ detail: 'Response lost after admission' }, 503)
+    if (attempt === 2) return response({ detail: 'Authentication expired' }, 401)
+    return response(receipt(value, { replayed: true }))
+  }) as typeof fetch
+  await assert.rejects(submitCollectionCommand(value))
+  await assert.rejects(submitCollectionCommand(value))
+  assert.deepEqual(pendingCollectionCommands(), [value])
+  assert.equal((await submitCollectionCommand(value)).replayed, true)
+  assert.deepEqual(pendingCollectionCommands(), [])
+})
+
 test('an uncertain after-admission response keeps the exact JSON for an explicit retry', { concurrency: false }, async () => {
   const value = command('intent-retry-exact-json')
   const calls: Array<Record<string, unknown>> = []
