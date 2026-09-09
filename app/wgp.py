@@ -6008,11 +6008,12 @@ def perform_spatial_upsampling(
         scale = 2
     h, w = sample.shape[-2:]
     h *= scale
-    h = round(h/16) * 16
     w *= scale
-    w = round(w/16) * 16
-    h = int(h)
-    w = int(w)
+    if not (still_image and spatial_upsampling in {"lanczos1.5", "lanczos2"}):
+        h = round(h / 16) * 16
+        w = round(w / 16) * 16
+    h = int(round(h))
+    w = int(round(w))
     frames_to_upsample = [sample[:, i] for i in range( sample.shape[1]) ] 
     if sample.dtype == torch.uint8:
         resample = Image.Resampling.LANCZOS if method is None else method
@@ -9239,7 +9240,8 @@ def generate_video(
                     send_cmd("progress", [0, get_latest_status(state,"Upsampling")])
                 
                 postprocess_audio_offset = native_frames_processed_count
-                native_frames_processed_count += sample.shape[1]
+                if not (audio_only or is_image):
+                    native_frames_processed_count += sample.shape[1]
                 output_fps  = fps
                 if len(temporal_upsampling) > 0:
                     sample, previous_last_frame, output_fps = perform_temporal_upsampling(sample, previous_last_frame if sliding_window and window_no > 1 else None, temporal_upsampling, fps, abort_callback=lambda: gen.get("abort", False))
