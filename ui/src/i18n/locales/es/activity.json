@@ -121,5 +121,11 @@
     "openSource": "Abrir origen",
     "installManually": "instalar a mano",
     "downloadStarted": "iniciada ↓ (mira la barra de descarga)"
+  },
+  "view": {
+    "label": "Disposición de la galería",
+    "feed": "De una en una",
+    "grid": "Rejilla",
+    "masonry": "Mosaico"
   }
 }
