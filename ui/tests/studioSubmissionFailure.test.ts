@@ -70,7 +70,7 @@ test('Load Settings leftovers do not block image command preparation', async () 
     resolution: '512x512', num_inference_steps: 4, seed: 42, guidance_scale: 1,
     image_mode: 1, video_length: 1, generation_mode: 'image',
     minimax_h3_planning_style: 'faithful', minimax_h3_audio_policy: 'native',
-    duration_seconds: 0, perturbation_layers: [9], stg_scale: 1,
+    duration_seconds: 0, perturbation_switch: 0, perturbation_layers: [9], stg_scale: 1,
     speakers_locations: '0:45 55:100', voice_clone_enabled: true,
   }
   const before = state('image', params)
@@ -80,6 +80,17 @@ test('Load Settings leftovers do not block image command preparation', async () 
   assert.equal(submission.params.minimax_h3_planning_style, undefined)
   assert.equal(submission.params.duration_seconds, undefined)
   assert.equal(submission.params.voice_clone_enabled, undefined)
+})
+
+test('an unreviewed native field still fails image preparation instead of being silently omitted', async () => {
+  const params = {
+    workspace: 'command-qa', prompt: 'Reject a typo literally', model_type: 'pi_flux2',
+    resolution: '512x512', num_inference_steps: 4, seed: 42, guidance_scale: 1,
+    image_mode: 1, video_length: 1, generation_mode: 'image', guidance_scal: 1,
+  }
+  const before = state('image', params)
+  const submission = await prepareImage(params, before, () => before)
+  await assert.rejects(submission.submit, /input\.params\.guidance_scal is not supported/)
 })
 
 test('two different legacy and image guides fail instead of silently discarding one', () => {

@@ -200,10 +200,70 @@ const ENVELOPE_INJECTION_FIELDS = new Set([
   'intent_id',
   'input',
   'params',
+  'workspace_collection_id',
   'command',
   'command_id',
   'commandId',
 ])
+
+/*
+ * `useStore.params` is a shared native form bag rather than a Studio image
+ * object. Load Settings and reroll can therefore leave fields from the
+ * video/audio/avatar families (and a few old primary-settings keys) beside
+ * the image fields. Keep this projection explicit: a new typo or an
+ * unreviewed native field must still fail at this boundary instead of being
+ * silently ignored.
+ *
+ * The generated `excluded` entries are the field-name portion of the server's
+ * image contract. The two descriptive entries in that list are filtered out;
+ * the additional names are emitted by the existing WangP restore path or
+ * primary-settings snapshot but are not part of the image catalog.
+ */
+const STUDIO_IMAGE_FORM_RESIDUAL_FIELDS = new Set([
+  ...imageCommandCatalog.studio.excluded.filter((field: string) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(field)),
+  'attention_sparsity',
+  'video_guide2',
+  'speakers_locations',
+  'apg_switch',
+  'cfg_star_switch',
+  'cfg_zero_step',
+  'custom_guide',
+  'matanyone_version',
+  'min_frames_if_references',
+  'multi_images_gen_type',
+  'output_filename',
+])
+
+const STUDIO_IMAGE_ADVANCED_RESIDUAL_FIELDS = new Set([
+  'perturbation_switch',
+  'perturbation_layers',
+  'perturbation_start_perc',
+  'perturbation_end_perc',
+  'stg_scale',
+  'apg_switch',
+  'cfg_star_switch',
+  'cfg_zero_step',
+])
+
+// These controls are excluded from the v2 image contract, but some native
+// video-capable handlers can use them. A stale sidecar may contain their
+// disabled defaults; silently dropping an active value would change a user's
+// request, so active controls remain fail-closed at this boundary.
+function hasResidualValue(value: unknown): boolean {
+  return Array.isArray(value) ? value.length > 0 : value !== undefined && value !== null && value !== 0
+}
+
+function isActiveAdvancedResidual(
+  key: string,
+  value: unknown,
+  fullParams: Record<string, unknown>,
+): boolean {
+  if (!STUDIO_IMAGE_ADVANCED_RESIDUAL_FIELDS.has(key)) return false
+  if (key === 'perturbation_switch') return hasResidualValue(value)
+  if (key === 'cfg_zero_step') return value !== undefined && value !== null && value !== -1
+  if (key === 'apg_switch' || key === 'cfg_star_switch') return hasResidualValue(value)
+  return fullParams.perturbation_switch !== 0 && hasResidualValue(value)
+}
 
 const SINGLE_REFERENCE_FIELDS = new Set([
   'image_start',
@@ -589,9 +649,16 @@ export function createStudioImageGenerationCommand(
   const workspaceCollectionId = takeWorkspaceCollectionId(fullParams.provenance)
   const params: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(fullParams)) {
-    if (key === 'workspace' || DECLARED_METADATA_FIELDS.has(key) || value === undefined) continue
+    if (key === 'workspace' || DECLARED_METADATA_FIELDS.has(key)) continue
     if (ENVELOPE_INJECTION_FIELDS.has(key)) {
       throw new Error('workspace parameters cannot contain envelope field ' + key)
+    }
+    if (!STUDIO_IMAGE_PARAM_CATALOG.has(key) && !STUDIO_IMAGE_FORM_RESIDUAL_FIELDS.has(key)) {
+      throw new Error('input.params.' + key + ' is not supported by generation.image')
+    }
+    if (value === undefined) continue
+    if (isActiveAdvancedResidual(key, value, fullParams)) {
+      throw new Error('input.params.' + key + ' is active and incompatible with generation.image')
     }
     if (!STUDIO_IMAGE_PARAM_CATALOG.has(key)) continue
     params[key] = value
