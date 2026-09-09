@@ -1840,11 +1840,25 @@ function requestLooksLikeStudioGeneration(text: string): boolean {
     || isExplicitSfxGenerationRequest(text)
 }
 
+function hasTaskControlOutsideSceneText(text: string, patterns: RegExp[]): boolean {
+  // Only the derived classifier input is masked. Never edit the submitted prompt.
+  const unquoted = text.replace(/"(?:\\.|[^"\\])*"|“[^”]*”|«[^»]*»|(?<!\w)'[^']*'(?!\w)|‘[^’]*’/gu, ' ')
+  const controlText = requestLooksLikeStudioGeneration(unquoted) ? unquoted : text
+  return controlText.split(/[.!?;\n]+/).some(part => {
+    const clause = part.trim()
+    return patterns.some(pattern => {
+      const match = pattern.exec(clause)
+      // A leading task command, or one in a later sentence, keeps authority.
+      // Within a generation clause, later task words describe the scene.
+      return match !== null && !requestLooksLikeStudioGeneration(clause.slice(0, match.index))
+    })
+  })
+}
+
 export function isExplicitCancelRequest(request: string): boolean {
   const text = request.trim()
   if (!text || NEGATED_CANCEL_REQUEST.test(text) || isHowToGenerateQuestion(text)) return false
-  if (requestLooksLikeStudioGeneration(text)) return false
-  return EXPLICIT_CANCEL_REQUESTS.some(pattern => pattern.test(text))
+  return hasTaskControlOutsideSceneText(text, EXPLICIT_CANCEL_REQUESTS)
 }
 
 const EXPLICIT_RETRY_REQUESTS = [
@@ -1856,8 +1870,7 @@ const NEGATED_RETRY_REQUEST = /\b(?:no|sin|don['’]?t|do\s+not)\b[^.!?\n]{0,24}
 export function isExplicitRetryRequest(request: string): boolean {
   const text = request.trim()
   if (!text || NEGATED_RETRY_REQUEST.test(text) || isHowToGenerateQuestion(text)) return false
-  if (requestLooksLikeStudioGeneration(text)) return false
-  return EXPLICIT_RETRY_REQUESTS.some(pattern => pattern.test(text))
+  return hasTaskControlOutsideSceneText(text, EXPLICIT_RETRY_REQUESTS)
 }
 
 export function isExplicitVideoGenerationRequest(request: string): boolean {
