@@ -45,4 +45,3 @@ export async function canonicalAudioReferences(params: Record<string, unknown>):
   const resolved = result.references as string[]
   fields.forEach((field, index) => { params[field] = resolved[index] })
 }
-

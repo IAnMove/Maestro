@@ -54,4 +54,3 @@ export function assertCanonicalAudioReference(value: unknown, field: string): vo
   }
   throw new Error(`${field} must be a canonical audio URL or asset ID`)
 }
-
