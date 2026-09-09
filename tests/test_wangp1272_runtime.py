@@ -182,3 +182,28 @@ def test_lanczos_stills_keep_exact_dimensions_and_video_keeps_alignment(method, 
     assert result.shape == (3, frame_count, output_height, width)
     assert result.dtype == torch.uint8
     assert torch.all(result == 127)
+
+
+def _spatial_upsampling_still_image_value(function_name):
+    tree = ast.parse((ROOT / 'app/wgp.py').read_text())
+    function = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == function_name)
+    calls = [
+        node for node in ast.walk(function)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == 'perform_spatial_upsampling'
+    ]
+    assert len(calls) == 1, f'{function_name} should call perform_spatial_upsampling once'
+    still_image = next((keyword.value for keyword in calls[0].keywords if keyword.arg == 'still_image'), None)
+    assert still_image is not None, f'{function_name} must pass still_image into perform_spatial_upsampling'
+    return still_image
+
+
+def test_generate_video_forwards_image_mode_into_spatial_upsampling():
+    still_image = _spatial_upsampling_still_image_value('generate_video')
+    assert isinstance(still_image, ast.Name) and still_image.id == 'is_image'
+
+
+def test_edit_video_marks_gallery_images_as_still_spatial_inputs():
+    still_image = _spatial_upsampling_still_image_value('edit_video')
+    assert isinstance(still_image, ast.Call)
+    assert isinstance(still_image.func, ast.Name) and still_image.func.id == 'has_image_file_extension'
+    assert [arg.id for arg in still_image.args if isinstance(arg, ast.Name)] == ['video_source']
