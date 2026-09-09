@@ -1,11 +1,13 @@
 """Provider-free source and processor preparation checks for Tools upscale."""
 
 from copy import deepcopy
+import hashlib
 
 import pytest
 from fastapi import HTTPException
 from PIL import Image
 
+from services.asset_manifest import build_asset_manifest, write_asset_manifest
 from services.tools_upscale_commands import (
     _canonical_request_source,
     _request_ready_params,
@@ -115,6 +117,98 @@ def test_image_source_is_confined_inspected_and_snapshotted(prepared_fixture):
     assert resources[0]["media"]["width"] == 19
     assert resources[0]["sha256"]
     assert resources[0]["size_bytes"] == prepared_fixture["source"].stat().st_size
+
+
+def test_source_workspace_is_forwarded_and_must_match_resolved_source(prepared_fixture):
+    seen = {}
+
+    def resolver(request, **_kwargs):
+        seen.update(request)
+        return (
+            str(prepared_fixture["source"]), prepared_fixture["source"].name,
+            "source", "image", "asset-poster", "destination",
+            str(prepared_fixture["roots"]["destination"]),
+        )
+
+    native, _ = _prepare(
+        prepared_fixture,
+        _params(prepared_fixture, source_workspace="source"),
+        resolve_source=resolver,
+    )
+
+    assert seen["source_workspace"] == "source"
+    assert native["source_workspace"] == "source"
+
+    with pytest.raises(HTTPException, match="source_workspace"):
+        _prepare(
+            prepared_fixture,
+            _params(prepared_fixture, source_workspace="destination"),
+            resolve_source=resolver,
+        )
+
+
+def test_asset_scope_preflight_rejects_ambiguity_and_keeps_explicit_identity(prepared_fixture):
+    destination = prepared_fixture["roots"]["destination"] / "poster.png"
+    Image.new("RGB", (19, 13), "white").save(destination)
+    for path, workspace in ((prepared_fixture["source"], "source"), (destination, "destination")):
+        write_asset_manifest(
+            path,
+            build_asset_manifest(path, asset_id="asset-shared", workspace_id=workspace, tool="fixture"),
+        )
+    calls = []
+
+    def native_resolver(body, **_kwargs):
+        calls.append(deepcopy(body))
+        path = prepared_fixture["source"] if body["source_workspace"] == "source" else destination
+        return str(path), path.name, body["source_workspace"], "image", "asset-shared", "destination", str(
+            prepared_fixture["roots"]["destination"]
+        )
+
+    resolve = _resolve_source({
+        "_resolve_tool_source": native_resolver,
+        "_tool_asset_roots": lambda: [
+            {"workspace_id": name, "path": str(path)}
+            for name, path in prepared_fixture["roots"].items()
+        ],
+    })
+    request = {
+        "source": "/api/v1/assets/asset-shared",
+        "source_kind": "image",
+        "workspace": "destination",
+    }
+    with pytest.raises(HTTPException) as ambiguous:
+        resolve(request)
+    assert ambiguous.value.status_code == 409
+    assert ambiguous.value.detail["code"] == "ambiguous_source"
+    assert calls == []
+
+    with pytest.raises(HTTPException) as missing:
+        resolve({**request, "source_workspace": "missing"})
+    assert missing.value.status_code == 409
+    assert missing.value.detail["code"] == "source_workspace_mismatch"
+    assert calls == []
+
+    native, resources = _prepare(
+        prepared_fixture,
+        _params(
+            prepared_fixture,
+            source="/api/v1/assets/asset-shared",
+            source_workspace="source",
+        ),
+        resolve_source=resolve,
+    )
+    assert calls[-1] == {
+        "source_kind": "image",
+        "workspace": "destination",
+        "asset_id": "asset-shared",
+        "source_workspace": "source",
+    }
+    assert native["source_workspace"] == "source"
+    assert native["source_asset_id"] == "asset-shared"
+    source_hash = hashlib.sha256(prepared_fixture["source"].read_bytes()).hexdigest()
+    destination_hash = hashlib.sha256(destination.read_bytes()).hexdigest()
+    assert source_hash != destination_hash
+    assert resources[0]["sha256"] == source_hash
 
 
 def test_processor_reference_is_resolved_before_validator_and_keeps_order(prepared_fixture):

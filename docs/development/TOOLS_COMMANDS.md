@@ -13,6 +13,7 @@ same envelope used by the other shared commands:
     "workspace_collection_id": "collection-123",
     "params": {
       "source": "/api/v1/file/poster.png?workspace=source",
+      "source_workspace": "source",
       "source_kind": "image",
       "method": "lanczos2",
       "seed": -1,
@@ -26,8 +27,12 @@ same envelope used by the other shared commands:
 identifies the logical collection associated with the command; it is retained
 in the durable command snapshots, provenance and fingerprint and is not a native processor setting. `source` is either an exact asset ID
 (`asset_...`) or one canonical local API reference: an upload URL, a
-workspace-qualified file URL, or an exact asset URL. Absolute host paths,
-remote URLs, traversal, fragments and ambiguous source locations are rejected.
+workspace-qualified file URL, or an exact asset URL. `source_workspace` is
+optional; when supplied for a source URL it must match that URL's workspace.
+Use `__uploads__` for an upload URL. For an asset ID with several catalog locations, omit the scope
+only when there is exactly one location, otherwise select one exact
+`source_workspace`. Absolute host paths, remote URLs, traversal, fragments,
+missing scopes and ambiguous source locations are rejected.
 The source kind must be `image` or `video`, and `method` is required rather
 than selected by a default.
 

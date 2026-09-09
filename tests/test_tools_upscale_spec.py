@@ -49,6 +49,40 @@ def test_fingerprint_excludes_intent_but_includes_source_kind_and_method():
     assert first["fingerprint"] != different_kind["fingerprint"]
 
 
+def test_source_workspace_is_preserved_and_fingerprinted():
+    source = "/api/v1/assets/asset-shared"
+    source_copy = freeze_tools_upscale_spec(command(source=source, source_workspace="source"))
+    other_scope = freeze_tools_upscale_spec(
+        command(intent="other-scope", source=source, source_workspace="default")
+    )
+
+    assert source_copy["effective"]["input"]["params"]["source_workspace"] == "source"
+    assert source_copy["original"]["input"]["params"]["source_workspace"] == "source"
+    assert source_copy["fingerprint"] != other_scope["fingerprint"]
+
+
+@pytest.mark.parametrize("source,source_workspace", [
+    ("/api/v1/file/poster.png?workspace=source", "default"),
+    ("/api/v1/uploads/poster.png", "source"),
+])
+def test_source_workspace_must_match_canonical_url(source, source_workspace):
+    with pytest.raises(ToolsUpscaleSpecError, match="source_workspace"):
+        freeze_tools_upscale_spec(command(source=source, source_workspace=source_workspace))
+
+
+@pytest.mark.parametrize("source_workspace", ["__uploads__", "source", "default"])
+def test_source_workspace_accepts_known_scope_shapes(source_workspace):
+    source = "/api/v1/uploads/poster.png" if source_workspace == "__uploads__" else "asset-poster"
+    frozen = freeze_tools_upscale_spec(command(source=source, source_workspace=source_workspace))
+    assert frozen["effective"]["input"]["params"]["source_workspace"] == source_workspace
+
+
+@pytest.mark.parametrize("source_workspace", ["", " ", "../source", "/tmp/source", "s" * 161, True, 12])
+def test_source_workspace_is_strict_and_bounded(source_workspace):
+    with pytest.raises(ToolsUpscaleSpecError, match="source_workspace"):
+        freeze_tools_upscale_spec(command(source_workspace=source_workspace))
+
+
 def test_collection_identity_is_preserved_and_fingerprinted():
     first_command = command()
     first_command["input"]["workspace_collection_id"] = "collection-one"
@@ -142,7 +176,7 @@ def test_schema_publishes_only_the_closed_tools_surface():
     assert schema["operation"] == "tools.upscale"
     assert params["additionalProperties"] is False
     assert set(schema["supported_input_fields"]) == {
-        "workspace", "workspace_collection_id", "source", "source_kind", "method", "seed",
+        "workspace", "workspace_collection_id", "source", "source_workspace", "source_kind", "method", "seed",
         "wangp_processor_settings",
     }
     assert "actor" in schema["excluded"]

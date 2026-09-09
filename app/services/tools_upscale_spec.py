@@ -17,6 +17,7 @@ The envelope is::
             "workspace_collection_id": "...",
             "params": {
                 "source": "asset_... or /api/v1/...",
+                "source_workspace": "source or __uploads__",
                 "source_kind": "image" or "video",
                 "method": "lanczos2",
                 "seed": -1,
@@ -37,7 +38,7 @@ from copy import deepcopy
 import hashlib
 import json
 from typing import Annotated, Any, Literal
-from urllib.parse import unquote, urlsplit
+from urllib.parse import parse_qs, unquote, urlsplit
 
 from pydantic import (
     BaseModel,
@@ -112,6 +113,14 @@ _Source = Annotated[
     StrictStr,
     StringConstraints(min_length=1, max_length=_MAX_REFERENCE_LENGTH),
 ]
+_SourceWorkspace = Annotated[
+    StrictStr,
+    StringConstraints(
+        min_length=1,
+        max_length=160,
+        pattern=r"^(?:__uploads__|default|[A-Za-z0-9][A-Za-z0-9_-]*)$",
+    ),
+]
 _Method = Annotated[
     StrictStr,
     StringConstraints(min_length=1, max_length=80),
@@ -123,6 +132,9 @@ class ToolsUpscaleParams(_ClosedModel):
     """Typed native input for one image or video upscale."""
 
     source: _Source
+    # An asset ID can exist in more than one explicit media root.  This scope
+    # selects that exact source location; it is kept in the native snapshot.
+    source_workspace: _SourceWorkspace | None = None
     source_kind: Literal["image", "video"]
     method: _Method
     seed: _Seed = -1
@@ -146,6 +158,20 @@ class ToolsUpscaleParams(_ClosedModel):
         if value not in TOOL_UPSCALE_METHODS:
             raise ValueError("method must be one of the installed Tools upscale methods")
         return value
+
+    @model_validator(mode="after")
+    def _check_source_workspace(self):
+        parsed = urlsplit(self.source)
+        expected = None
+        if parsed.path.startswith("/api/v1/uploads/"):
+            expected = "__uploads__"
+        elif parsed.path.startswith("/api/v1/file/"):
+            values = parse_qs(parsed.query, keep_blank_values=True).get("workspace", [])
+            if len(values) == 1:
+                expected = values[0]
+        if expected and self.source_workspace not in (None, expected):
+            raise ValueError("source_workspace must match the source URL workspace")
+        return self
 
     @model_validator(mode="after")
     def _check_media_method(self):
@@ -280,6 +306,7 @@ def tools_upscale_schema() -> dict[str, Any]:
             "workspace",
             "workspace_collection_id",
             "source",
+            "source_workspace",
             "source_kind",
             "method",
             "seed",

@@ -65,6 +65,36 @@ def _resource_adapter(runtime):
     )
 
 
+def _asset_locations(runtime, asset_id):
+    roots_factory = runtime.get("_tool_asset_roots")
+    if not callable(roots_factory):
+        return None
+    from services.asset_catalog import find_asset
+
+    asset = find_asset(roots_factory(), asset_id)
+    if asset is None:
+        return None
+    locations = asset.get("locations")
+    if not isinstance(locations, list):
+        raise command_error(409, "source_location_unavailable", "The source asset has no valid locations")
+    return locations
+
+
+def _check_asset_scope(runtime, asset_id, source_workspace):
+    locations = _asset_locations(runtime, asset_id)
+    if locations is None:
+        return
+    if any(not isinstance(location, dict) for location in locations):
+        raise command_error(409, "source_location_unavailable", "The source asset has invalid locations")
+    matches = [item for item in locations if item.get("workspace_id") == source_workspace]
+    if source_workspace is not None and len(matches) != 1:
+        code = "ambiguous_source" if len(matches) > 1 else "source_workspace_mismatch"
+        raise command_error(409, code, "The source_workspace does not identify one exact asset location")
+    if source_workspace is None and len(locations) != 1:
+        code = "source_location_unavailable" if not locations else "ambiguous_source"
+        raise command_error(409, code, "Choose a source_workspace for this asset")
+
+
 def _resolve_source(runtime):
     resolver = runtime.get("_resolve_tool_source") or runtime.get("resolve_tool_source")
     if not callable(resolver):
@@ -82,6 +112,7 @@ def _resolve_source(runtime):
         if asset_id:
             body["asset_id"] = asset_id
             body.pop("source", None)
+        _check_asset_scope(runtime, asset_id, body.get("source_workspace"))
         expected_kinds = kwargs.get("expected_kinds") or (body.get("source_kind"),)
         try:
             return resolver(body, expected_kinds=expected_kinds)

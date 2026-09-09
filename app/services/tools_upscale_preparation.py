@@ -74,6 +74,8 @@ def _call_source_resolver(resolver: Callable, params: dict[str, Any], kind: str)
 
         request["asset_id"] = _asset_id_from_reference(source)
         request.pop("source", None)
+    if params.get("source_workspace") is not None:
+        request["source_workspace"] = params["source_workspace"]
     try:
         return resolver(request, expected_kinds=(kind,))
     except TypeError as first_error:
@@ -373,6 +375,9 @@ def prepare_tools_upscale(
         result = (_call_source_resolver(resolver, working, kind) if callable(resolver)
                   else _fallback_source(working, resources))
         source = _normalise_source(result, kind)
+        requested_workspace = working.get("source_workspace")
+        if requested_workspace is not None and source["source_workspace"] != requested_workspace:
+            raise ValueError("The selected source does not match source_workspace")
         source["url"] = working["source"]
         path = _check_source_path(source, resources)
         identities = [_source_resource(source, path, resources, probe_video)]
