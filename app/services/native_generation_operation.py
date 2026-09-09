@@ -12,3 +12,6 @@ class NativeGenerationOperation:
     freeze: Callable[[dict], tuple[dict, dict]]
     prepare: Callable[[dict], tuple[dict, list]]
     catalog: dict
+    prepare_request: Callable | None = None
+    worker: Callable[[str], bool] | None = None
+    use_generation_defaults: bool = True

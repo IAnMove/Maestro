@@ -83,12 +83,17 @@ def create_image_generation_commands(runtime):
 
         return NativeGenerationOperation(freeze=freeze, prepare=prepare, catalog=speech_command_catalog())
 
+    operations = {"generation.speech": speech_operation()}
+    if callable(runtime.get("tools_upscale")) and callable(runtime.get("_run_tool_upscale")):
+        from services.tools_upscale_commands import create_tools_upscale_operation
+        operations["tools.upscale"] = create_tools_upscale_operation(runtime)
+
     service = ImageGenerationCommands(
         registry=runtime["_task_registry"], prepare=runtime["generate"], preflight=preflight,
         make_job=runtime["_new_generation_job"], task_fields=runtime["_generation_task_fields"],
         dispatch=dispatch, persist_recovery=persist, active_job_ids=lambda: runtime["_jobs"].keys(),
         prepare_studio=prepare_studio, runtime_defaults=lambda: {"mode": "", **runtime["wgp"].primary_settings},
-        operations={"generation.speech": speech_operation()},
+        operations=operations,
     )
     service.canonicalize_reference = lambda value, media_kind="image": resources(media_kind).canonicalize_legacy(value)
     return service

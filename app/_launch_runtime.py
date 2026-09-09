@@ -10672,6 +10672,13 @@ def _run_generation_with_preparation(job_id: str) -> bool:
     job = _jobs.get(job_id)
     if not isinstance(job, dict):
         return False
+    try:
+        native_worker = _image_generation_commands.native_worker(job)
+    except HTTPException as error:
+        finish_job(job, "failed", error=str(error.detail), message="Command recovery could not be verified")
+        return False
+    if native_worker is not None:
+        return bool(native_worker(job_id))
     params = job.get("params") if isinstance(job.get("params"), dict) else {}
     pending = params.get("_h3_window_plan_pending")
     if not isinstance(pending, dict):
@@ -23436,6 +23443,17 @@ async def tools_upscale(request: Request):
         "workspace": workspace, "out_dir": output_dir,
         "provenance": provenance,
     }
+    admit_command = getattr(request, "admit_generation_command", None)
+    if callable(admit_command):
+        # Only the typed in-process command adapter can transfer admission.
+        # Preserve the existing tool's resolved inputs and native worker;
+        # canonical task/receipt persistence now owns its queue lifecycle.
+        job["params"].pop("_non_durable_tool", None)
+        provenance["capability"] = "tools.upscale"
+        command_collection = (body.get("provenance") or {}).get("workspace_id")
+        if command_collection is not None:
+            provenance["workspace_id"] = command_collection
+        return admit_command(job["params"], workspace, provenance)
     _register_manual_generation_job(job)
     worker = _run_generation if execution_mode.policy().simulated else _run_tool_upscale
     threading.Thread(target=worker, args=(job_id,), daemon=False).start()
