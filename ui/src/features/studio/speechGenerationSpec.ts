@@ -1,33 +1,18 @@
 import { stableSerialize } from '../../lib/commandContract'
+import { createCatalogValidator, type CommandSchema } from '../../lib/generationCommandSchema'
+import { assertCanonicalAudioReference } from '../../lib/canonicalAudioReference'
+export { assertCanonicalAudioReference } from '../../lib/canonicalAudioReference'
 import speechCommandCatalog from '../../api/speechCommandCatalog.json'
 
 export const STUDIO_SPEECH_SCHEMA_VERSION = 2 as const
 export const STUDIO_SPEECH_OPERATION = 'generation.speech' as const
 
 type CatalogRecord = Record<string, unknown>
-type SpeechSchema = CatalogRecord & {
-  anyOf?: unknown[]
-  properties?: CatalogRecord
-  required?: string[]
-  additionalProperties?: boolean
-  $defs?: CatalogRecord
-  $ref?: string
-  const?: unknown
-  enum?: unknown[]
-  type?: string
-  minLength?: number
-  maxLength?: number
-  pattern?: string
-  minimum?: number
-  maximum?: number
-  minItems?: number
-  maxItems?: number
-  items?: unknown
-}
 
 const studioCatalog = speechCommandCatalog.studio as unknown as CatalogRecord
-const inputSchema = studioCatalog.input as SpeechSchema
-const paramsSchema = (inputSchema.$defs?.StudioSpeechParams || {}) as SpeechSchema
+const inputSchema = studioCatalog.input as CommandSchema
+const paramsSchema = (inputSchema.$defs?.StudioSpeechParams || {}) as CommandSchema
+const assertCatalogValue = createCatalogValidator(paramsSchema.$defs, 'generation.speech')
 
 /**
  * The generated catalog is the sole source of the speech parameter allowlist.
@@ -237,7 +222,6 @@ const AUDIO_REFERENCE_FIELDS = [
   'audio_guide5',
   'audio_guide6',
 ] as const
-const ASSET_ID = /^asset(?:[_:-])[A-Za-z0-9][A-Za-z0-9._:-]{0,238}$/
 const WORKSPACE = /^(?:default|[A-Za-z0-9][A-Za-z0-9_-]*)$/
 const MAX_INTENT_LENGTH = 160
 const MAX_WORKSPACE_LENGTH = 240
@@ -255,171 +239,6 @@ function requiredText(value: unknown, field: string, maximum: number): string {
   return value
 }
 
-function safeReferencePath(value: string): boolean {
-  return Boolean(value)
-    && !value.includes('\\')
-    && !value.includes('\u0000')
-    && value.split('/').every(part => Boolean(part) && part !== '.' && part !== '..')
-}
-
-/** Match the server's canonical asset URL/ID syntax without resolving anything. */
-export function assertCanonicalAudioReference(value: unknown, field: string): void {
-  if (value === null || value === '') return
-  if (typeof value !== 'string' || value.trim() !== value) {
-    throw new Error(`${field} must be a canonical audio URL or asset ID`)
-  }
-  if (ASSET_ID.test(value)) return
-  if (!value.startsWith('/api/v1/') || value.includes('\\') || value.includes('\u0000')) {
-    throw new Error(`${field} must be a canonical audio URL or asset ID`)
-  }
-  const rawPathEnd = value.search(/[?#]/)
-  const rawPath = rawPathEnd < 0 ? value : value.slice(0, rawPathEnd)
-  let decodedPath: string
-  try {
-    decodedPath = decodeURIComponent(rawPath)
-  } catch {
-    throw new Error(`${field} must be a canonical audio URL or asset ID`)
-  }
-  const parsed = new URL(value, 'http://hocuspocus.invalid')
-  if (parsed.origin !== 'http://hocuspocus.invalid' || parsed.hash) {
-    throw new Error(`${field} must be a canonical audio URL or asset ID`)
-  }
-  if (parsed.pathname.startsWith('/api/v1/uploads/')) {
-    if (parsed.search || !safeReferencePath(decodedPath.slice('/api/v1/uploads/'.length))) {
-      throw new Error(`${field} must be a canonical audio URL or asset ID`)
-    }
-    return
-  }
-  if (parsed.pathname.startsWith('/api/v1/assets/')) {
-    const suffix = decodedPath.slice('/api/v1/assets/'.length)
-    if (parsed.search || !ASSET_ID.test(suffix)) {
-      throw new Error(`${field} must be a canonical audio URL or asset ID`)
-    }
-    return
-  }
-  if (parsed.pathname.startsWith('/api/v1/file/')) {
-    const suffix = decodedPath.slice('/api/v1/file/'.length)
-    const query = new URLSearchParams(parsed.search)
-    if (!safeReferencePath(suffix) || query.size !== 1 || query.getAll('workspace').length !== 1
-      || !WORKSPACE.test(query.get('workspace') || '')) {
-      throw new Error(`${field} must be a canonical audio URL or asset ID`)
-    }
-    return
-  }
-  throw new Error(`${field} must be a canonical audio URL or asset ID`)
-}
-
-function schemaTypeMatches(value: unknown, type: unknown): boolean {
-  if (type === 'null') return value === null
-  if (type === 'string') return typeof value === 'string'
-  if (type === 'boolean') return typeof value === 'boolean'
-  if (type === 'integer') return typeof value === 'number' && Number.isSafeInteger(value)
-  if (type === 'number') return typeof value === 'number' && Number.isFinite(value)
-  if (type === 'array') return Array.isArray(value)
-  if (type === 'object') return isRecord(value)
-  return true
-}
-
-function resolveSchema(schema: unknown): SpeechSchema {
-  if (!isRecord(schema)) throw new Error('The generated speech catalog contains an invalid schema')
-  if (typeof schema.$ref !== 'string') return schema
-  const prefix = '#/$defs/'
-  if (!schema.$ref.startsWith(prefix)) throw new Error('The generated speech catalog contains an unsupported reference')
-  return resolveSchema(paramsSchema.$defs?.[schema.$ref.slice(prefix.length)])
-}
-
-function assertCatalogUnion(value: unknown, schema: SpeechSchema, field: string): void {
-  const valid = schema.anyOf?.some(option => {
-    try {
-      assertCatalogValue(value, option, field)
-      return true
-    } catch {
-      return false
-    }
-  })
-  if (!valid) throw new Error(`${field} has an invalid native speech value`)
-}
-
-function assertCatalogIdentity(value: unknown, schema: SpeechSchema, field: string): void {
-  if ('const' in schema && value !== schema.const) {
-    throw new Error(`${field} must equal its native selector`)
-  }
-  if (Array.isArray(schema.enum) && !schema.enum.some(option => Object.is(option, value))) {
-    throw new Error(`${field} has an invalid native speech value`)
-  }
-  if (schema.type && !schemaTypeMatches(value, schema.type)) {
-    throw new Error(`${field} has an invalid native speech type`)
-  }
-}
-
-function assertCatalogString(value: unknown, schema: SpeechSchema, field: string): void {
-  if (typeof value !== 'string') return
-  if (typeof schema.minLength === 'number' && value.length < schema.minLength) {
-    throw new Error(`${field} is too short`)
-  }
-  if (typeof schema.maxLength === 'number' && value.length > schema.maxLength) {
-    throw new Error(`${field} is too long`)
-  }
-  if (typeof schema.pattern === 'string' && !(new RegExp(schema.pattern).test(value))) {
-    throw new Error(`${field} has an invalid native speech value`)
-  }
-}
-
-function assertCatalogNumber(value: unknown, schema: SpeechSchema, field: string): void {
-  if (typeof value !== 'number') return
-  if (!Number.isFinite(value)) throw new Error(`${field} must be finite`)
-  if (typeof schema.minimum === 'number' && value < schema.minimum) {
-    throw new Error(`${field} is below its native minimum`)
-  }
-  if (typeof schema.maximum === 'number' && value > schema.maximum) {
-    throw new Error(`${field} is above its native maximum`)
-  }
-}
-
-function assertCatalogArray(value: unknown, schema: SpeechSchema, field: string): void {
-  if (!Array.isArray(value)) return
-  if (typeof schema.minItems === 'number' && value.length < schema.minItems) {
-    throw new Error(`${field} has too few items`)
-  }
-  if (typeof schema.maxItems === 'number' && value.length > schema.maxItems) {
-    throw new Error(`${field} has too many items`)
-  }
-  if (schema.items) {
-    value.forEach((item, index) => assertCatalogValue(item, schema.items, `${field}[${index}]`))
-  }
-}
-
-function assertCatalogObject(value: unknown, schema: SpeechSchema, field: string): void {
-  if (!isRecord(value)) return
-  const properties = schema.properties || {}
-  if (schema.additionalProperties === false) {
-    for (const key of Object.keys(value)) {
-      if (!(key in properties)) throw new Error(`${field}.${key} is not supported by generation.speech`)
-    }
-  }
-  if (Array.isArray(schema.required)) {
-    for (const key of schema.required) {
-      if (!(key in value)) throw new Error(`${field}.${key} is required by generation.speech`)
-    }
-  }
-  for (const [key, child] of Object.entries(value)) {
-    const childSchema = properties[key]
-    if (childSchema) assertCatalogValue(child, childSchema, `${field}.${key}`)
-  }
-}
-
-function assertCatalogValue(value: unknown, schema: unknown, field: string): void {
-  const resolved = resolveSchema(schema)
-  if (Array.isArray(resolved.anyOf)) {
-    assertCatalogUnion(value, resolved, field)
-    return
-  }
-  assertCatalogIdentity(value, resolved, field)
-  assertCatalogString(value, resolved, field)
-  assertCatalogNumber(value, resolved, field)
-  assertCatalogArray(value, resolved, field)
-  assertCatalogObject(value, resolved, field)
-}
 
 function assertSpeechParams(value: unknown): asserts value is StudioSpeechParams {
   if (!isRecord(value)) throw new Error('input.params must be an object')

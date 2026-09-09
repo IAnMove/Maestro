@@ -1,17 +1,10 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { SpeechGenerationReceipt } from '../../api/speechGenerationCommands'
 import {
-  pendingSpeechGenerationCommands,
-  submitSpeechGenerationCommand,
-  subscribeSpeechGenerationCommands,
+  pendingSpeechGenerationCommands, submitSpeechGenerationCommand, subscribeSpeechGenerationCommands,
 } from '../../api/speechGenerationCommands'
-import i18n, { useUiTranslation } from '../../i18n'
-import {
-  SPEECH_PRESENTATION_EVENT,
-  SPEECH_RESULT_EVENT,
-  type SpeechPresentation,
-} from './speechCommandPresentation'
+import { useUiTranslation } from '../../i18n'
 import type { StudioSpeechGenerationCommand } from './speechGenerationSpec'
+import { StudioAudioCommandPanel, type AudioPanelProps, type AudioPanelConfiguration } from './StudioAudioCommandPanel'
 
 function parameters(command: StudioSpeechGenerationCommand): Record<string, unknown> {
   return command.input.params as Record<string, unknown>
@@ -52,122 +45,12 @@ function RequestSummary({ command }: { command: StudioSpeechGenerationCommand })
   </div>
 }
 
-interface Props {
-  workspace: string
-  model: string
-  visible: boolean
-  onRecovered: (receipt: SpeechGenerationReceipt) => Promise<void>
+const configuration: AudioPanelConfiguration<StudioSpeechGenerationCommand, SpeechGenerationReceipt> = {
+  subMode: 'speech', pendingCommands: pendingSpeechGenerationCommands,
+  submitCommand: submitSpeechGenerationCommand, subscribeCommands: subscribeSpeechGenerationCommands,
 }
 
-export function StudioSpeechCommandPanel({ workspace, model, visible, onRecovered }: Props) {
-  const { t } = useUiTranslation('studio')
-  const [shown, setShown] = useState<StudioSpeechGenerationCommand | null>(null)
-  const [pending, setPending] = useState<StudioSpeechGenerationCommand[]>([])
-  const [error, setError] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [receipt, setReceipt] = useState<SpeechGenerationReceipt | null>(null)
-  const current = useRef({ workspace, model, visible })
-  const root = useRef<HTMLDivElement>(null)
-  const waiting = useRef<SpeechPresentation | null>(null)
-  useLayoutEffect(() => { current.current = { workspace, model, visible } }, [workspace, model, visible])
-
-  useEffect(() => {
-    const refresh = () => {
-      try { setPending(pendingSpeechGenerationCommands(workspace)) }
-      catch { setError(i18n.t('studio:speechCommands.pendingInvalid')) }
-    }
-    refresh()
-    return subscribeSpeechGenerationCommands(refresh)
-  }, [workspace])
-
-  useLayoutEffect(() => {
-    const elementAtSetup = root.current
-    const receive = (event: Event) => {
-      const request = (event as CustomEvent<SpeechPresentation>).detail
-      const view = current.current
-      if (!view.visible || request.command.input.workspace !== view.workspace
-          || String(parameters(request.command).model_type) !== view.model || waiting.current?.active) {
-        request.respond(i18n.t('studio:speechCommands.contextChanged'))
-        return
-      }
-      waiting.current = request
-      setShown(request.command)
-      setBusy(true)
-      setReceipt(null)
-      setError('')
-    }
-    window.addEventListener(SPEECH_PRESENTATION_EVENT, receive)
-    if (elementAtSetup) elementAtSetup.dataset.studioSpeechListening = 'true'
-    // React StrictMode can simulate an effect cleanup while retaining the DOM
-    // node. Defer rejection until after that probe; real navigation removes
-    // the node and still receives a deterministic pre-POST failure.
-    return () => {
-      if (elementAtSetup) elementAtSetup.dataset.studioSpeechListening = 'false'
-      const request = waiting.current
-      queueMicrotask(() => {
-        if (request?.active && (!elementAtSetup || !elementAtSetup.isConnected)) {
-          request.respond(i18n.t('studio:speechCommands.panelUnavailable'))
-        }
-      })
-      window.removeEventListener(SPEECH_PRESENTATION_EVENT, receive)
-    }
-  }, [])
-
-  useEffect(() => {
-    const complete = (event: Event) => {
-      const result = (event as CustomEvent<{ intentId: string; receipt?: SpeechGenerationReceipt; error?: string }>).detail
-      if (result.intentId !== shown?.intent_id) return
-      setBusy(false)
-      setReceipt(result.receipt || null)
-      setError(result.error || '')
-    }
-    window.addEventListener(SPEECH_RESULT_EVENT, complete)
-    return () => window.removeEventListener(SPEECH_RESULT_EVENT, complete)
-  }, [shown])
-
-  useLayoutEffect(() => {
-    const request = waiting.current
-    if (!request?.active || request.command !== shown || !root.current) return
-    root.current.dataset.studioSpeechCommand = request.command.intent_id
-    root.current.scrollIntoView?.({ block: 'nearest' })
-    let second = 0
-    const first = requestAnimationFrame(() => {
-      second = requestAnimationFrame(() => {
-        const view = current.current
-        const valid = root.current?.isConnected && view.visible
-          && view.workspace === request.command.input.workspace
-          && view.model === String(parameters(request.command).model_type)
-        request.respond(valid ? undefined : i18n.t('studio:speechCommands.contextChanged'))
-        waiting.current = null
-      })
-    })
-    return () => { cancelAnimationFrame(first); cancelAnimationFrame(second) }
-  }, [shown])
-
-  const recover = async (command: StudioSpeechGenerationCommand) => {
-    setBusy(true)
-    setError('')
-    setShown(command)
-    try {
-      const admitted = await submitSpeechGenerationCommand(command)
-      setReceipt(admitted)
-      await onRecovered(admitted)
-    } catch (failure) {
-      setError(failure instanceof Error ? failure.message : String(failure))
-    } finally { setBusy(false) }
-  }
-
-  return <div ref={root} data-studio-speech-ready={visible ? 'true' : 'false'} className="px-3 space-y-2">
-    {shown && <section role="status" className="border border-border rounded-lg p-2 space-y-1 bg-bg-tertiary">
-      <strong className="text-xs">{receipt ? t('speechCommands.admitted', { id: receipt.result.job_id }) : t('speechCommands.prepared')}</strong>
-      <RequestSummary command={shown} />
-    </section>}
-    {pending.filter(command => !busy || command.intent_id !== shown?.intent_id).map(command => <section key={command.intent_id} className="border border-border rounded-lg p-2 space-y-2">
-      <strong className="text-xs">{t('speechCommands.pending')}</strong>
-      <RequestSummary command={command} />
-      <button type="button" disabled={busy} onClick={() => void recover(command)}
-        className="text-xs border border-border rounded px-2 py-1 disabled:opacity-50">{t('speechCommands.recover')}</button>
-    </section>)}
-    {error && <p role="alert" className="text-xs text-indicator-error break-words">{error}</p>}
-  </div>
+export function StudioSpeechCommandPanel(props: AudioPanelProps<SpeechGenerationReceipt>) {
+  return <StudioAudioCommandPanel {...props} configuration={configuration}
+    renderSummary={command => <RequestSummary command={command} />} />
 }

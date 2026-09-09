@@ -8,6 +8,7 @@ import pytest
 
 from services.studio_music_spec import (
     STUDIO_MUSIC_DEFAULTS,
+    SUPPORTED_INPUT_FIELDS,
     StudioMusicSpecError,
     freeze_studio_music_spec,
     studio_music_schema,
@@ -218,3 +219,14 @@ def test_schema_is_closed_and_exposes_only_local_models():
     assert "_music_description" in params["properties"]
     assert schema["music_model_types"] == ["ace_step_v1_5_xl_sft_lm_4b", "minimax_music3"]
     assert "provenance" in schema["excluded"]
+
+
+def test_supported_input_fields_identify_every_closed_native_property_once():
+    schema = studio_music_schema()
+    properties = tuple(schema["input"]["$defs"]["StudioMusicParams"]["properties"])
+    supported = tuple(SUPPORTED_INPUT_FIELDS)
+
+    assert set(supported) == set(properties)
+    assert len(supported) == len(set(supported))
+    assert set(schema["supported_input_fields"]) == set(properties)
+    assert "lyrics_language" in properties

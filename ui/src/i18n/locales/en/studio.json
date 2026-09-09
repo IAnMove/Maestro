@@ -951,6 +951,20 @@
     "pendingInvalid": "The saved speech submission could not be read. It has been preserved for recovery.",
     "referenceFailed": "A selected audio reference could not be prepared. No speech was submitted."
   },
+  "musicCommands": {
+    "prepared": "Music request prepared",
+    "admitted": "Music admitted · {{id}}",
+    "pending": "Music submission pending confirmation",
+    "recover": "Recover this music submission",
+    "resources": "{{references}} audio references · {{loras}} LoRAs",
+    "contextChanged": "The music form changed before submission. Review the current settings and try again.",
+    "panelUnavailable": "The music request could not be shown. Open Studio and try again.",
+    "pendingInvalid": "The saved music submission could not be read. It has been preserved for recovery.",
+    "referenceFailed": "A selected audio reference could not be prepared. No music was submitted.",
+    "lyrics": "Lyrics",
+    "caption": "Musical description",
+    "defaultDuration": "Model default duration"
+  },
   "toolsCommands": {
     "prepared": "Tools upscale request ready",
     "admitted": "Tools upscale queued · {{id}}",
