@@ -29,6 +29,7 @@ import { markJobsCancelling, prependJob, removeJob, updateJob, withJobs } from '
 import {
   extractSingleClipStudioParams,
   isJoinedSequenceOutput,
+  restoredSfxSettings,
   splitStudioClipPrompts,
 } from '../features/studio/studioRestore'
 import {
@@ -36,8 +37,10 @@ import {
   type GenerationSubmissionContext,
 } from '../features/studio/generationProvenance'
 import { storyDirectorSubmissionProvenance } from '../features/stories/provenance'
-import type { ImageGenerationReceipt } from '../api/imageGenerationCommands'
+import type { GenerationReceiptLike } from '../api/generationCommandClient'
 import { prepareStudioSubmission, studioUploadReference } from '../features/studio/studioSubmission'
+import { audioReferenceParams, restoreAudioReferences, stashAudioReferences, type AudioReferenceStash } from '../features/studio/audioReferenceState'
+import { beginOutputSettingsRestore, type OutputSettingsSource } from '../features/studio/outputSettingsRestore'
 
 const DASHBOARD_PIPELINE_PAGE_SIZE = 8
 const CIVIT_DOWNLOAD_POLL_MS = 2000
@@ -594,6 +597,9 @@ function _applyModelDefaults(
     if (active !== modelType) return
     const overrides: Record<string, unknown> = {}
     for (const field of _PRIMARY_MODEL_DEFAULT_FIELDS) {
+      // Audio references belong to the selected tab. A late defaults response
+      // must not disable a restored voice/music reference by resetting its selector.
+      if (state.generationMode === 'audio' && field === 'audio_prompt_type') continue
       // A one-click Full -> Pruned Turbo recommendation switches models and
       // then restores the managed 6-step preset. Do not let the asynchronous
       // base-model defaults response race in afterward and put it back at
@@ -721,6 +727,11 @@ const musicModelPrefixes = ['ace_step', 'heartmula']
 function isMusicModelType(modelType: string): boolean {
   if (musicModelTypes.has(modelType)) return true
   return musicModelPrefixes.some(p => modelType.startsWith(p))
+}
+
+function audioSubModeForModel(modelType: string): import('../types').AudioSubMode {
+  if (sfxModelTypes.has(modelType)) return 'sfx'
+  return isMusicModelType(modelType) ? 'music' : 'speech'
 }
 
 // Model types that belong to the SFX sub-family (MMAudio variants)
@@ -1343,6 +1354,7 @@ export interface AppState extends LlmSlice, StudioConfigurationSlice {
   clearEditVideo: () => void
   audioSubMode: import('../types').AudioSubMode
   setAudioSubMode: (mode: import('../types').AudioSubMode) => void
+  audioReferenceStash: AudioReferenceStash
   // Music mode (ACE-Step): describe + LLM writes, or type Style/Lyrics directly.
   musicDescription: string
   setMusicDescription: (s: string) => void
@@ -1520,7 +1532,7 @@ export interface AppState extends LlmSlice, StudioConfigurationSlice {
   startGeneration: (
     scheduledPrompt?: ScheduledPromptSubmission,
     submissionContext?: GenerationSubmissionContext,
-  ) => Promise<void | ImageGenerationReceipt>
+  ) => Promise<void | GenerationReceiptLike>
   stopGeneration: (jobId?: string) => void
   dismissJob: (jobId: string) => void
   reconnectJobs: () => Promise<void>
@@ -1639,8 +1651,8 @@ export interface AppState extends LlmSlice, StudioConfigurationSlice {
   selectedOutputMeta: OutputMetadata | null
   metadataLoading: boolean
   loadOutputMetadata: (name: string) => Promise<void>
-  loadSettingsFromOutput: () => Promise<boolean | void>
-  rerollGeneration: () => Promise<void>
+  loadSettingsFromOutput: (source?: OutputSettingsSource) => Promise<boolean | void>
+  rerollGeneration: (source?: OutputSettingsSource) => Promise<boolean | void>
   deleteSelectedOutput: () => Promise<void>
   rejoinClipGroup: (groupId: string) => Promise<void>
 
@@ -2641,10 +2653,11 @@ export const useStore = create<AppState>((set, get) => {
   musicInstrumental: false,
   setMusicInstrumental: (b) => set({ musicInstrumental: b }),
   audioSubMode: 'speech' as import('../types').AudioSubMode,
+  audioReferenceStash: {},
   selectedModelPerAudioSubMode: {} as Partial<Record<import('../types').AudioSubMode, string>>,
   setAudioSubMode: (subMode) => {
     const { audioSubMode: prevSub, params, models } = get()
-    if (subMode === prevSub) return
+    if (subMode === prevSub && (subMode === 'mixer' || audioSubModeForModel(params.model_type) === subMode)) return
     // Save current model for the sub-mode we're leaving
     const savedModels = { ...get().selectedModelPerAudioSubMode, [prevSub]: params.model_type }
     // Determine model for target sub-mode
@@ -2657,10 +2670,14 @@ export const useStore = create<AppState>((set, get) => {
       mixer: '',  // Mixer doesn't use a model — it's an ffmpeg-based tool
     }
     const saved = savedModels[subMode]
-    const targetModel = (saved && models.some(m => m.model_type === saved))
+    const targetModel = (saved && audioSubModeForModel(saved) === subMode && models.some(m => m.model_type === saved))
       ? saved
       : audioSubModeDefaults[subMode]
-    set({ audioSubMode: subMode, selectedModelPerAudioSubMode: savedModels })
+    const audioReferenceStash = stashAudioReferences(get())
+    set({
+      ...restoreAudioReferences(get(), subMode, audioReferenceStash),
+      audioSubMode: subMode, selectedModelPerAudioSubMode: savedModels, audioReferenceStash,
+    })
     if (targetModel && models.some(m => m.model_type === targetModel)) {
       get().selectModel(targetModel)
     }
@@ -2771,6 +2788,7 @@ export const useStore = create<AppState>((set, get) => {
 
     set(() => ({
       generationMode: mode,
+      ...(mode === 'audio' ? { audioSubMode: audioSubModeForModel(newModelType) } : {}),
       selectedModelPerMode: savedModels,
       savedLoraPerMode: savedLoras,
       savedParamsPerMode: savedParams,
@@ -2799,11 +2817,11 @@ export const useStore = create<AppState>((set, get) => {
       loraWeights: sameModel ? restoredLora.loraWeights : {},
       availableLoras: sameModel ? restoredLora.availableLoras : [],
     }))
+    if (newModelType && mode !== 'model3d') get().loadModelOptions(newModelType)
     if (newModelType && !sfxModelTypes.has(newModelType) && mode !== 'model3d') {
       if (!sameModel) {
         get().loadLoras(newModelType)
       }
-      get().loadModelOptions(newModelType)
       // Mode switch counts as a model selection too — apply the new
       // model's defaults so numeric primaries (steps, CFG, flow_shift,
       // sample_solver) match what that model expects rather than what
@@ -2840,7 +2858,8 @@ export const useStore = create<AppState>((set, get) => {
     // (multi-voice only), but the user expects single-voice ("Peter: hello")
     // to populate voice slot 1 too. Voice-count gate covers both cases —
     // ttsVoiceCount > 0 means at least one voice clone is active.
-    if (key === 'prompt' && typeof value === 'string' && get().generationMode === 'audio' && get().ttsVoiceCount > 0) {
+    if (key === 'prompt' && typeof value === 'string' && get().generationMode === 'audio'
+        && get().audioSubMode === 'speech' && get().ttsVoiceCount > 0) {
       get()._autoParseSpkeakerNames(value)
     }
     // Handle sub-mode transitions (Frames / Multi-Shot / Extend / Blend)
@@ -3871,9 +3890,9 @@ export const useStore = create<AppState>((set, get) => {
             availableLoras: savedLora.availableLoras || [],
           }))
         }
+        if (mode !== 'model3d') get().loadModelOptions(mt)
         if (!sfxModelTypes.has(mt) && mode !== 'model3d') {
           get().loadLoras(mt)
-          get().loadModelOptions(mt)
           _applyModelDefaults(get, set, mt)
         }
       }
@@ -3979,16 +3998,16 @@ export const useStore = create<AppState>((set, get) => {
 
     try {
       const result = tool === 'upscale'
-        ? await api.submitToolUpscale({
-          source,
-          source_kind: s.toolsSourceKind as 'image' | 'video',
-          asset_id: s.toolsSourceAssetId || undefined,
-          source_workspace: s.toolsSourceWorkspace || undefined,
-          method: s.toolsUpscaleMethod,
-          wangp_processor_settings: s.params.wangp_processor_settings,
-          workspace: s.activeWorkspace,
-          provenance: { actor: 'user' },
-        })
+        ? await (async () => {
+          const { prepareStudioToolsUpscaleSubmission, toolsUpscaleParamsFromState } =
+            await import('../features/studio/toolsCommandSubmission')
+          return (await prepareStudioToolsUpscaleSubmission(
+            toolsUpscaleParamsFromState(s),
+            s,
+            get,
+            { actor: 'user', capability: 'tools.upscale' },
+          )).submit()
+        })()
         : tool === 'revoice'
           ? await api.submitToolRevoice({ video_path: source, voice_ref_paths: refPaths, mode: s.toolsRevoiceMode, workspace: s.activeWorkspace })
           : await api.submitToolRemoveBackground({
@@ -4000,10 +4019,14 @@ export const useStore = create<AppState>((set, get) => {
             provenance: { actor: 'user' },
           })
 
+      const taskId = 'task_id' in result && typeof result.task_id === 'string'
+        ? result.task_id
+        : result.job_id
       set(st => ({
         jobs: st.jobs.map(j => j === newJob ? {
           ...j,
           id: result.job_id,
+          taskId,
           status: 'queued',
           message: removingBackground ? i18n.t('tools.queuedRemoveBackground', { ns: 'studio' }) : 'Queued...',
         } : j),
@@ -4056,6 +4079,15 @@ export const useStore = create<AppState>((set, get) => {
     // reusing runTool()'s submit+poll. The Tools panel reflects this clip
     // afterward (harmless — and convenient if the user opens it).
     set({ toolsTool: 'upscale', toolsSourcePath: name, toolsSourceName: name, toolsSourceUrl: url, toolsSourceAssetId: null, toolsSourceWorkspace: null, toolsSourceKind: 'video' })
+    // The shortcut is exposed from the video activity view, so the current
+    // mode is usually video. Switch to Tools before runTool snapshots the
+    // form; this also mounts the durable ACK panel that presents the command.
+    const state = get()
+    state.setSettingsOpen(false)
+    state.setDashboardOpen(false)
+    state.setSidebarMode('studio')
+    state.setSidebarOpen(true)
+    state.setGenerationMode('tools')
     await get().runTool()
   },
   sendClipToTools: (name, url, tool) => {
@@ -4987,7 +5019,8 @@ export const useStore = create<AppState>((set, get) => {
     // Voice clone (SeedVC) — only send if the user explicitly enabled
     // it AND provided at least one reference. Backend defaults all three
     // params to falsy if absent (postprocessing step is a no-op).
-    if (state.voiceCloneEnabled && state.voiceCloneRefs.length > 0) {
+    if (!(state.generationMode === 'audio' && state.audioSubMode !== 'speech')
+        && state.voiceCloneEnabled && state.voiceCloneRefs.length > 0) {
       const validRefs = state.voiceCloneRefs.filter(r => r && r.path)
       if (validRefs.length > 0) {
         params.voice_clone_enabled = true
@@ -5015,42 +5048,27 @@ export const useStore = create<AppState>((set, get) => {
       if (state.audioSubMode === 'music') {
         params._music_description = state.musicDescription || ''
         params._music_instrumental = !!state.musicInstrumental
+        params.video_length = 0
+        params.image_mode = 0
+        params.multi_prompts_gen_type = 2
+        params.duration_seconds = state.durationSeconds
       }
       if (state.audioSubMode === 'sfx') {
-        // SFX mode: use MMAudio to generate sound effects
-        // MMAudio runs as post-processing on a video model, so use a video model as carrier
+        // The SFX command keeps the real MMAudio selector; no video carrier
+        // is generated. These are the controls consumed by the native worker.
         const sfxModel = params.model_type as string
-        const isSfxVirtual = sfxModel.startsWith('mmaudio_')
-        if (isSfxVirtual) {
-          // Swap virtual MMAudio model for a real video model; backend uses MMAudio params
-          params.model_type = 'ltx2_22B_distilled_1_1'
-          // Keep the virtual id so Load Settings can restore the SFX tab's
-          // model selection (the sidecar otherwise records only the carrier).
-          params._sfx_virtual_model = sfxModel
-        }
         params.MMAudio_setting = 1
-        // Always set MMAudio variant explicitly so backend doesn't fall back to server config
         params._mmaudio_variant = sfxModel === 'mmaudio_nsfw' ? 'nsfw' : 'v2'
-        // Copy MMAudio prompt into main prompt field (for API validation & metadata)
-        if (!params.prompt && params.MMAudio_prompt) {
-          params.prompt = params.MMAudio_prompt
-        }
+        // SFX owns MMAudio_prompt. Do not admit leftover Speech/Music lyrics
+        // from the shared `prompt` field when the SFX box was never filled.
+        params.prompt = typeof params.MMAudio_prompt === 'string' ? params.MMAudio_prompt : ''
         params.sfx_mode = true
         params.duration_seconds = state.durationSeconds
-        // Generate a minimal video if no video_guide uploaded (1 frame), then run MMAudio
-        if (!params.video_guide) {
-          params.video_length = 17  // Minimum viable video for MMAudio (~1s)
-          params.num_inference_steps = 4
-        } else {
-          params.video_length = 0  // No video gen needed — just run MMAudio on uploaded video
-        }
+        params.video_length = 0
+        params.num_inference_steps = 25
         params.image_mode = 0
-        // Clear video-specific params
-        delete params.sliding_window_size
-        delete params.sliding_window_overlap
-        delete params.sliding_window_discard_last_frames
-      } else {
-        // Speech/Music TTS mode
+      } else if (state.audioSubMode === 'speech') {
+        // Speech voice controls do not rename lyrics or replace music references.
         params.video_length = 0
         params.image_mode = 0
         params.multi_prompts_gen_type = 2  // Preserve full text as one prompt (don't split by newlines)
@@ -6170,6 +6188,12 @@ export const useStore = create<AppState>((set, get) => {
 
   loadModelOptions: async (modelType) => {
     const seq = ++_modelOptionsSeq
+    // Virtual SFX has no options endpoint. Still invalidate pending responses
+    // and clear the previous model's constraints and Advanced controls.
+    if (sfxModelTypes.has(modelType)) {
+      set({ modelOptions: null, modelOptionsLoading: false })
+      return
+    }
     set({ modelOptionsLoading: true })
     try {
       const options = await api.fetchModelOptions(modelType)
@@ -6336,7 +6360,8 @@ export const useStore = create<AppState>((set, get) => {
       // would silently ignore).
       const newMaxVoiceCount = ((options as { max_voice_count?: number }).max_voice_count) ?? 6
       const currentVoiceCount = get().ttsVoiceCount
-      if (currentVoiceCount > newMaxVoiceCount) {
+      if (activeState.generationMode === 'audio' && activeState.audioSubMode === 'speech'
+          && currentVoiceCount > newMaxVoiceCount) {
         const trimmedVoices = get().ttsVoices.slice(0, newMaxVoiceCount)
         ttsDefaults.ttsVoiceCount = newMaxVoiceCount
         ttsDefaults.ttsVoices = trimmedVoices
@@ -8607,10 +8632,10 @@ export const useStore = create<AppState>((set, get) => {
       loraWeights: {},
       availableLoras: [],
     }))
-    // Virtual SFX models don't have backend model options or LoRAs
+    if (currentMode !== 'model3d') get().loadModelOptions(modelType)
+    // Virtual SFX models don't have backend LoRAs or model defaults.
     if (!sfxModelTypes.has(modelType) && currentMode !== 'model3d') {
       get().loadLoras(modelType)
-      get().loadModelOptions(modelType)
       _applyModelDefaults(get, set, modelType)
     }
     // Persist to localStorage
@@ -8635,31 +8660,15 @@ export const useStore = create<AppState>((set, get) => {
     set({ loraPickerSort: sort })
   },
 
-  loadSettingsFromOutput: async () => {
-    // Metadata is normally fetched in the background when an output is selected.
-    // On a slow/high-latency link (e.g. the user is remote over VPN) that fetch
-    // may not have landed — or may have failed — by the time "Load Settings" is
-    // clicked, leaving selectedOutputMeta null and this a silent no-op. Re-fetch
-    // on demand so the click is self-healing regardless of the background state.
-    let selectedOutputMeta = get().selectedOutputMeta
-    console.log('[LoadSettings] clicked — meta present:', !!selectedOutputMeta?.params,
-                '| metadataLoading:', get().metadataLoading, '| selectedOutput idx:', get().selectedOutput)
-    if (!selectedOutputMeta?.params) {
-      const pendingOutput = get().filteredOutputs()[get().selectedOutput]
-      console.log('[LoadSettings] no meta yet — on-demand fetch for:', pendingOutput?.name ?? '(no output at index)')
-      if (pendingOutput) {
-        await get().loadOutputMetadata(pendingOutput.name)
-        selectedOutputMeta = get().selectedOutputMeta
-        console.log('[LoadSettings] after on-demand fetch — params present:', !!selectedOutputMeta?.params,
-                    '| source:', selectedOutputMeta?.source)
-      }
-    }
-    if (!selectedOutputMeta?.params) {
-      console.warn('[LoadSettings] ABORT — no params available after fetch attempt; button is a no-op')
-      return false
-    }
+  loadSettingsFromOutput: async (source) => {
+    const restore = await beginOutputSettingsRestore(get, api.fetchOutputMetadata, source)
+    if (!restore) return false
+    const selectedOutputMeta = restore.metadata
     const { models } = get()
     const p = selectedOutputMeta.params as Record<string, unknown>
+    if (get().generationMode === 'audio') {
+      set({ audioReferenceStash: stashAudioReferences(get()) })
+    }
     const finishWangpRestore = beginWangpRestore(p, get, set)
     const uploadFilenames = selectedOutputMeta.upload_filenames as Record<string, string> | undefined
     console.log('[LoadSettings] applying settings — model_type:', p.model_type, '| param keys:', Object.keys(p).length)
@@ -8714,10 +8723,7 @@ export const useStore = create<AppState>((set, get) => {
       // params restored below.
       if (mode === 'audio') {
         const recordedSub = p._audio_sub_mode as import('../types').AudioSubMode | undefined
-        const inferredSub: import('../types').AudioSubMode =
-          sfxModelTypes.has(modelType) || p.sfx_mode ? 'sfx'
-          : isMusicModelType(modelType) ? 'music'
-          : 'speech'
+        const inferredSub = p.sfx_mode ? 'sfx' : audioSubModeForModel(modelType)
         const subMode = (recordedSub === 'speech' || recordedSub === 'music' || recordedSub === 'sfx')
           ? recordedSub : inferredSub
         const restoredLyrics = (p._tts_original_prompt as string) || (p.prompt as string) || ''
@@ -8746,12 +8752,10 @@ export const useStore = create<AppState>((set, get) => {
     // modelOptions matches the restored model before rerollGeneration
     // submits (stale capabilities used to strip stg_scale/perturbation_*
     // from the request, which then poisoned the next sidecar with zeros).
-    // (Virtual SFX models have no LoRAs/options endpoints — same guard
-    // as boot.)
-    if (!sfxModelTypes.has(modelType)) {
-      get().loadLoras(modelType)
-      await get().loadModelOptions(modelType)
-    }
+    // Virtual SFX clears stale options locally without fetching an endpoint.
+    if (!sfxModelTypes.has(modelType)) get().loadLoras(modelType)
+    await get().loadModelOptions(modelType)
+    if (!restore.isCurrent()) return false
 
     // Detect I2V: if image_start was used or image_prompt_type contains "S"
     const hadStartImage = !!(p.image_start || (p.image_prompt_type as string || '').includes('S'))
@@ -8790,6 +8794,10 @@ export const useStore = create<AppState>((set, get) => {
     }
 
     Object.assign(newParams, restoreWangpSettings(p))
+    if (get().generationMode === 'audio') Object.assign(newParams, audioReferenceParams(p))
+    if (get().generationMode === 'audio' && get().audioSubMode === 'sfx') {
+      Object.assign(newParams, restoredSfxSettings(p))
+    }
     // Copy optional fields — explicitly clear when absent to prevent stale values leaking
     newParams.sliding_window_size = (p.sliding_window_size as number) ?? undefined
     newParams.sliding_window_overlap = (p.sliding_window_overlap as number) ?? undefined
@@ -8830,7 +8838,12 @@ export const useStore = create<AppState>((set, get) => {
     // pencil restored only the lyrics — clear when absent so a stale
     // caption can't leak into an unrelated restore.
     newParams.alt_prompt = (p.alt_prompt as string) || ''
-    newParams.video_guide = (p.video_guide as string) || ''
+    // Audio tabs own video_guide via audioReferenceParams. Forcing '' here
+    // after a Music/Speech restore makes generation.music treat the empty
+    // residual as active. Video/Edit still clear an absent guide.
+    if (get().generationMode !== 'audio') {
+      newParams.video_guide = (p.video_guide as string) || ''
+    }
     newParams.image_refs = Array.isArray(p.image_refs) ? (p.image_refs as string[]) : []
     newParams.h3_ref_videos = Array.isArray(p.h3_ref_videos) ? (p.h3_ref_videos as string[]) : []
     newParams.h3_ref_audios = Array.isArray(p.h3_ref_audios) ? (p.h3_ref_audios as string[]) : []
@@ -8882,7 +8895,7 @@ export const useStore = create<AppState>((set, get) => {
     ) ? p.h3_window_plan as unknown as H3WindowPlan : null
 
     // Detect multi-clip output and reconstruct clips
-    const selectedName = get().filteredOutputs()[get().selectedOutput]?.name || ''
+    const selectedName = restore.name
     const loadFullSequence = isJoinedSequenceOutput(selectedName)
     if (p.multi_prompts_gen_type === 3 && Array.isArray(p.image_start) && loadFullSequence) {
       // Director Mode joins per-clip prompts with `\n---CLIP_BOUNDARY---\n`.
@@ -9043,7 +9056,8 @@ export const useStore = create<AppState>((set, get) => {
     // Derive duration and sliding window from video_length and fps
     const fps = model?.fps || 16
     const frames = newParams.video_length || 81
-    set({ durationSeconds: Math.round((frames / fps) * 10) / 10 })
+    set({ durationSeconds: get().generationMode === 'audio' && restoredDuration > 0
+      ? restoredDuration : Math.round((frames / fps) * 10) / 10 })
     if (newParams.sliding_window_size) {
       set({ slidingWindowSeconds: Math.round((newParams.sliding_window_size / fps) * 10) / 10 })
     }
@@ -9384,13 +9398,14 @@ export const useStore = create<AppState>((set, get) => {
         }
       }
     }
-    return finishWangpRestore()
+    const restored = await finishWangpRestore()
+    return restore.isCurrent() && restored
   },
 
-  rerollGeneration: async () => {
+  rerollGeneration: async (source) => {
     // Await the (now async, self-healing) settings load before generating, so a
     // slow on-demand metadata fetch can't let the reroll fire with stale params.
-    if (await get().loadSettingsFromOutput() === false) return
+    if (await get().loadSettingsFromOutput(source) === false) return false
     await get().startGeneration()
   },
 

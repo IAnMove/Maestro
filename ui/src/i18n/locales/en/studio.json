@@ -37,6 +37,7 @@
     "mixer": "Mixer"
   },
   "generate": {
+    "submitting": "Preparing…",
     "needImage": "Need image",
     "needReference": "Need reference",
     "needSource": "Need source",
@@ -927,6 +928,7 @@
     }
   },
   "commands": {
+    "generationAdmitted": "Generation queued · {{id}}",
     "prepared": "Image request ready",
     "admitted": "Image queued · {{id}}",
     "admittedNotVisible": "Image task {{id}} was admitted. Reopen Studio or Activity to follow it.",
@@ -938,5 +940,59 @@
     "pendingInvalid": "The saved submission could not be read. It has been preserved for recovery.",
     "referenceFailed": "A selected reference could not be prepared. No image was submitted.",
     "conflictingGuides": "Conflicting image guides are selected. Choose one control image and mask before generating."
+  },
+  "speechCommands": {
+    "prepared": "Speech request ready",
+    "admitted": "Speech queued · {{id}}",
+    "pending": "A previous speech submission needs recovery",
+    "recover": "Recover this speech submission",
+    "resources": "{{references}} audio references · {{voices}} voices · {{loras}} LoRAs",
+    "autoDuration": "auto duration",
+    "contextChanged": "The speech form changed before submission. Review the current settings and try again.",
+    "panelUnavailable": "The speech request could not be shown. Open Studio and try again.",
+    "pendingInvalid": "The saved speech submission could not be read. It has been preserved for recovery.",
+    "referenceFailed": "A selected audio reference could not be prepared. No speech was submitted."
+  },
+  "musicCommands": {
+    "prepared": "Music request prepared",
+    "admitted": "Music admitted · {{id}}",
+    "pending": "Music submission pending confirmation",
+    "recover": "Recover this music submission",
+    "resources": "{{references}} audio references · {{loras}} LoRAs",
+    "contextChanged": "The music form changed before submission. Review the current settings and try again.",
+    "panelUnavailable": "The music request could not be shown. Open Studio and try again.",
+    "pendingInvalid": "The saved music submission could not be read. It has been preserved for recovery.",
+    "referenceFailed": "A selected audio reference could not be prepared. No music was submitted.",
+    "lyrics": "Lyrics",
+    "caption": "Musical description",
+    "defaultDuration": "Model default duration"
+  },
+  "toolsCommands": {
+    "prepared": "Tools upscale request ready",
+    "admitted": "Tools upscale queued · {{id}}",
+    "queued": "Queued; inspect Activity for completion.",
+    "pending": "A previous Tools upscale submission needs recovery",
+    "recover": "Recover this Tools upscale submission",
+    "destination": "Output workspace: {{workspace}}",
+    "sourceWorkspace": "Source workspace: {{workspace}}",
+    "contextChanged": "The Tools form changed before submission. Review the current source and settings, then try again.",
+    "panelUnavailable": "The Tools upscale request could not be shown. Open Tools and try again.",
+    "pendingInvalid": "The saved Tools upscale request could not be read. It has been preserved for recovery."
+  },
+  "sfxCommands": {
+    "packIdTooLong": "The pack identifier is too long; no effects were submitted.",
+    "packPartial": "{{count}} of {{total}} sound effects admitted. Submission stopped: {{error}}",
+    "packQueued": "{{count}} sound effects queued. Follow them in Activity.",
+    "packMissingReceipt": "No admission receipt was returned for {{name}}.",
+    "packPresentationFailed": "Studio could not show the result. Existing tasks remain available in Activity.",
+    "prepared": "Sound effect prepared",
+    "admitted": "Sound effect queued · {{id}}",
+    "pending": "A sound effect request needs recovery",
+    "recover": "Recover this request",
+    "pendingInvalid": "The saved sound effect request could not be read.",
+    "contextChanged": "The Studio context changed. Prepare this request again.",
+    "panelUnavailable": "The sound effect panel is unavailable. Open Audio → SFX and try again.",
+    "duration": "Duration: {{seconds}} s",
+    "videoDuration": "The output video uses the source video’s duration and replaces its audio."
   }
 }

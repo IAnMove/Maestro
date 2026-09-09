@@ -10672,6 +10672,13 @@ def _run_generation_with_preparation(job_id: str) -> bool:
     job = _jobs.get(job_id)
     if not isinstance(job, dict):
         return False
+    try:
+        native_worker = _image_generation_commands.native_worker(job)
+    except HTTPException as error:
+        finish_job(job, "failed", error=str(error.detail), message="Command recovery could not be verified")
+        return False
+    if native_worker is not None:
+        return bool(native_worker(job_id))
     params = job.get("params") if isinstance(job.get("params"), dict) else {}
     pending = params.get("_h3_window_plan_pending")
     if not isinstance(pending, dict):
@@ -10870,7 +10877,9 @@ async def generate(request: Request):
         prepare_generation_inputs(body, _generation_model_def, requested_workspace,
                                   uploads_dir=os.path.join(os.getcwd(), "uploads"),
                                   workspace_dir=_workspace_dir(requested_workspace),
-                                  prepared_images=getattr(request, "prepared_studio_images", False) is True)
+                                  prepared_images=getattr(request, "prepared_studio_images", False) is True,
+                                  prepared_speech=(getattr(request, "prepared_studio_speech", False) is True
+                                                   or getattr(request, "prepared_studio_audio", False) is True))
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     try:
@@ -22438,6 +22447,13 @@ def _run_sfx_generation(job: dict, raw_params: dict, start_time: float):
         ):
             return False
 
+        from services.studio_sfx_execution import prepared_sfx_execution
+        from services.studio_sfx_commands import check_sfx_models
+        typed_sfx = prepared_sfx_execution(
+            job, raw_params, registry=_task_registry(job["workspace"]),
+            check_models=lambda variant: check_sfx_models(globals(), variant),
+        )
+
         out_dir = job.get("out_dir") or wgp.save_path
         os.makedirs(out_dir, exist_ok=True)
         wgp.save_path = out_dir
@@ -22459,11 +22475,17 @@ def _run_sfx_generation(job: dict, raw_params: dict, start_time: float):
                 video_path = candidate
 
         if video_path and not os.path.isfile(video_path):
+            if typed_sfx:
+                raise ValueError("The admitted SFX video is no longer available")
             print(f"[SFX] Warning: video_guide not found: {video_path}, falling back to text-only")
             video_path = None
 
         # If video provided, derive duration from it
-        if video_path:
+        if typed_sfx:
+            # The admission records the inspected guide duration and exact
+            # source identity. Do not rederive it or silently cap the request.
+            pass
+        elif video_path:
             try:
                 import decord
                 vr = decord.VideoReader(video_path)
@@ -22494,12 +22516,14 @@ def _run_sfx_generation(job: dict, raw_params: dict, start_time: float):
             )
             return False
 
-        # Download model files if needed
-        if not update_job(
-            job, message="Downloading MMAudio models...", phase="Downloading models",
-        ):
-            return False
-        wgp.download_mmaudio(variant_override=variant)
+        # Typed commands require installed dependencies, checked again above.
+        # Keep legacy provisioning until its callers have been migrated.
+        if not typed_sfx:
+            if not update_job(
+                job, message="Downloading MMAudio models...", phase="Downloading models",
+            ):
+                return False
+            wgp.download_mmaudio(variant_override=variant)
         if is_cancel_requested(job):
             return False
 
@@ -22552,10 +22576,10 @@ def _run_sfx_generation(job: dict, raw_params: dict, start_time: float):
         elapsed = time.time() - start_time
         for fname in new_files:
             ext = os.path.splitext(fname)[1].lower()
-            if ext not in {".wav", ".mp3", ".flac"}:
+            if ext not in {".wav", ".mp3", ".flac", ".mp4"}:
                 continue
             sidecar = {
-                "params": {
+                "params": copy.deepcopy(raw_params) if typed_sfx else {
                     "prompt": prompt,
                     "MMAudio_prompt": prompt,
                     "MMAudio_neg_prompt": neg_prompt,
@@ -23435,6 +23459,17 @@ async def tools_upscale(request: Request):
         "workspace": workspace, "out_dir": output_dir,
         "provenance": provenance,
     }
+    admit_command = getattr(request, "admit_generation_command", None)
+    if callable(admit_command):
+        # Only the typed in-process command adapter can transfer admission.
+        # Preserve the existing tool's resolved inputs and native worker;
+        # canonical task/receipt persistence now owns its queue lifecycle.
+        job["params"].pop("_non_durable_tool", None)
+        provenance["capability"] = "tools.upscale"
+        command_collection = (body.get("provenance") or {}).get("workspace_id")
+        if command_collection is not None:
+            provenance["workspace_id"] = command_collection
+        return admit_command(job["params"], workspace, provenance)
     _register_manual_generation_job(job)
     worker = _run_generation if execution_mode.policy().simulated else _run_tool_upscale
     threading.Thread(target=worker, args=(job_id,), daemon=False).start()
@@ -36223,7 +36258,7 @@ def _generation_task_fields(job: dict) -> dict:
     }.get(mode, "Generation job")
     if str(provenance.get("capability") or "") == "remove_background":
         task_title = "Tools · Remove background"
-    elif str(provenance.get("capability") or "") == "upscale":
+    elif str(provenance.get("capability") or "") in {"upscale", "tools.upscale"}:
         task_title = "Tools · Upscale"
     elif str(provenance.get("capability") or "") == "revoice":
         task_title = "Tools · Revoice"
@@ -36863,7 +36898,8 @@ api.include_router(create_wangp_mcp_router(
               "generate": generate, "recast": recast_endpoint, "upscale": tools_upscale,
               **wangp_agent_handlers(api), **image_command_handlers(_image_generation_commands)},
     journal_path=os.path.join(os.path.dirname(__file__), "settings", "wangp-mcp-requests.sqlite3"),
-    command_operations=[*workspace_command_catalog()["operations"], *image_command_catalog()],
+    command_operations=[*workspace_command_catalog()["operations"], *image_command_catalog(
+        adapter.catalog for adapter in _image_generation_commands.operations.values())],
 ))
 
 # ============================================================================

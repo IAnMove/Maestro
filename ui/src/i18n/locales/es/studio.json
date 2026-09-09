@@ -37,6 +37,7 @@
     "mixer": "Mezclador"
   },
   "generate": {
+    "submitting": "Preparando…",
     "needImage": "Falta imagen",
     "needReference": "Falta referencia",
     "needSource": "Falta origen",
@@ -927,6 +928,7 @@
     }
   },
   "commands": {
+    "generationAdmitted": "Generación en cola · {{id}}",
     "prepared": "Solicitud de imagen preparada",
     "admitted": "Imagen en cola · {{id}}",
     "admittedNotVisible": "La tarea de imagen {{id}} está admitida. Abre Studio o Actividad para seguirla.",
@@ -938,5 +940,59 @@
     "pendingInvalid": "No se pudo leer la solicitud guardada. Se ha conservado para recuperarla.",
     "referenceFailed": "No se pudo preparar una referencia seleccionada. No se ha enviado ninguna imagen.",
     "conflictingGuides": "Hay guías de imagen distintas seleccionadas. Elige una imagen de control y una máscara antes de generar."
+  },
+  "speechCommands": {
+    "prepared": "Solicitud de voz preparada",
+    "admitted": "Voz en cola · {{id}}",
+    "pending": "Una solicitud de voz anterior necesita recuperación",
+    "recover": "Recuperar esta solicitud de voz",
+    "resources": "{{references}} referencias de audio · {{voices}} voces · {{loras}} LoRAs",
+    "autoDuration": "duración automática",
+    "contextChanged": "El formulario de voz cambió antes del envío. Revisa los ajustes actuales y vuelve a intentarlo.",
+    "panelUnavailable": "No se pudo mostrar la solicitud de voz. Abre Studio y vuelve a intentarlo.",
+    "pendingInvalid": "No se pudo leer la solicitud de voz guardada. Se ha conservado para recuperarla.",
+    "referenceFailed": "No se pudo preparar una referencia de audio seleccionada. No se ha enviado ninguna voz."
+  },
+  "musicCommands": {
+    "prepared": "Petición de música preparada",
+    "admitted": "Música admitida · {{id}}",
+    "pending": "Envío de música pendiente de confirmar",
+    "recover": "Recuperar este envío de música",
+    "resources": "{{references}} referencias de audio · {{loras}} LoRAs",
+    "contextChanged": "El formulario de música cambió antes del envío. Revisa los ajustes actuales e inténtalo de nuevo.",
+    "panelUnavailable": "No se pudo mostrar la petición de música. Abre Studio e inténtalo de nuevo.",
+    "pendingInvalid": "No se pudo leer el envío de música guardado. Se ha conservado para recuperarlo.",
+    "referenceFailed": "No se pudo preparar una referencia de audio seleccionada. No se envió ninguna petición de música.",
+    "lyrics": "Letra",
+    "caption": "Descripción musical",
+    "defaultDuration": "Duración predeterminada del modelo"
+  },
+  "toolsCommands": {
+    "prepared": "Solicitud de escalado de Tools preparada",
+    "admitted": "Escalado de Tools en cola · {{id}}",
+    "queued": "En cola; consulta Actividad para ver cuándo termina.",
+    "pending": "Una solicitud anterior de escalado de Tools necesita recuperación",
+    "recover": "Recuperar esta solicitud de escalado de Tools",
+    "destination": "Workspace de salida: {{workspace}}",
+    "sourceWorkspace": "Workspace de origen: {{workspace}}",
+    "contextChanged": "El formulario de Tools cambió antes del envío. Revisa el origen y los ajustes y vuelve a intentarlo.",
+    "panelUnavailable": "No se pudo mostrar la solicitud de escalado de Tools. Abre Tools y vuelve a intentarlo.",
+    "pendingInvalid": "No se pudo leer la solicitud guardada de escalado de Tools. Se ha conservado para recuperarla."
+  },
+  "sfxCommands": {
+    "packIdTooLong": "El identificador del pack es demasiado largo; no se ha enviado ningún efecto.",
+    "packPartial": "{{count}} de {{total}} efectos admitidos. El envío se detuvo: {{error}}",
+    "packQueued": "{{count}} efectos de sonido en cola. Puedes seguirlos en Activity.",
+    "packMissingReceipt": "No se recibió un recibo de admisión para {{name}}.",
+    "packPresentationFailed": "Studio no pudo mostrar el resultado. Las tareas existentes siguen disponibles en Activity.",
+    "prepared": "Efecto de sonido preparado",
+    "admitted": "Efecto de sonido en cola · {{id}}",
+    "pending": "Hay una solicitud de efecto de sonido pendiente de recuperar",
+    "recover": "Recuperar esta solicitud",
+    "pendingInvalid": "No se ha podido leer la solicitud guardada del efecto de sonido.",
+    "contextChanged": "El contexto de Studio ha cambiado. Prepara de nuevo esta solicitud.",
+    "panelUnavailable": "El panel de efectos de sonido no está disponible. Abre Audio → SFX y vuelve a intentarlo.",
+    "duration": "Duración: {{seconds}} s",
+    "videoDuration": "El vídeo de salida conserva la duración del vídeo fuente y sustituye su audio."
   }
 }

@@ -323,6 +323,7 @@ def _harness(
         "acknowledge_cancel": acknowledge_cancel,
         "snapshot_job": lambda job: dict(job),
         "_run_generation": lambda job_id, **_kwargs: gpu_calls.append(job_id),
+        "_image_generation_commands": SimpleNamespace(native_worker=lambda _job: None),
     }
     _load(
         "_new_generation_job",

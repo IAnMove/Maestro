@@ -1,5 +1,6 @@
 """HTTP and MCP projections of the executable image command contract."""
 from __future__ import annotations
+from typing import Literal
 
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, ConfigDict, Field, StrictStr, ValidationError, field_validator
@@ -11,6 +12,7 @@ from services.image_generation_commands import command_error
 class ReferenceResolutionInput(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     references: list[StrictStr] = Field(min_length=1, max_length=64)
+    media_kind: Literal["image", "audio", "video"] = "image"
 
 
 class UISubmissionContext(BaseModel):
@@ -37,7 +39,7 @@ def _ui_context(request):
         raise command_error(422, "invalid_ui_context", "Use only exact workflowId and runId attribution") from error
 
 
-def image_command_catalog():
+def image_command_catalog(additional_operations=()):
     spec = image_generation_schema()
     studio = studio_image_schema()
     studio_input = dict(studio["input"])
@@ -60,18 +62,20 @@ def image_command_catalog():
              "description": "Admit an image job with an installed model and explicit output workspace. Version 1 is a single text-to-image request; version 2 accepts the complete typed Studio image parameters, canonical references, LoRAs and image processors. Preserve literal prompts and reuse intent_id only for retries. The receipt proves admission; inspect its task for completion.",
              "inputSchema": envelope},
             {"name": "generation.receipt", "version": 1, "domain": "studio", "mutation": False,
-             "description": "Read an immutable image admission and its current canonical task in the exact original output workspace.",
+             "description": "Read an immutable generation admission and its current canonical task in the exact original output workspace.",
              "inputSchema": {"type": "object", "additionalProperties": False,
                              "properties": {"version": {"type": "integer", "const": 1},
                                             "operation": {"const": "generation.receipt"}, "input": receipt_input},
-                             "required": ["version", "operation", "input"]}}]
+                             "required": ["version", "operation", "input"]}}, *additional_operations]
 
 
 def image_command_handlers(service):
-    async def submit(arguments):
-        if not isinstance(arguments, dict) or set(arguments) != {"version", "intent_id", "input"}:
-            raise command_error(422, "invalid_command", "Use version, intent_id and input for the image tool")
-        return await service.submit({**arguments, "operation": "generation.image"}, trusted_tool="external_agent")
+    def submission_handler(operation):
+        async def submit(arguments):
+            if not isinstance(arguments, dict) or set(arguments) != {"version", "intent_id", "input"}:
+                raise command_error(422, "invalid_command", "Use version, intent_id and input for the generation tool")
+            return await service.submit({**arguments, "operation": operation}, trusted_tool="external_agent")
+        return submit
 
     def receipt(arguments):
         if (not isinstance(arguments, dict) or set(arguments) != {"version", "input"}
@@ -81,7 +85,8 @@ def image_command_handlers(service):
             raise command_error(422, "invalid_command", "Use version 1 with workspace and intent_id")
         return service.receipt(**arguments["input"])
 
-    return {"generation.image": submit, "generation.receipt": receipt}
+    operations = {"generation.image", *getattr(service, "operations", {})}
+    return {**{operation: submission_handler(operation) for operation in operations}, "generation.receipt": receipt}
 
 
 def create_image_generation_commands_router(service):
@@ -89,7 +94,8 @@ def create_image_generation_commands_router(service):
 
     @router.get("/api/v1/generation/commands")
     def catalog():
-        return {"version": 2, "operations": image_command_catalog()}
+        return {"version": 2, "operations": image_command_catalog(
+            adapter.catalog for adapter in getattr(service, "operations", {}).values())}
 
     @router.post("/api/v1/generation/commands")
     async def submit(request: Request):
@@ -118,7 +124,8 @@ def create_image_generation_commands_router(service):
         if any(not 1 <= len(value) <= 8192 for value in body.references):
             raise command_error(422, "invalid_reference", "An exact bounded media reference is required")
         try:
-            return {"references": [resolve(value) for value in body.references]}
+            return {"references": [resolve(value) if body.media_kind == "image"
+                                   else resolve(value, media_kind=body.media_kind) for value in body.references]}
         except (ValueError, OSError) as error:
             raise command_error(422, "invalid_reference", str(error)) from error
 

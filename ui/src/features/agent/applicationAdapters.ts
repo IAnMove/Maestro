@@ -5,7 +5,7 @@ import { rememberedCharacterKitLibrary } from '../characters/session'
 import type { SeriesAssemblyJob } from '../series/assemblyContract'
 import type { SeriesJobStatus } from '../series/types'
 import type { MediaFilter } from '../../types'
-import type { AgentApply3dRhythmAction, AgentApplySeriesPlanAction, AgentApplyStoryProposalAction, AgentApproveStorySectionAction, AgentApproveStoryVisualsAction, AgentAssembleSeriesEpisodeAction, AgentAttachStudioReferencesAction, AgentCommitSeriesCanonAction, AgentConfigureStudioLorasAction, AgentConfigureStorySongAction, AgentCreateComicAction, AgentCreateSeriesEpisodeAction, AgentCreateStoryAction, AgentCreateWorkspaceAction, AgentCreateWorkspaceCollectionAction, AgentDownloadModelAction, AgentGenerateComicAction, AgentGenerateSeriesPlanAction, AgentGenerateStorySectionAction, AgentGenerateStorySongAction, AgentGenerateStoryVisualsAction, AgentPrepare3dAction, AgentPrepareAudioAction, AgentPrepareImageAction, AgentPrepareVideoAction, AgentQueueSfxPackAction, AgentRemoveBackgroundAction, AgentRenderSeriesShotsAction, AgentReviewSeriesAttemptsAction, AgentStageSeriesComicAction, AgentSelectWorkspaceAction, AgentStartGenerationAction, AgentStageStoryComicAction, AgentStartDirectorProductionAction, AgentStageStoryMusicVideoAction, AgentStageStoryVideoAction, AgentUpdateSeriesEpisodeAction, AgentUpdateStoryAction, AgentUpdateWorkspaceCollectionAction } from './agentActions'
+import type { AgentApply3dRhythmAction, AgentApplySeriesPlanAction, AgentApplyStoryProposalAction, AgentApproveStorySectionAction, AgentApproveStoryVisualsAction, AgentAssembleSeriesEpisodeAction, AgentAttachStudioReferencesAction, AgentCommitSeriesCanonAction, AgentConfigureStudioLorasAction, AgentConfigureStorySongAction, AgentCreateComicAction, AgentCreateSeriesEpisodeAction, AgentCreateStoryAction, AgentCreateWorkspaceAction, AgentCreateWorkspaceCollectionAction, AgentDownloadModelAction, AgentGenerateComicAction, AgentGenerateSeriesPlanAction, AgentGenerateStorySectionAction, AgentGenerateStorySongAction, AgentGenerateStoryVisualsAction, AgentPrepare3dAction, AgentPrepareAudioAction, AgentPrepareImageAction, AgentPrepareVideoAction, AgentQueueSfxPackAction, AgentRemoveBackgroundAction, AgentRenderSeriesShotsAction, AgentReviewSeriesAttemptsAction, AgentStageSeriesComicAction, AgentSelectWorkspaceAction, AgentStartGenerationAction, AgentStageStoryComicAction, AgentStartDirectorProductionAction, AgentStageStoryMusicVideoAction, AgentStageStoryVideoAction, AgentUpdateSeriesEpisodeAction, AgentUpdateStoryAction, AgentUpdateWorkspaceCollectionAction, AgentUpscaleAction } from './agentActions'
 import type {
   AgentAttachVideoclipAlternativeSongAction,
   AgentMountVideoclipAlternativeSongAction,
@@ -48,6 +48,7 @@ import { createWorkspaceCollectionAdapter } from './workspaceCollectionAdapter'
 import { downloadModel as requestModelDownload, fetchModelDownloads } from '../../api/generation'
 
 export interface AdapterOutcome {
+  commandResult?: CommandResult
   message: string
   target: AgentExecutionTarget
   projectTarget?: AgentExecutionTarget
@@ -83,6 +84,7 @@ export interface StudioAdapter {
 
 export interface ToolsAdapter {
   removeBackground(action: AgentRemoveBackgroundAction, context?: GenerationSubmissionContext): Promise<AdapterOutcome>
+  upscale(action: AgentUpscaleAction, context?: GenerationSubmissionContext): Promise<AdapterOutcome>
 }
 
 export interface StoryLabAdapter {
@@ -392,9 +394,13 @@ export function createDefaultApplicationAdapters(): WizardApplicationAdapters {
     },
     async queueSfxPack(action, context) {
       const { queueSfx } = await import('../studio/adapters')
-      return presentStudioSliceResult(await queueSfx(action, context || {
-        actor: 'wizard', capability: action.type,
-      }), 'Audio → SFX')
+      const result = await queueSfx(action, context || { actor: 'wizard', capability: action.type })
+      const presented = await presentSfxPackResult(result)
+      return { ...presented, commandResult: result, report: executionReport({
+        state: result.status === 'queued' ? 'queued' : result.status === 'partial' ? 'partial' : 'failed',
+        message: presented.message, target: presented.target, taskId: result.taskIds[0],
+        metadata: { ...presented.metadata, error: result.error }, recoverable: true,
+      }) }
     },
   }
   adapters.tools = createToolsAdapter(navigate)
@@ -1031,6 +1037,20 @@ async function presentAdmittedStudioResult(result: CommandResult): Promise<Adapt
       message, taskId: result.taskIds[0],
       target: { kind: 'generation_task', id: result.taskIds[0], title: 'Studio generation' },
       metadata: { ...metadata, presentationWarning: message },
+    }
+  }
+}
+
+async function presentSfxPackResult(result: CommandResult): Promise<AdapterOutcome> {
+  const metadata: Record<string, unknown> = { ...result.artifacts[0]?.metadata, taskIds: result.taskIds }
+  try {
+    return { ...await presentStudioSliceResult(result, 'Audio → SFX'), metadata }
+  } catch {
+    const warning = i18n.t('studio:sfxCommands.packPresentationFailed')
+    return {
+      message: `${String(metadata.summary || '')} ${warning}`,
+      target: { kind: 'sfx_pack', id: result.entities[0]?.id || result.commandId, title: 'Audio → SFX' },
+      taskId: result.taskIds[0], metadata: { ...metadata, presentationWarning: warning },
     }
   }
 }

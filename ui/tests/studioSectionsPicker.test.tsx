@@ -139,3 +139,27 @@ test('AudioModeSection soundtrack slot exposes dual-origin AssetInput without op
     globalThis.fetch = previousFetch
   }
 })
+
+test('a restored speech reference is visible, retains its source URL and can be removed without deleting the voice', { concurrency: false }, async () => {
+  const { render, cleanup, fireEvent } = await import('@testing-library/react')
+  const { AudioModeSection } = await import('../src/components/Sidebar/AudioModeSection.tsx')
+  const { useStore } = await import('../src/stores/useStore.ts')
+  const before = useStore.getState(), previousFetch = globalThis.fetch
+  globalThis.fetch = mockFetch()
+  useStore.setState({ activeWorkspace: 'different-destination', audioGuideFilename: 'voice.wav',
+    ttsVoiceCount: 1, ttsVoices: [{ name: 'Tentri', filename: null, path: null }],
+    params: { audio_prompt_type: 'A', audio_guide: '/api/v1/file/voice.wav?workspace=speech-source' },
+    modelOptions: { audio_only: true, audio_mode_from_voice_count: true,
+      audio_prompt_type_sources: { choices: [['Text', ''], ['Voice', 'A']], default: '' } },
+  } as never)
+  try {
+    const view = render(<AudioModeSection />)
+    assert.ok(view.getByRole('button', { name: /voice\.wav/ }))
+    assert.equal(useStore.getState().params.audio_guide, '/api/v1/file/voice.wav?workspace=speech-source')
+    fireEvent.click(view.getByRole('button', { name: 'Remove', exact: true }))
+    assert.equal(useStore.getState().ttsVoiceCount, 1)
+    assert.equal(useStore.getState().ttsVoices[0].name, 'Tentri')
+    assert.equal(useStore.getState().params.audio_guide, undefined)
+    assert.equal(view.queryByRole('button', { name: /voice\.wav/ }), null)
+  } finally { cleanup(); useStore.setState(before); globalThis.fetch = previousFetch }
+})

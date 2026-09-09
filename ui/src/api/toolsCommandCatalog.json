@@ -1,0 +1,491 @@
+{
+  "version": 2,
+  "operations": [
+    {
+      "name": "tools.upscale",
+      "version": 2,
+      "supportedVersions": [
+        2
+      ],
+      "domain": "tools",
+      "mutation": true,
+      "description": "Upscale one exact image or video source in an explicit output workspace with an installed local processor. Preserve the source workspace, processor settings and intent_id; the shared receipt proves admission and its canonical task reports completion.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "$defs": {
+          "ToolsUpscaleParams": {
+            "additionalProperties": false,
+            "description": "Typed native input for one image or video upscale.",
+            "properties": {
+              "source": {
+                "maxLength": 8192,
+                "minLength": 1,
+                "title": "Source",
+                "type": "string"
+              },
+              "source_workspace": {
+                "anyOf": [
+                  {
+                    "maxLength": 160,
+                    "minLength": 1,
+                    "pattern": "^(?:__uploads__|default|[A-Za-z0-9][A-Za-z0-9_-]*)$",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Source Workspace"
+              },
+              "source_kind": {
+                "enum": [
+                  "image",
+                  "video"
+                ],
+                "title": "Source Kind",
+                "type": "string"
+              },
+              "method": {
+                "maxLength": 80,
+                "minLength": 1,
+                "title": "Method",
+                "type": "string"
+              },
+              "seed": {
+                "default": -1,
+                "maximum": 9223372036854775807,
+                "minimum": -9223372036854775808,
+                "title": "Seed",
+                "type": "integer"
+              },
+              "wangp_processor_settings": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/WangpProcessorSettings"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              }
+            },
+            "required": [
+              "source",
+              "source_kind",
+              "method"
+            ],
+            "title": "ToolsUpscaleParams",
+            "type": "object"
+          },
+          "WangpProcessorSettings": {
+            "additionalProperties": false,
+            "description": "Typed settings currently declared by image-capable processors.",
+            "properties": {
+              "spatial_upsampler_strength": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Spatial Upsampler Strength"
+              },
+              "spatial_upsampler_face_count": {
+                "anyOf": [
+                  {
+                    "maximum": 5,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Spatial Upsampler Face Count"
+              },
+              "spatial_upsampler_h3_strength": {
+                "anyOf": [
+                  {
+                    "maximum": 1,
+                    "minimum": 0,
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Spatial Upsampler H3 Strength"
+              },
+              "spatial_upsampler_prompt": {
+                "anyOf": [
+                  {
+                    "maxLength": 200000,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Spatial Upsampler Prompt"
+              },
+              "spatial_upsampler_reference_images": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "maxLength": 8192,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "maxItems": 64,
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Spatial Upsampler Reference Images"
+              },
+              "spatial_upsampler_dlss_strength": {
+                "anyOf": [
+                  {
+                    "maximum": 2,
+                    "minimum": 0,
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Spatial Upsampler Dlss Strength"
+              }
+            },
+            "title": "WangpProcessorSettings",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "version": {
+            "type": "integer",
+            "const": 2
+          },
+          "operation": {
+            "const": "tools.upscale"
+          },
+          "intent_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "input": {
+            "additionalProperties": false,
+            "properties": {
+              "workspace": {
+                "maxLength": 240,
+                "minLength": 1,
+                "pattern": "^(?:default|[A-Za-z0-9][A-Za-z0-9_-]*)$",
+                "title": "Workspace",
+                "type": "string"
+              },
+              "workspace_collection_id": {
+                "anyOf": [
+                  {
+                    "maxLength": 200,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Workspace Collection Id"
+              },
+              "params": {
+                "$ref": "#/$defs/ToolsUpscaleParams"
+              }
+            },
+            "required": [
+              "workspace",
+              "params"
+            ],
+            "title": "ToolsUpscaleInput",
+            "type": "object"
+          }
+        },
+        "required": [
+          "version",
+          "operation",
+          "intent_id",
+          "input"
+        ]
+      }
+    }
+  ],
+  "studio": {
+    "version": 2,
+    "operation": "tools.upscale",
+    "intent_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "input": {
+      "$defs": {
+        "ToolsUpscaleParams": {
+          "additionalProperties": false,
+          "description": "Typed native input for one image or video upscale.",
+          "properties": {
+            "source": {
+              "maxLength": 8192,
+              "minLength": 1,
+              "title": "Source",
+              "type": "string"
+            },
+            "source_workspace": {
+              "anyOf": [
+                {
+                  "maxLength": 160,
+                  "minLength": 1,
+                  "pattern": "^(?:__uploads__|default|[A-Za-z0-9][A-Za-z0-9_-]*)$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Source Workspace"
+            },
+            "source_kind": {
+              "enum": [
+                "image",
+                "video"
+              ],
+              "title": "Source Kind",
+              "type": "string"
+            },
+            "method": {
+              "maxLength": 80,
+              "minLength": 1,
+              "title": "Method",
+              "type": "string"
+            },
+            "seed": {
+              "default": -1,
+              "maximum": 9223372036854775807,
+              "minimum": -9223372036854775808,
+              "title": "Seed",
+              "type": "integer"
+            },
+            "wangp_processor_settings": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/WangpProcessorSettings"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            }
+          },
+          "required": [
+            "source",
+            "source_kind",
+            "method"
+          ],
+          "title": "ToolsUpscaleParams",
+          "type": "object"
+        },
+        "WangpProcessorSettings": {
+          "additionalProperties": false,
+          "description": "Typed settings currently declared by image-capable processors.",
+          "properties": {
+            "spatial_upsampler_strength": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Spatial Upsampler Strength"
+            },
+            "spatial_upsampler_face_count": {
+              "anyOf": [
+                {
+                  "maximum": 5,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Spatial Upsampler Face Count"
+            },
+            "spatial_upsampler_h3_strength": {
+              "anyOf": [
+                {
+                  "maximum": 1,
+                  "minimum": 0,
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Spatial Upsampler H3 Strength"
+            },
+            "spatial_upsampler_prompt": {
+              "anyOf": [
+                {
+                  "maxLength": 200000,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Spatial Upsampler Prompt"
+            },
+            "spatial_upsampler_reference_images": {
+              "anyOf": [
+                {
+                  "items": {
+                    "maxLength": 8192,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "maxItems": 64,
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Spatial Upsampler Reference Images"
+            },
+            "spatial_upsampler_dlss_strength": {
+              "anyOf": [
+                {
+                  "maximum": 2,
+                  "minimum": 0,
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Spatial Upsampler Dlss Strength"
+            }
+          },
+          "title": "WangpProcessorSettings",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "workspace": {
+          "maxLength": 240,
+          "minLength": 1,
+          "pattern": "^(?:default|[A-Za-z0-9][A-Za-z0-9_-]*)$",
+          "title": "Workspace",
+          "type": "string"
+        },
+        "workspace_collection_id": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Workspace Collection Id"
+        },
+        "params": {
+          "$ref": "#/$defs/ToolsUpscaleParams"
+        }
+      },
+      "required": [
+        "workspace",
+        "params"
+      ],
+      "title": "ToolsUpscaleInput",
+      "type": "object"
+    },
+    "supported_input_fields": [
+      "workspace",
+      "workspace_collection_id",
+      "source",
+      "source_workspace",
+      "source_kind",
+      "method",
+      "seed",
+      "wangp_processor_settings"
+    ],
+    "source_kinds": [
+      "image",
+      "video"
+    ],
+    "methods": [
+      "dlss5*1",
+      "dlss5*1.5",
+      "dlss5*1.724",
+      "dlss5*2",
+      "dlss5*3",
+      "dlssg*2",
+      "dlssg*3",
+      "dlssg*4",
+      "dlssg*5",
+      "dlssg*6",
+      "flashvsr2",
+      "flashvsr2pass2",
+      "flashvsr2pass4",
+      "flashvsr3",
+      "flashvsr4",
+      "h3facerefine",
+      "lanczos1.5",
+      "lanczos2",
+      "rife2",
+      "rife3",
+      "rife4"
+    ],
+    "effects": {
+      "seed": -1,
+      "wangp_processor_settings": {}
+    },
+    "excluded": [
+      "actor",
+      "client",
+      "permission",
+      "provenance",
+      "workspace inside input.params",
+      "filesystem paths",
+      "remote URLs",
+      "free-form processor settings",
+      "generation.image",
+      "generation.speech"
+    ]
+  }
+}

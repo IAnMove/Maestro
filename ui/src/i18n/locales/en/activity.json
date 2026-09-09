@@ -1,4 +1,5 @@
 {
+  "settingsUnavailable": "Saved settings could not be restored. Select the file again.",
   "title": "Activity",
   "openHistory": "Show canonical task history",
   "inboxLegacy": "Inbox / Legacy",

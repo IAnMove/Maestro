@@ -28,7 +28,6 @@ import { WangpModelControls } from './WangpModelControls'
 import { BlendControls } from './BlendControls'
 import { AnchorReturnBanner } from './AnchorReturnBanner'
 import { VoiceRefSection } from './VoiceRefSection'
-import { ToolsPanel } from './ToolsPanel'
 import { Hunyuan3DPanel } from './Hunyuan3DPanel'
 import { HardwareStatusBar } from './HardwareStatusBar'
 import { H3PromptControls } from './H3PromptControls'
@@ -37,12 +36,14 @@ import { PanoramaLoopPanel } from './PanoramaLoopPanel'
 import { BrandIdentity } from '../BrandIdentity'
 import { DirectorChat } from './DirectorChat'
 import { useUiTranslation } from '../../i18n'
+import { StudioCommandPanels } from '../../features/studio/StudioCommandPanels'
 
 const ViggleControls = lazy(() => import('./ViggleControls').then(module => ({ default: module.ViggleControls })))
-const StudioImageCommandPanel = lazy(() => import('../../features/studio/StudioImageCommandPanel').then(module => ({ default: module.StudioImageCommandPanel })))
+const ToolsPanel = lazy(() => import('./ToolsPanel').then(module => ({ default: module.ToolsPanel })))
 
 export function Sidebar() {
   const { t } = useUiTranslation('navigation')
+  const { t: tCommon } = useUiTranslation('common')
   const [toolsCollapsed, setToolsCollapsed] = useState(() =>
     window.localStorage.getItem('hocuspocus-tools-sidebar-collapsed') === 'true')
   const generationMode = useStore(s => s.generationMode)
@@ -104,8 +105,17 @@ export function Sidebar() {
       window.localStorage.setItem('hocuspocus-tools-sidebar-collapsed', 'false')
       setSidebarOpen(true)
     }
+    const openSpeechSubmission = () => {
+      setToolsCollapsed(false)
+      window.localStorage.setItem('hocuspocus-tools-sidebar-collapsed', 'false')
+      setSidebarOpen(true)
+    }
     window.addEventListener('hocuspocus:studio-image-open', openImageSubmission)
-    return () => window.removeEventListener('hocuspocus:studio-image-open', openImageSubmission)
+    window.addEventListener('hocuspocus:studio-speech-open', openSpeechSubmission)
+    return () => {
+      window.removeEventListener('hocuspocus:studio-image-open', openImageSubmission)
+      window.removeEventListener('hocuspocus:studio-speech-open', openSpeechSubmission)
+    }
   }, [setSidebarOpen])
 
   useEffect(() => {
@@ -198,7 +208,9 @@ export function Sidebar() {
       <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-4 min-h-0 [&>*]:shrink-0">
         {/* Tools mode: standalone post-processing (upscale / revoice) on any
             existing clip. Renders in place of the generation controls. */}
-        {isTools ? <ToolsPanel /> : isModel3d ? <Hunyuan3DPanel /> : (
+        {isTools ? <Suspense fallback={<div role="status">{tCommon('status.loading')}</div>}>
+          <ToolsPanel />
+        </Suspense> : isModel3d ? <Hunyuan3DPanel /> : (
         <>
         {/* Edit mode: sub-mode toggle + sub-controls */}
         {isEdit && <EditSubModeToggle />}
@@ -248,13 +260,9 @@ export function Sidebar() {
 
         {/* Prompt area (non-edit modes, skip for SFX/Mixer/Music which have their own UI) */}
         {!isEdit && !(isAudio && (audioSubMode === 'sfx' || audioSubMode === 'mixer' || audioSubMode === 'music')) && (isMultiClip ? <MultiClipEditor /> : <PromptInput />)}
-        {isImage && <Suspense fallback={null}><StudioImageCommandPanel workspace={workspace || 'default'} model={String(modelType)}
-          visible={studioUnobscured && (!isMobile || sidebarOpen)} onRecovered={async receipt => {
-            await useStore.getState().reconnectJobs()
-            if (useStore.getState().activeWorkspace === receipt.result.workspace) {
-              await useStore.getState().maybeRefreshGallery()
-            }
-          }} /></Suspense>}
+        <StudioCommandPanels mode={generationMode} audioSubMode={audioSubMode}
+          workspace={workspace || 'default'} model={String(modelType)}
+          visible={studioUnobscured && (!isMobile || sidebarOpen)} />
 
         {/* Video: reference images below prompt. In Frames mode the InputsPanel
             renders them as ordered tiles instead. */}

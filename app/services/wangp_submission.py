@@ -20,8 +20,7 @@ class JsonRequest:
         return deepcopy(self.payload)
 
 
-def prepare_generation_inputs(body, model_def, workspace, *, uploads_dir, workspace_dir, prepared_images=False):
-    """Validate processor options and resolve new-family media before admission."""
+def _prepare_canonical_image_references(body, model_def, workspace, *, uploads_dir, workspace_dir):
     canonical_refs = body.pop('canonical_image_refs', False)
     if canonical_refs:
         if canonical_refs is not True or not model_def.get('image_outputs') or body.get('image_mode') != 1:
@@ -31,22 +30,38 @@ def prepare_generation_inputs(body, model_def, workspace, *, uploads_dir, worksp
             raise ValueError('Canonical image references must be a non-empty ordered list')
         body['image_refs'] = [resolve_wangp_media(value, workspace, uploads_dir=uploads_dir,
                                                 workspace_dir=workspace_dir) for value in references]
+
+
+def _prepare_native_processors(body):
     if body.get('spatial_upsampling') or body.get('temporal_upsampling') or body.get('wangp_processor_settings'):
         from shared.wangp1272.processors import validate_selection, validated_settings
         error = validate_selection(body.get('spatial_upsampling', ''), body.get('temporal_upsampling', ''), body.get('image_mode') == 1)
         if error:
             raise ValueError(error)
         body['wangp_processor_settings'] = validated_settings(body.get('spatial_upsampling', ''), body.get('wangp_processor_settings'))
+
+
+def prepare_generation_inputs(body, model_def, workspace, *, uploads_dir, workspace_dir,
+                              prepared_images=False, prepared_speech=False):
+    """Validate processor options and resolve new-family media before admission."""
+    _prepare_canonical_image_references(body, model_def, workspace,
+                                        uploads_dir=uploads_dir, workspace_dir=workspace_dir)
+    _prepare_native_processors(body)
     if not model_def.get('wangp_1272'):
         return
     if prepared_images and (not model_def.get('image_outputs') or body.get('image_mode') != 1):
         raise ValueError('Prepared image inputs require an image generation request')
+    if prepared_speech and (not model_def.get('audio_only') or body.get('generation_mode') != 'audio'):
+        raise ValueError('Prepared speech inputs require an audio generation request')
     def resolve(value):
         return resolve_wangp_media(value, workspace, uploads_dir=uploads_dir, workspace_dir=workspace_dir)
-    for field in ('video_guide', 'video_guide2', 'video_mask', 'audio_guide', 'audio_guide2', 'image_start', 'image_end', 'image_refs'):
+    audio_fields = ('audio_guide', 'audio_guide2', 'audio_guide3', 'audio_guide4', 'audio_guide5', 'audio_guide6')
+    for field in ('video_guide', 'video_guide2', 'video_mask', *audio_fields, 'image_start', 'image_end', 'image_refs'):
         if prepared_images and field in ('image_start', 'image_end', 'image_refs'):
             # Only the in-process Studio command adapter supplies this flag.
             # Those exact paths were resolved against each source workspace.
+            continue
+        if prepared_speech and field in audio_fields:
             continue
         values = body.get(field)
         if values:

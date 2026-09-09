@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { Wrench, Play } from 'lucide-react'
 import { useStore } from '../../stores/useStore'
 import { useUiTranslation } from '../../i18n'
@@ -9,6 +9,11 @@ import { catalogItemToOutput, voiceRefFromOutput } from '../../features/asset-pi
 import { ToolsParamsPanel } from './ToolsParamsPanel'
 import { resolveToolSource } from '../../lib/toolSource'
 import { ToolsSourcePanel } from './ToolsSourcePanel'
+import { canonicalToolsSource } from '../../features/studio/toolsSource'
+
+const ToolsCommandPanel = lazy(() => import('../../features/studio/ToolsCommandPanel').then(module => ({
+  default: module.ToolsCommandPanel,
+})))
 
 export function ToolsPanel() {
   const { t } = useUiTranslation('studio')
@@ -113,6 +118,18 @@ export function ToolsPanel() {
     (tool === 'revoice' && hasVideoSource && hasRefs) ||
     (tool === 'remove_background' && hasImageSource)
   const flashvsrOff = flashvsrMode === 0 && method.startsWith('flashvsr')
+  const commandSource = (() => {
+    if (sourceAssetId) return sourceAssetId
+    if (!sourcePath && !sourceUrl) return ''
+    try {
+      return canonicalToolsSource(sourcePath, sourceUrl, sourceWorkspace, activeWorkspace)
+    } catch {
+      // The command panel displays the malformed value so the durable builder
+      // can reject it with a field-specific error instead of sending legacy
+      // paths to the old Tools endpoint.
+      return sourceUrl || sourcePath || ''
+    }
+  })()
 
   return (
     <div className="flex flex-col gap-4">
@@ -172,6 +189,23 @@ export function ToolsPanel() {
         removeBackgroundInstruction={removeBackgroundInstruction}
         setRemoveBackgroundInstruction={setRemoveBackgroundInstruction}
       />
+
+      <Suspense fallback={null}>
+        <ToolsCommandPanel
+          workspace={activeWorkspace}
+          source={commandSource}
+          sourceWorkspace={sourceAssetId ? sourceWorkspace : null}
+          sourceKind={sourceKind === 'image' || sourceKind === 'video' ? sourceKind : null}
+          method={method}
+          visible={tool === 'upscale'}
+          onRecovered={async receipt => {
+            await useStore.getState().reconnectJobs()
+            if (useStore.getState().activeWorkspace === receipt.result.workspace) {
+              await useStore.getState().maybeRefreshGallery()
+            }
+          }}
+        />
+      </Suspense>
 
       {/* Run */}
       <button

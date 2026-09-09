@@ -32,6 +32,8 @@ def file_identity(path):
 
 
 class StudioImageResources:
+    media_kind = "image"
+
     def __init__(self, *, workspace_dir, uploads_dir, list_workspaces,
                  lora_search_dirs, lora_compatible):
         self.workspace_dir = workspace_dir
@@ -91,8 +93,8 @@ class StudioImageResources:
         roots = [{"workspace_id": name, "path": self.workspace_dir(name)} for name in self._workspace_names()]
         roots.append({"workspace_id": "__uploads__", "path": self.uploads_dir()})
         asset = find_asset(roots, identity)
-        if not asset or asset.get("kind") != "image":
-            raise ValueError("Choose an existing image asset ID")
+        if not asset or asset.get("kind") != self.media_kind:
+            raise ValueError(f"Choose an existing {self.media_kind} asset ID")
         locations = asset.get("locations") or []
         if len(locations) != 1:
             raise ValueError("This asset has multiple locations; choose an exact source URL")

@@ -122,7 +122,8 @@ test('keeps a tool failure visible in the activity card', async ({ page }) => {
 
 test('runs the shared Upscale action from an image and publishes a derived asset', async ({ page }) => {
   const session = await gotoApp(page, { upscaleMode: 'complete' })
-  const submissions = collectRequests(page, '/api/v1/tools/upscale')
+  const submissions = collectRequests(page, '/api/v1/generation/commands')
+  const legacySubmissions = collectRequests(page, '/api/v1/tools/upscale')
   const statuses = collectRequests(page, '/api/v1/status/tool-upscale-e2e')
 
   try {
@@ -134,18 +135,51 @@ test('runs the shared Upscale action from an image and publishes a derived asset
     await expect(page.getByRole('img', { name: 'hero.png', exact: true })).toBeVisible()
     const imageRun = page.getByRole('button', { name: 'Upscale Image', exact: true })
     await expect(imageRun).toBeEnabled()
+    const acknowledgement = page.waitForResponse(response => (
+      new URL(response.url()).pathname === '/api/v1/generation/commands'
+      && response.request().method() === 'POST'
+    ))
     await imageRun.click()
 
     await expect.poll(() => submissions.length).toBe(1)
     const payload = JSON.parse(submissions[0].postData() || '{}') as Record<string, unknown>
     expect(payload).toMatchObject({
-      source: 'hero.png',
-      source_kind: 'image',
-      asset_id: 'asset-hero',
-      source_workspace: 'default',
-      workspace: 'default',
+      version: 2,
+      operation: 'tools.upscale',
+      intent_id: expect.any(String),
     })
+    const input = payload.input as Record<string, unknown>
+    const params = input.params as Record<string, unknown>
+    expect(input).toMatchObject({ workspace: 'default' })
+    expect(params).toMatchObject({
+      source: 'asset-hero',
+      source_kind: 'image',
+      source_workspace: 'default',
+    })
+    expect(payload.asset_id).toBeUndefined()
+    expect(payload.source).toBeUndefined()
     expect(payload.video_path).toBeUndefined()
+    const response = await acknowledgement
+    expect(response.status()).toBe(200)
+    const envelope = await response.json() as Record<string, unknown>
+    expect(envelope.replayed).toBe(false)
+    expect(envelope.receipt).toMatchObject({
+      version: 1,
+      commandId: payload.intent_id,
+      operation: 'tools.upscale',
+      status: 'queued',
+      taskIds: ['task-generation-tool-upscale-e2e'],
+      result: {
+        job_id: 'tool-upscale-e2e',
+        task_id: 'task-generation-tool-upscale-e2e',
+        workspace: 'default',
+        status: 'queued',
+      },
+      commandVersion: 2,
+      fingerprintVersion: 2,
+      contentFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
+    })
+    expect(legacySubmissions).toHaveLength(0)
     await expect(page.getByText('Queued...', { exact: true }).first()).toBeVisible()
     await expect.poll(() => statuses.length, { timeout: 10_000 }).toBeGreaterThanOrEqual(2)
 
