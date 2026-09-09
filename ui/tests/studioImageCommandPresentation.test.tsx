@@ -272,6 +272,41 @@ test('unmounting while the snapshot is waiting cancels before admission', { conc
   }
 })
 
+test('a transient Suspense hide preserves the waiting request until the panel is visible again', { concurrency: false }, async () => {
+  const { render, waitFor, cleanup, act } = await import('@testing-library/react')
+  const never = new Promise<void>(() => undefined)
+  function Sibling({ suspended }: { suspended: boolean }) {
+    if (suspended) throw never
+    return null
+  }
+  const tree = (suspended: boolean) => <React.StrictMode><React.Suspense fallback={<p>Loading</p>}>
+    <StudioImageCommandPanel workspace="studio-ack-workspace" model="pi_flux2" visible onRecovered={async () => undefined} />
+    <Sibling suspended={suspended} />
+  </React.Suspense></React.StrictMode>
+  const params = baseParams('suspense-before-post')
+  const state = formState(params)
+  const transport = setSubmissionFetch()
+  const view = render(tree(false))
+  try {
+    const prepared = await prepareStudioSubmission(params, state, () => state, { actor: 'wizard', commandId: 'suspense-before-post' })
+    let submission!: ReturnType<typeof prepared.submit>
+    let settled = false
+    await act(async () => {
+      submission = prepared.submit()
+      void submission.then(() => { settled = true }, () => { settled = true })
+    })
+    await waitFor(() => assert.equal(document.querySelector('[data-studio-image-command]')?.getAttribute('data-studio-image-command'), 'suspense-before-post'))
+    view.rerender(tree(true))
+    await act(async () => { await flushAnimationFrames() })
+    assert.equal(settled, false, 'a temporary hidden tree is not a cancelled request')
+    assert.equal(transport.generationCalls(), 0)
+    view.rerender(tree(false))
+    await act(async () => { await flushAnimationFrames() })
+    await submission
+    assert.equal(transport.generationCalls(), 1)
+  } finally { cleanup() }
+})
+
 test('recovery reload reuses the exact intention after 503 and keeps its receipt if reconnect fails', { concurrency: false }, async () => {
   const { render, screen, fireEvent, waitFor, cleanup } = await import('@testing-library/react')
   const saved = command('recovery-reload')

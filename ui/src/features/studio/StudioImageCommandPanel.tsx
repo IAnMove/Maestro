@@ -53,6 +53,7 @@ export function StudioImageCommandPanel({ workspace, model, visible, onRecovered
   }, [workspace])
 
   useLayoutEffect(() => {
+    const element = root.current
     const receive = (event: Event) => {
       const request = (event as CustomEvent<ImagePresentation>).detail
       const view = current.current
@@ -70,7 +71,13 @@ export function StudioImageCommandPanel({ workspace, model, visible, onRecovered
     window.addEventListener(IMAGE_PRESENTATION_EVENT, receive)
     return () => {
       window.removeEventListener(IMAGE_PRESENTATION_EVENT, receive)
-      waiting.current?.respond(i18n.t('studio:commands.panelUnavailable'))
+      const request = waiting.current
+      // Suspense temporarily disconnects layout effects while retaining the
+      // DOM. Keep the same request until reveal reconnects its ACK effect.
+      // An actual navigation/unmount removes the element and cancels it.
+      queueMicrotask(() => {
+        if (!element?.isConnected) request?.respond(i18n.t('studio:commands.panelUnavailable'))
+      })
     }
   }, [])
 

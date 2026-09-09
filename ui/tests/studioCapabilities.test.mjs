@@ -114,3 +114,34 @@ test('keeps compute confirmation and exact reference/LoRA semantics', async () =
   assert.deepEqual(definitions.get('configure_studio_loras').validate(clearLoras), [])
   assert.equal(definitions.get('configure_studio_loras').resolve({ type: 'configure_studio_loras', loras: [] }), null)
 })
+
+test('image preparation preserves literal prompts and language metadata without appending instructions', async () => {
+  const definitions = await registeredStudioCapabilities()
+  const definition = definitions.get('prepare_image')
+  const prompt = '  A blue origami octopus.\nNo text or watermark.  '
+  const negative = '  blur\nextra letters  '
+  const languageIntent = { contentLanguage: 'en', technicalPromptLanguage: 'en',
+    verbatimSegments: [{ kind: 'visible_text', text: prompt, language: 'en' }] }
+  const parsed = definition.resolve({ type: 'prepare_image', prompt, negative_prompt: negative,
+    model_type: 'flux2_klein_9b', guidance_scale: -1 })
+  assert.equal(parsed.prompt, prompt)
+  assert.equal(parsed.negativePrompt, negative)
+  assert.equal(parsed.guidanceScale, undefined, 'unspecified CFG keeps the selected model default')
+  const prepared = await definition.prepare({ ...parsed, languageIntent })
+  let received
+  await definition.execute(prepared, { adapters: { studio: { async prepareImage(action) {
+    received = action
+    return { message: 'Prepared' }
+  } } } })
+  assert.equal(received.prompt, prompt)
+  assert.equal(received.negativePrompt, negative)
+  assert.deepEqual(received.languageIntent, languageIntent)
+})
+
+test('image prompts are accepted intact or rejected rather than silently truncated', async () => {
+  const definition = (await registeredStudioCapabilities()).get('prepare_image')
+  const prompt = 'x'.repeat(10_000) + '\nfin'
+  assert.equal(definition.resolve({ type: 'prepare_image', prompt }).prompt, prompt)
+  assert.equal(definition.resolve({ type: 'prepare_image', prompt: 'x'.repeat(200_001) }), null)
+  assert.equal(definition.resolve({ type: 'prepare_image', prompt, negative_prompt: 'x'.repeat(200_001) }), null)
+})
