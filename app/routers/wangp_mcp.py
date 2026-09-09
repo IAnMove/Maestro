@@ -20,6 +20,10 @@ from services.wangp_submission import JsonRequest
 PROTOCOL = '2025-03-26'
 MUTATIONS = {'generate', 'recast', 'upscale', 'organize'}
 REQUEST_TOOLS = MUTATIONS | {'analyze'}
+# Modes accepted by the generic /api/v1/generate handler. ``model3d`` has a
+# separate /api/v1/model3d/generate contract and is intentionally not routed
+# through this MCP tool.
+GENERATION_MODES = ('image', 'video', 'audio', 'avatar')
 
 
 def tool_definitions():
@@ -32,14 +36,35 @@ def tool_definitions():
         ('collections', 'Read existing Workspace collections and their revisions.'),
         ('organize', 'Group exact asset_ids in a Workspace collection without moving files. Create with name, or update exact workspace_id with expected_revision. Supplied asset_ids replace collection membership.'),
         ('analyze', 'Analyze up to four images or one video with the selected vision LLM. params: prompt, workspace, media=[{source: canonical URL, kind: image|video}]. Video uses 8 sampled frames and no audio. Returns text and evidence, not a generation job.'),
-        ('generate', 'Submit one image/video generation to Hocuspocus. Preserve literal prompts. Returns a job ID, not a finished artifact.'),
+        ('generate', 'Submit one direct generation to Hocuspocus. Preserve literal prompts. Returns a job ID, not a finished artifact.'),
         ('recast', 'Submit Viggle character replacement: model_type=viggle_animate, video_path and ref_image_path (an edited frame of that video).'),
         ('upscale', 'Process an existing image/video using the shared Tools queue: face refinement, DLSS, RIFE or existing upscalers.'),
     ]:
         properties, required = {}, []
         if name in REQUEST_TOOLS:
+            params_schema = {
+                'type': 'object',
+                'description': 'Parameters accepted by the corresponding /api/v1 endpoint, including workspace.',
+            }
+            if name == 'generate':
+                params_schema.update(
+                    properties={
+                        'generation_mode': {
+                            'type': 'string',
+                            'enum': list(GENERATION_MODES),
+                            'minLength': 1,
+                            'description': 'Required direct generation mode; do not infer it from image_mode.',
+                        },
+                        'image_mode': {
+                            'type': 'integer',
+                            'minimum': 0,
+                            'description': 'Optional native output selector; it must agree with generation_mode.',
+                        },
+                    },
+                    required=['generation_mode'],
+                )
             properties = {'request_id': {'type': 'string', 'minLength': 1, 'maxLength': 160},
-                          'params': {'type': 'object', 'description': 'Parameters accepted by the corresponding /api/v1 endpoint, including workspace.'}}
+                          'params': params_schema}
             required = ['request_id', 'params']
         elif name == 'status':
             properties = {'job_id': {'type': 'string', 'minLength': 1}}
@@ -59,7 +84,7 @@ class RequestJournal:
     def __init__(self, path):
         self.path = Path(path)
 
-    def reserve(self, request_id, digest):
+    def reserve(self, request_id, digest, validate=None):
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with sqlite3.connect(self.path, timeout=15) as db:
             db.execute('CREATE TABLE IF NOT EXISTS requests (id TEXT PRIMARY KEY, digest TEXT NOT NULL, result TEXT)')
@@ -71,6 +96,8 @@ class RequestJournal:
                 if row[1] is None:
                     raise ValueError('Submission already reserved. Inspect Activity; do not resubmit with another request_id after an uncertain response.')
                 return json.loads(row[1])
+            if validate is not None:
+                validate()
             db.execute('INSERT INTO requests VALUES (?, ?, NULL)', (request_id, digest))
         return None
 
@@ -89,6 +116,30 @@ def _request_arguments(name, arguments):
     return request_id, params, digest
 
 
+def _validate_generate_params(params):
+    mode = params.get('generation_mode')
+    if not isinstance(mode, str) or not mode:
+        raise ValueError('MCP generate requires a non-empty generation_mode')
+    if mode not in GENERATION_MODES:
+        modes = ', '.join(GENERATION_MODES)
+        raise ValueError(f'MCP generate generation_mode must be one of: {modes}')
+    if 'image_mode' not in params:
+        return
+    image_mode = params['image_mode']
+    if isinstance(image_mode, bool) or not isinstance(image_mode, int) or image_mode < 0:
+        raise ValueError('MCP generate image_mode must be a non-negative integer')
+    if mode == 'image' and image_mode == 0:
+        raise ValueError('MCP generate image mode requires image_mode > 0 when supplied')
+    if mode != 'image' and image_mode != 0:
+        raise ValueError(f'MCP generate {mode} mode requires image_mode=0')
+
+
+def _prepare_generate_params(params):
+    """Make the explicit MCP mode reach WanGP's native output switch."""
+    if 'image_mode' not in params:
+        params['image_mode'] = 1 if params.get('generation_mode') == 'image' else 0
+
+
 def create_wangp_mcp_router(*, handlers, journal_path, token_getter=None):
     router = APIRouter()
     journal = RequestJournal(journal_path)
@@ -99,10 +150,13 @@ def create_wangp_mcp_router(*, handlers, journal_path, token_getter=None):
             raise ValueError('Unknown tool or invalid arguments')
         if name in REQUEST_TOOLS:
             request_id, params, digest = _request_arguments(name, arguments)
-            existing = journal.reserve(request_id, digest)
+            validate = (lambda: _validate_generate_params(params)) if name == 'generate' else None
+            existing = journal.reserve(request_id, digest, validate=validate)
             if existing is not None:
                 return existing
             params = dict(params)
+            if name == 'generate':
+                _prepare_generate_params(params)
             from services.generation_provenance import normalize_submission_provenance
             provenance = normalize_submission_provenance(params.get('provenance'), trusted_tool='external_agent')
             provenance.update(actor='user', capability=name)
@@ -144,7 +198,10 @@ def create_wangp_mcp_router(*, handlers, journal_path, token_getter=None):
             elif method == 'tools/call':
                 params = message.get('params') or {}
                 value = await call_tool(params.get('name'), params.get('arguments') or {})
-                result = {'content': [{'type': 'text', 'text': json.dumps(value, ensure_ascii=False)}], 'isError': isinstance(value, dict) and 'error' in value}
+                result = {
+                    'content': [{'type': 'text', 'text': json.dumps(value, ensure_ascii=False)}],
+                    'isError': _tool_result_is_error(value),
+                }
             else:
                 return {'jsonrpc': '2.0', 'id': request_id, 'error': {'code': -32601, 'message': 'Method not found'}}
             return {'jsonrpc': '2.0', 'id': request_id, 'result': result}
@@ -179,3 +236,24 @@ def create_wangp_mcp_router(*, handlers, journal_path, token_getter=None):
         return Response(status_code=405, headers={'Allow': 'POST'})
 
     return router
+
+
+def _tool_result_is_error(value):
+    if not isinstance(value, dict):
+        return False
+    if value.get('error') is not None:
+        return True
+    status = value.get('status')
+    if isinstance(status, str) and status.strip().casefold() == 'failed':
+        return True
+    status_code = value.get('status_code')
+    if isinstance(status_code, bool):
+        return False
+    if isinstance(status_code, (int, float)):
+        return status_code >= 400
+    if isinstance(status_code, str):
+        try:
+            return int(status_code.strip()) >= 400
+        except ValueError:
+            return False
+    return False
