@@ -10871,7 +10871,8 @@ async def generate(request: Request):
                                   uploads_dir=os.path.join(os.getcwd(), "uploads"),
                                   workspace_dir=_workspace_dir(requested_workspace),
                                   prepared_images=getattr(request, "prepared_studio_images", False) is True,
-                                  prepared_speech=getattr(request, "prepared_studio_speech", False) is True)
+                                  prepared_speech=(getattr(request, "prepared_studio_speech", False) is True
+                                                   or getattr(request, "prepared_studio_audio", False) is True))
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     try:
