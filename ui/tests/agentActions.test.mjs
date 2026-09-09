@@ -1812,6 +1812,42 @@ test('new UI-label question patterns preserve literal captions in explicit video
   }
 })
 
+test('how-to language in the scene of an opening generate command still launches', async () => {
+  const {
+    isHowToGenerateQuestion,
+    isExplicitVideoGenerationRequest,
+    reconcileAgentTurnWithRequest,
+  } = await import('../src/features/agent/agentActions.ts')
+
+  for (const request of [
+    'Generate a video about how to make pancakes',
+    'Genera un vídeo de cómo hacer una pizza',
+    'Hazme un vídeo de cómo hacer una pizza',
+    'Generate a video showing a sign that reads "What does the generate video button do?"',
+    'Generate a video about why people cancel gym memberships',
+    'Genera un vídeo de alguien que dice puedo cancelar la reserva',
+  ]) {
+    assert.equal(isHowToGenerateQuestion(request), false, request)
+    assert.equal(isExplicitVideoGenerationRequest(request), true, request)
+    const proposal = { reply: 'Ready', actions: [
+      { type: 'prepare_video', prompt: request }, { type: 'start_generation', confirm: true },
+    ] }
+    const turn = await reconcileAgentTurnWithRequest(request, proposal)
+    assert.deepEqual(turn.actions, proposal.actions, request)
+  }
+
+  for (const request of [
+    'How do I generate a video?',
+    'How to make a video',
+    'What does the generate video button do?',
+    'Cómo generar un vídeo',
+    'Can I cancel?',
+  ]) {
+    assert.equal(isHowToGenerateQuestion(request), true, request)
+    assert.equal(isExplicitVideoGenerationRequest(request), false, request)
+  }
+})
+
 test('Spanish para-preposition does not cancel the active GPU task', async () => {
   const { isExplicitCancelRequest, reconcileAgentTurnWithRequest } = await import('../src/features/agent/agentActions.ts')
   for (const request of [

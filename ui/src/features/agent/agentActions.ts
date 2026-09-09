@@ -2061,13 +2061,20 @@ const HOW_TO_GENERATE = [
   /^(?:¿\s*)?c[oó]mo\s+funciona\b[^.!?\n]{0,80}\b(?:el\s+)?(?:bot[oó]n\s+)?(?:genera|generate)\b/i,
 ]
 
+// Launch verbs at the request opening. How-to language after that is
+// scene or caption text, not an educational question about the product.
+const OPENS_WITH_GENERATION_COMMAND = /^(?:¿\s*)?(?:(?:por favor|please)[, ]+)?(?:haz(?:me)?|haced(?:me)?|genera(?:me|d)?|gen[eé]rame|crea(?:me|d)?|cr[eé]ame|lanza(?:d)?|encola(?:d)?|renderiza(?:d)?|make|create|generate|render|launch|start|queue)\b/i
+
 export function isHowToGenerateQuestion(request: string): boolean {
   const text = request.trim()
   if (!text) return false
   // Classify from the opening window so a long explanation after
   // "how do I generate a video?" stays educational. A later command
   // after 240 characters is treated as a separate request.
-  return HOW_TO_GENERATE.some(pattern => pattern.test(text.slice(0, 240)))
+  const window = text.slice(0, 240)
+  if (!HOW_TO_GENERATE.some(pattern => pattern.test(window))) return false
+  if (OPENS_WITH_GENERATION_COMMAND.test(window)) return false
+  return true
 }
 
 const LABS_INVENTORY = /(?:¿\s*)?(?:qu[eé]\s+puedes\s+hacer|what\s+can\s+you\s+do)(?:\s+(?:en|in|con|with))?\s+(?:el\s+)?(?:series\s+lab|story\s+lab)/i
