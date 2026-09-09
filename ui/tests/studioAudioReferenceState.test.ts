@@ -7,6 +7,7 @@ Object.assign(globalThis, { window: dom.window, document: dom.window.document,
   localStorage: dom.window.localStorage, Event: dom.window.Event, CustomEvent: dom.window.CustomEvent })
 window.matchMedia = (() => ({ matches: false })) as typeof window.matchMedia
 const { useStore } = await import('../src/stores/useStore')
+const { createStudioSfxGenerationCommand, projectStudioSfxFormParams, neutralizeStudioSfxFormResidue } = await import('../src/features/studio/sfxGenerationSpec')
 const { createStudioMusicGenerationCommand } = await import('../src/features/studio/musicGenerationSpec')
 const speechRef = '/api/v1/file/voice.wav?workspace=speech-source'
 const musicRef = '/api/v1/file/beat.wav?workspace=music-source'
@@ -25,7 +26,7 @@ async function withStudio(run: () => Promise<void> | void) {
       models: [
         { model_type: 'kugelaudio_0_open', name: 'Kugel', family: 'tts', is_downloaded: true },
         { model_type: 'ace_step_v1_5_xl_sft_lm_4b', name: 'ACE', family: 'tts', is_downloaded: true },
-        { model_type: 'mmaudio_v2', name: 'MMAudio', family: 'audio', is_downloaded: true },
+        { model_type: 'mmaudio_v2', name: 'MMAudio', family: 'tts', is_downloaded: true },
       ] as typeof before.models,
       params: { ...before.params, model_type: 'kugelaudio_0_open', audio_prompt_type: 'AN',
         audio_guide: speechRef, audio_guide2: undefined, _tts_voice_count: 1,
@@ -147,6 +148,7 @@ test('Load Settings for Music preserves the previous Speech references and the n
     }, upload_filenames: { audio_guide: 'beat.wav' } } as never })
     await useStore.getState().loadSettingsFromOutput()
     assert.equal(useStore.getState().audioSubMode, 'music')
+    assert.equal(useStore.getState().durationSeconds, 20)
     assert.equal(useStore.getState().params.audio_guide, musicRef)
     assert.equal(musicCommand().input.params.audio_guide, musicRef)
     useStore.getState().setAudioSubMode('speech')
@@ -215,3 +217,31 @@ test('late model defaults cannot disable restored Speech or newly chosen Music r
     assert.equal(useStore.getState().params.audio_guide, speechRef)
   })
 })
+
+for (const nativeAlias of [true, false]) {
+  test(`Load Settings for SFX restores literal fields and duration (native alias: ${nativeAlias})`, async () => {
+    await withStudio(async () => {
+      const literal = '  a glass chime\nwith a long tail  '
+      useStore.getState().setParams({ MMAudio_prompt: 'stale sound', MMAudio_neg_prompt: 'stale negative', sfx_text_weight: 4 } as never)
+      useStore.setState({ selectedOutputMeta: { params: {
+        model_type: 'mmaudio_v2', _audio_sub_mode: 'sfx', sfx_mode: true,
+        prompt: literal, ...(nativeAlias ? { MMAudio_prompt: literal } : {}),
+        MMAudio_neg_prompt: '', sfx_text_weight: 0, guidance_scale: 0,
+        duration_seconds: 7.5, video_length: 0, num_inference_steps: 25,
+      } } as never })
+      await useStore.getState().loadSettingsFromOutput()
+      const state = useStore.getState()
+      assert.equal(state.audioSubMode, 'sfx')
+      assert.equal(state.params.MMAudio_prompt, literal)
+      assert.equal(state.params.MMAudio_neg_prompt, '')
+      assert.equal(state.params.sfx_text_weight, 0)
+      assert.equal(state.params.guidance_scale, 0)
+      assert.equal(state.durationSeconds, 7.5, 'audio duration is not derived from video frames')
+      const submitted = createStudioSfxGenerationCommand(neutralizeStudioSfxFormResidue(projectStudioSfxFormParams({
+        ...state.params, workspace: state.activeWorkspace, duration_seconds: state.durationSeconds,
+      })), `restore-sfx-${nativeAlias}`)
+      assert.equal(submitted.input.params.MMAudio_prompt, literal)
+      assert.equal(submitted.input.params.duration_seconds, 7.5)
+    })
+  })
+}

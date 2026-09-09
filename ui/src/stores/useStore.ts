@@ -29,6 +29,7 @@ import { markJobsCancelling, prependJob, removeJob, updateJob, withJobs } from '
 import {
   extractSingleClipStudioParams,
   isJoinedSequenceOutput,
+  restoredSfxSettings,
   splitStudioClipPrompts,
 } from '../features/studio/studioRestore'
 import {
@@ -8811,6 +8812,9 @@ export const useStore = create<AppState>((set, get) => {
 
     Object.assign(newParams, restoreWangpSettings(p))
     if (get().generationMode === 'audio') Object.assign(newParams, audioReferenceParams(p))
+    if (get().generationMode === 'audio' && get().audioSubMode === 'sfx') {
+      Object.assign(newParams, restoredSfxSettings(p))
+    }
     // Copy optional fields — explicitly clear when absent to prevent stale values leaking
     newParams.sliding_window_size = (p.sliding_window_size as number) ?? undefined
     newParams.sliding_window_overlap = (p.sliding_window_overlap as number) ?? undefined
@@ -9064,7 +9068,8 @@ export const useStore = create<AppState>((set, get) => {
     // Derive duration and sliding window from video_length and fps
     const fps = model?.fps || 16
     const frames = newParams.video_length || 81
-    set({ durationSeconds: Math.round((frames / fps) * 10) / 10 })
+    set({ durationSeconds: get().generationMode === 'audio' && restoredDuration > 0
+      ? restoredDuration : Math.round((frames / fps) * 10) / 10 })
     if (newParams.sliding_window_size) {
       set({ slidingWindowSeconds: Math.round((newParams.sliding_window_size / fps) * 10) / 10 })
     }

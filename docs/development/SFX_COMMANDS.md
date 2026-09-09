@@ -144,6 +144,18 @@ strings and host/remote paths are rejected. The request duration is retained
 until server preparation probes the guide. No-guidance requests are limited
 to 20 seconds; the legacy SFX pack helper retains its separate clip behavior.
 
+### Restoring and submitting the SFX form
+
+The visible SFX description owns `MMAudio_prompt`. An empty description cannot
+submit a leftover Speech/Music `prompt`. The direct command contract still accepts
+a prompt-only envelope and rejects conflicting aliases.
+
+Loading an identified SFX output restores its literal description, negative prompt,
+text weight and guidance, including explicit empty/zero values. Legacy SFX sidecars
+with only `prompt` restore that text into the visible SFX field. Missing optional
+SFX fields use native defaults rather than the previous clip's values. Recorded
+audio duration takes precedence over video-frame conversion in Load Settings.
+
 ### Switching into the SFX form
 
 Loading options for a virtual MMAudio model clears the previous model's options
