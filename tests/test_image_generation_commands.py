@@ -512,7 +512,7 @@ def _recovery_http_app(service, queue):
 
 
 @pytest.mark.parametrize("storage_error", [sqlite3.OperationalError("database is locked"), OSError("disk unavailable")])
-@pytest.mark.parametrize("failure_phase", ["restore", "link"])
+@pytest.mark.parametrize("failure_phase", ["restore", "link", "update"])
 def test_recovery_http_storage_failure_preserves_queue_and_interrupted_task(tmp_path, monkeypatch, storage_error, failure_phase):
     from services.durable_generation_queue import DurableGenerationQueue
 
@@ -527,17 +527,20 @@ def test_recovery_http_storage_failure_preserves_queue_and_interrupted_task(tmp_
     before = queue.list()
     registry = restarted.registry("workspace-a")
 
-    def unavailable(_intent):
+    def unavailable(*_args, **_kwargs):
         raise storage_error
 
-    monkeypatch.setattr(registry, "command_admission", unavailable)
+    monkeypatch.setattr(registry, "update" if failure_phase == "update" else "command_admission", unavailable)
     if failure_phase == "link":
         monkeypatch.setattr(service, "restore_recovery", lambda _workspaces: None)
     with TestClient(_recovery_http_app(service, queue)) as client:
         for method, path in (("get", "/api/v1/jobs/recovery"), ("post", "/api/v1/jobs/recovery/discard")):
             response = getattr(client, method)(path)
-            assert response.status_code == 503
-            assert response.json()["detail"]["code"] == "storage_unavailable"
+            if failure_phase == "update" and method == "get":
+                assert response.status_code == 200
+            else:
+                assert response.status_code == 503
+                assert response.json()["detail"]["code"] == "storage_unavailable"
             assert queue.list() == before
             assert registry.get(accepted["receipt"]["taskIds"][0])["status"] == "interrupted"
 
