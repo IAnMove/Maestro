@@ -2,8 +2,43 @@ import { useEffect, useMemo } from 'react'
 import { useUiTranslation } from '../../i18n'
 import { useStore, getFamiliesForMode, getModelsForFamily } from '../../stores/useStore'
 import { MINIMAX_IMAGE_API_LABEL, MINIMAX_IMAGE_API_MODEL } from '../../lib/externalModels'
-import type { DirectorPipelineType } from '../../types'
+import type { DirectorPipelineType, ModelDef, ModelFamily } from '../../types'
 import { InfoTooltip } from './InfoTooltip'
+
+/** One compatibility catalog shared by Director and Story production selectors. */
+function directorModelGroups({ mode, families, models, enabledModels, nsfwMode, pipelineType, seamless }: {
+  mode: 'image' | 'video'
+  families: ModelFamily[]
+  models: ModelDef[]
+  enabledModels: Set<string>
+  nsfwMode: boolean
+  pipelineType: DirectorPipelineType
+  seamless: boolean
+}) {
+  return getFamiliesForMode(mode, families).map(family => ({
+    family,
+    models: getModelsForFamily(family.id, models, mode)
+      .filter(model => enabledModels.has(model.model_type))
+      .filter(model => !model.nsfw_only || nsfwMode)
+      .filter(model => mode === 'image'
+        ? model.director?.image.compatible === true
+        : model.director?.video[pipelineType].compatible === true
+          && (!seamless || model.director?.video.seamless.compatible === true)),
+  })).filter(group => group.models.length > 0)
+}
+
+function resolveDirectorModelSelection(
+  compatibleModels: ModelDef[], mode: 'image' | 'video', value: string, preserveSelection: boolean,
+) {
+  const externalKnown = mode === 'image' && value === MINIMAX_IMAGE_API_MODEL
+  const known = externalKnown || compatibleModels.some(model => model.model_type === value)
+  const preferredId = mode === 'image' ? 'flux2_klein_9b' : 'ltx2_22B_distilled_1_1'
+  const fallback = compatibleModels.find(model => model.model_type === preferredId)
+    || compatibleModels[0]
+  const selectedValue = known || preserveSelection ? value : (fallback?.model_type || '')
+  const selectedModel = compatibleModels.find(model => model.model_type === selectedValue)
+  return { known, fallback, selectedValue, selectedModel }
+}
 
 export function DirectorModelPicker({ mode, value, onChange, pipeline, allowSeamless, preserveSelection = false, showModeLabel = true }: {
   pipeline?: DirectorPipelineType
@@ -30,30 +65,17 @@ export function DirectorModelPicker({ mode, value, onChange, pipeline, allowSeam
       ? 'short_film_audio'
       : 'short_film_story')
 
-  const groups = useMemo(() =>
-    getFamiliesForMode(mode, families).map(family => ({
-      family,
-      models: getModelsForFamily(family.id, models, mode)
-        .filter(m => enabledModels.has(m.model_type))
-        .filter(m => !m.nsfw_only || nsfwMode)
-        .filter(m => mode === 'image'
-          ? m.director?.image.compatible === true
-          : m.director?.video[pipelineType].compatible === true
-            && (!seamless || m.director?.video.seamless.compatible === true)),
-    })).filter(g => g.models.length > 0),
-  [mode, families, models, enabledModels, nsfwMode, pipelineType, seamless])
+  const groups = useMemo(() => directorModelGroups({
+    mode, families, models, enabledModels, nsfwMode, pipelineType, seamless,
+  }), [mode, families, models, enabledModels, nsfwMode, pipelineType, seamless])
 
   const compatibleModels = useMemo(
     () => groups.flatMap(group => group.models),
     [groups],
   )
-  const externalKnown = mode === 'image' && value === MINIMAX_IMAGE_API_MODEL
-  const known = externalKnown || compatibleModels.some(model => model.model_type === value)
-  const preferredId = mode === 'image' ? 'flux2_klein_9b' : 'ltx2_22B_distilled_1_1'
-  const fallback = compatibleModels.find(model => model.model_type === preferredId)
-    || compatibleModels[0]
-  const selectedValue = known || preserveSelection ? value : (fallback?.model_type || '')
-  const selectedModel = compatibleModels.find(model => model.model_type === selectedValue)
+  const { known, fallback, selectedValue, selectedModel } = resolveDirectorModelSelection(
+    compatibleModels, mode, value, preserveSelection,
+  )
 
   useEffect(() => {
     if (!preserveSelection && !known && fallback && fallback.model_type !== value) {
