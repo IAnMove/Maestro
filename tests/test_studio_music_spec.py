@@ -103,6 +103,19 @@ def test_instrumental_marker_remains_literal_and_is_not_rewritten():
     assert frozen["effective"]["input"]["params"]["alt_prompt"] == command["input"]["params"]["alt_prompt"]
 
 
+def test_empty_or_omitted_alt_prompt_is_admitted():
+    blank = music_command()
+    blank["input"]["params"]["alt_prompt"] = ""
+    frozen_blank = freeze_studio_music_spec(blank)
+    assert frozen_blank["effective"]["input"]["params"]["alt_prompt"] == ""
+
+    omitted = music_command()
+    omitted["input"]["params"].pop("alt_prompt")
+    frozen_omitted = freeze_studio_music_spec(omitted)
+    assert "alt_prompt" not in frozen_omitted["original"]["input"]["params"]
+    assert frozen_omitted["effective"]["input"]["params"].get("alt_prompt", "") == ""
+
+
 def test_fingerprint_excludes_intent_but_covers_workspace_collection_and_content():
     first = freeze_studio_music_spec(music_command("first"))
     second = freeze_studio_music_spec(music_command("second"))
