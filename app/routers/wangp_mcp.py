@@ -12,10 +12,12 @@ import os
 from pathlib import Path
 import secrets
 import sqlite3
+from copy import deepcopy
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse, Response
 from services.wangp_submission import JsonRequest
+from services.workspace_commands import catalog as command_catalog
 
 PROTOCOL = '2025-03-26'
 MUTATIONS = {'generate', 'recast', 'upscale', 'organize'}
@@ -24,9 +26,32 @@ REQUEST_TOOLS = MUTATIONS | {'analyze'}
 # separate /api/v1/model3d/generate contract and is intentionally not routed
 # through this MCP tool.
 GENERATION_MODES = ('image', 'video', 'audio', 'avatar')
+LEGACY_TOOLS = REQUEST_TOOLS | {'models', 'processors', 'status', 'assets', 'collections'}
 
 
-def tool_definitions():
+def _selected_operations(command_operations):
+    entries = deepcopy(list(command_catalog()['operations'] if command_operations is None else command_operations))
+    names = [entry['name'] for entry in entries]
+    if any(not isinstance(name, str) or not name for name in names):
+        raise ValueError('Command catalog names must be nonempty strings')
+    if len(set(names)) != len(names) or LEGACY_TOOLS.intersection(names):
+        raise ValueError('Command catalog names must be unique and cannot collide with legacy tools')
+    return entries, frozenset(names)
+
+
+def _command_tool(operation):
+    # HTTP carries its operation explicitly; MCP carries it as the tool name.
+    # Derive the transport projection from the same source schema.
+    schema = operation['inputSchema']
+    schema = {**schema, 'properties': {key: value for key, value in schema['properties'].items() if key != 'operation'},
+              'required': [key for key in schema['required'] if key != 'operation']}
+    return {
+        'name': operation['name'], 'description': operation['description'], 'inputSchema': schema,
+        'annotations': {'readOnlyHint': not operation['mutation'], 'destructiveHint': False, 'idempotentHint': True},
+    }
+
+
+def tool_definitions(available=None, command_operations=None):
     tools = []
     for name, description in [
         ('models', 'Discover exact model identifiers and capabilities.'),
@@ -77,7 +102,15 @@ def tool_definitions():
         tools.append({'name': name, 'description': description,
                       'inputSchema': {'type': 'object', 'properties': properties, 'required': required, 'additionalProperties': False},
                       'annotations': {'readOnlyHint': name not in MUTATIONS, 'destructiveHint': False, 'idempotentHint': True}})
+    operations, _ = _selected_operations(command_operations)
+    for operation in operations:
+        if available is not None and operation['name'] in available:
+            tools.append(_command_tool(operation))
     return tools
+
+
+class UncertainRequest(ValueError):
+    """Legacy reservation exists without a response; do not infer admission."""
 
 
 class RequestJournal:
@@ -94,7 +127,7 @@ class RequestJournal:
                 if row[0] != digest:
                     raise ValueError('request_id was already used with different parameters')
                 if row[1] is None:
-                    raise ValueError('Submission already reserved. Inspect Activity; do not resubmit with another request_id after an uncertain response.')
+                    raise UncertainRequest('Submission already reserved. Inspect Activity; do not resubmit with another request_id after an uncertain response.')
                 return json.loads(row[1])
             if validate is not None:
                 validate()
@@ -140,18 +173,43 @@ def _prepare_generate_params(params):
         params['image_mode'] = 1 if params.get('generation_mode') == 'image' else 0
 
 
-def create_wangp_mcp_router(*, handlers, journal_path, token_getter=None):
+def create_wangp_mcp_router(*, handlers, journal_path, token_getter=None, command_operations=None):
     router = APIRouter()
     journal = RequestJournal(journal_path)
     token_getter = token_getter or (lambda: os.environ.get('HOCUS_MCP_TOKEN', ''))
 
+    operations, operation_names = _selected_operations(command_operations)
+    callable_names = LEGACY_TOOLS | operation_names
+
     async def call_tool(name, arguments):
-        if name not in handlers or not isinstance(arguments, dict):
+        if not isinstance(name, str) or name not in callable_names or not callable(handlers.get(name)) or not isinstance(arguments, dict):
             raise ValueError('Unknown tool or invalid arguments')
+        if name in operation_names:
+            result = handlers[name](arguments)
+            return await result if inspect.isawaitable(result) else result
         if name in REQUEST_TOOLS:
             request_id, params, digest = _request_arguments(name, arguments)
             validate = (lambda: _validate_generate_params(params)) if name == 'generate' else None
-            existing = journal.reserve(request_id, digest, validate=validate)
+            try:
+                existing = journal.reserve(request_id, digest, validate=validate)
+            except UncertainRequest as uncertain:
+                # Only collection commands can currently prove their effect and
+                # receipt were committed together. Preserve uncertainty for all
+                # older/unlinked reservations and generation admissions.
+                if name != 'organize' or 'commands.receipt' not in handlers:
+                    raise
+                try:
+                    proof = handlers['commands.receipt']({'version': 1, 'input': {'intent_id': request_id}})
+                    proof = await proof if inspect.isawaitable(proof) else proof
+                except HTTPException as error:
+                    if error.status_code == 404:
+                        raise uncertain from error
+                    raise
+                if not isinstance(proof, dict) or proof.get('commandId') != request_id:
+                    raise uncertain
+                # Re-enter the domain operation only after finding the receipt;
+                # its digest check must prove the same parameters before replay.
+                existing = None
             if existing is not None:
                 return existing
             params = dict(params)
@@ -167,6 +225,8 @@ def create_wangp_mcp_router(*, handlers, journal_path, token_getter=None):
                 if inspect.isawaitable(result):
                     result = await result
             except HTTPException as error:
+                if error.status_code >= 500:
+                    raise  # Keep uncertain admissions recoverable; never cache a storage outage as a terminal result.
                 result = {'error': error.detail, 'status_code': error.status_code}
             # Unexpected failures deliberately retain the reservation. A queue
             # admission could have succeeded before its response was lost.
@@ -194,19 +254,31 @@ def create_wangp_mcp_router(*, handlers, journal_path, token_getter=None):
             elif method == 'ping':
                 result = {}
             elif method == 'tools/list':
-                result = {'tools': tool_definitions()}
+                result = {'tools': tool_definitions({name for name, handler in handlers.items() if callable(handler)}, operations)}
             elif method == 'tools/call':
                 params = message.get('params') or {}
+                if not isinstance(params, dict):
+                    raise ValueError('Tool call params must be an object')
                 value = await call_tool(params.get('name'), params.get('arguments') or {})
                 result = {
                     'content': [{'type': 'text', 'text': json.dumps(value, ensure_ascii=False)}],
                     'isError': _tool_result_is_error(value),
                 }
+                if params.get('name') in operation_names and isinstance(value, dict):
+                    result['structuredContent'] = value
             else:
                 return {'jsonrpc': '2.0', 'id': request_id, 'error': {'code': -32601, 'message': 'Method not found'}}
             return {'jsonrpc': '2.0', 'id': request_id, 'result': result}
         except (ValueError, KeyError, TypeError, HTTPException) as error:
             detail = error.detail if isinstance(error, HTTPException) else str(error)
+            params = message.get('params') or {}
+            if method == 'tools/call' and isinstance(params, dict) and isinstance(params.get('name'), str) and params['name'] in operation_names:
+                problem = detail if isinstance(detail, dict) else {'code': 'invalid_command', 'message': str(detail), 'retryable': False}
+                failed = {'version': 1, 'status': 'failed', 'error': problem}
+                return {'jsonrpc': '2.0', 'id': request_id, 'result': {
+                    'isError': True, 'structuredContent': failed,
+                    'content': [{'type': 'text', 'text': json.dumps(failed, ensure_ascii=False)}],
+                }}
             return {'jsonrpc': '2.0', 'id': request_id, 'result': {'isError': True, 'content': [{'type': 'text', 'text': str(detail)}]}}
 
     @router.post('/api/v1/wangp/mcp')

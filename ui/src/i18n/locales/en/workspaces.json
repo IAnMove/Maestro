@@ -72,6 +72,25 @@
     "historical": "historical",
     "seed": "seed {{seed}}"
   },
+  "commands": {
+    "pendingInvalid": "The local recovery record could not be read. No command was sent.",
+    "intentConflict": "This request ID belongs to another pending command. Recover that command first.",
+    "failed": "The collection command failed.",
+    "failedWithIntent": "{{message}} Request: {{id}}.",
+    "invalidReceipt": "The result could not be verified. Recover request {{id}} before creating another.",
+    "panelUnavailable": "The collection editor did not confirm the requested view.",
+    "contextChanged": "The collection or editor changed during preparation. No new command was sent.",
+    "unsavedChanges": "The collection editor is busy or has unsaved changes. Finish those edits before asking the Wizard to change a collection.",
+    "saved": "Saved “{{name}}”, revision {{revision}}.",
+    "savedButNotVisible": "The collection is saved, but its editor could not be opened. You can recover it by ID: {{id}}.",
+    "revisionConflict": "The collection changed from revision {{expected}} to {{current}}. Read it again before editing.",
+    "pendingTitle": "Requests awaiting a confirmed result",
+    "pendingHint": "Retrying keeps the original request ID. A saved collection will be recovered without creating another.",
+    "recover": "Recover / retry this request",
+    "recovering": "Recovering…",
+    "identity": "{{id}} · Revision {{revision}}",
+    "referenceOutsidePage": "Outside the loaded catalog page"
+  },
   "collections": {
     "aria": "Workspace collections",
     "savedAria": "Saved Workspaces",

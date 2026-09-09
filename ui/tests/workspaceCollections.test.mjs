@@ -1,5 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { JSDOM } from 'jsdom'
+
+const dom = new JSDOM('<!doctype html><html><body /></html>', { url: 'http://localhost/' })
+Object.assign(globalThis, { window: dom.window, document: dom.window.document,
+  localStorage: dom.window.localStorage, Event: dom.window.Event })
 
 test('Workspace collection client persists exact references and revisions', async () => {
   const calls = []
@@ -8,6 +13,15 @@ test('Workspace collection client persists exact references and revisions', asyn
     calls.push({ url: String(url), options })
     if (options.method === 'DELETE') return new Response(null, { status: 204 })
     const value = options.body ? JSON.parse(String(options.body)) : {}
+    if (value.operation?.startsWith('collections.')) {
+      const input = value.input
+      return new Response(JSON.stringify({ version: 1, commandId: value.intent_id, operation: value.operation,
+        status: 'completed', replayed: false, entities: [], artifacts: [], taskIds: [], pipelineIds: [],
+        result: { schema: 'hocuspocus.workspace-record', schema_version: 1, id: 'workspace-1', revision: 2,
+          name: input.name, description: input.description || '', project_ids: input.project_ids || [],
+          asset_ids: input.asset_ids || [], production_ids: input.production_ids || [], created_at: null, updated_at: null },
+      }), { headers: { 'Content-Type': 'application/json' } })
+    }
     return new Response(JSON.stringify(options.method === 'POST' || options.method === 'PUT'
       ? { schema: 'hocuspocus.workspace-record', schema_version: 1, id: 'workspace-1', revision: 2, name: value.name || 'Film', description: value.description || '', project_ids: value.project_ids || [], asset_ids: value.asset_ids || [], production_ids: value.production_ids || [], created_at: null, updated_at: null }
       : { workspaces: [], total: 0 }), { status: options.method === 'POST' ? 201 : 200, headers: { 'Content-Type': 'application/json' } })
@@ -21,8 +35,12 @@ test('Workspace collection client persists exact references and revisions', asyn
 
     assert.equal(new URL(calls[0].url, 'http://localhost').pathname, '/api/v1/workspace-collections')
     assert.equal(calls[1].options.method, 'POST')
-    assert.equal(JSON.parse(calls[2].options.body).expected_revision, 1)
-    assert.deepEqual(JSON.parse(calls[2].options.body).project_ids, ['project-1'])
+    assert.equal(new URL(calls[1].url, 'http://localhost').pathname, '/api/v1/commands')
+    assert.equal(JSON.parse(calls[1].options.body).operation, 'collections.create')
+    assert.equal(JSON.parse(calls[2].options.body).operation, 'collections.update')
+    assert.equal(JSON.parse(calls[2].options.body).input.expected_revision, 1)
+    assert.deepEqual(JSON.parse(calls[2].options.body).input.project_ids, ['project-1'])
+    assert.notEqual(JSON.parse(calls[1].options.body).intent_id, JSON.parse(calls[2].options.body).intent_id)
     assert.equal(calls[3].options.method, 'DELETE')
   } finally { globalThis.fetch = originalFetch }
 })

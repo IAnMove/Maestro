@@ -3033,13 +3033,33 @@
     },
     {
       "method": "GET",
+      "path": "/api/v1/commands",
+      "endpoint": "command_catalog",
+      "status_code": null,
+      "response_model": null,
+      "include_in_schema": null,
+      "source": "app/routers/workspace_collections.py",
+      "ordinal": 303
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/commands",
+      "endpoint": "execute_shared_command",
+      "status_code": null,
+      "response_model": null,
+      "include_in_schema": null,
+      "source": "app/routers/workspace_collections.py",
+      "ordinal": 304
+    },
+    {
+      "method": "GET",
       "path": "/api/v1/workspace-collections",
       "endpoint": "list_workspace_collections",
       "status_code": null,
       "response_model": null,
       "include_in_schema": null,
       "source": "app/routers/workspace_collections.py",
-      "ordinal": 303
+      "ordinal": 305
     },
     {
       "method": "GET",
@@ -3049,7 +3069,7 @@
       "response_model": null,
       "include_in_schema": null,
       "source": "app/routers/workspace_collections.py",
-      "ordinal": 304
+      "ordinal": 306
     },
     {
       "method": "POST",
@@ -3059,7 +3079,7 @@
       "response_model": null,
       "include_in_schema": null,
       "source": "app/routers/workspace_collections.py",
-      "ordinal": 305
+      "ordinal": 307
     },
     {
       "method": "PUT",
@@ -3069,7 +3089,7 @@
       "response_model": null,
       "include_in_schema": null,
       "source": "app/routers/workspace_collections.py",
-      "ordinal": 306
+      "ordinal": 308
     },
     {
       "method": "DELETE",
@@ -3079,7 +3099,7 @@
       "response_model": null,
       "include_in_schema": null,
       "source": "app/routers/workspace_collections.py",
-      "ordinal": 307
+      "ordinal": 309
     },
     {
       "method": "GET",
@@ -3089,7 +3109,7 @@
       "response_model": null,
       "include_in_schema": false,
       "source": "app/_launch_runtime.py",
-      "ordinal": 308
+      "ordinal": 310
     },
     {
       "method": "POST",
@@ -3099,7 +3119,7 @@
       "response_model": null,
       "include_in_schema": null,
       "source": "app/routers/wangp_mcp.py",
-      "ordinal": 309
+      "ordinal": 311
     },
     {
       "method": "GET",
@@ -3109,7 +3129,7 @@
       "response_model": null,
       "include_in_schema": null,
       "source": "app/routers/wangp_mcp.py",
-      "ordinal": 310
+      "ordinal": 312
     },
     {
       "method": "GET",
@@ -3119,7 +3139,7 @@
       "response_model": null,
       "include_in_schema": null,
       "source": "app/_launch_runtime.py",
-      "ordinal": 311
+      "ordinal": 313
     }
   ]
 }
