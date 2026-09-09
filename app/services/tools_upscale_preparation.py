@@ -95,7 +95,7 @@ def _fallback_source(params: dict[str, Any], resources: Any):
     }
 
 
-def _normalise_source(result: Any, expected_kind: str) -> dict[str, Any]:
+def _source_fields(result: Any) -> dict[str, Any]:
     if isinstance(result, Mapping):
         values = {
             "path": result.get("path") or result.get("source_path") or result.get("resolved"),
@@ -115,6 +115,11 @@ def _normalise_source(result: Any, expected_kind: str) -> dict[str, Any]:
         }
     else:
         raise ValueError("The Tools source resolver returned an invalid result")
+    return values
+
+
+def _normalise_source(result: Any, expected_kind: str) -> dict[str, Any]:
+    values = _source_fields(result)
     path = values["path"]
     if not isinstance(path, (str, os.PathLike)) or not os.fspath(path):
         raise ValueError("The selected Tools source is unavailable")
