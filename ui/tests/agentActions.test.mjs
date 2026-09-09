@@ -1695,6 +1695,43 @@ test('informational stop and cancel questions do not cancel the active GPU task'
   }
 })
 
+test('informational retry questions do not relaunch a failed GPU task', async () => {
+  const { isExplicitRetryRequest, isHowToGenerateQuestion, reconcileAgentTurnWithRequest } = await import('../src/features/agent/agentActions.ts')
+  for (const request of [
+    'How do I retry a failed generation?',
+    'How can I retry the generation?',
+    'How to retry a failed job?',
+    'When should I retry the generation?',
+    'What happens if I retry the generation?',
+    'Why would I retry the generation?',
+    'Should I retry the generation?',
+    'Can you explain how to retry a failed task?',
+    '¿Puedo reintentar la generación?',
+    '¿Cómo reintento una generación fallida?',
+    '¿Qué pasa si reintento la generación?',
+  ]) {
+    assert.equal(isHowToGenerateQuestion(request), true, request)
+    assert.equal(isExplicitRetryRequest(request), false, request)
+    const turn = await reconcileAgentTurnWithRequest(request, { reply: 'Reintento.', actions: [] })
+    assert.equal(turn.actions.some(action => action.type === 'retry_task'), false, request)
+  }
+
+  for (const request of [
+    'reintenta la generación',
+    'retry the generation',
+    'retry the failed job',
+    'Can you retry the generation?',
+    'Please retry the generation',
+    'I want to retry the generation',
+    '¿Puedes reintentar la generación?',
+  ]) {
+    assert.equal(isExplicitRetryRequest(request), true, request)
+    const turn = await reconcileAgentTurnWithRequest(request, { reply: 'Vale.', actions: [] })
+    assert.equal(turn.actions[0].type, 'retry_task', request)
+    assert.equal(turn.actions[0].confirm, true, request)
+  }
+})
+
 test('UI-label generate questions do not enqueue Studio generation', async () => {
   const { useStore } = await import('../src/stores/useStore.ts')
   const {

@@ -2,6 +2,7 @@ import { lazy, Suspense, useRef, useCallback, useState, useEffect, useLayoutEffe
 import { Film, Play, Square, Loader2, X, BookMarked, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react'
 import { TabFilter } from './TabFilter'
 import { ThumbnailGallery } from './ThumbnailGallery'
+import { GalleryViewSwitcher } from './GalleryViewSwitcher'
 import { MediaFeedItem } from './MediaFeedItem'
 import { useStore } from '../../stores/useStore'
 import { jobFitsGalleryFilter } from '../../lib/galleryListQuery'
@@ -21,6 +22,7 @@ import {
   mediaFeedMaxPreviewHeight,
 } from './mediaFeedSizing'
 
+const GalleryLayouts = lazy(() => import('./GalleryLayouts'))
 const SceneAnimatorPanel = lazy(() => import('../Sidebar/SceneAnimatorPanel')
   .then(module => ({ default: module.SceneAnimatorPanel })))
 const Scene3DEditorPanel = lazy(() => import('../../features/scene3d/Scene3DEditorPanel')
@@ -327,6 +329,11 @@ export function MainContent() {
   const maxMediaHeight = mediaFeedMaxPreviewHeight(containerHeight)
   const estimatedItemHeight = estimatedMediaFeedItemHeight(containerWidth, containerHeight)
 
+  // Gallery layout. Grid and mosaic live in a lazily loaded module so the
+  // one-up feed stays the only layout in the entry chunk.
+  const galleryView = useStore(s => s.galleryView)
+  const activeWorkspace = useStore(s => s.activeWorkspace)
+
   // Measure container on mount and resize; clear stale heights whenever either
   // dimension changes because the viewport cap also makes item height depend
   // on the available vertical space.
@@ -558,6 +565,7 @@ export function MainContent() {
     setScrollTop(el.scrollTop)
   }, [outputs, getItemHeight])
 
+
   const visibleItems = useMemo(() => {
     const items: JSX.Element[] = []
     for (let i = startIndex; i < endIndex; i++) {
@@ -679,6 +687,9 @@ export function MainContent() {
           </div>
         ) : <>
         {/* Scrollable media feed */}
+        <div className="pointer-events-none absolute right-3 top-3 z-20 md:right-4 md:top-4">
+          <GalleryViewSwitcher />
+        </div>
         <div
           ref={feedRef}
           className="flex-1 overflow-y-auto p-3 md:p-4"
@@ -734,16 +745,31 @@ export function MainContent() {
           </div>
 
           {/* Position container for virtualized output items */}
-          <div className="relative" style={{ height: totalHeight - placeholderTotalHeight }}>
-            {visibleItems.map(item => {
-              // Adjust top positions to be relative to this container (subtract placeholder height)
-              const adjustedStyle = {
-                ...item.props.style,
-                top: (item.props.style?.top as number) - placeholderTotalHeight,
-              }
-              return { ...item, props: { ...item.props, style: adjustedStyle } }
-            })}
-          </div>
+          {galleryView === 'feed' ? (
+            <div className="relative" style={{ height: totalHeight - placeholderTotalHeight }}>
+              {visibleItems.map(item => {
+                // Adjust top positions to be relative to this container (subtract placeholder height)
+                const adjustedStyle = {
+                  ...item.props.style,
+                  top: (item.props.style?.top as number) - placeholderTotalHeight,
+                }
+                return { ...item, props: { ...item.props, style: adjustedStyle } }
+              })}
+            </div>
+          ) : (
+            <Suspense fallback={<PanelLoadingFallback />}>
+              <GalleryLayouts
+                view={galleryView}
+                outputs={outputs}
+                workspace={activeWorkspace}
+                activeIndex={activeIndex}
+                containerWidth={containerWidth}
+                containerHeight={containerHeight}
+                scrollTop={scrollTop}
+                onOpen={setSelectedOutput}
+              />
+            </Suspense>
+          )}
 
           {/* Loading state */}
           {outputsLoading && outputs.length === 0 && (

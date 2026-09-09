@@ -1844,9 +1844,8 @@ const NEGATED_RETRY_REQUEST = /\b(?:no|sin|don['’]?t|do\s+not)\b[^.!?\n]{0,24}
 
 export function isExplicitRetryRequest(request: string): boolean {
   const text = request.trim()
-  return Boolean(text)
-    && !NEGATED_RETRY_REQUEST.test(text)
-    && EXPLICIT_RETRY_REQUESTS.some(pattern => pattern.test(text))
+  if (!text || NEGATED_RETRY_REQUEST.test(text) || isHowToGenerateQuestion(text)) return false
+  return EXPLICIT_RETRY_REQUESTS.some(pattern => pattern.test(text))
 }
 
 export function isExplicitVideoGenerationRequest(request: string): boolean {
@@ -2013,6 +2012,17 @@ const HOW_TO_GENERATE = [
   /\b(?:puedo|podemos|podr[ií]a)\s+(?:cancelar|parar|detener)\b/i,
   /\b(?:debo|deber[ií]a)\s+(?:cancelar|parar|detener)\b/i,
   /\b(?:hay|existe)\s+(?:alguna\s+)?(?:forma|manera|modo|bot[oó]n|opci[oó]n)\s+de\s+(?:cancelar|parar|detener)\b/i,
+  // Educational retry questions must not relaunch a failed GPU job.
+  /\bhow\s+(?:can|do|would|should)\s+(?:i|we|you)\s+(?:retry|try\s+again)\b/i,
+  /\bhow\s+to\s+(?:retry|try\s+again)\b/i,
+  /\bwhen\s+(?:should|do|can|would)\s+(?:i|we|you)\s+(?:retry|try\s+again)\b/i,
+  /\bshould\s+(?:i|we)\s+(?:retry|try\s+again)\b/i,
+  /\b(?:what|why)\b[^.!?\n]{0,80}\b(?:retry|try\s+again)\b/i,
+  /\b(?:explain|describe|tell\s+me)\b[^.!?\n]{0,96}\b(?:retry|try\s+again)\b/i,
+  /\b(?:c[oó]mo(?:\s+(?:lo|la|las|los|puedo|se))?\s+(?:reintento|reintentar|repite|repetir))\b/i,
+  /\b(?:cu[aá]ndo|por\s+qu[eé]|qu[eé]\s+pasa)\b[^.!?\n]{0,80}\b(?:reintento|reintentar|repite|repetir|retry)\b/i,
+  /\b(?:puedo|podemos|podr[ií]a)\s+(?:reintentar|repetir)\b/i,
+  /\b(?:debo|deber[ií]a)\s+(?:reintentar|repetir)\b/i,
   // UI-label questions mention "generate video" without being a launch command.
   /\bwhat\s+does\b[^.!?\n]{0,80}\b(?:the\s+)?(?:generate|genera|launch|start)\b/i,
   /\bhow\s+does\b[^.!?\n]{0,80}\b(?:the\s+)?(?:generate|genera|launch|start)\b/i,
