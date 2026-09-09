@@ -67,7 +67,7 @@ def create_image_generation_commands(runtime):
         registry=runtime["_task_registry"], prepare=runtime["generate"], preflight=preflight,
         make_job=runtime["_new_generation_job"], task_fields=runtime["_generation_task_fields"],
         dispatch=dispatch, persist_recovery=persist, active_job_ids=lambda: runtime["_jobs"].keys(),
-        prepare_studio=prepare_studio,
+        prepare_studio=prepare_studio, runtime_defaults=lambda: {"mode": "", **runtime["wgp"].primary_settings},
     )
     service.canonicalize_reference = lambda value: resources().canonicalize_legacy(value)
     return service

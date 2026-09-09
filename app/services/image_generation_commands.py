@@ -37,7 +37,7 @@ def validate_image_model(params, *, model_definition, model_downloaded, allow_re
 
 class ImageGenerationCommands:
     def __init__(self, *, registry, prepare, preflight, make_job, task_fields,
-                 dispatch, persist_recovery, active_job_ids, prepare_studio=None):
+                 dispatch, persist_recovery, active_job_ids, prepare_studio=None, runtime_defaults=None):
         self.registry = registry
         self.prepare = prepare
         self.preflight = preflight
@@ -47,6 +47,7 @@ class ImageGenerationCommands:
         self.persist_recovery = persist_recovery
         self.active_job_ids = active_job_ids
         self.prepare_studio = prepare_studio
+        self.runtime_defaults = runtime_defaults or (lambda: {})
         self.owner = uuid.uuid4().hex
 
     def _registry(self, workspace):
@@ -94,7 +95,8 @@ class ImageGenerationCommands:
         registry = self._registry(workspace)
         provenance = deepcopy(provenance)
         provenance["command"]["command_id"] = frozen["original"]["intent_id"]
-        job = self.make_job(body, workspace, reserve_generation=False, publish_task=False, provenance=provenance)
+        native_params = {**deepcopy(self.runtime_defaults()), **deepcopy(body)}
+        job = self.make_job(native_params, workspace, reserve_generation=False, publish_task=False, provenance=provenance)
         effective = deepcopy(frozen["effective"])
         effective["runtime"] = {"params": deepcopy(job["params"]), "workspace": workspace,
                                 "provenance": deepcopy(job["provenance"])}
@@ -138,6 +140,7 @@ class ImageGenerationCommands:
                 self.preflight(params)
             request = JsonRequest({**deepcopy(params), "provenance": self._provenance(
                 frozen, trusted_tool, submission_context)}, trusted_tool=trusted_tool)
+            request.prepared_studio_images = command["version"] == 2
             # This callback is an in-process capability, never a JSON option.
             # The native facade performs its ordinary validation first and then
             # transfers admission to the same canonical task/worker adapter.

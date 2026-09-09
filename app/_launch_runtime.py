@@ -10869,7 +10869,8 @@ async def generate(request: Request):
     try:
         prepare_generation_inputs(body, _generation_model_def, requested_workspace,
                                   uploads_dir=os.path.join(os.getcwd(), "uploads"),
-                                  workspace_dir=_workspace_dir(requested_workspace))
+                                  workspace_dir=_workspace_dir(requested_workspace),
+                                  prepared_images=getattr(request, "prepared_studio_images", False) is True)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     try:

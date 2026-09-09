@@ -62,6 +62,7 @@ Studio and advanced MCP clients use this version 2 envelope:
       "seed": 42,
       "guidance_scale": 1.0,
       "image_refs": ["/api/v1/file/reference.png?workspace=source"],
+      "video_prompt_type": "I",
       "activated_loras": [],
       "loras_multipliers": "",
       "spatial_upsampling": ""
@@ -77,6 +78,9 @@ inputs and unknown fields are rejected before admission. Repeat/batch and
 multiline policies are explicit native parameters; they can produce several
 images in one native job. Nested processor settings use a closed schema and
 must match the installed image processor's capabilities.
+Selected inputs must also match their native conditioning selectors (`I` for
+references, `V` for a guide, `VA` for its mask, `S`/`E` for frames). Inconsistent
+selectors and active frame lists with empty slots are rejected before admission.
 
 References use exact asset IDs or local API URLs. Workspace file URLs must
 name their source workspace, which may differ from the output workspace.
@@ -130,7 +134,12 @@ the intention ID; another deliberate generation uses another intention.
 The content fingerprint excludes transport identity and includes all validated
 effective inputs. TaskRegistry stores the original envelope, effective input
 and the prepared native runtime snapshot separately from its bounded public
-task metadata. Version 2 receipts expose `commandVersion`, `fingerprintVersion`
+task metadata. The native snapshot also freezes the engine's base settings at
+admission, including omitted settings outside the typed image input. These
+defaults come from the engine's settings file, not a browser's current form.
+Changing those defaults while a job waits cannot alter that admitted snapshot.
+They are recorded in the runtime snapshot, outside the input fingerprint.
+Version 2 receipts expose `commandVersion`, `fingerprintVersion`
 and `contentFingerprint` together. The fingerprint versions cannot adopt each
 other's intentions. A snapshot checksum detects corrupt admission storage and fails
 closed. This is integrity checking, not protection against a malicious database

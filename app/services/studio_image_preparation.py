@@ -3,6 +3,7 @@ from copy import deepcopy
 
 from services.image_generation_commands import command_error, validate_image_model
 from services.studio_image_resources import validate_lora_multipliers
+from services.studio_image_conditioning import validate_image_selectors
 
 
 def _has_reference(value):
@@ -64,6 +65,7 @@ def prepare_studio_image(params, *, model_definition, model_downloaded, resource
                                       model_downloaded=model_downloaded, allow_references=True)
     try:
         maximum_phases = _validate_conditioning(params, definition)
+        validate_image_selectors(params, definition)
         _validate_model_options(params, definition)
         validate_lora_multipliers(params, maximum_phases)
         _validate_processors(params, processor_capabilities, validate_processors, processor_settings)

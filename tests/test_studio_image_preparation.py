@@ -224,7 +224,7 @@ def test_supported_reference_reaches_resource_preparation():
             [{"role": "image_refs", "sha256": "ref-hash"}],
         ),
     )
-    params = base_params(image_refs=["/api/v1/uploads/ref.png"])
+    params = base_params(image_refs=["/api/v1/uploads/ref.png"], video_prompt_type="I")
     definition = {
         **BASE_DEFINITION,
         "image_ref_choices": {"choices": [("Reference", "I")]},
