@@ -6,7 +6,7 @@ import { SCENE3D_TEMPLATES, TEMPLATE_CATEGORIES, type Scene3DTemplateCategory, t
 const categories = ['cinema', 'product', 'music', 'space', 'drive'] as const
 
 export function Scene3DTemplateBrowser({ selected, disabled, onSelect }: {
-  selected: Scene3DTemplateId; disabled: boolean; onSelect: (id: Scene3DTemplateId) => void
+  selected?: Scene3DTemplateId; disabled: boolean; onSelect: (id: Scene3DTemplateId) => void
 }) {
   const { t } = useUiTranslation('scene3dEditor')
   const [category, setCategory] = useState<'all' | Scene3DTemplateCategory>('all')

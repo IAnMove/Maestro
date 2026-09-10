@@ -1,0 +1,129 @@
+import assert from 'node:assert/strict'
+import test from 'node:test'
+import { JSDOM } from 'jsdom'
+import { createDefaultScene3DDocument } from '../src/features/scene3d/document.ts'
+import { applyScene3DTemplate } from '../src/features/scene3d/templates.ts'
+import {
+  WORLD3D_TEMPLATE_KIND,
+  USER_TEMPLATE_STORAGE_KEY,
+  createUserTemplate,
+  downloadUserTemplate,
+  isWorld3DTemplateRaw,
+  parseUserTemplate,
+  readStoredUserTemplates,
+  remountUserTemplate,
+  removeUserTemplate,
+  saveUserTemplate,
+  scenarioDocumentFromShot,
+  templateFileTooLarge,
+  writeStoredUserTemplates,
+} from '../src/features/scene3d/userTemplates.ts'
+
+const dom = new JSDOM('<!doctype html><html><body /></html>', { url: 'http://localhost/' })
+Object.assign(globalThis, { window: dom.window, document: dom.window.document, Storage: dom.window.Storage })
+
+const gallery = { workspaceId: 'demo', filename: 'hero.glb', url: '/api/v1/uploads/hero.glb' }
+
+test('export strips clip identity, production and blob URLs from a scenario pack', () => {
+  const document = applyScene3DTemplate('two-shot')
+  document.clipNumber = 17
+  document.playbackSpeed = 2
+  document.dressing = applyScene3DTemplate('cafe-dance').dressing
+  document.production = { kind: 'song', title: 'Clip 17', workspace: 'demo' }
+  document.slots[0].sourceUrl = 'blob:http://localhost/secret'
+  document.slots[0].sourceRef = { ...gallery, url: 'blob:http://localhost/secret' }
+  document.slots[1].sourceUrl = gallery.url
+  document.slots[1].sourceRef = gallery
+  const pack = createUserTemplate({ document, title: 'My tavern', description: 'Cafe layout', includeAssets: true, id: 'user-tavern' })
+  assert.ok(pack)
+  assert.equal(pack.kind, WORLD3D_TEMPLATE_KIND)
+  assert.equal(pack.title, 'My tavern')
+  assert.equal(pack.document.clipNumber, undefined)
+  assert.equal(pack.document.production, undefined)
+  assert.equal(pack.document.templateId, 'two-shot')
+  assert.equal(pack.document.dressing, 'cafe')
+  assert.equal(pack.document.slots[0].sourceUrl, '')
+  assert.equal(pack.document.slots[1].sourceUrl, gallery.url)
+  assert.equal(pack.document.slots[0].speech, undefined)
+})
+
+test('export without assets clears durable URLs too', () => {
+  const document = createDefaultScene3DDocument()
+  document.slots[0].sourceUrl = gallery.url
+  const stripped = scenarioDocumentFromShot(document, false)
+  assert.equal(stripped.slots[0].sourceUrl, '')
+  assert.equal(createUserTemplate({ document, title: '  ' }), undefined)
+})
+
+test('import accepts a pack and wraps a raw shot JSON as a scenario', () => {
+  const shot = createDefaultScene3DDocument()
+  shot.clipNumber = 4
+  shot.slots[0].sourceUrl = gallery.url
+  const wrapped = parseUserTemplate(shot)
+  assert.ok(wrapped)
+  assert.equal(wrapped.kind, WORLD3D_TEMPLATE_KIND)
+  assert.equal(wrapped.document.clipNumber, undefined)
+  assert.equal(wrapped.document.slots[0].sourceUrl, gallery.url)
+  assert.equal(parseUserTemplate({ kind: WORLD3D_TEMPLATE_KIND, version: 2, id: 'x', title: 'x', document: shot }), undefined)
+  assert.equal(isWorld3DTemplateRaw({ kind: WORLD3D_TEMPLATE_KIND }), true)
+  assert.equal(isWorld3DTemplateRaw(shot), false)
+})
+
+test('applying a scenario keeps clip size and can reuse the current GLBs', () => {
+  const previous = createDefaultScene3DDocument()
+  previous.clipNumber = 8
+  previous.width = 1920
+  previous.height = 1080
+  previous.fps = 60
+  previous.playbackSpeed = 0.5
+  previous.slots[0].sourceUrl = gallery.url
+  previous.slots[0].sourceRef = gallery
+  previous.slots[0].clip = { index: 0, name: 'Walk' }
+  const pack = createUserTemplate({ document: applyScene3DTemplate('hero-push'), title: 'Hero', id: 'user-hero' })
+  const kept = remountUserTemplate(pack, previous, true)
+  assert.equal(kept.clipNumber, 8)
+  assert.equal(kept.width, 1920)
+  assert.equal(kept.templateId, 'hero-push')
+  assert.equal(kept.slots[0].sourceUrl, gallery.url)
+  assert.equal(kept.slots[0].clip.name, 'Walk')
+  const fresh = remountUserTemplate(pack, previous, false)
+  assert.equal(fresh.slots[0].sourceUrl, '')
+  assert.equal(fresh.clipNumber, 8)
+})
+
+test('browser library stores at most 24 scenarios and rejects oversized files', () => {
+  window.localStorage.clear()
+  for (let index = 0; index < 26; index++) {
+    const pack = createUserTemplate({ document: createDefaultScene3DDocument(), title: `Scene ${index}`, id: `user-${index}` })
+    saveUserTemplate(pack)
+  }
+  const stored = readStoredUserTemplates()
+  assert.equal(stored.length, 24)
+  assert.equal(stored[0].id, 'user-25')
+  assert.equal(stored.at(-1).id, 'user-2')
+  assert.equal(removeUserTemplate('user-25').length, 23)
+  assert.equal(templateFileTooLarge(1.5 * 1024 * 1024 + 1), true)
+  assert.equal(templateFileTooLarge(1024), false)
+  const original = Storage.prototype.setItem
+  Storage.prototype.setItem = () => { throw new Error('full') }
+  try {
+    assert.throws(() => writeStoredUserTemplates([]), /quota/)
+  } finally { Storage.prototype.setItem = original }
+})
+
+test('download uses a shareable scenario filename', () => {
+  const clicks = []
+  const original = URL.createObjectURL
+  URL.createObjectURL = () => 'blob:template'
+  URL.revokeObjectURL = () => {}
+  const proto = window.HTMLAnchorElement.prototype
+  const click = proto.click
+  proto.click = function clickSpy() { clicks.push(this.download) }
+  try {
+    downloadUserTemplate(createUserTemplate({ document: createDefaultScene3DDocument(), title: 'Night Cafe!', id: 'user-night' }))
+    assert.deepEqual(clicks, ['night-cafe.world3d.template.json'])
+  } finally {
+    proto.click = click
+    URL.createObjectURL = original
+  }
+})
