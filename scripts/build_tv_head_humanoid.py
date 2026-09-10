@@ -53,8 +53,8 @@ def box_geometry() -> tuple[bytes, bytes, bytes]:
     )
 
 
-def pad4(data: bytes) -> bytes:
-    return data + b"\x00" * ((4 - (len(data) % 4)) % 4)
+def pad4(data: bytes, padding: bytes = b"\x00") -> bytes:
+    return data + padding * ((4 - (len(data) % 4)) % 4)
 
 
 def write_png(path: Path, width: int, height: int, pixels: bytes) -> None:
@@ -283,7 +283,7 @@ def build() -> None:
             },
         ],
     }
-    json_blob = pad4(json.dumps(gltf, separators=(",", ":")).encode("utf-8"))
+    json_blob = pad4(json.dumps(gltf, separators=(",", ":")).encode("utf-8"), b" ")
     glb = b"".join([
         struct.pack("<4sII", b"glTF", 2, 12 + 8 + len(json_blob) + 8 + len(bin_blob)),
         struct.pack("<I4s", len(json_blob), b"JSON"),

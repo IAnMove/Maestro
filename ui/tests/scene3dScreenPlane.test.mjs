@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Group, Mesh, Object3D, Vector3 } from 'three'
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { defaultMediaScreen, defaultModelScreen, parseMediaScreen, pickScreenAnchor } from '../src/features/scene3d/mediaScreen.ts'
 import { SCREEN_PLANE_NAME, attachScreenPlane, detachScreenPlane, namedSceneMeshes, namedSceneNodes } from '../src/features/scene3d/screenPlane.ts'
 
@@ -95,13 +96,15 @@ test('a stale cleanup cannot remove the replacement plane', () => {
   assert.equal(head.children.length, 0)
 })
 
-test('bundled TV-head example is a small GLB with headfront and Walking', () => {
+test('bundled TV-head example loads as a GLB with headfront and Walking', async () => {
   const glb = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../public/examples/tv-head-humanoid.glb'))
   assert.ok(glb.length > 1000)
   assert.ok(glb.length < 20000)
   const jsonLength = glb.readUInt32LE(12)
-  const json = glb.subarray(20, 20 + jsonLength).toString('utf8').replace(/\0+$/, '')
-  assert.match(json, /"name":"headfront"/)
-  assert.match(json, /"name":"Walking"/)
-  assert.match(json, /"name":"LeftUpLeg"/)
+  const json = JSON.parse(glb.subarray(20, 20 + jsonLength).toString('utf8'))
+  assert.equal(json.asset.version, '2.0')
+  const loaded = await new GLTFLoader().parseAsync(glb.buffer.slice(glb.byteOffset, glb.byteOffset + glb.byteLength), '')
+  assert.ok(loaded.scene.getObjectByName('headfront'))
+  assert.ok(loaded.scene.getObjectByName('LeftUpLeg'))
+  assert.ok(loaded.animations.some(clip => clip.name === 'Walking'))
 })
