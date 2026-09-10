@@ -1190,17 +1190,18 @@ input[type="range"]::-webkit-slider-thumb {
   background-color: rgba(0, 0, 0, 0.34);
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.55), inset 0 -1px 0 rgba(255, 255, 255, 0.035);
 }
-/* Drawn rather than moulded. A drop shadow under a pill is the stock
-   button of every framework; a hairline ring and a single-pixel top light
-   say "pressable" just as clearly and leave the feedback to the press
-   itself. The ring is also where each section takes its colour, so the
-   four differ in temperature while at rest — which is the job the colour
-   swatch used to do, without adding an element or a pixel of width. */
+/* The parents keep the moulded pill: they are the top level, they carry the
+   most weight, and an outline around each one turns the row into a strip of
+   boxes. All they take from the section is the hue of their own fill, which
+   is enough to tell the four apart at rest. */
 .hp-navigation-primary {
-  background-color: rgba(var(--hp-navigation-rgb), 0.085);
-  box-shadow: inset 0 0 0 1px rgba(var(--hp-navigation-rgb), 0.16),
-              inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  background-color: rgba(var(--hp-navigation-rgb), 0.1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 1px 2px rgba(0, 0, 0, 0.4);
 }
+/* The children are drawn rather than moulded. A drop shadow under a pill is
+   the stock button of every framework, and at this size, repeated six times
+   in a row, it is all you see. A hairline ring and a single-pixel top light
+   say "pressable" just as clearly and leave the feedback to the press. */
 .hp-navigation-child {
   background-color: rgba(255, 255, 255, 0.045);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06),
@@ -1217,20 +1218,34 @@ input[type="range"]::-webkit-slider-thumb {
 .hp-navigation-primary[data-navigation-active='true'] svg,
 .hp-navigation-primary[data-navigation-expanded='true'] svg { opacity: 1; }
 .hp-navigation-primary:hover {
-  background-color: rgba(var(--hp-navigation-rgb), 0.15);
-  box-shadow: inset 0 0 0 1px rgba(var(--hp-navigation-rgb), 0.3),
-              inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  background-color: rgba(var(--hp-navigation-rgb), 0.19);
 }
 .hp-navigation-child:hover {
   background-color: rgba(255, 255, 255, 0.085);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.11),
               inset 0 1px 0 rgba(255, 255, 255, 0.07);
 }
-/* All of the button-ness lives here, and only while the finger is down. */
+/* A parent with no panel — Workspaces, Activity — has no selected child to
+   stand for it, so it takes the sunken state itself. Current means sunken at
+   either level, which is the whole point of having one material. The label is
+   left to the component's own active colour: the hue reads well pooled in a
+   recess, less so as text. */
+.hp-navigation-primary[data-navigation-active='true']:not([data-navigation-expanded='true']) {
+  background-color: rgba(0, 0, 0, 0.24);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.55),
+              inset 0 0 13px rgba(var(--hp-navigation-rgb), 0.17),
+              inset 0 -1px 0 rgba(255, 255, 255, 0.05);
+}
+/* All of the button-ness lives here, and only while the finger is down. The
+   current-state selectors are repeated so that pressing something already
+   selected still answers — otherwise the sunken rule above, and the selected
+   child below, would outrank the press and swallow it. */
 .hp-navigation-primary:active,
-.hp-navigation-child:active {
-  background-color: rgba(0, 0, 0, 0.22);
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.45);
+.hp-navigation-primary[data-navigation-active='true']:active,
+.hp-navigation-child:active,
+.hp-navigation-child[aria-selected='true']:active {
+  background-color: rgba(0, 0, 0, 0.34);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.6);
   transform: translateY(0.5px);
 }
 .hp-navigation-primary[data-navigation-expanded='true'] {
