@@ -1,6 +1,6 @@
 import { Object3D, Raycaster, Vector2 } from 'three'
 import { TransformControls } from 'three/addons/controls/TransformControls.js'
-import { worldSfxIdFromObject } from '../sceneFx/worldRuntime'
+import { worldAnchorOffsetFromSlotRoot, worldSfxIdFromObject } from '../sceneFx/worldRuntime'
 import type { GpuWorld } from './gpu'
 import type { Scene3DSlot } from './types'
 import type { WorldSfx } from '../sceneFx/world'
@@ -8,6 +8,7 @@ import type { WorldSfx } from '../sceneFx/world'
 export type TransformMode = 'translate' | 'rotate' | 'scale'
 export type TransformPatch = Partial<Pick<Scene3DSlot, 'position' | 'rotationY' | 'scale'>> & {
   worldRotation?: [number, number, number]
+  anchorOffset?: { x: number; y: number; z: number }
 }
 
 export const WORLD_SFX_SELECT_PREFIX = 'wsfx:'
@@ -35,12 +36,20 @@ export function createTransformGizmo(world: GpuWorld, onChange: (id: string, pat
   let worldAxes = false
   let allowed = true
   let mode: TransformMode = 'translate'
+  let attachedAnchorSlotId: string | undefined
   const redraw = () => world.renderer.render(world.scene, world.camera)
   let uniformScale = 1
   const objectChange = () => {
     if (!allowed || !selectedId) return
     const patch = transformPatch(proxy, mode, controls.axis, worldAxes)
     if (patch.scale !== undefined) uniformScale = patch.scale
+    if (attachedAnchorSlotId && patch.position) {
+      const root = world.slots.get(attachedAnchorSlotId)?.root
+      if (root) {
+        const local = worldAnchorOffsetFromSlotRoot(root, patch.position)
+        if ([local.x, local.y, local.z].every(Number.isFinite)) patch.anchorOffset = local
+      }
+    }
     onChange(selectedId, patch)
   }
   const finishDrag = () => { if (mode === 'scale') proxy.scale.setScalar(uniformScale) }
@@ -74,6 +83,7 @@ export function createTransformGizmo(world: GpuWorld, onChange: (id: string, pat
       controls.enabled = enabled
       if ((!slot && !worldCue) || slot?.media === 'image' || !enabled) { controls.pointerUp(null); controls.detach(); return }
       worldAxes = Boolean(worldCue)
+      attachedAnchorSlotId = worldCue?.anchor?.slotId
       const id = worldCue ? WORLD_SFX_SELECT_PREFIX + worldCue.id : slot!.id
       if (selectedId !== id) controls.pointerUp(null)
       selectedId = id

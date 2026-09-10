@@ -237,6 +237,15 @@ function build(kind: WorldSfx['kind'], color: string) {
   return root
 }
 
+export function worldAnchorOffsetFromSlotRoot(
+  root: Object3D,
+  point: readonly [number, number, number],
+): WorldVec3 {
+  root.updateMatrixWorld(true)
+  const local = root.worldToLocal(new Vector3(point[0], point[1], point[2]))
+  return { x: local.x, y: local.y, z: local.z }
+}
+
 function resolvePoint(anchor: WorldSfxAnchor | undefined, fallback: WorldVec3, slots: readonly WorldSlotPose[]): { point: Vector3; missing: boolean } {
   if (!anchor?.slotId) return { point: new Vector3(fallback.x, fallback.y, fallback.z), missing: false }
   const slot = slots.find(item => item.id === anchor.slotId)
