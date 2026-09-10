@@ -273,9 +273,15 @@ export async function saveWizardConversationWithRecovery(
   } catch (error) {
     if (!isWizardConversationConflict(error)) throw error
     const remote = await transport.fetch(workspace)
-    const merged = base
-      ? mergeQueuedWizardConversationSnapshots(conversation, base, remote, options)
-      : mergeWizardConversationSnapshots(conversation, remote)
+    // A missing ancestor is not a 40-message UI window. The two-way
+    // merge slices to the visible chat; that would drop older server
+    // turns after a failed hydration left `base` unset.
+    const merged = mergeQueuedWizardConversationSnapshots(
+      conversation,
+      base,
+      remote,
+      base ? options : { honorLocalDeletes: false },
+    )
     return {
       conversation: await transport.save(workspace, merged),
       merged: true,

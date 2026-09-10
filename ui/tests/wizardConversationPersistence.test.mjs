@@ -407,6 +407,40 @@ test('a normal queued save cannot delete canonical turns outside the 40-message 
   }, snapshots, transport)
 })
 
+test('a CAS recovery without a hydration snapshot keeps server turns outside the UI window', async () => {
+  const ids = Array.from({ length: 50 }, (_value, index) => `msg-${index + 1}`)
+  let canonical = payload(7, ids)
+  const localWindow = payload(0, [...ids.slice(-40), 'new-local'])
+  const snapshots = new Map()
+  let saves = 0
+  const transport = {
+    async fetch() { return clone(canonical) },
+    async save(_workspace, conversation) {
+      saves += 1
+      if (saves === 1) {
+        assert.equal(conversation.revision, 0)
+        throw revisionConflict(conversation.revision, canonical.revision)
+      }
+      assert.equal(conversation.revision, 7)
+      assert.equal(conversation.messages.some(message => message.id === 'msg-1'), true)
+      assert.deepEqual(conversation.messages.map(message => message.id), [...ids, 'new-local'])
+      canonical = { ...clone(conversation), revision: 8 }
+      return clone(canonical)
+    },
+  }
+
+  const saved = await persistQueuedWizardConversation({
+    workspace: 'workspace-a',
+    captured: localWindow,
+  }, snapshots, transport)
+
+  assert.equal(saved.merged, true)
+  assert.equal(saved.conversation.revision, 8)
+  assert.equal(saved.conversation.messages.length, 51)
+  assert.equal(saved.conversation.messages[0].id, 'msg-1')
+  assert.equal(saved.conversation.messages.at(-1).id, 'new-local')
+})
+
 test('a conflict retry keeps using the recorded clear ancestor', async () => {
   const clearBase = payload(1, ['cleared-user', 'cleared-assistant'])
   const capturedClear = payload(1, ['welcome-after-clear'])
