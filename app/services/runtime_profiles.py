@@ -69,6 +69,8 @@ def installation_current(engine: str, platform: str) -> bool:
     spec = recipe(engine, platform)
     try:
         receipt = json.loads((APP_DIR.parent / spec["env"] / ".hocus-runtime-profile.json").read_text())
+        if not isinstance(receipt, dict):
+            return False
         matches = (receipt.get("fingerprint") == dependency_fingerprint(engine, platform)
                    and receipt.get("profile") == spec["id"] and receipt.get("cudaCalculation") is True)
         if not matches:

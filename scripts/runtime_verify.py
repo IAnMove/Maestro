@@ -61,7 +61,7 @@ def main() -> None:
     if args.inspect:
         packages = inspect_environment(args.engine)
         receipt = json.loads(target.read_text(encoding="utf-8"))
-        if receipt.get("packages") != packages:
+        if not isinstance(receipt, dict) or receipt.get("packages") != packages:
             raise RuntimeError("Installed package set changed since runtime verification")
         return
     result = verify(args.engine, cuda=not args.no_cuda)

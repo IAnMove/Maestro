@@ -80,6 +80,18 @@ def test_a_failed_migration_cannot_reuse_legacy_markers(tmp_path):
             assert not profiles.managed_ready("hunyuan3d")
 
 
+def test_non_object_receipts_allow_repair_instead_of_aborting_preflight(tmp_path):
+    profiles.catalog()  # Load the real recipe before isolating the receipt root.
+    app = tmp_path / "app"
+    env = app / "env"
+    env.mkdir(parents=True)
+    receipt = env / ".hocus-runtime-profile.json"
+    with patch.object(profiles, "APP_DIR", app):
+        for value in ([], None, "corrupt", 42):
+            receipt.write_text(json.dumps(value))
+            assert not profiles.installation_current("wangp", "linux")
+
+
 def test_child_python_does_not_import_from_parent_pythonpath(tmp_path):
     import os
     target = tmp_path / "separate engine"
