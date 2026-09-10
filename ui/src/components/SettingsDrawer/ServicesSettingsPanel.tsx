@@ -1,10 +1,41 @@
 import { lazy, Suspense, useState, useCallback, useEffect, useRef } from 'react'
 import { RefreshCw, ShieldAlert, ShieldCheck, Lock, Loader2 } from 'lucide-react'
 import { useUiTranslation } from '../../i18n'
-import { useStore } from '../../stores/useStore'
+import { useStore, getFamiliesForMode } from '../../stores/useStore'
 import { testLlmConnection } from '../../api/client'
+import {
+  HUNYUAN3D_PROFILE_MODELS,
+  MINIMAX_IMAGE_MODELS,
+  MINIMAX_MUSIC_MODELS,
+  downloadedModelOptions,
+  keepCurrentOption,
+  textModelOptions,
+} from '../../lib/productionProfileCatalog'
 
 const McpSettingsPanel = lazy(() => import('./McpSettingsPanel').then(module => ({ default: module.McpSettingsPanel })))
+
+function CatalogSelect({
+  value, options, disabled, onChange, emptyLabel,
+}: {
+  value: string
+  options: { id: string; label: string }[]
+  disabled?: boolean
+  onChange: (value: string) => void
+  emptyLabel?: string
+}) {
+  const listed = keepCurrentOption(options, value)
+  return (
+    <select
+      value={value}
+      disabled={disabled || listed.length === 0}
+      onChange={e => onChange(e.target.value)}
+      className="mt-1 w-full min-w-0 flex-1 bg-bg-tertiary border border-border rounded-lg px-2 py-1.5 text-xs text-text-primary"
+    >
+      {listed.length === 0 && <option value="">{emptyLabel || '—'}</option>}
+      {listed.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}
+    </select>
+  )
+}
 
 function ApiKeyField({ label, maskedValue, isSet, onSave }: {
   label: string
@@ -278,6 +309,8 @@ export function ServicesSettingsPanel() {
   const llmStatus = useStore(s => s.llmStatus)
   const llmModels = useStore(s => s.llmModels)
   const loadLlmModels = useStore(s => s.loadLlmModels)
+  const installedModels = useStore(s => s.models)
+  const families = useStore(s => s.families)
   const [refreshing, setRefreshing] = useState(false)
   const [llmTest, setLlmTest] = useState<{ status: 'idle' | 'testing' | 'ok' | 'error'; message: string }>({
     status: 'idle',
@@ -303,10 +336,18 @@ export function ServicesSettingsPanel() {
   const isLocal = provider === 'local'
   const needsUrl = isRemote || isOllama || isOpenAI || isMiniMax || isGrok
 
-  const handleRefreshModels = async () => {
+  const handleRefreshModels = async (providerOverride?: string, urlOverride?: string) => {
     setRefreshing(true)
-    await loadLlmModels()
-    setRefreshing(false)
+    try {
+      await pendingLlmConfig.current
+      const latest = useStore.getState().servicesConfig
+      await loadLlmModels({
+        provider: providerOverride || latest?.llm_provider || provider,
+        url: urlOverride || latest?.llm_remote_url,
+      })
+    } finally {
+      setRefreshing(false)
+    }
   }
 
   const resetLlmTest = () => {
@@ -397,16 +438,42 @@ export function ServicesSettingsPanel() {
             </label>
             <label className="text-[10px] text-text-muted">
               {t('services.textModel')}
-              <input
+              <CatalogSelect
                 value={productionProfile.text.model}
-                onChange={e => setProductionProfile({
-                  ...productionProfile,
-                  text: { ...productionProfile.text, model: e.target.value },
-                })}
+                options={textModelOptions(llmModels, productionProfile.text.provider, productionProfile.text.model)}
                 disabled={productionProfileLoading}
-                className="mt-1 w-full bg-bg-tertiary border border-border rounded-lg px-2 py-1.5 text-xs text-text-primary"
+                emptyLabel={t('services.noRemoteModels')}
+                onChange={value => setProductionProfile({
+                  ...productionProfile,
+                  text: { ...productionProfile.text, model: value },
+                })}
               />
             </label>
+            {(productionProfile.text.provider === 'ollama' || productionProfile.text.provider === 'remote') && (
+              <label className="col-span-2 text-[10px] text-text-muted">
+                {t('services.textServerUrl')}
+                <div className="mt-1 flex gap-1">
+                  <input
+                    value={productionProfile.text.base_url || ''}
+                    onChange={e => setProductionProfile({
+                      ...productionProfile,
+                      text: { ...productionProfile.text, base_url: e.target.value },
+                    })}
+                    placeholder="http://192.168.1.10:11434"
+                    disabled={productionProfileLoading}
+                    className="min-w-0 flex-1 bg-bg-tertiary border border-border rounded-lg px-2 py-1.5 text-xs text-text-primary"
+                  />
+                  <button
+                    type="button"
+                    disabled={productionProfileLoading || refreshing}
+                    onClick={() => void handleRefreshModels(productionProfile.text.provider, productionProfile.text.base_url)}
+                    className="shrink-0 rounded-lg border border-border px-2 text-[10px] text-accent-blue disabled:opacity-50"
+                  >
+                    {refreshing ? t('services.loadingRemoteModels') : t('services.loadRemoteModels')}
+                  </button>
+                </div>
+              </label>
+            )}
             <label className="text-[10px] text-text-muted">
               {t('services.imageProviderModel')}
               <div className="mt-1 flex gap-1">
@@ -423,14 +490,16 @@ export function ServicesSettingsPanel() {
                   <option value="local">{t('services.providers.localGeneric')}</option>
                   <option value="maestro">{t('services.providers.maestro')}</option>
                 </select>
-                <input
+                <CatalogSelect
                   value={productionProfile.image.model}
-                  onChange={e => setProductionProfile({
-                    ...productionProfile,
-                    image: { ...productionProfile.image, model: e.target.value },
-                  })}
+                  options={productionProfile.image.provider === 'minimax'
+                    ? MINIMAX_IMAGE_MODELS
+                    : downloadedModelOptions(installedModels, getFamiliesForMode('image', families).map(family => family.id))}
                   disabled={productionProfileLoading}
-                  className="min-w-0 flex-1 bg-bg-tertiary border border-border rounded-lg px-2 py-1.5 text-xs text-text-primary"
+                  onChange={value => setProductionProfile({
+                    ...productionProfile,
+                    image: { ...productionProfile.image, model: value },
+                  })}
                 />
               </div>
             </label>
@@ -454,14 +523,17 @@ export function ServicesSettingsPanel() {
                   <option value="minimax">{t('services.providers.minimaxMusic')}</option>
                   <option value="maestro">{t('services.providers.maestro')}</option>
                 </select>
-                <input
+                <CatalogSelect
                   value={productionProfile.music.model}
-                  onChange={e => setProductionProfile({
-                    ...productionProfile,
-                    music: { ...productionProfile.music, model: e.target.value },
-                  })}
+                  options={productionProfile.music.provider === 'minimax'
+                    ? MINIMAX_MUSIC_MODELS
+                    : downloadedModelOptions(installedModels, ['tts']).filter(option =>
+                      option.id.startsWith('ace_step') || option.id.startsWith('heartmula') || option.id === 'minimax_music3')}
                   disabled={productionProfileLoading}
-                  className="min-w-0 flex-1 bg-bg-tertiary border border-border rounded-lg px-2 py-1.5 text-xs text-text-primary"
+                  onChange={value => setProductionProfile({
+                    ...productionProfile,
+                    music: { ...productionProfile.music, model: value },
+                  })}
                 />
               </div>
               {productionProfile.music.provider === 'minimax' && (
@@ -487,31 +559,34 @@ export function ServicesSettingsPanel() {
                   <option value="meshy">{t('services.providers.meshy')}</option>
                   <option value="hi3d">{t('services.providers.hi3d')}</option>
                 </select>
-                <input
+                <CatalogSelect
                   value={productionProfile.model3d?.model || 'hunyuan3d-2mini-turbo'}
-                  onChange={e => setProductionProfile({
+                  options={(() => {
+                    const local = downloadedModelOptions(installedModels, getFamiliesForMode('model3d', families).map(family => family.id))
+                    return local.length ? local : HUNYUAN3D_PROFILE_MODELS
+                  })()}
+                  disabled={productionProfileLoading}
+                  onChange={value => setProductionProfile({
                     ...productionProfile,
                     model3d: {
                       ...(productionProfile.model3d || { provider: 'local', model: 'hunyuan3d-2mini-turbo' }),
-                      model: e.target.value,
+                      model: value,
                     },
                   })}
-                  disabled={productionProfileLoading}
-                  className="min-w-0 flex-1 bg-bg-tertiary border border-border rounded-lg px-2 py-1.5 text-xs text-text-primary"
                 />
               </div>
             </label>
           </div>
           <label className="text-[10px] text-text-muted block">
             {t('services.videoModel')}
-            <input
+            <CatalogSelect
               value={productionProfile.video.model}
-              onChange={e => setProductionProfile({
-                ...productionProfile,
-                video: { ...productionProfile.video, model: e.target.value },
-              })}
+              options={downloadedModelOptions(installedModels, getFamiliesForMode('video', families).map(family => family.id))}
               disabled={productionProfileLoading}
-              className="mt-1 w-full bg-bg-tertiary border border-border rounded-lg px-2 py-1.5 text-xs text-text-primary"
+              onChange={value => setProductionProfile({
+                ...productionProfile,
+                video: { ...productionProfile.video, model: value },
+              })}
             />
           </label>
           <div className="grid grid-cols-4 gap-2">
@@ -696,7 +771,7 @@ export function ServicesSettingsPanel() {
             </label>
             {!isLocal && (
               <button
-                onClick={handleRefreshModels}
+                onClick={() => void handleRefreshModels()}
                 disabled={refreshing}
                 className="text-[10px] text-accent-blue hover:text-accent-blue-hover flex items-center gap-0.5 disabled:opacity-50"
               >

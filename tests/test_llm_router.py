@@ -96,6 +96,24 @@ def test_generate_returns_llm_text_without_loading_wgp():
     generate.assert_called_once()
 
 
+def test_list_llm_models_forwards_url_query_to_the_catalog():
+    app = FastAPI()
+    app.include_router(_core_router())
+    client = TestClient(app)
+    with patch("services.llm_service.get_available_models", return_value=[
+        {"id": "qwen3:32b", "label": "qwen3:32b (Ollama)", "size_hint": "ollama", "provider": "ollama"},
+    ]) as catalog:
+        response = client.get("/api/v1/llm/models", params={
+            "provider": "ollama",
+            "url": "http://192.168.1.10:11434",
+        })
+    assert response.status_code == 200
+    assert response.json()["models"][0]["id"] == "qwen3:32b"
+    catalog.assert_called_once()
+    assert catalog.call_args.kwargs["provider"] == "ollama"
+    assert catalog.call_args.kwargs["remote_url"] == "http://192.168.1.10:11434"
+
+
 def test_plan_h3_windows_rejects_non_h3_models():
     app = FastAPI()
     app.include_router(_prompt_router(get_model_def=lambda _model_type: {"architecture": "ltx2"}))

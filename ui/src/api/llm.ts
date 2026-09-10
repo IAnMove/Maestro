@@ -131,8 +131,11 @@ export async function unloadLlm(): Promise<void> {
   if (!res.ok) throw new Error('Failed to unload LLM')
 }
 
-export async function fetchLlmModels(provider?: string): Promise<{ models: import('../types').LlmModelOption[] }> {
-  const query = provider ? `?provider=${encodeURIComponent(provider)}` : ''
+export async function fetchLlmModels(provider?: string, url?: string): Promise<{ models: import('../types').LlmModelOption[] }> {
+  const params = new URLSearchParams()
+  if (provider) params.set('provider', provider)
+  if (url) params.set('url', url)
+  const query = params.toString() ? `?${params}` : ''
   const res = await fetch(`${BASE}/api/v1/llm/models${query}`)
   if (!res.ok) throw new Error('Failed to fetch LLM models')
   return res.json()
