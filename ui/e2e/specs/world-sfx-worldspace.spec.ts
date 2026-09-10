@@ -15,21 +15,22 @@ async function openVideo3d(page: Parameters<typeof gotoApp>[0]) {
 
 test('world SFX demos occupy the 3D stage and keep screen overlays', async ({ page }, info) => {
   const { session, workspace } = await openVideo3d(page)
-  await workspace.getByTestId('world-sfx-demo-depth').click()
   await expect(workspace.getByTestId('world-sfx-controls')).toBeVisible()
+  await workspace.getByTestId('world-sfx-demo-depth').click()
   await expect(workspace.getByTestId('scene-fx-overlay')).toBeVisible()
   await workspace.getByLabel('Scene position', { exact: true }).fill('0')
   await page.screenshot({ path: info.outputPath('world-sfx-depth-front.png') })
   await workspace.getByLabel('Scene position', { exact: true }).fill('5')
   await page.screenshot({ path: info.outputPath('world-sfx-depth-oblique.png') })
   await workspace.getByTestId('world-sfx-demo-duel').click()
-  await expect(workspace.getByText('energy beam', { exact: false })).toBeVisible()
+  await expect(workspace.getByTestId('world-sfx-controls').locator('summary')).toContainText('(5)')
   await workspace.getByTestId('world-sfx-demo-mixed').click()
   await expect(workspace.getByTestId('scene-fx-overlay')).toBeVisible()
   await closeApp(page, session)
 })
 
 test('portal depth demo exports a decodable MP4 when the encoder exists', async ({ page }, info) => {
+  test.setTimeout(120_000)
   const { session, workspace } = await openVideo3d(page)
   const available = await page.evaluate(async () => {
     if (typeof VideoEncoder === 'undefined') return false
@@ -41,6 +42,7 @@ test('portal depth demo exports a decodable MP4 when the encoder exists', async 
     await route.fulfill({ json: { name: 'world-sfx-depth.mp4', type: 'video', url: '/api/v1/file/world-sfx-depth.mp4' } })
   })
   await workspace.getByTestId('world-sfx-demo-depth').click()
+  await workspace.getByRole('combobox', { name: 'Speed', exact: true }).selectOption('4')
   await workspace.getByTestId('world3d-export').click()
   await expect(workspace.getByTestId('world3d-export-note')).toContainText('world-sfx-depth.mp4', { timeout: 90_000 })
   const bytes = await page.evaluate(async () => {

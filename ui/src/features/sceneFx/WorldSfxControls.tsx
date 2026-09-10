@@ -22,7 +22,11 @@ export function WorldSfxControls({ cues = [], duration, selectedId, disabled, on
     if (!cue || !Number.isFinite(value)) return
     update(id, { [field]: { ...cue[field], [axis]: value } })
   }
-  return <details className="rounded-lg border border-violet-400/30 bg-bg-primary p-3" data-testid="world-sfx-controls" open={open} onToggle={event => setOpen((event.target as HTMLDetailsElement).open)}>
+  return <div className="space-y-2 rounded-lg border border-violet-400/30 bg-bg-primary p-3" data-testid="world-sfx-controls">
+    <div className="flex flex-wrap gap-2">
+      {(['depth', 'duel', 'mixed'] as const).map(id => <button key={id} type="button" data-testid={`world-sfx-demo-${id}`} disabled={disabled} onClick={() => onDemo(id)} className="min-h-10 rounded border border-cyan-400/40 px-3 text-xs disabled:opacity-50">{t(`worldDemo.${id}`)}</button>)}
+    </div>
+  <details open={open} onToggle={event => setOpen((event.target as HTMLDetailsElement).open)}>
     <summary className="cursor-pointer text-sm font-semibold">{t('worldTitle')} ({cues.length})</summary>
     <p className="my-2 text-xs text-text-muted">{t('worldHelp')}</p>
     <fieldset disabled={disabled} className="space-y-3 disabled:opacity-50">
@@ -62,8 +66,8 @@ export function WorldSfxControls({ cues = [], duration, selectedId, disabled, on
       </div>)}
       <div className="flex flex-wrap gap-2">
         {WORLD_SFX_KINDS.map(kind => <button key={kind} type="button" disabled={cues.length >= 64} onClick={() => onChange([...cues, createWorldSfx(kind, duration, cues.map(cue => cue.id))])} className="min-h-10 rounded border border-violet-400/40 px-3 text-xs">{t('addWorld')} · {t(`presets.${kind}`)}</button>)}
-        {(['depth', 'duel', 'mixed'] as const).map(id => <button key={id} type="button" data-testid={`world-sfx-demo-${id}`} onClick={() => onDemo(id)} className="min-h-10 rounded border border-cyan-400/40 px-3 text-xs">{t(`worldDemo.${id}`)}</button>)}
       </div>
     </fieldset>
   </details>
+  </div>
 }
