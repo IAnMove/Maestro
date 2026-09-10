@@ -46,7 +46,9 @@ models as part of this check.
   Credentials, CUDA visibility and system toolchains retain their existing
   handling. Pinokio's conda base, identified by `CONDA_PYTHON_EXE`, supplies
   machine tools such as nvcc/FFmpeg and stays on `PATH` after the engine;
-  its libraries remain reachable but cannot shadow the engine.
+  its libraries remain reachable after matching libraries in the engine's
+  `lib`/`lib64`. This does not override every wheel's private RUNPATH directory;
+  loader failures in those packages still require a targeted runtime check.
 - TorchCodec 0.5 matches the main Torch 2.7 on Linux. Windows uses the existing
   video-reader fallbacks because that TorchCodec version has no Windows wheel.
   SAM uses NumPy 1.26.4, matching its pinned upstream requirements.
