@@ -4,13 +4,15 @@
  * Themes are CSS-variable overrides applied via `[data-theme="..."]` on
  * the <html> element. The actual variable values live in src/index.css.
  *
- * The user-facing model is THREE theme families (HocusPocus Blue, Classic,
- * Onyx), each with a dark and a light variant, plus an appearance mode:
+ * The user-facing model is a list of theme families (HocusPocus Blue,
+ * Classic, Onyx, plus the community palettes below), each with a dark and
+ * a light variant, plus an appearance mode:
  *   - mode: 'dark' | 'light' | 'auto' — auto follows the OS scheme
  *     (prefers-color-scheme) and live-switches when the OS changes.
  * The effective CSS theme = the chosen family's variant for whichever
- * scheme the mode resolves to. The light variants (ivory / daylight /
- * pearl) are internal CSS ids, not user-facing names.
+ * scheme the mode resolves to. The light variant ids (ivory, daylight,
+ * pearl, latte, lotus, ...) are internal CSS ids, not user-facing names:
+ * the picker only ever shows the family label.
  *
  * Persistence: localStorage under "maestro-theme-mode" and
  * "maestro-theme-family". Legacy keys are migrated on first load so
@@ -25,8 +27,19 @@
  * the index.html pre-mount script.
  */
 
-export type ThemeId = 'default' | 'golden-hour' | 'onyx' | 'ivory' | 'daylight' | 'pearl'
-export type FamilyId = 'default' | 'golden-hour' | 'onyx'
+export type ThemeId =
+  | 'default' | 'golden-hour' | 'onyx' | 'ivory' | 'daylight' | 'pearl'
+  | 'tokyo-night' | 'tokyo-day'
+  | 'catppuccin' | 'latte'
+  | 'gruvbox' | 'gruvbox-day'
+  | 'everforest' | 'everforest-day'
+  | 'rose-pine' | 'rose-pine-dawn'
+  | 'kanagawa' | 'lotus'
+  | 'nord' | 'nord-day'
+export type FamilyId =
+  | 'default' | 'golden-hour' | 'onyx'
+  | 'tokyo-night' | 'catppuccin' | 'gruvbox' | 'everforest'
+  | 'rose-pine' | 'kanagawa' | 'nord'
 export type ThemeMode = 'dark' | 'light' | 'auto'
 
 export interface ThemeVariant {
@@ -73,6 +86,65 @@ export const FAMILIES: ThemeFamily[] = [
     dark: { id: 'onyx', swatch: { bg: '#000000', surface: '#1a1a1a', accent: '#aaaaaa' } },
     light: { id: 'pearl', swatch: { bg: '#f2f2f2', surface: '#f9f9f9', accent: '#525252' } },
   },
+  /* Community palettes. Ordered calmest-first among themselves: this app
+   * is mostly a wall of thumbnails, and a saturated chrome steals colour
+   * from the content, which is a cost a terminal palette never pays. */
+  {
+    id: 'everforest',
+    label: 'Everforest',
+    description:
+      'Desaturated forest greens on warm grey — the most restful of the set, and the kindest to a full gallery.',
+    dark: { id: 'everforest', swatch: { bg: '#272e33', surface: '#343f44', accent: '#a7c080' } },
+    light: { id: 'everforest-day', swatch: { bg: '#f4f0d9', surface: '#fffbef', accent: '#8da101' } },
+  },
+  {
+    id: 'gruvbox',
+    label: 'Gruvbox',
+    description:
+      'Warm retro earth tones with low contrast — easy on the eyes over long sessions.',
+    dark: { id: 'gruvbox', swatch: { bg: '#1d2021', surface: '#32302f', accent: '#fabd2f' } },
+    light: { id: 'gruvbox-day', swatch: { bg: '#f2e5bc', surface: '#f9f5d7', accent: '#b57614' } },
+  },
+  {
+    id: 'nord',
+    label: 'Nord',
+    description:
+      'Arctic blue-grey, muted and even — a cold, quiet room.',
+    dark: { id: 'nord', swatch: { bg: '#242933', surface: '#3b4252', accent: '#88c0d0' } },
+    light: { id: 'nord-day', swatch: { bg: '#e5e9f0', surface: '#ffffff', accent: '#5e81ac' } },
+  },
+  {
+    id: 'tokyo-night',
+    label: 'Tokyo Night',
+    description:
+      'Cool blues and violets on deep navy — the closest neighbour to HocusPocus Blue.',
+    dark: { id: 'tokyo-night', swatch: { bg: '#16161e', surface: '#24283b', accent: '#7aa2f7' } },
+    light: { id: 'tokyo-day', swatch: { bg: '#e1e2e7', surface: '#f2f2f5', accent: '#2e7de9' } },
+  },
+  {
+    id: 'catppuccin',
+    label: 'Catppuccin',
+    description:
+      'Soft pastels on plum-tinted charcoal — the most carefully balanced palette of the set.',
+    dark: { id: 'catppuccin', swatch: { bg: '#11111b', surface: '#1e1e2e', accent: '#cba6f7' } },
+    light: { id: 'latte', swatch: { bg: '#eff1f5', surface: '#ffffff', accent: '#8839ef' } },
+  },
+  {
+    id: 'rose-pine',
+    label: 'Rosé Pine',
+    description:
+      'Muted rose and pine on ink — the prettiest empty; it competes hardest with a full gallery.',
+    dark: { id: 'rose-pine', swatch: { bg: '#191724', surface: '#26233a', accent: '#c4a7e7' } },
+    light: { id: 'rose-pine-dawn', swatch: { bg: '#faf4ed', surface: '#ffffff', accent: '#907aa9' } },
+  },
+  {
+    id: 'kanagawa',
+    label: 'Kanagawa',
+    description:
+      'Ink-wash browns and indigo after Hokusai — warm and painterly, with the Lotus paper in daylight.',
+    dark: { id: 'kanagawa', swatch: { bg: '#16161d', surface: '#2a2a37', accent: '#e6c384' } },
+    light: { id: 'lotus', swatch: { bg: '#f2ecbc', surface: '#fffcea', accent: '#4d699b' } },
+  },
 ]
 
 /** Any theme id (either variant) -> its family. */
@@ -83,9 +155,27 @@ const FAMILY_OF: Record<ThemeId, FamilyId> = {
   daylight: 'default',
   onyx: 'onyx',
   pearl: 'onyx',
+  'tokyo-night': 'tokyo-night',
+  'tokyo-day': 'tokyo-night',
+  catppuccin: 'catppuccin',
+  latte: 'catppuccin',
+  gruvbox: 'gruvbox',
+  'gruvbox-day': 'gruvbox',
+  everforest: 'everforest',
+  'everforest-day': 'everforest',
+  'rose-pine': 'rose-pine',
+  'rose-pine-dawn': 'rose-pine',
+  kanagawa: 'kanagawa',
+  lotus: 'kanagawa',
+  nord: 'nord',
+  'nord-day': 'nord',
 }
 
-const LIGHT_IDS: ReadonlySet<string> = new Set(['ivory', 'daylight', 'pearl'])
+const LIGHT_IDS: ReadonlySet<string> = new Set([
+  'ivory', 'daylight', 'pearl',
+  'tokyo-day', 'latte', 'gruvbox-day', 'everforest-day',
+  'rose-pine-dawn', 'lotus', 'nord-day',
+])
 
 export interface ThemePrefs {
   mode: ThemeMode

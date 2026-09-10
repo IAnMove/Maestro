@@ -535,6 +535,473 @@ model-viewer.scene-animator-model {
   --shadow-active-ring: 0 0 4px rgba(255, 255, 255, 0.12);
 }
 
+/* ═══ Community palettes ═════════════════════════════════════════════════
+ * Seven more families, each with a dark and a light variant, taken from
+ * the palettes people already run on their desktops. Nothing here is code:
+ * a theme is a set of token overrides, exactly as documented at the top of
+ * this file.
+ *
+ * How each palette is mapped, so the next one is mechanical:
+ *   bg-primary..bg-active   the palette's own surface ladder, darkest first
+ *   border / border-light   the two lowest contrast steps above the surface
+ *   text-*                  fg, then its muted steps — never below the
+ *                           WCAG floor the base tokens already fixed
+ *   accent-blue             whatever the palette uses for links and focus
+ *   accent-warm             its secondary accent (aqua, cyan or orange)
+ *   accent-cool-*           its violet pair, for AI badges
+ *   gradient-cta            the primary-action pair
+ *   media-canvas            the dark themes alias bg-tertiary; the light
+ *                           ones stay dark, so footage never sits in a
+ *                           bright letterbox
+ *
+ * This app is mostly a wall of thumbnails, which is a constraint a
+ * terminal palette never has: a saturated chrome steals colour from the
+ * content. Everforest and Gruvbox are the calmest of the seven for a full
+ * gallery; Kanagawa and Rosé Pine are the prettiest empty and the loudest
+ * full. */
+
+/* The paper treatment is identical for every light variant below, so it is
+ * declared once. Chip and indicator hues stay stable across themes — a user
+ * who learned "green dot = recommended" must read it the same everywhere —
+ * and only drop to their darker stops, which is what makes them legible on
+ * paper. Individual palettes follow and set only their own surfaces. */
+[data-theme="tokyo-day"],
+[data-theme="latte"],
+[data-theme="gruvbox-day"],
+[data-theme="everforest-day"],
+[data-theme="rose-pine-dawn"],
+[data-theme="lotus"],
+[data-theme="nord-day"] {
+  color-scheme: light;
+  --color-indicator-success: #15803d;
+  --color-indicator-warning: #b45309;
+  --color-chip-yellow: #a16207;
+  --color-chip-green: #15803d;
+  --color-chip-cyan: #0e7490;
+  --color-chip-blue: #1d4ed8;
+  --color-chip-purple: #7e22ce;
+  --color-chip-pink: #be185d;
+  --color-chip-teal: #0f766e;
+  --color-chip-orange: #c2410c;
+  --color-chip-gray: #4b5563;
+  --color-chip-red: #b91c1c;
+  /* Bright letterbox bars glare and wash out perceived contrast. */
+  --color-media-canvas: #111827;
+}
+
+/* ─── Tokyo Night ─────────────────────────────────────────────────────── */
+[data-theme="tokyo-night"] {
+  --color-bg-primary: #16161e;
+  --color-bg-secondary: #1a1b26;
+  --color-bg-tertiary: #24283b;
+  --color-bg-hover: #292e42;
+  --color-bg-active: #3b4261;
+  --color-border: #292e42;
+  --color-border-light: #3b4261;
+  --color-text-primary: #c0caf5;
+  --color-text-secondary: #a9b1d6;
+  --color-text-muted: #8b93b8;
+  --color-accent-blue: #7aa2f7;
+  --color-accent-blue-hover: #9eb8ff;
+  --color-accent-green: #9ece6a;
+  --color-accent-green-hover: #b3dd85;
+  --color-accent-warm: #7dcfff;
+  --color-accent-warm-hover: #a3dcff;
+  --color-accent-cool-from: #bb9af7;
+  --color-accent-cool-to: #7aa2f7;
+  --color-gradient-cta-from: #3d59a1;
+  --color-gradient-cta-to: #6d4aa8;
+  --color-gradient-toggle-from: #7aa2f7;
+  --color-gradient-toggle-to: #7dcfff;
+  --color-gradient-active-frame-from: #7aa2f7;
+  --color-gradient-active-frame-to: #7dcfff;
+  --color-media-canvas: #24283b;
+  --shadow-accent-glow: 0 0 18px rgba(122, 162, 247, 0.35);
+  --shadow-active-ring: 0 0 6px rgba(125, 207, 255, 0.2);
+}
+[data-theme="tokyo-day"] {
+  --color-bg-primary: #e1e2e7;
+  --color-bg-secondary: #e9e9ec;
+  --color-bg-tertiary: #f2f2f5;
+  --color-bg-hover: #d5d6dc;
+  --color-bg-active: #c4c8da;
+  --color-border: #c4c8da;
+  --color-border-light: #a1a6c5;
+  --color-text-primary: #2b4d9e;
+  --color-text-secondary: #414c85;
+  --color-text-muted: #4d5a8f;
+  --color-accent-blue: #1f63c4;
+  --color-accent-blue-hover: #17509f;
+  --color-accent-green: #587539;
+  --color-accent-green-hover: #46602c;
+  --color-accent-warm: #007197;
+  --color-accent-warm-hover: #005a79;
+  --color-accent-cool-from: #9854f1;
+  --color-accent-cool-to: #2e7de9;
+  --color-gradient-cta-from: #1f63c4;
+  --color-gradient-cta-to: #7c3fd0;
+  --color-gradient-toggle-from: #2e7de9;
+  --color-gradient-toggle-to: #007197;
+  --color-gradient-active-frame-from: #2e7de9;
+  --color-gradient-active-frame-to: #007197;
+  --shadow-accent-glow: 0 2px 12px rgba(46, 125, 233, 0.24);
+  --shadow-active-ring: 0 0 0 2px rgba(46, 125, 233, 0.32);
+}
+
+/* ─── Catppuccin ──────────────────────────────────────────────────────── */
+[data-theme="catppuccin"] {
+  --color-bg-primary: #11111b;
+  --color-bg-secondary: #181825;
+  --color-bg-tertiary: #1e1e2e;
+  --color-bg-hover: #313244;
+  --color-bg-active: #45475a;
+  --color-border: #313244;
+  --color-border-light: #45475a;
+  --color-text-primary: #cdd6f4;
+  --color-text-secondary: #bac2de;
+  --color-text-muted: #9399b2;
+  --color-accent-blue: #89b4fa;
+  --color-accent-blue-hover: #a6c8ff;
+  --color-accent-green: #a6e3a1;
+  --color-accent-green-hover: #bdeab9;
+  --color-accent-warm: #94e2d5;
+  --color-accent-warm-hover: #b0ebe1;
+  --color-accent-cool-from: #cba6f7;
+  --color-accent-cool-to: #b4befe;
+  --color-gradient-cta-from: #1e66f5;
+  --color-gradient-cta-to: #8839ef;
+  --color-gradient-toggle-from: #89b4fa;
+  --color-gradient-toggle-to: #74c7ec;
+  --color-gradient-active-frame-from: #cba6f7;
+  --color-gradient-active-frame-to: #89dceb;
+  --color-media-canvas: #1e1e2e;
+  --shadow-accent-glow: 0 0 18px rgba(203, 166, 247, 0.34);
+  --shadow-active-ring: 0 0 6px rgba(137, 180, 250, 0.2);
+}
+[data-theme="latte"] {
+  --color-bg-primary: #eff1f5;
+  --color-bg-secondary: #e6e9ef;
+  --color-bg-tertiary: #ffffff;
+  --color-bg-hover: #dce0e8;
+  --color-bg-active: #ccd0da;
+  --color-border: #ccd0da;
+  --color-border-light: #acb0be;
+  --color-text-primary: #4c4f69;
+  --color-text-secondary: #5c5f77;
+  --color-text-muted: #5f6278;
+  --color-accent-blue: #1e66f5;
+  --color-accent-blue-hover: #1552cc;
+  --color-accent-green: #40a02b;
+  --color-accent-green-hover: #348122;
+  --color-accent-warm: #179299;
+  --color-accent-warm-hover: #12757b;
+  --color-accent-cool-from: #8839ef;
+  --color-accent-cool-to: #7287fd;
+  --color-gradient-cta-from: #1e66f5;
+  --color-gradient-cta-to: #8839ef;
+  --color-gradient-toggle-from: #1e66f5;
+  --color-gradient-toggle-to: #209fb5;
+  --color-gradient-active-frame-from: #8839ef;
+  --color-gradient-active-frame-to: #04a5e5;
+  --shadow-accent-glow: 0 2px 12px rgba(136, 57, 239, 0.22);
+  --shadow-active-ring: 0 0 0 2px rgba(30, 102, 245, 0.32);
+}
+
+/* ─── Gruvbox ─────────────────────────────────────────────────────────── */
+[data-theme="gruvbox"] {
+  --color-bg-primary: #1d2021;
+  --color-bg-secondary: #282828;
+  --color-bg-tertiary: #32302f;
+  --color-bg-hover: #3c3836;
+  --color-bg-active: #504945;
+  --color-border: #3c3836;
+  --color-border-light: #504945;
+  --color-text-primary: #ebdbb2;
+  --color-text-secondary: #d5c4a1;
+  --color-text-muted: #a89984;
+  --color-accent-blue: #83a598;
+  --color-accent-blue-hover: #9fbcb1;
+  --color-accent-green: #b8bb26;
+  --color-accent-green-hover: #cdd047;
+  --color-accent-warm: #fe8019;
+  --color-accent-warm-hover: #ff9a45;
+  --color-accent-cool-from: #d3869b;
+  --color-accent-cool-to: #83a598;
+  --color-gradient-cta-from: #79740e;
+  --color-gradient-cta-to: #427b58;
+  --color-gradient-toggle-from: #458588;
+  --color-gradient-toggle-to: #83a598;
+  --color-gradient-active-frame-from: #fabd2f;
+  --color-gradient-active-frame-to: #fe8019;
+  --color-media-canvas: #32302f;
+  --shadow-accent-glow: 0 0 18px rgba(250, 189, 47, 0.3);
+  --shadow-active-ring: 0 0 6px rgba(254, 128, 25, 0.18);
+}
+[data-theme="gruvbox-day"] {
+  --color-bg-primary: #f2e5bc;
+  --color-bg-secondary: #fbf1c7;
+  --color-bg-tertiary: #f9f5d7;
+  --color-bg-hover: #ebdbb2;
+  --color-bg-active: #d5c4a1;
+  --color-border: #d5c4a1;
+  --color-border-light: #bdae93;
+  --color-text-primary: #3c3836;
+  --color-text-secondary: #504945;
+  --color-text-muted: #665c54;
+  --color-accent-blue: #076678;
+  --color-accent-blue-hover: #054e5c;
+  --color-accent-green: #79740e;
+  --color-accent-green-hover: #5f5b0b;
+  --color-accent-warm: #af3a03;
+  --color-accent-warm-hover: #8c2e02;
+  --color-accent-cool-from: #8f3f71;
+  --color-accent-cool-to: #076678;
+  --color-gradient-cta-from: #79740e;
+  --color-gradient-cta-to: #427b58;
+  --color-gradient-toggle-from: #076678;
+  --color-gradient-toggle-to: #427b58;
+  --color-gradient-active-frame-from: #b57614;
+  --color-gradient-active-frame-to: #af3a03;
+  --shadow-accent-glow: 0 2px 12px rgba(181, 118, 20, 0.26);
+  --shadow-active-ring: 0 0 0 2px rgba(7, 102, 120, 0.3);
+}
+
+/* ─── Everforest ──────────────────────────────────────────────────────── */
+[data-theme="everforest"] {
+  --color-bg-primary: #272e33;
+  --color-bg-secondary: #2d353b;
+  --color-bg-tertiary: #343f44;
+  --color-bg-hover: #3d484d;
+  --color-bg-active: #475258;
+  --color-border: #3d484d;
+  --color-border-light: #4f585e;
+  --color-text-primary: #d3c6aa;
+  --color-text-secondary: #9da9a0;
+  --color-text-muted: #a4b19f;
+  --color-accent-blue: #7fbbb3;
+  --color-accent-blue-hover: #9bcdc6;
+  --color-accent-green: #a7c080;
+  --color-accent-green-hover: #bcd09b;
+  --color-accent-warm: #e69875;
+  --color-accent-warm-hover: #edb094;
+  --color-accent-cool-from: #d699b6;
+  --color-accent-cool-to: #7fbbb3;
+  --color-gradient-cta-from: #4e6b2f;
+  --color-gradient-cta-to: #2f6b52;
+  --color-gradient-toggle-from: #7fbbb3;
+  --color-gradient-toggle-to: #83c092;
+  --color-gradient-active-frame-from: #dbbc7f;
+  --color-gradient-active-frame-to: #a7c080;
+  --color-media-canvas: #343f44;
+  --shadow-accent-glow: 0 0 18px rgba(167, 192, 128, 0.28);
+  --shadow-active-ring: 0 0 6px rgba(127, 187, 179, 0.18);
+}
+[data-theme="everforest-day"] {
+  --color-bg-primary: #f4f0d9;
+  --color-bg-secondary: #fdf6e3;
+  --color-bg-tertiary: #fffbef;
+  --color-bg-hover: #efebd4;
+  --color-bg-active: #e0dcc7;
+  --color-border: #e6e2cc;
+  --color-border-light: #cbd3c7;
+  --color-text-primary: #414d54;
+  --color-text-secondary: #55636a;
+  --color-text-muted: #5e6c62;
+  --color-accent-blue: #2b7396;
+  --color-accent-blue-hover: #235d7a;
+  --color-accent-green: #8da101;
+  --color-accent-green-hover: #6f7f01;
+  --color-accent-warm: #f57d26;
+  --color-accent-warm-hover: #d0651a;
+  --color-accent-cool-from: #df69ba;
+  --color-accent-cool-to: #3a94c5;
+  --color-gradient-cta-from: #5f7000;
+  --color-gradient-cta-to: #256f55;
+  --color-gradient-toggle-from: #3a94c5;
+  --color-gradient-toggle-to: #35a77c;
+  --color-gradient-active-frame-from: #dfa000;
+  --color-gradient-active-frame-to: #8da101;
+  --shadow-accent-glow: 0 2px 12px rgba(141, 161, 1, 0.24);
+  --shadow-active-ring: 0 0 0 2px rgba(58, 148, 197, 0.3);
+}
+
+/* ─── Rosé Pine ───────────────────────────────────────────────────────── */
+[data-theme="rose-pine"] {
+  --color-bg-primary: #191724;
+  --color-bg-secondary: #1f1d2e;
+  --color-bg-tertiary: #26233a;
+  --color-bg-hover: #403d52;
+  --color-bg-active: #524f67;
+  --color-border: #403d52;
+  --color-border-light: #524f67;
+  --color-text-primary: #e0def4;
+  --color-text-secondary: #c3bfd6;
+  --color-text-muted: #9d99b4;
+  --color-accent-blue: #9ccfd8;
+  --color-accent-blue-hover: #b6dde4;
+  --color-accent-green: #31748f;
+  --color-accent-green-hover: #3e8dab;
+  --color-accent-warm: #f6c177;
+  --color-accent-warm-hover: #f9d29a;
+  --color-accent-cool-from: #c4a7e7;
+  --color-accent-cool-to: #9ccfd8;
+  --color-gradient-cta-from: #8f4d61;
+  --color-gradient-cta-to: #6b5a86;
+  --color-gradient-toggle-from: #31748f;
+  --color-gradient-toggle-to: #9ccfd8;
+  --color-gradient-active-frame-from: #c4a7e7;
+  --color-gradient-active-frame-to: #ebbcba;
+  --color-media-canvas: #26233a;
+  --shadow-accent-glow: 0 0 18px rgba(196, 167, 231, 0.34);
+  --shadow-active-ring: 0 0 6px rgba(235, 111, 146, 0.2);
+}
+[data-theme="rose-pine-dawn"] {
+  --color-bg-primary: #faf4ed;
+  --color-bg-secondary: #fffaf3;
+  --color-bg-tertiary: #ffffff;
+  --color-bg-hover: #f2e9e1;
+  --color-bg-active: #dfdad9;
+  --color-border: #dfdad9;
+  --color-border-light: #cecacd;
+  --color-text-primary: #575279;
+  --color-text-secondary: #5d5682;
+  --color-text-muted: #66627f;
+  --color-accent-blue: #286983;
+  --color-accent-blue-hover: #1f5468;
+  --color-accent-green: #56949f;
+  --color-accent-green-hover: #457881;
+  --color-accent-warm: #ea9d34;
+  --color-accent-warm-hover: #c9832a;
+  --color-accent-cool-from: #907aa9;
+  --color-accent-cool-to: #286983;
+  --color-gradient-cta-from: #91506a;
+  --color-gradient-cta-to: #6f5c86;
+  --color-gradient-toggle-from: #286983;
+  --color-gradient-toggle-to: #56949f;
+  --color-gradient-active-frame-from: #907aa9;
+  --color-gradient-active-frame-to: #d7827e;
+  --shadow-accent-glow: 0 2px 12px rgba(144, 122, 169, 0.26);
+  --shadow-active-ring: 0 0 0 2px rgba(40, 105, 131, 0.3);
+}
+
+/* ─── Kanagawa ────────────────────────────────────────────────────────── */
+[data-theme="kanagawa"] {
+  --color-bg-primary: #16161d;
+  --color-bg-secondary: #1f1f28;
+  --color-bg-tertiary: #2a2a37;
+  --color-bg-hover: #363646;
+  --color-bg-active: #54546d;
+  --color-border: #363646;
+  --color-border-light: #54546d;
+  --color-text-primary: #dcd7ba;
+  --color-text-secondary: #c8c093;
+  --color-text-muted: #a6a288;
+  --color-accent-blue: #7e9cd8;
+  --color-accent-blue-hover: #9cb4e4;
+  --color-accent-green: #98bb6c;
+  --color-accent-green-hover: #aecb8b;
+  --color-accent-warm: #ffa066;
+  --color-accent-warm-hover: #ffb98a;
+  --color-accent-cool-from: #957fb8;
+  --color-accent-cool-to: #7e9cd8;
+  --color-gradient-cta-from: #4a5f8f;
+  --color-gradient-cta-to: #5b4b7a;
+  --color-gradient-toggle-from: #7e9cd8;
+  --color-gradient-toggle-to: #7fb4ca;
+  --color-gradient-active-frame-from: #e6c384;
+  --color-gradient-active-frame-to: #d27e99;
+  --color-media-canvas: #2a2a37;
+  --shadow-accent-glow: 0 0 18px rgba(230, 195, 132, 0.28);
+  --shadow-active-ring: 0 0 6px rgba(126, 156, 216, 0.2);
+}
+[data-theme="lotus"] {
+  --color-bg-primary: #f2ecbc;
+  --color-bg-secondary: #faf6d8;
+  --color-bg-tertiary: #fffcea;
+  --color-bg-hover: #e7dba0;
+  --color-bg-active: #ded8ae;
+  --color-border: #ded8ae;
+  --color-border-light: #bdb68e;
+  --color-text-primary: #545464;
+  --color-text-secondary: #43436c;
+  --color-text-muted: #5c5a4e;
+  --color-accent-blue: #4d699b;
+  --color-accent-blue-hover: #3d547c;
+  --color-accent-green: #6f894e;
+  --color-accent-green-hover: #596e3e;
+  --color-accent-warm: #cc6d00;
+  --color-accent-warm-hover: #a35700;
+  --color-accent-cool-from: #624c83;
+  --color-accent-cool-to: #4d699b;
+  --color-gradient-cta-from: #56693c;
+  --color-gradient-cta-to: #47635e;
+  --color-gradient-toggle-from: #4d699b;
+  --color-gradient-toggle-to: #4e8ca2;
+  --color-gradient-active-frame-from: #77713f;
+  --color-gradient-active-frame-to: #cc6d00;
+  --shadow-accent-glow: 0 2px 12px rgba(119, 113, 63, 0.26);
+  --shadow-active-ring: 0 0 0 2px rgba(77, 105, 155, 0.32);
+}
+
+/* ─── Nord ────────────────────────────────────────────────────────────── */
+[data-theme="nord"] {
+  --color-bg-primary: #242933;
+  --color-bg-secondary: #2e3440;
+  --color-bg-tertiary: #3b4252;
+  --color-bg-hover: #434c5e;
+  --color-bg-active: #4c566a;
+  --color-border: #434c5e;
+  --color-border-light: #4c566a;
+  --color-text-primary: #eceff4;
+  --color-text-secondary: #d8dee9;
+  --color-text-muted: #a8b1c2;
+  --color-accent-blue: #88c0d0;
+  --color-accent-blue-hover: #a3cfdb;
+  --color-accent-green: #a3be8c;
+  --color-accent-green-hover: #b8cea6;
+  --color-accent-warm: #8fbcbb;
+  --color-accent-warm-hover: #a8cbca;
+  --color-accent-cool-from: #b48ead;
+  --color-accent-cool-to: #81a1c1;
+  --color-gradient-cta-from: #4c6b91;
+  --color-gradient-cta-to: #35706e;
+  --color-gradient-toggle-from: #5e81ac;
+  --color-gradient-toggle-to: #81a1c1;
+  --color-gradient-active-frame-from: #88c0d0;
+  --color-gradient-active-frame-to: #8fbcbb;
+  --color-media-canvas: #3b4252;
+  --shadow-accent-glow: 0 0 18px rgba(136, 192, 208, 0.32);
+  --shadow-active-ring: 0 0 6px rgba(129, 161, 193, 0.2);
+}
+[data-theme="nord-day"] {
+  --color-bg-primary: #e5e9f0;
+  --color-bg-secondary: #eceff4;
+  --color-bg-tertiary: #ffffff;
+  --color-bg-hover: #dbe1ea;
+  --color-bg-active: #c9d1de;
+  --color-border: #d8dee9;
+  --color-border-light: #b3bccd;
+  --color-text-primary: #2e3440;
+  --color-text-secondary: #3b4252;
+  --color-text-muted: #59637a;
+  --color-accent-blue: #5e81ac;
+  --color-accent-blue-hover: #4c6b91;
+  --color-accent-green: #4f7a3c;
+  --color-accent-green-hover: #3f6230;
+  --color-accent-warm: #35706e;
+  --color-accent-warm-hover: #2a5a58;
+  --color-accent-cool-from: #8a5f83;
+  --color-accent-cool-to: #5e81ac;
+  --color-gradient-cta-from: #4c6b91;
+  --color-gradient-cta-to: #35706e;
+  --color-gradient-toggle-from: #5e81ac;
+  --color-gradient-toggle-to: #4c6b91;
+  --color-gradient-active-frame-from: #5e81ac;
+  --color-gradient-active-frame-to: #35706e;
+  --shadow-accent-glow: 0 2px 12px rgba(94, 129, 172, 0.26);
+  --shadow-active-ring: 0 0 0 2px rgba(94, 129, 172, 0.32);
+}
+
 /* Custom utility classes that use the theme tokens. These let
  * components opt into theme-aware gradient and glow effects. */
 @layer utilities {
