@@ -73,6 +73,24 @@ test('reconciliation answers explanatory questions without actions', () => {
   }
 })
 
+test('scene-command showcase keeps the shared command and still drops guessed Studio generation', async () => {
+  const request = 'Monta una escena Video3D con el showcase de anime, sin vídeo generativo.'
+  const sceneCommand = { version: 1, operation: 'scenes.effects.showcase', input: { dimension: '2d', collection: 'anime', sound: true } }
+  const { reconcileAgentTurnWithRequest } = await import('../src/features/agent/agentActions.ts')
+  const turn = await reconcileAgentTurnWithRequest(request, {
+    reply: 'Voy a generar el vídeo y abrir el compositor.',
+    actions: [
+      { type: 'prepare_video', prompt: 'Anime effects video.' },
+      { type: 'start_generation', confirm: true },
+      { type: 'prepare_programmatic_video', intent: request, generationPolicy: 'provided_only', outputNames: [], sceneCommand },
+    ],
+  })
+  assert.deepEqual(turn.actions.map(action => action.type), ['prepare_programmatic_video'])
+  assert.deepEqual(turn.actions[0].sceneCommand, sceneCommand)
+  assert.equal(turn.actions[0].intent, request)
+  assert.equal(turn.actions.some(action => action.type === 'prepare_video' || action.type === 'start_generation'), false)
+})
+
 test('existing-only English inventory beats both Studio and proposed music generation', () => {
   for (const actions of [
     [{ type: 'prepare_video', prompt: 'invented' }, { type: 'start_generation', confirm: true }],
@@ -116,4 +134,16 @@ test('registered programmatic capability parses an object and never accepts mode
   assert.equal(parseRegisteredCapability('prepare_programmatic_video', {
     type: 'prepare_programmatic_video', intent: '', output_names: [],
   }), null)
+  const showcase = { version: 1, operation: 'scenes.effects.showcase', input: { dimension: '2d', sound: true } }
+  assert.deepEqual(parseRegisteredCapability('prepare_programmatic_video', {
+    type: 'prepare_programmatic_video',
+    intent: 'Monta el showcase de efectos en Video3D.',
+    scene_command: showcase,
+  }), {
+    type: 'prepare_programmatic_video',
+    intent: 'Monta el showcase de efectos en Video3D.',
+    generationPolicy: 'provided_only',
+    outputNames: [],
+    sceneCommand: showcase,
+  })
 })
