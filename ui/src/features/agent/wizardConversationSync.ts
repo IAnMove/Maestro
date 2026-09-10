@@ -1,4 +1,4 @@
-import { insertMissingConversationValues } from './wizardMessageOrder'
+import { capConversationValues, insertMissingConversationValues } from './wizardMessageOrder'
 import { normalizeVisualEvidence, type VisualEvidence } from './visualEvidence'
 
 export const WIZARD_WELCOME_TEXT = 'Saludos, creador. Soy el mago de HocusPocus: puedo consultar la cola, explicarte el estudio, llevarte a la sección adecuada y preparar o lanzar un vídeo cuando me lo pidas. Dime qué quieres conjurar. 🪄'
@@ -76,8 +76,14 @@ export function mergeWizardMessages(
   remoteMessages: WizardSyncMessage[],
 ): WizardSyncMessage[] {
   const localById = new Map(localMessages.map(message => [message.id, message]))
+  const remoteIds = new Set(remoteMessages.map(message => message.id).filter(Boolean))
   const canonical = remoteMessages.map(message => localById.get(message.id) ?? message)
-  return insertMissingConversationValues(canonical, localMessages, message => message.id).slice(-40)
+  return capConversationValues(
+    insertMissingConversationValues(canonical, localMessages, message => message.id),
+    message => message.id,
+    message => Boolean(message.id) && !remoteIds.has(message.id),
+    40,
+  )
 }
 
 /** True when the visible client state still contains a turn absent from a saved snapshot. */
