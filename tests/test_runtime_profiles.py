@@ -81,17 +81,22 @@ def test_a_failed_migration_cannot_reuse_legacy_markers(tmp_path):
 
 
 def test_child_python_does_not_import_from_parent_pythonpath(tmp_path):
+    import os
     target = tmp_path / "separate engine"
     subprocess.run([sys.executable, "-m", "venv", "--without-pip", str(target)], check=True)
     executable = python_path(target, kind="venv")
     poison = tmp_path / "inherited packages"
     poison.mkdir()
     (poison / "parent_only_dependency.py").write_text("raise RuntimeError('leaked parent')")
-    env = isolated_environment(executable, {"PYTHONPATH": str(poison), "PYTHONHOME": str(tmp_path),
+    # Real Windows Python also needs SystemRoot for OS cryptography. Preserve
+    # host variables while poisoning only the dependency/manager inputs.
+    env = isolated_environment(executable, {**os.environ, "PYTHONPATH": str(poison), "PYTHONHOME": str(tmp_path),
                                           "UV_PYTHON": sys.executable, "PIP_TARGET": str(poison),
                                           "HF_TOKEN": "test-value", "CUDA_VISIBLE_DEVICES": "0"})
     assert "UV_PYTHON" not in env and "PIP_TARGET" not in env
     assert env["HF_TOKEN"] == "test-value" and env["CUDA_VISIBLE_DEVICES"] == "0"
+    if sys.platform == "win32":
+        assert env["SYSTEMROOT"] == os.environ["SYSTEMROOT"]
     code = "import importlib.util,sys; assert importlib.util.find_spec('parent_only_dependency') is None; print(sys.prefix)"
     result = subprocess.run([str(executable), "-c", code], env=env, capture_output=True, text=True, check=True)
     assert Path(result.stdout.strip()).resolve() == target.resolve()
