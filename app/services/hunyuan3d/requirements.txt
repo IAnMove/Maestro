@@ -1,5 +1,7 @@
 # Isolated Hunyuan3D runtime. Versions follow Tencent's tested 2.1 stack;
-# torch itself is installed by hunyuan3d_install.js before this file.
+# torch is installed by install.js/update.js before this file. `diso` is not
+# listed here: it imports torch at build time and uv's isolated build cannot
+# see the env, so Pinokio installs it with --no-build-isolation after this file.
 ninja==1.11.1.1
 pybind11==2.13.6
 diffusers==0.30.3
@@ -37,5 +39,4 @@ timm>=1.0,<2
 torchmetrics==1.6.0
 pythreejs
 torchdiffeq==0.2.5
-diso
 fast-simplification>=0.1.7

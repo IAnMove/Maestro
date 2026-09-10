@@ -119,7 +119,8 @@ module.exports = {
         },
         message: [
           "uv pip install torch==2.7.0 torchvision==0.22.0 torchaudio==2.7.0 --index-url https://download.pytorch.org/whl/cu128",
-          "uv pip install -r app/services/hunyuan3d/requirements.txt"
+          "uv pip install -r app/services/hunyuan3d/requirements.txt",
+          "uv pip install --no-build-isolation diso==0.1.4"
         ]
       }
     },
