@@ -5,6 +5,7 @@ import { fxSamples } from '../src/features/sceneFx/audio'
 import { withFxShowcase } from '../src/features/sceneFx/showcase'
 import { createDefaultScene3DDocument, parseScene3DDocument } from '../src/features/scene3d/document'
 import { parseSceneFile, serializeSceneFile } from '../src/lib/sceneFile'
+import { getSceneLayerTiming } from '../src/lib/sceneTimeline'
 
 test('2D and 3D preserve all effects and audio settings through save/reopen', () => {
   const world = withFxShowcase(createDefaultScene3DDocument())
@@ -48,4 +49,15 @@ test('anime showcase preserves the scene and supports oriented energy beams', ()
   assert.equal(rotated[0].rotation, -45)
   assert.equal(parseScene3DDocument({ ...next, sfx: rotated })?.sfx?.[0].rotation, -45)
   assert.equal(source.sfx, undefined)
+})
+
+test('2D showcase background matches the requested collection after reopening', () => {
+  for (const [collection, seconds] of [['anime', 36], ['all', 90]] as const) {
+    const next = withFxShowcase({ version: 1 as const, name: 'FX', layers: [], width: 640, height: 360, duration: 3 }, collection)
+    const reopened = parseSceneFile(serializeSceneFile(next))
+    assert.equal(reopened.duration, seconds)
+    assert.equal(getSceneLayerTiming(reopened.layers[0]).span, seconds)
+    const authored = { ...reopened, duration: 120 }
+    assert.equal(withFxShowcase(authored, collection).layers, authored.layers)
+  }
 })

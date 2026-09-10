@@ -84,6 +84,9 @@ class EffectsShowcase(Strict):
         if self.document is None:
             bases = json.loads((Path(__file__).parent.parent / 'shared' / 'scene_bases.json').read_text())
             self.document = bases[self.dimension]
+            if self.dimension == '2d':
+                duration = 3 * sum(self.collection == 'all' or item['collection'] == self.collection for item in CATALOG)
+                self.document['layers'][0]['animation']['duration'] = duration
         DocumentInput(document=self.document)
         return self
 

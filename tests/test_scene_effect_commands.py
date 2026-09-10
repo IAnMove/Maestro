@@ -107,3 +107,15 @@ def test_anime_showcase_uses_36_seconds_and_preserves_longer_authored_scenes(ser
     scene['duration'] = 72
     command['input']['document'] = scene
     assert service.execute(command)['result']['document']['duration'] == 72
+
+
+@pytest.mark.parametrize('collection,seconds', [('anime', 36), ('all', 90)])
+def test_default_2d_showcase_has_no_longer_background_tail(service, collection, seconds):
+    scene = service.execute({'version': 1, 'operation': 'scenes.effects.showcase',
+                             'input': {'dimension': '2d', 'collection': collection}})['result']['document']
+    assert scene['duration'] == seconds
+    assert scene['layers'][0]['animation']['duration'] == seconds
+    scene['layers'][0]['animation']['duration'] = 120
+    preserved = service.execute({'version': 1, 'operation': 'scenes.effects.showcase',
+                                 'input': {'document': scene, 'collection': collection}})['result']['document']
+    assert preserved['layers'] == scene['layers']
