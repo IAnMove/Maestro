@@ -57,8 +57,8 @@ def _assert_launcher_parity() -> None:
         if 'runtime_setup.js' not in source.read_text():
             raise AssertionError(f"{source.name} bypasses the shared runtime setup")
     setup = (ROOT / "runtime_setup.js").read_text()
-    if 'npm ci' not in setup or 'npm install' in setup:
-        raise AssertionError("Shared setup must install UI dependencies from the npm lockfile")
+    if 'ui_build.js' not in setup:
+        raise AssertionError("Shared setup must verify/repair React even when Git is unchanged")
     subprocess.run(["node", "scripts/check_runtime_profiles.cjs"], cwd=ROOT, check=True)
     subprocess.run(["node", "scripts/check_vendor_revisions_contract.js"], cwd=ROOT, check=True)
 

@@ -36950,14 +36950,17 @@ _mimetypes.add_type("text/css", ".css")
 _mimetypes.add_type("image/svg+xml", ".svg")
 
 _ui_dist = os.path.normpath(os.path.join(_app_dir, "..", "ui", "dist"))
-if os.path.isdir(_ui_dist):
+from services.ui_distribution import build_status as _ui_build_status, recovery_html as _ui_recovery_html
+_ui_ready = _ui_build_status()["ready"]
+if _ui_ready:
     api.mount("/", StaticFiles(directory=_ui_dist, html=True))
     print(f"[HocusPocus Lab] React UI serving from {_ui_dist}")
 else:
     @api.get("/")
     def index():
-        return {"message": "React UI not built. Run: cd ui && npm install && npm run build"}
-    print(f"[HocusPocus Lab] React UI not found at {_ui_dist} - serving API only")
+        from fastapi.responses import HTMLResponse
+        return HTMLResponse(_ui_recovery_html(), status_code=503, headers={"Cache-Control": "no-store"})
+    print(f"[HocusPocus Lab] React UI missing or incomplete at {_ui_dist}. Use Repair Web UI, then restart. Serving API only.")
 
 
 # ============================================================================
@@ -37042,7 +37045,7 @@ def run_server():
     display_host = "127.0.0.1" if host == "0.0.0.0" else host
 
     print(f"\n{'='*50}")
-    print(f"  HocusPocus Lab UI: http://{display_host}:{port}/")
+    print(f"  {'HocusPocus Lab UI:' if _ui_ready else 'Web UI repair page (API only):'} http://{display_host}:{port}/")
     # Trailing slash required: the Gradio submount 404s the bare path.
     print(f"  Classic UI:    http://{display_host}:{port}/classic/")
     print(f"  API docs:      http://{display_host}:{port}/docs")

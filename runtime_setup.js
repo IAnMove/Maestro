@@ -3,14 +3,13 @@ const runtime = require('./runtime_install')
 module.exports = {
   requires: {bundle: 'ai'},
   run: [
+    // Repair React before lengthy native installs, including on an unchanged Git revision.
+    ...runtime.call('ui_build.js'),
     ...runtime.preflight(),
     {when: "{{!exists('app/postprocessing/seedvc/__init__.py')}}", method: 'shell.run', params: {
       message: runtime.guarded('git clone --depth 1 --branch v1.0.0 https://github.com/Blizaine/maestro-seedvc app/postprocessing/seedvc'),
     }},
     ...runtime.installEngines(['wangp', 'hunyuan3d', 'minimax_h3']),
-    {when: "{{exists('ui/package.json')}}", method: 'shell.run', params: {
-      path: 'ui', message: runtime.guarded(['npm ci', 'npm run build']),
-    }},
     ...runtime.call('sam_install.js').map(step => ({...step,
       when: `{{args.update && exists('app/services/sam/env') && local.runtime.engines.sam.supported${step.when ? ' && (' + step.when.slice(2,-2) + ')' : ''}}}`,
     })),
