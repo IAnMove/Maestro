@@ -1031,6 +1031,7 @@
     "sceneMissing": "There is no saved scene named “{{name}}” in this workspace.",
     "sceneMissingAvailable": "There is no saved scene named “{{name}}” in this workspace. Available: {{available}}.",
     "sceneAmbiguous": "Several saved scenes are named “{{name}}”; give the full filename.",
+    "workspaceChangedOpen": "Workspace changed while opening the scene. Open it again in this folder.",
     "sceneLoadFailed": "Could not load saved scene “{{name}}”.",
     "sceneOpenFailed": "Saved scene “{{name}}” could not be opened in Video 3D.",
     "openedWithLayer": "Opened “{{scene}}” and selected layer “{{layer}}”.",

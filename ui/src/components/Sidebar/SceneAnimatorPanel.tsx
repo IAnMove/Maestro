@@ -43,7 +43,8 @@ import { sceneToRecipe } from '../../lib/sceneToRecipe'
 import { parseSceneFile, sceneFileName, serializeSceneFile } from '../../lib/sceneFile'
 import { SceneLibraryDialog } from './SceneLibraryDialog'
 import { PENDING_SCENE_KEY } from '../../lib/sceneOutput'
-import { normalizeSceneLookupName, sceneFromLibraryPayload, sceneLibraryTitle, sceneOutputMatchesName } from '../../lib/sceneLibrary'
+import { loadAgentLibraryScene } from '../../lib/agentSceneOpen'
+import { normalizeSceneLookupName } from '../../lib/sceneLibrary'
 import { assessNarrativeAsset } from '../../lib/assetSuitability'
 import { getSceneClipTime } from '../../lib/sceneClip'
 import { sanitizeSceneMotion } from '../../lib/sceneMotion'
@@ -2687,24 +2688,34 @@ export function SceneAnimatorPanel() {
       }
     }
 
-    const library = await fetchOutputs(0, 0, { mediaType: 'scene', workspace })
-    const matches = library.outputs.filter(file => sceneOutputMatchesName(file, request.sceneName))
-    if (!matches.length) {
-      const available = library.outputs.slice(0, 8).map(file => `“${sceneLibraryTitle(file.name)}”`).join(', ')
-      throw new Error(available
-        ? t('agent.sceneMissingAvailable', { name: request.sceneName, available })
-        : t('agent.sceneMissing', { name: request.sceneName }))
+    const source = {
+      epoch: galleryWorkspaceEpoch(),
+      workspace: galleryWorkspaceName(useStore.getState()),
+      generation: generationRef.current,
     }
-    if (matches.length > 1) throw new Error(t('agent.sceneAmbiguous', { name: request.sceneName }))
-    const response = await fetch(matches[0].url)
-    if (!response.ok) throw new Error(t('agent.sceneLoadFailed', { name: request.sceneName }))
-    const next = sceneFromLibraryPayload(await response.json()) as AnimatorScene
+    const stillCurrent = () => source.epoch === galleryWorkspaceEpoch()
+      && source.workspace === galleryWorkspaceName(useStore.getState())
+      && source.generation === generationRef.current
+    const loaded = await loadAgentLibraryScene(request.sceneName, source.workspace, stillCurrent)
+    if (!loaded.ok) {
+      if (loaded.reason === 'stale') throw new Error(t('agent.workspaceChangedOpen'))
+      if (loaded.reason === 'missing') {
+        const available = loaded.availableTitles.map(name => `“${name}”`).join(', ')
+        throw new Error(available
+          ? t('agent.sceneMissingAvailable', { name: request.sceneName, available })
+          : t('agent.sceneMissing', { name: request.sceneName }))
+      }
+      if (loaded.reason === 'ambiguous') throw new Error(t('agent.sceneAmbiguous', { name: request.sceneName }))
+      throw new Error(t('agent.sceneLoadFailed', { name: request.sceneName }))
+    }
+    const next = loaded.scene as AnimatorScene
     const layerMatches = request.layerName
       ? next.layers.filter(layer => normalizeSceneLookupName(layer.name) === normalizeSceneLookupName(request.layerName))
       : []
     if (layerMatches.length > 1) throw new Error(t('agent.layersAmbiguousWizard', { name: request.layerName }))
     if (request.layerName && !layerMatches.length) throw new Error(t('agent.layerMissingInScene', { scene: next.name, name: request.layerName }))
-    if (!importSceneRef.current(JSON.stringify(next), t('animator.openedLabel', { label: sceneLibraryTitle(matches[0].name) }))) {
+    if (!stillCurrent()) throw new Error(t('agent.workspaceChangedOpen'))
+    if (!importSceneRef.current(JSON.stringify(next), t('animator.openedLabel', { label: loaded.label }))) {
       throw new Error(t('agent.sceneOpenFailed', { name: request.sceneName }))
     }
     const target = layerMatches[0] ?? next.layers[0]

@@ -1031,6 +1031,7 @@
     "sceneMissing": "No existe una escena guardada llamada “{{name}}” en este workspace.",
     "sceneMissingAvailable": "No existe una escena guardada llamada “{{name}}” en este workspace. Disponibles: {{available}}.",
     "sceneAmbiguous": "Hay varias escenas guardadas llamadas “{{name}}”; indica el nombre completo del archivo.",
+    "workspaceChangedOpen": "El espacio de trabajo cambió al abrir la escena. Ábrela de nuevo en esta carpeta.",
     "sceneLoadFailed": "No se pudo cargar la escena guardada “{{name}}”.",
     "sceneOpenFailed": "La escena guardada “{{name}}” no se pudo abrir en Vídeo 3D.",
     "openedWithLayer": "He abierto “{{scene}}” y seleccionado la capa “{{layer}}”.",
