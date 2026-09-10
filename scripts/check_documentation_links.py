@@ -41,7 +41,7 @@ def main() -> int:
         errors.append("ui/README.md: Vite template documentation returned")
 
     root_readme = (ROOT / "README.md").read_text(encoding="utf-8")
-    for required in ("curl -X POST", "import requests", "await fetch", "Blizaine/Maestro"):
+    for required in ("curl -X GET", "runtime-capabilities", "import requests", "await fetch", "Blizaine/Maestro"):
         if required not in root_readme:
             errors.append(f"README.md: missing launcher/API documentation {required!r}")
 

@@ -1,0 +1,53 @@
+{
+  "minimax_h3": {
+    "url": "https://github.com/kijai/ComfyUI",
+    "path": "app/services/minimax_h3/vendor/ComfyUI",
+    "revision": "e2ab36d933356bc8cd6ecb39c655fe8be75af4e5",
+    "marker": "app/services/minimax_h3/env/.maestro_minimax_h3_e2ab36d933356bc8cd6ecb39c655fe8be75af4e5.installed",
+    "requiredPaths": [
+      "main.py",
+      "requirements.txt"
+    ]
+  },
+  "hunyuan3d2": {
+    "url": "https://github.com/Tencent-Hunyuan/Hunyuan3D-2",
+    "path": "app/services/hunyuan3d/vendor/Hunyuan3D-2",
+    "revision": "f8db63096c8282cb27354314d896feba5ba6ff8a",
+    "marker": "app/services/hunyuan3d/env/.maestro_hunyuan3d_2_f8db63096c8282cb27354314d896feba5ba6ff8a.installed",
+    "requiredPaths": [
+      "hy3dgen",
+      "hy3dgen/texgen/custom_rasterizer/setup.py"
+    ]
+  },
+  "hunyuan3d21": {
+    "url": "https://github.com/Tencent-Hunyuan/Hunyuan3D-2.1",
+    "path": "app/services/hunyuan3d/vendor/Hunyuan3D-2.1",
+    "revision": "82920d643c0dc2f7bfd7255f45f62d386edfe60c",
+    "marker": "app/services/hunyuan3d/env/.maestro_hunyuan3d_21_82920d643c0dc2f7bfd7255f45f62d386edfe60c.installed",
+    "requiredPaths": [
+      "hy3dshape",
+      "hy3dpaint/custom_rasterizer/setup.py"
+    ]
+  },
+  "sam3": {
+    "url": "https://github.com/facebookresearch/sam3",
+    "path": "app/services/sam/sam3",
+    "revision": "8f0b7f4d4e7eda2ed606ebde6702c93359ad01da",
+    "marker": "app/services/sam/env/.maestro_sam3_8f0b7f4d4e7eda2ed606ebde6702c93359ad01da.installed",
+    "requiredPaths": [
+      "sam3",
+      "pyproject.toml"
+    ]
+  },
+  "unirig": {
+    "url": "https://github.com/VAST-AI-Research/UniRig",
+    "path": "app/services/rigging/vendor/UniRig",
+    "revision": "6793c6640ff01c8fb389f3993434124bb43d2933",
+    "marker": "app/services/rigging/env/.maestro_unirig_6793c6640ff01c8fb389f3993434124bb43d2933.installed",
+    "requiredPaths": [
+      "launch/inference/generate_skeleton.sh",
+      "launch/inference/generate_skin.sh",
+      "launch/inference/merge.sh"
+    ]
+  }
+}

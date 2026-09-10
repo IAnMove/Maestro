@@ -4,7 +4,7 @@
 
 # SAM 3 core deps
 timm>=1.0.17
-numpy>=2
+numpy==1.26.4  # pinned SAM revision requires numpy>=1.26,<2
 tqdm
 ftfy==6.1.1
 regex

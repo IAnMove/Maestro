@@ -2,6 +2,7 @@
 // Mirrors the directories created by install.js and sam_install.js.
 module.exports = {
   run: [
+    { method: "fs.rm", params: { path: "app/.runtime" } },
     // Main Python venv
     { method: "fs.rm", params: { path: "app/env" } },
     // SAM 3.1 Python 3.12 conda env
@@ -15,6 +16,8 @@ module.exports = {
     // MiniMax H3 isolated ComfyUI runtime and lazily-downloaded checkpoints
     { method: "fs.rm", params: { path: "app/services/minimax_h3/env" } },
     { method: "fs.rm", params: { path: "app/services/minimax_h3/vendor" } },
+    { method: "fs.rm", params: { path: "app/services/rigging/env" } },
+    { method: "fs.rm", params: { path: "app/services/rigging/vendor" } },
     // UI build artifacts
     { method: "fs.rm", params: { path: "ui/node_modules" } },
     { method: "fs.rm", params: { path: "ui/dist" } }

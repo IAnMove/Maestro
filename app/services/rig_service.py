@@ -20,6 +20,9 @@ import threading
 import time
 import uuid
 from pathlib import Path
+
+from services.runtime_environment import isolated_environment, python_path as managed_python_path
+from services.runtime_profiles import managed_ready
 from typing import Any
 
 from . import resource_scheduler
@@ -168,13 +171,13 @@ _WORKER_TIME_LIMIT_SECONDS = 10 * 60
 
 
 def _python_path() -> Path | None:
-    candidates = [ENV_DIR / "python.exe", ENV_DIR / "bin" / "python"]
-    return next((path for path in candidates if path.is_file()), None)
+    candidates = [managed_python_path(ENV_DIR)]
+    return next((path for path in candidates if path.is_file() and managed_ready("hunyuan3d")), None)
 
 
 def _unirig_python_path() -> Path | None:
-    candidates = [RIGGING_ENV_DIR / "python.exe", RIGGING_ENV_DIR / "bin" / "python"]
-    return next((path for path in candidates if path.is_file()), None)
+    candidates = [managed_python_path(RIGGING_ENV_DIR)]
+    return next((path for path in candidates if path.is_file() and managed_ready("rigging")), None)
 
 
 def installation_status() -> dict[str, Any]:
@@ -262,7 +265,7 @@ def has_active_unirig_jobs() -> bool:
 
 def unirig_installation_status() -> dict[str, Any]:
     python_path = _unirig_python_path()
-    installed = bool(python_path and RIGGING_MARKER.is_file() and UNIRIG_WORKER_PATH.is_file() and UNIRIG_VENDOR_DIR.is_dir())
+    installed = bool(python_path and RIGGING_MARKER.is_file() and UNIRIG_VENDOR_DIR.is_dir() and UNIRIG_WORKER_PATH.is_file())
     return {
         "installed": installed,
         "install_hint": None if installed else "Open HocusPocus Lab in Pinokio and run 'Install AI Rigging (UniRig)'. Needs an NVIDIA GPU with 8GB+ VRAM; weights (~2GB) download on first use.",
@@ -624,7 +627,7 @@ def _run_job_serialized(job_id: str, output_dir: str) -> None:
     pid_path = JOBS_DIR / f"{job_id}.pid"
 
     command = [str(python_path), str(worker_path), "--request", str(request_path), "--output", str(output_path)]
-    env = os.environ.copy()
+    env = isolated_environment(Path(python_path))
     if engine == "unirig":
         # Same network isolation as the Hunyuan3D worker: the public UniRig
         # weights must not inherit Pinokio's HF credentials or proxy setup.
