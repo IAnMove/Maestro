@@ -23,7 +23,6 @@ UPDATE_SCRIPT = ROOT / "update.js"
 UI_DIR = ROOT / "ui"
 PACKAGE_JSON = UI_DIR / "package.json"
 PACKAGE_LOCK = UI_DIR / "package-lock.json"
-PYTHON_RESOLVER = "uv pip install -r requirements.txt --index-strategy unsafe-best-match"
 
 
 def _normalise_name(name: str) -> str:
@@ -54,15 +53,14 @@ def _assert_python_manifest() -> None:
 
 
 def _assert_launcher_parity() -> None:
-    install = INSTALL_SCRIPT.read_text()
-    update = UPDATE_SCRIPT.read_text()
-    for name, text in (("install.js", install), ("update.js", update)):
-        if text.count(PYTHON_RESOLVER) != 1:
-            raise AssertionError(f"{name} must use the shared Python resolver exactly once")
-        if "npm install" in text:
-            raise AssertionError(f"{name} still uses npm install instead of npm ci")
-        if "npm ci" not in text:
-            raise AssertionError(f"{name} does not install the UI from the npm lockfile")
+    for source in (INSTALL_SCRIPT, UPDATE_SCRIPT):
+        if 'runtime_setup.js' not in source.read_text():
+            raise AssertionError(f"{source.name} bypasses the shared runtime setup")
+    setup = (ROOT / "runtime_setup.js").read_text()
+    if 'npm ci' not in setup or 'npm install' in setup:
+        raise AssertionError("Shared setup must install UI dependencies from the npm lockfile")
+    subprocess.run(["node", "scripts/check_runtime_profiles.cjs"], cwd=ROOT, check=True)
+    subprocess.run(["node", "scripts/check_vendor_revisions_contract.js"], cwd=ROOT, check=True)
 
 
 def _assert_npm_lock_matches_manifest() -> None:

@@ -1,3 +1,4 @@
+const runtime = require('./runtime_install')
 module.exports = async (kernel) => {
   let port = await kernel.port()
   // SERVER_NAME is intentionally NOT set here. The host-binding
@@ -13,6 +14,7 @@ module.exports = async (kernel) => {
     },
     daemon: true,
     run: [
+      runtime.startGuard(),
       // SAM service starts on demand (launched by the backend when inpaint is used)
       // — not started here to avoid holding a CUDA context that wastes VRAM
       {
@@ -20,7 +22,10 @@ module.exports = async (kernel) => {
         params: {
           venv: "env",
           env: {
-            SERVER_PORT: port
+            SERVER_PORT: port,
+            PYTHONNOUSERSITE: "1",
+            PYTHONPATH: "",
+            PYTHONHOME: ""
           },
           path: "app",
           message: [

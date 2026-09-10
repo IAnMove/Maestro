@@ -7013,6 +7013,13 @@ def get_active_downloads():
     return {"downloads": _get()}
 
 
+@api.get("/api/v1/runtime-capabilities")
+def get_runtime_capabilities():
+    """Installation recipes and detected hardware, without loading AI models."""
+    from services.runtime_profiles import detect_profiles
+    return detect_profiles()
+
+
 @api.get("/api/v1/system-detect")
 def get_system_detect():
     """Return current hardware + the auto-tune recommendation for it.

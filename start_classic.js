@@ -1,3 +1,4 @@
+const runtime = require('./runtime_install')
 module.exports = async (kernel) => {
   let port = await kernel.port()
   // SERVER_NAME intentionally not set — wgp.py defaults to "localhost"
@@ -14,12 +15,16 @@ module.exports = async (kernel) => {
     },
     daemon: true,
     run: [
+      runtime.startGuard(),
       {
         method: "shell.run",
         params: {
           venv: "env",
           env: {
-            SERVER_PORT: port
+            SERVER_PORT: port,
+            PYTHONNOUSERSITE: "1",
+            PYTHONPATH: "",
+            PYTHONHOME: ""
           },
           path: "app",
           message: [

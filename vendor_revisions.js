@@ -3,6 +3,12 @@
 // The revisions were resolved from the upstream GitHub commit histories on
 // 2026-08-16; see docs/DEPS-03_VENDOR_REVISIONS.md for the evidence URLs.
 module.exports = Object.freeze({
+  minimax_h3: Object.freeze({
+    url: "https://github.com/kijai/ComfyUI",
+    path: "app/services/minimax_h3/vendor/ComfyUI",
+    revision: "e2ab36d933356bc8cd6ecb39c655fe8be75af4e5",
+    marker: "app/services/minimax_h3/env/.maestro_minimax_h3_e2ab36d933356bc8cd6ecb39c655fe8be75af4e5.installed"
+  }),
   hunyuan3d2: Object.freeze({
     url: "https://github.com/Tencent-Hunyuan/Hunyuan3D-2",
     path: "app/services/hunyuan3d/vendor/Hunyuan3D-2",

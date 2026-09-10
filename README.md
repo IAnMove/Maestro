@@ -129,7 +129,26 @@ AMD GPUs and macOS are **not** supported (CUDA kernels). First launch downloads 
 2. Discover → paste `https://github.com/IAnMove/hocuspocus`, or download from this repo.
 3. **Install**, then **Start**. The first job on each model fetches its weights.
 
-Pinokio **Update** pulls code and rebuilds the UI. **Reset** wipes `app/env/` and the UI build; checkpoints in `app/ckpts/` stay unless you delete them. SAM (Inpaint) and UniRig are optional menu installs.
+Pinokio **Install** and **Update** share Windows/Linux recipes with separate Python environments and pinned dependencies per engine. Update also rebuilds the UI. SAM (Inpaint) and UniRig are optional menu installs; UniRig currently has a Linux recipe. See [runtime profiles and recovery](docs/development/RUNTIME_PROFILES.md).
+
+**Reset** removes the managed environments, vendor checkouts and UI build, including the Hunyuan model cache in `app/ckpts/model3d`. Use Install/Update to retry a failed setup; Reset is destructive.
+
+To inspect the selected runtime recipes, use the URL shown by Start (replace the example host and port, including when connecting over LAN):
+
+```sh
+curl -X GET http://127.0.0.1:7860/api/v1/runtime-capabilities
+```
+
+```python
+import requests
+report = requests.get("http://127.0.0.1:7860/api/v1/runtime-capabilities", timeout=30).json()
+print(report["engines"])
+```
+
+```javascript
+const report = await fetch('/api/v1/runtime-capabilities').then(response => response.json());
+console.log(report.engines);
+```
 
 ---
 
