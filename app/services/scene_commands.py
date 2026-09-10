@@ -15,6 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator, ValidationEr
 
 CATALOG = json.loads((Path(__file__).parent.parent / 'shared' / 'scene_effects.json').read_text())
 PRESETS = {entry['id']: entry for entry in CATALOG}
+WORLD_KINDS = {'portal', 'magic_circle', 'summoning_gate'}
 
 
 class Strict(BaseModel):
@@ -68,8 +69,43 @@ class DocumentInput(Strict):
         return self
 
 
+class WorldVec(Strict):
+    x: float = Field(ge=-50, le=50)
+    y: float = Field(ge=-20, le=50)
+    z: float = Field(ge=-50, le=50)
+
+
+class WorldFxCue(Strict):
+    id: str = Field(min_length=1, max_length=160)
+    kind: str
+    label: str = Field(default='', max_length=80)
+    start: float = Field(ge=0, lt=600)
+    end: float = Field(gt=0, le=600)
+    position: WorldVec = Field(default_factory=lambda: WorldVec(x=0, y=1.1, z=-1.2))
+    rotation: WorldVec = Field(default_factory=lambda: WorldVec(x=0, y=0, z=0))
+    scale: float = Field(default=1.4, ge=0.05, le=20)
+    intensity: float = Field(default=1, ge=.1, le=2)
+    color: str | None = Field(default=None, pattern=r'^#[0-9a-fA-F]{6}$')
+    seed: int = Field(default=1, ge=1, le=1000000)
+    sound: bool = False
+    volume: float = Field(default=.25, ge=0, le=1)
+    anchor: dict | None = None
+
+    @model_validator(mode='after')
+    def valid_world_preset(self):
+        if self.kind not in WORLD_KINDS or self.end <= self.start:
+            raise ValueError('World SFX need portal, magic_circle or summoning_gate and an end later than start')
+        self.color = self.color or PRESETS[self.kind]['color']
+        if self.anchor is not None:
+            slot_id = self.anchor.get('slotId') if isinstance(self.anchor, dict) else None
+            if not isinstance(slot_id, str) or not slot_id or len(slot_id) > 160:
+                raise ValueError('World SFX anchors need a slotId')
+        return self
+
+
 class EffectsApply(DocumentInput):
-    cues: Annotated[list[FxCue], Field(max_length=64)]
+    cues: Annotated[list[FxCue], Field(default_factory=list, max_length=64)]
+    worldCues: Annotated[list[WorldFxCue], Field(default_factory=list, max_length=64)]
     replace: bool = False
 
 
@@ -105,8 +141,8 @@ class SpeechPrepare(DocumentInput):
 
 OPERATIONS = {
     'scenes.speech.capabilities': (Strict, 'Read local Rhubarb and optional installed-only CPU BS-RoFormer availability. No model downloads or inference.'),
-    'scenes.effects.catalog': (Strict, 'List 30 visual overlays, including magic/anime, and their local procedural sounds for 2D/3D. No AI generation.'),
-    'scenes.effects.apply': (EffectsApply, 'Return an editable 2D/3D document with timed SFX. Matching cue IDs replace in place. No save or export.'),
+    'scenes.effects.catalog': (Strict, 'List 30 screen overlays and the 3 world-space kinds (portal, magic_circle, summoning_gate). Screen uses percent; world uses meters. No AI generation.'),
+    'scenes.effects.apply': (EffectsApply, 'Return an editable 2D/3D document with timed SFX. Screen cues go to sfx; worldCues go to worldSfx on Video3D only. Matching IDs replace in place. No save or export.'),
     'scenes.effects.showcase': (EffectsShowcase, 'Return a reusable SFX showcase: all effects 90 seconds, or collection anime 36 seconds. Retains actors/camera and replaces only SFX. No save or export.'),
     'scenes.speech.prepare': (SpeechPrepare, 'Analyze an existing workspace voice with Rhubarb and attach it to an exact 3D speaker/clip. Optional isolate_vocals uses installed-only local CPU BS-RoFormer, preserving original playback. Returns an editable document; face calibration may be needed. No downloads, voice generation, save or video export.'),
 }
@@ -144,7 +180,20 @@ def _effects(value):
         entries[cue.id] = cue.model_dump()
     if len(entries) > 64:
         raise ValueError('Maximum 64 effects per scene')
-    document['sfx'] = list(entries.values())
+    if value.cues or value.replace:
+        document['sfx'] = list(entries.values())
+    if value.worldCues or (value.replace and 'slots' in document):
+        if 'slots' not in document:
+            raise ValueError('World SFX require a Video3D document. Screen overlays remain available for 2D.')
+        world_current = [] if value.replace else [WorldFxCue.model_validate(cue).model_dump() for cue in document.get('worldSfx', [])]
+        world_entries = {cue['id']: cue for cue in world_current}
+        for cue in value.worldCues:
+            if cue.end > document['duration']:
+                raise ValueError('Effect timing exceeds the scene duration')
+            world_entries[cue.id] = cue.model_dump()
+        if len(world_entries) > 64:
+            raise ValueError('Maximum 64 world effects per scene')
+        document['worldSfx'] = list(world_entries.values())
     return document
 
 
@@ -166,7 +215,11 @@ class SceneCommands:
             return {'version': 1, 'status': 'completed', 'result': {
                 'rhubarb': bool(rhubarb_executable()), 'vocalIsolation': isolation_capability()}}
         if name == 'scenes.effects.catalog':
-            return {'version': 1, 'status': 'completed', 'result': {'effects': deepcopy(CATALOG), 'coordinates': 'screen-percent'}}
+            return {'version': 1, 'status': 'completed', 'result': {
+                'effects': deepcopy(CATALOG),
+                'coordinates': {'screen': 'percent', 'world': 'meters'},
+                'worldKinds': sorted(WORLD_KINDS),
+            }}
         if isinstance(value, SpeechPrepare):
             from services.scene_speech_command import prepare_speech
             document = prepare_speech(value, self.workspace_dir)

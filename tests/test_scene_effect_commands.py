@@ -71,6 +71,21 @@ def test_http_and_mcp_return_identical_documents_without_browser(service, tmp_pa
     assert len(schema['operations']) == 5
 
 
+def test_world_cues_upsert_on_video3d_and_reject_2d(service):
+    world = showcase(service, '3d')
+    cue = {'id': 'portal-1', 'kind': 'portal', 'start': 0, 'end': 2, 'position': {'x': 0, 'y': 1, 'z': -1}, 'sound': True}
+    first = service.execute({'version': 1, 'operation': 'scenes.effects.apply', 'input': {'document': world, 'worldCues': [cue]}})
+    assert first['result']['document']['worldSfx'][0]['kind'] == 'portal'
+    assert first['result']['document']['sfx'] == world['sfx']
+    assert first == service.execute({'version': 1, 'operation': 'scenes.effects.apply', 'input': {'document': world, 'worldCues': [cue]}})
+    catalog = service.execute({'version': 1, 'operation': 'scenes.effects.catalog', 'input': {}})['result']
+    assert catalog['coordinates']['world'] == 'meters'
+    assert 'portal' in catalog['worldKinds']
+    flat = showcase(service, '2d')
+    with pytest.raises(ValueError, match='Video3D'):
+        service.execute({'version': 1, 'operation': 'scenes.effects.apply', 'input': {'document': flat, 'worldCues': [cue]}})
+
+
 def test_speech_rejects_paths_and_unknown_character_before_analysis(service):
     doc = showcase(service)
     doc['slots'][0]['sourceUrl'] = '/api/v1/file/actor.glb?workspace=default'

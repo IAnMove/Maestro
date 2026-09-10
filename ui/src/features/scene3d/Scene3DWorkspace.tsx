@@ -2,6 +2,10 @@ import { useSceneDocumentHandoff } from '../sceneFx/handoff'
 import { SceneFxControls } from '../sceneFx/SceneFxControls'
 import { SceneFxOverlay } from '../sceneFx/SceneFxOverlay'
 import { adoptPreparedSceneDocument, withFxShowcase } from '../sceneFx/showcase'
+import { WorldSfxControls } from '../sceneFx/WorldSfxControls'
+import { worldSfxAudioCues, parseWorldSfx, type WorldSfx } from '../sceneFx/world'
+import { worldSfxDepthDocument } from '../sceneFx/worldDemo'
+import { WORLD_SFX_SELECT_PREFIX } from './transformGizmo'
 import { Scene3DMotionControls } from './Scene3DMotionControls'
 import { Scene3DSpeakerControls } from './speech/Scene3DSpeakerControls'
 import { Scene3DSpeechStatus } from './speech/Scene3DSpeechStatus'
@@ -83,6 +87,7 @@ export function Scene3DWorkspace({ width, height, initialDocument }: Props) {
   const [playing, setPlaying] = useState(false)
   const [frame, setFrame] = useState(0)
   const [selectedId, setSelectedId] = useState('subject_1')
+  const [selectedWorldSfxId, setSelectedWorldSfxId] = useState<string | undefined>()
   const frameRef = useRef(0)
   const sceneDocRef = useRef(sceneDoc)
   const [catalogs, setCatalogs] = useState<Record<string, Scene3DClipCatalogEntry[]>>({})
@@ -338,27 +343,56 @@ export function Scene3DWorkspace({ width, height, initialDocument }: Props) {
       <Scene3DSpeechSelector slots={sceneDoc.slots} selected={selected} open={speechOpen}
         onToggle={() => { setPickTarget(undefined); setSpeechOpen(open => !open) }} onSelect={id => { setPickTarget(undefined); setSelectedId(id) }} />
       <SceneFxControls cues={sceneDoc.sfx} duration={sceneDoc.duration} disabled={editingLocked} onChange={sfx => applyScene(current => ({ ...current, sfx }))} onShowcase={collection => applyScene(current => withFxShowcase(current, collection))} />
+      <WorldSfxControls cues={sceneDoc.worldSfx} duration={sceneDoc.duration} selectedId={selectedWorldSfxId} disabled={editingLocked}
+        onSelect={id => { setPickTarget(undefined); setSelectedWorldSfxId(id) }}
+        onChange={worldSfx => applyScene(current => ({ ...current, worldSfx }))}
+        onDemo={() => {
+          if (!canMutateWorld3DScene(exportingRef.current)) return
+          const demo = worldSfxDepthDocument()
+          generationRef.current += 1
+          setPlaying(false); setFrame(0); applyScene(demo)
+          setSelectedId(demo.slots[0]?.id ?? 'subject_1')
+          setSelectedWorldSfxId(demo.worldSfx?.[0]?.id)
+        }} />
       <KineticTextControls cues={sceneDoc.texts} duration={sceneDoc.duration} disabled={editingLocked} onChange={texts => applyScene(current => ({ ...current, texts }))} />
       <Scene3DTransport playing={playing} disabled={exporting} seconds={seconds} duration={sceneDoc.duration} speed={speed}
         onToggle={() => { if (canMutateWorld3DScene(exportingRef.current)) { setPickTarget(undefined); setPlaying(current => !current) } }}
         onSeek={time => { if (exportingRef.current) return; setPlaying(false); setFrame(Math.min(count - 1, Math.max(0, Math.round(time * fps)))) }}
         onSpeed={playbackSpeed => applyScene(current => ({ ...current, playbackSpeed }))} />
       <div className={`grid items-start gap-3 ${speechVisible ? 'xl:grid-cols-[minmax(0,1fr)_21rem]' : ''}`}>
-      <Scene3DInteraction enabled={!playing && !exporting && Boolean(selected) && selected.media !== 'image'}
+      <Scene3DInteraction enabled={!playing && !exporting && (Boolean(selectedWorldSfxId) || (Boolean(selected) && selected.media !== 'image'))}
         width={sceneDoc.width} height={sceneDoc.height} onMode={setTransformMode}>
         <Scene3DStage
           ref={stageRef}
           document={sceneDoc}
           sceneSeconds={seconds}
           selectedId={selectedId}
+          selectedWorldSfxId={selectedWorldSfxId}
           transformMode={transformMode}
           editing={!playing && !exporting}
-          onSelect={id => { setPickTarget(undefined); setSelectedId(id) }}
-          onTransform={(id, patch) => applyScene(current => patchScene3DSlot(current, id, patch))}
+          onSelect={id => {
+            setPickTarget(undefined)
+            if (id.startsWith(WORLD_SFX_SELECT_PREFIX)) { setSelectedWorldSfxId(id.slice(WORLD_SFX_SELECT_PREFIX.length)); return }
+            setSelectedWorldSfxId(undefined)
+            setSelectedId(id)
+          }}
+          onTransform={(id, patch) => applyScene(current => {
+            if (!id.startsWith(WORLD_SFX_SELECT_PREFIX)) return patchScene3DSlot(current, id, patch)
+            const cueId = id.slice(WORLD_SFX_SELECT_PREFIX.length)
+            const DEG = 180 / Math.PI
+            return { ...current, worldSfx: parseWorldSfx((current.worldSfx ?? []).map(cue => {
+              if (cue.id !== cueId) return cue
+              const next: WorldSfx = { ...cue }
+              if (patch.position) next.position = { x: patch.position[0], y: patch.position[1], z: patch.position[2] }
+              if (patch.worldRotation) next.rotation = { x: patch.worldRotation[0] * DEG, y: patch.worldRotation[1] * DEG, z: patch.worldRotation[2] * DEG }
+              if (patch.scale !== undefined) next.scale = patch.scale
+              return next
+            })) }
+          })}
           onSlotClips={(slotId, clips) => setCatalogs(current => ({ ...current, [slotId]: clips }))}
           onSlotMeshes={(slotId, names) => setMeshes(current => ({ ...current, [slotId]: names }))}
         />
-        <SceneFxOverlay cues={sceneDoc.sfx} seconds={seconds} width={sceneDoc.width} height={sceneDoc.height} duration={sceneDoc.duration} playing={playing} speed={speed} />
+        <SceneFxOverlay cues={sceneDoc.sfx} soundCues={[...(sceneDoc.sfx ?? []), ...worldSfxAudioCues(sceneDoc.worldSfx)]} seconds={seconds} width={sceneDoc.width} height={sceneDoc.height} duration={sceneDoc.duration} playing={playing} speed={speed} />
         <KineticTextOverlay cues={sceneDoc.texts} seconds={seconds} width={sceneDoc.width} height={sceneDoc.height} />
         {speechVisible && !playing && !exporting && selected && pickTarget === `${generationRef.current}/${selected.id}/${selected.sourceUrl}` &&
           <LipsPickOverlay onCancel={() => setPickTarget(undefined)} onPick={(x, y) => {
