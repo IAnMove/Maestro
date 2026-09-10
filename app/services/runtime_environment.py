@@ -26,6 +26,10 @@ def _from_parent(value: str, parents: set[Path]) -> bool:
     return any(candidate == p or p in candidate.parents for p in parents)
 
 
+def _interpreter_prefix(python: Path) -> Path:
+    return python.parent.parent if python.parent.name.lower() in {"bin", "scripts"} else python.parent
+
+
 def _without_package_overrides(source: Mapping[str, str]) -> dict[str, str]:
     blocked = {"VIRTUAL_ENV", "CONDA_DEFAULT_ENV", "CONDA_PROMPT_MODIFIER", "LD_PRELOAD"}
     return {k: v for k, v in source.items()
@@ -40,13 +44,17 @@ def isolated_environment(python: Path, inherited: Mapping[str, str] | None = Non
     """
     source = dict(os.environ if inherited is None else inherited)
     env = _without_package_overrides(source)
-    prefix = python.parent.parent if python.parent.name in {"bin", "Scripts"} else python.parent
+    prefix = _interpreter_prefix(python)
     # Discard native libraries from the parent engine as well as its Python
     # packages. Keep system CUDA/toolchain paths (needed for native builds).
     parents = {Path(sys.prefix).resolve()}
     parents.update(Path(v).resolve() for k, v in source.items() if v and
                    (k.upper() == "VIRTUAL_ENV" or k.upper().startswith("CONDA_PREFIX")))
     parents.discard(prefix.resolve())
+    # Pinokio's machine tools (nvcc, ffmpeg, git) live in conda base.
+    # CONDA_PYTHON_EXE identifies that base, not the activated engine.
+    if source.get("CONDA_PYTHON_EXE"):
+        parents.discard(_interpreter_prefix(Path(source["CONDA_PYTHON_EXE"])).resolve())
 
     bins = [python.parent]
     if python.name.lower() == "python.exe":

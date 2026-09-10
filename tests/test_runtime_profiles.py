@@ -162,6 +162,22 @@ def test_native_library_paths_cannot_leak_from_the_parent_engine(tmp_path):
     assert "LD_PRELOAD" not in env and "CONDA_PREFIX_1" not in env
 
 
+def test_pinokio_machine_toolchain_survives_engine_isolation(tmp_path):
+    import os
+    base = tmp_path / "pinokio conda base"
+    parent = tmp_path / "parent engine"
+    target = tmp_path / "selected engine"
+    env = isolated_environment(python_path(target), {
+        "VIRTUAL_ENV": str(parent), "CONDA_PREFIX": str(base),
+        "CONDA_PYTHON_EXE": str(python_path(base)),
+        "PATH": os.pathsep.join([str(parent / "bin"), str(base / "bin")]),
+        "LD_LIBRARY_PATH": os.pathsep.join([str(parent / "lib"), str(base / "lib")]),
+    })
+    assert str(parent) not in env["PATH"] and str(parent) not in env["LD_LIBRARY_PATH"]
+    assert str(base / "bin") in env["PATH"]  # nvcc/ffmpeg remain reachable.
+    assert env["LD_LIBRARY_PATH"] == str(base / "lib")
+
+
 def test_package_helper_ignores_inherited_destinations_and_configuration(monkeypatch):
     import importlib.util
     import os
