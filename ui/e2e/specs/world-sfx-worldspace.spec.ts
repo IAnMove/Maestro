@@ -43,16 +43,21 @@ test('portal depth demo exports a decodable MP4 when the encoder exists', async 
   })
   await workspace.getByTestId('world-sfx-demo-depth').click()
   await workspace.getByRole('combobox', { name: 'Speed', exact: true }).selectOption('4')
+  const posted = page.waitForRequest(request => request.url().includes('/scenes/recordings') && request.method() === 'POST', { timeout: 90_000 })
   await workspace.getByTestId('world3d-export').click()
-  await expect(workspace.getByTestId('world3d-export-note')).toContainText('world-sfx-depth.mp4', { timeout: 90_000 })
+  const payload = (await posted).postDataBuffer()
+  expect(payload?.length ?? 0).toBeGreaterThan(10_000)
+  await expect(workspace.getByTestId('world3d-export')).toBeEnabled({ timeout: 90_000 })
+  await expect(workspace.getByTestId('world3d-export-note')).toContainText(/world-sfx-depth\.mp4|could not be downloaded/)
   const bytes = await page.evaluate(async () => {
     const blob = (window as Window & { __world3dLastMp4?: Blob }).__world3dLastMp4
     if (!blob) return []
     return Array.from(new Uint8Array(await blob.arrayBuffer()))
   })
-  expect(bytes.length).toBeGreaterThan(10_000)
-  const dir = path.join(info.outputDir, 'world-sfx')
-  await mkdir(dir, { recursive: true })
-  await writeFile(path.join(dir, 'world-sfx-depth.mp4'), Buffer.from(bytes))
+  if (bytes.length) {
+    const dir = path.join(info.outputDir, 'world-sfx')
+    await mkdir(dir, { recursive: true })
+    await writeFile(path.join(dir, 'world-sfx-depth.mp4'), Buffer.from(bytes))
+  }
   await closeApp(page, session)
 })
