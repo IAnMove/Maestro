@@ -9,7 +9,9 @@ export type MediaScreen = {
   targetMesh: string
   anchor: string
   offset: [number, number, number]
+  pitch: number
   yaw: number
+  roll: number
   width: number
   height: number
   style: 'monitor' | 'billboard' | 'frameless'
@@ -22,7 +24,7 @@ export type MediaScreen = {
 
 export const defaultMediaScreen = (): MediaScreen => ({
   sourceUrl: '', media: 'image', mode: 'mesh', targetMesh: 'SCREEN_CONTENT', anchor: '',
-  offset: [0, 0, 0], yaw: 0, width: 4, height: 3, style: 'monitor', fit: 'contain',
+  offset: [0, 0, 0], pitch: 0, yaw: 0, roll: 0, width: 4, height: 3, style: 'monitor', fit: 'contain',
   start: 0, speed: 1, loop: true, flipY: false,
 })
 
@@ -44,15 +46,18 @@ export function pickScreenAnchor(names: readonly string[]): string {
   return names.find(name => /headfront|screen|display|monitor|tv/i.test(name)) ?? ''
 }
 
-export function defaultModelScreen(nodeNames: readonly string[] = []): MediaScreen {
+export function defaultModelScreen(nodeNames: readonly string[] = [], meshNames: readonly string[] = []): MediaScreen {
   const anchor = pickScreenAnchor(nodeNames)
-  if (anchor) {
+  if (anchor && !meshNames.includes(anchor)) {
     return {
       ...defaultMediaScreen(), mode: 'plane', targetMesh: 'HOCUS_SCREEN_PLANE', anchor,
+      // Meshy's headfront bone points +Y out of the display, with +Z up and
+      // +X left. Align the plane's +Z normal, +Y up and +X right to that frame.
+      ...(anchor.toLowerCase() === 'headfront' ? { pitch: Math.PI / 2, yaw: Math.PI } : {}),
       width: 0.32, height: 0.22,
     }
   }
-  return { ...defaultMediaScreen(), mode: 'mesh', targetMesh: nodeNames[0] || 'SCREEN_CONTENT' }
+  return { ...defaultMediaScreen(), mode: 'mesh', targetMesh: pickScreenAnchor(meshNames) || meshNames[0] || 'SCREEN_CONTENT' }
 }
 
 export function parseMediaScreen(raw: unknown): MediaScreen | undefined {
@@ -66,7 +71,8 @@ export function parseMediaScreen(raw: unknown): MediaScreen | undefined {
     media: value.media === 'video' ? 'video' : 'image', mode,
     targetMesh: typeof value.targetMesh === 'string' ? value.targetMesh : defaults.targetMesh,
     anchor: typeof value.anchor === 'string' ? value.anchor.slice(0, 120) : '',
-    offset: parseOffset(value.offset), yaw: bounded(value.yaw, 0, -Math.PI, Math.PI),
+    offset: parseOffset(value.offset), pitch: bounded(value.pitch, 0, -Math.PI, Math.PI),
+    yaw: bounded(value.yaw, 0, -Math.PI, Math.PI), roll: bounded(value.roll, 0, -Math.PI, Math.PI),
     width: bounded(value.width, plane ? 0.32 : 4, 0.02, 80),
     height: bounded(value.height, plane ? 0.22 : 3, 0.02, 80),
     style: value.style === 'billboard' || value.style === 'frameless' ? value.style : 'monitor',
@@ -91,6 +97,6 @@ export function mediaScreenMountKey(screen?: MediaScreen) {
   if (!screen) return ''
   return JSON.stringify([
     screen.sourceUrl, screen.media, screen.mode, screen.targetMesh, screen.anchor,
-    screen.offset, screen.yaw, screen.width, screen.height, screen.style, screen.fit, screen.flipY,
+    screen.offset, screen.pitch, screen.yaw, screen.roll, screen.width, screen.height, screen.style, screen.fit, screen.flipY,
   ])
 }

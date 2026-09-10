@@ -4,10 +4,17 @@ import type { MediaScreen } from './mediaScreen.ts'
 export { pickScreenAnchor } from './mediaScreen.ts'
 
 export const SCREEN_PLANE_NAME = 'HOCUS_SCREEN_PLANE'
+const attachedPlanes = new WeakMap<Object3D, Mesh>()
 
 export function namedSceneNodes(root: Object3D): string[] {
   const names: string[] = []
   root.traverse(child => { if (child.name) names.push(child.name) })
+  return [...new Set(names)]
+}
+
+export function namedSceneMeshes(root: Object3D): string[] {
+  const names: string[] = []
+  root.traverse(child => { if (child instanceof Mesh && child.name) names.push(child.name) })
   return [...new Set(names)]
 }
 
@@ -37,14 +44,16 @@ export function attachScreenPlane(root: Object3D, screen: MediaScreen): Mesh {
   mesh.name = SCREEN_PLANE_NAME
   const [x, y, z] = screenPlaneOffset(screen)
   mesh.position.set(x, y, z)
-  mesh.rotation.y = screen.yaw ?? 0
+  mesh.rotation.set(screen.pitch ?? 0, screen.yaw ?? 0, screen.roll ?? 0)
   parent.add(mesh)
+  attachedPlanes.set(root, mesh)
   return mesh
 }
 
-export function detachScreenPlane(root: Object3D) {
-  const existing = findNamedNode(root, SCREEN_PLANE_NAME)
-  if (!existing || !(existing instanceof Mesh)) return
+export function detachScreenPlane(root: Object3D, expected = attachedPlanes.get(root)) {
+  const existing = attachedPlanes.get(root)
+  if (!existing || existing !== expected) return
+  attachedPlanes.delete(root)
   existing.removeFromParent()
   existing.geometry.dispose()
   const material = existing.material

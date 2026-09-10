@@ -24,6 +24,12 @@ A **layered compositor**, not MiniMax H3.
 
 Use the compositor when you need **controllable motion of a known object** over plates: a ship crossing stars, a UFO rising behind mountains, a logo flying in, rain over a still. Use H3 when you need **performance, speech, or a living location**. Mix them: H3 for people/places, compositor for the vehicle insert, Video Editor to cut them together. Use a **Character Kit** when the known object is a graphic puppet that must speak with mouth overlays—not a Hunyuan mesh and not H3 lip-sync. Use **Put a face / screen on this character** when the GLB already has a TV/monitor head: the compositor anchors a plane to `headfront` (or another bone) and the clip (Walk/Run) carries the picture with it.
 
+For a TV head, choose **Anchor a plane**, then adjust its width, height, local
+offset and pitch/yaw/roll to fit the display. The `headfront` preset starts with
+the orientation of the Meshy rig; size and centering still depend on the model.
+Save the shot JSON to keep that placement. For a prepared monitor, use
+**Paint an existing mesh** and select its screen mesh instead.
+
 Do **not** ask H3 to “keep this exact GLB flying on a perfect path.” H3 will invent a new ship. The compositor keeps the mesh.
 
 ---

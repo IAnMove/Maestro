@@ -124,7 +124,17 @@ and use the regular object transforms and travel controls. **Fit entire image**
 letterboxes the original; **Fill and crop** fills the face without stretching.
 Screen faces are unlit so the app's content remains readable under scene lights.
 
-For an existing GLB, enable **Use a mesh as a screen** and select its mesh name.
+For an existing GLB, enable **Put a face / screen on this character**. Prepared
+monitor meshes use **Paint an existing mesh**; a known bone such as `headfront`
+defaults to **Anchor a plane**. Mesh selection lists paintable meshes; plane
+attachment lists named bones/nodes. A plane follows its animated parent, keeps
+the original body material and uses upright media by default. Its width, height,
+offset and three-axis rotation are local to the GLB anchor and survive
+saving/reopening a shot. Offset is limited to -2…2 and angles to -180…180 degrees
+in both editor and loader. Meshy's `headfront` preset aligns its +Y-facing bone
+to an upright front-facing screen; other rigs can adjust pitch, yaw and roll.
+
+In mesh mode, select the prepared display mesh.
 `SCREEN_CONTENT` is the initial name for prepared monitor models. The name must
 identify exactly one mesh; missing/duplicate names fail visibly and prevent an
 incomplete export. The mesh needs usable UVs. Its existing geometry and UVs

@@ -100,7 +100,7 @@ export function Scene3DWorkspace({ width, height, initialDocument }: Props) {
   const [modelItems, setModelItems] = useState<ApiOutput[]>([])
   const [imageItems, setImageItems] = useState<ApiOutput[]>([])
   const [videoItems, setVideoItems] = useState<ApiOutput[]>([])
-  const [meshes, setMeshes] = useState<Record<string, string[]>>({})
+  const [screenTargets, setScreenTargets] = useState<Record<string, { meshes: string[]; nodes: string[] }>>({})
   const [exporting, setExporting] = useState(false)
   const [exportNote, setExportNote] = useState<string | null>(null)
   const exportingRef = useRef(false)
@@ -402,7 +402,7 @@ export function Scene3DWorkspace({ width, height, initialDocument }: Props) {
             })) }
           })}
           onSlotClips={(slotId, clips) => setCatalogs(current => ({ ...current, [slotId]: clips }))}
-          onSlotMeshes={(slotId, names) => setMeshes(current => ({ ...current, [slotId]: names }))}
+          onSlotMeshes={(slotId, meshes, nodes) => setScreenTargets(current => ({ ...current, [slotId]: { meshes, nodes } }))}
         />
         <SceneFxOverlay cues={sceneDoc.sfx} soundCues={[...(sceneDoc.sfx ?? []), ...worldSfxAudioCues(sceneDoc.worldSfx)]} seconds={seconds} width={sceneDoc.width} height={sceneDoc.height} duration={sceneDoc.duration} playing={playing} speed={speed} />
         <KineticTextOverlay cues={sceneDoc.texts} seconds={seconds} width={sceneDoc.width} height={sceneDoc.height} />
@@ -499,7 +499,7 @@ export function Scene3DWorkspace({ width, height, initialDocument }: Props) {
                   onChoose={item => assignChoice(slot, capture, item)}
                 />
               </div>}
-              <Scene3DScreenControls slot={slot} meshes={meshes[slot.id] ?? []} items={[...imageItems, ...videoItems]} disabled={editingLocked}
+              <Scene3DScreenControls slot={slot} meshes={screenTargets[slot.id]?.meshes ?? []} nodes={screenTargets[slot.id]?.nodes ?? []} items={[...imageItems, ...videoItems]} disabled={editingLocked}
                 onChange={screen => applyScene(current => patchScene3DSlot(current, slot.id, { screen }))}
                 onChoose={item => {
                   if (item && item.type !== 'image' && item.type !== 'video') return

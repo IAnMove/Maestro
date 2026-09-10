@@ -1,6 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { useUiTranslation } from '../../i18n'
 import { bindScreenMedia } from './screenMediaRuntime'
+import { namedSceneMeshes, namedSceneNodes } from './screenPlane'
 import { slotMountKey } from './backdrop'
 import { createTransformGizmo, type TransformMode, type TransformPatch } from './transformGizmo.ts'
 import { TextureLoader } from 'three'
@@ -44,7 +45,7 @@ type Props = {
   onTransform?: (slotId: string, patch: TransformPatch) => void
   onSelect?: (slotId: string) => void
   onSlotClips?: (slotId: string, clips: Scene3DClipCatalogEntry[]) => void
-  onSlotMeshes?: (slotId: string, meshes: string[]) => void
+  onSlotMeshes?: (slotId: string, meshes: string[], nodes: string[]) => void
 }
 
 export type Scene3DStageHandle = {
@@ -301,9 +302,7 @@ export const Scene3DStage = forwardRef<Scene3DStageHandle, Props>(function Scene
         onSlotClipsRef.current?.(slotId, clips)
         paintWorld(world, documentRef.current, secondsRef.current)
       }, (loaded, gltf) => {
-        const names: string[] = []
-        gltf.scene.traverse(child => { if (child.name) names.push(child.name) })
-        onSlotMeshesRef.current?.(loaded.id, [...new Set(names)])
+        onSlotMeshesRef.current?.(loaded.id, namedSceneMeshes(gltf.scene), namedSceneNodes(gltf.scene))
         bindScreen(loaded)
         repaint()
       })
