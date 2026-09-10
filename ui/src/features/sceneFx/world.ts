@@ -51,6 +51,25 @@ export function worldAnchorOffsetFromWorldPoint(
   return { x: dx * cos - dz * sin, y: dy, z: dx * sin + dz * cos }
 }
 
+/** Persist a gizmo drag in the same frame the cue is drawn (live pose / GPU local). */
+export function applyWorldSfxTranslate(
+  cue: WorldSfx,
+  worldPoint: readonly [number, number, number],
+  posedAnchor?: { position: readonly [number, number, number]; rotationY: number },
+  localOffset?: WorldVec3,
+): WorldSfx {
+  if (cue.anchor?.slotId && (localOffset || posedAnchor)) {
+    return {
+      ...cue,
+      anchor: {
+        slotId: cue.anchor.slotId,
+        offset: localOffset ?? worldAnchorOffsetFromWorldPoint(posedAnchor!, worldPoint),
+      },
+    }
+  }
+  return { ...cue, position: { x: worldPoint[0], y: worldPoint[1], z: worldPoint[2] } }
+}
+
 export function worldVec3(raw: unknown, fallback: WorldVec3, min: number, max: number): WorldVec3 {
   const value = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {}
   return {
