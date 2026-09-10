@@ -121,11 +121,27 @@ def test_no_git_or_ui_still_reports_release_and_system(project, capsys):
     distribution.report_identity(project)
     output = capsys.readouterr().out
     assert "Version: 0.9.0" in output and "commit: unknown" in output
+    assert "local changes: unknown" in output
     assert "React build: unavailable" in output and "Python" in output
     assert "Errno" not in output  # not a false Pinokio shell failure on first install
     page = distribution.recovery_html(project)
     assert "Repair Web UI" in page and "npm ci --include=dev" in page
     assert "Restart Start" in page and "Version 0.9.0" in page
+
+
+def test_product_version_does_not_use_upstream_git_tags(project):
+    def git(*args):
+        return subprocess.run(["git", *args], cwd=project, check=True, capture_output=True, text=True)
+    git("init")
+    git("add", "VERSION")
+    git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-m", "Product version")
+    git("tag", "v99-upstream")
+    clean = distribution.source_identity(project)
+    assert clean["version"] == "0.9.0" and clean["dirty"] is False
+    assert clean["commit"] == git("rev-parse", "HEAD").stdout.strip()
+    (project / "VERSION").write_text("0.9.1", encoding="utf-8")
+    modified = distribution.source_identity(project)
+    assert modified["version"] == "0.9.1" and modified["dirty"] is True
 
 
 def test_runtime_serves_503_recovery_or_real_assets(project):

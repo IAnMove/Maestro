@@ -17,7 +17,7 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "app"))
 from services.ui_distribution import (  # noqa: E402
-    MANIFEST, build_status, source_digest, source_identity, validate_artifact,
+    MANIFEST, build_status, report_identity, source_digest, source_identity, validate_artifact,
 )
 
 
@@ -114,6 +114,7 @@ def main() -> int:
             print(json.dumps({"ready": state["ready"], "reason": state["reason"],
                               "build_id": state["build"].get("build_id")}))
             return 0 if state["ready"] else 1
+        report_identity()
         ensure_build(force=args.force)
         return 0
     except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:

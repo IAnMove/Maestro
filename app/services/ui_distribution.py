@@ -25,7 +25,8 @@ def source_identity(root: Path = ROOT) -> dict:
         version = (root / "VERSION").read_text(encoding="utf-8").strip() or "unknown"
     except OSError:
         version = "unknown"
-    return {"version": version, "revision": git("describe", "--tags", "--always", "--dirty"),
+    status = git("status", "--porcelain", "--untracked-files=no")
+    return {"version": version, "dirty": None if status == "unknown" else bool(status),
             "commit": git("rev-parse", "HEAD"), "branch": git("branch", "--show-current") or "detached"}
 
 
@@ -117,7 +118,8 @@ def report_identity(root: Path = ROOT) -> None:
     source = source_identity(root)
     state = build_status(root)
     info = state["build"]
-    print(f"[HocusPocus] Version: {source['version']} | branch: {source['branch']} | commit: {source['commit']} | revision: {source['revision']}", flush=True)
+    modified = "unknown" if source["dirty"] is None else "yes" if source["dirty"] else "no"
+    print(f"[HocusPocus] Version: {source['version']} | branch: {source['branch']} | commit: {source['commit']} | local changes: {modified}", flush=True)
     print(f"[HocusPocus] System: {platform.system()} {platform.release()} ({platform.version()}) | {platform.machine()} | Python {platform.python_version()}", flush=True)
     print(f"[HocusPocus] React build: {info.get('build_id', 'unavailable')} | built: {info.get('built_at', 'unknown')} | commit: {info.get('commit', 'unknown')}", flush=True)
     print(f"[HocusPocus] React status: {'ready' if state['ready'] else 'unavailable'} {state['reason']}", flush=True)
