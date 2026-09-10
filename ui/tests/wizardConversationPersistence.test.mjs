@@ -627,6 +627,7 @@ test('first hydration keeps exclusive local answers that sit beside the oldest s
   const local = payload(1, localIds)
   const remote = payload(4, remoteIds)
   const earlyAnswers = Array.from({ length: 10 }, (_value, index) => `a${index + 1}`)
+  const newestRemoteQuestions = Array.from({ length: 19 }, (_value, index) => `u${index + 22}`)
 
   const choice = applyRemoteWizardConversation({
     localMessages: local.messages,
@@ -638,6 +639,14 @@ test('first hydration keeps exclusive local answers that sit beside the oldest s
 
   assert.deepEqual(earlyAnswers.filter(id => merged.some(message => message.id === id)), earlyAnswers)
   assert.deepEqual(earlyAnswers.filter(id => choice.messages.some(message => message.id === id)), earlyAnswers)
+  assert.deepEqual(
+    newestRemoteQuestions.filter(id => merged.some(message => message.id === id)),
+    newestRemoteQuestions,
+  )
+  assert.deepEqual(
+    newestRemoteQuestions.filter(id => choice.messages.some(message => message.id === id)),
+    newestRemoteQuestions,
+  )
   assert.equal(choice.source, 'local')
 
   const snapshots = new Map([['workspace-a', clone(remote)]])
@@ -658,6 +667,21 @@ test('first hydration keeps exclusive local answers that sit beside the oldest s
   assert.deepEqual(
     earlyAnswers.filter(id => saved.conversation.messages.some(message => message.id === id)),
     earlyAnswers,
+  )
+  assert.deepEqual(
+    newestRemoteQuestions.filter(id => saved.conversation.messages.some(message => message.id === id)),
+    newestRemoteQuestions,
+  )
+
+  const reloaded = applyRemoteWizardConversation({
+    localMessages: choice.messages,
+    localRevision: 0,
+    remoteMessages: saved.conversation.messages.slice(-40),
+    remoteRevision: saved.conversation.revision,
+  })
+  assert.deepEqual(
+    newestRemoteQuestions.filter(id => reloaded.messages.some(message => message.id === id)),
+    newestRemoteQuestions,
   )
 })
 

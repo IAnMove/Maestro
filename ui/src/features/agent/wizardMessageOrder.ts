@@ -28,6 +28,8 @@ export function insertMissingConversationValues<T>(canonical: T[], local: T[], k
  * Cap a rebased timeline without dropping exclusive local turns.
  * Neighbor insert can place those turns beside the oldest shared ids, where a
  * trailing window would silently delete them before the first persist.
+ * Fill remaining slots from the newest non-exclusive turns so an early
+ * exclusive cluster cannot hide the latest remote history across reloads.
  */
 export function capConversationValues<T>(
   merged: T[],
@@ -41,22 +43,17 @@ export function capConversationValues<T>(
     if (key(value) && isExclusive(value)) exclusiveIndexes.push(index)
   })
   if (!exclusiveIndexes.length) return merged.slice(-limit)
-  const exclusiveCount = exclusiveIndexes.length
-  if (exclusiveCount >= limit) return exclusiveIndexes.map(index => merged[index])
-  const firstExclusive = exclusiveIndexes[0]
-  const lastExclusive = exclusiveIndexes[exclusiveIndexes.length - 1]
-  if (lastExclusive - firstExclusive + 1 > limit) {
-    const exclusiveIds = new Set(exclusiveIndexes.map(index => key(merged[index])))
-    const others = merged.filter(value => !exclusiveIds.has(key(value)))
-    const keepIds = new Set([
-      ...exclusiveIds,
-      ...others.slice(-(limit - exclusiveCount)).map(value => key(value)),
-    ])
-    return merged.filter(value => keepIds.has(key(value)))
-  }
-  let start = firstExclusive
-  let end = lastExclusive + 1
-  while (end - start < limit && end < merged.length) end += 1
-  while (end - start < limit && start > 0) start -= 1
-  return merged.slice(start, end)
+  const keptExclusiveIndexes = exclusiveIndexes.length <= limit
+    ? exclusiveIndexes
+    : exclusiveIndexes.slice(-limit)
+  const exclusiveIds = new Set(keptExclusiveIndexes.map(index => key(merged[index])))
+  const others = merged.filter(value => {
+    const id = key(value)
+    return Boolean(id) && !exclusiveIds.has(id)
+  })
+  const keepIds = new Set([
+    ...exclusiveIds,
+    ...others.slice(-(limit - exclusiveIds.size)).map(value => key(value)),
+  ])
+  return merged.filter(value => keepIds.has(key(value)))
 }
