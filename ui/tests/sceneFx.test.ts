@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { FX_CATALOG, parseSceneFx } from '../src/features/sceneFx/types'
 import { fxSamples } from '../src/features/sceneFx/audio'
-import { withFxShowcase } from '../src/features/sceneFx/showcase'
+import { adoptPreparedSceneDocument, isFxShowcaseDocument, sceneHasAuthoredContent, withFxShowcase } from '../src/features/sceneFx/showcase'
 import { createDefaultScene3DDocument, parseScene3DDocument } from '../src/features/scene3d/document'
 import { parseSceneFile, serializeSceneFile } from '../src/lib/sceneFile'
 import { getSceneLayerTiming } from '../src/lib/sceneTimeline'
@@ -60,4 +60,56 @@ test('2D showcase background matches the requested collection after reopening', 
     const authored = { ...reopened, duration: 120 }
     assert.equal(withFxShowcase(authored, collection).layers, authored.layers)
   }
+})
+
+test('Wizard showcase without a document keeps an authored 2D scene and its local assets', () => {
+  const current = {
+    version: 1 as const,
+    name: 'Hero shot',
+    width: 1280,
+    height: 720,
+    duration: 8,
+    layers: [{
+      id: 'hero',
+      type: 'image' as const,
+      source: 'blob:http://localhost/user-cutout',
+      name: 'Hero',
+      visible: true,
+      transform: { x: 40, y: 50, scale: 1, opacity: 1, rotation: 0 },
+      animation: { start: { x: 40, y: 50, scale: 1, opacity: 1, rotation: 0 }, end: { x: 40, y: 50, scale: 1, opacity: 1, rotation: 0 }, duration: 8, curve: 'linear' as const },
+    }],
+  }
+  const incoming = withFxShowcase({ version: 1 as const, name: 'SFX showcase', layers: [], width: 1280, height: 720, duration: 4 }, 'anime')
+  assert.equal(isFxShowcaseDocument(incoming), true)
+  assert.equal(sceneHasAuthoredContent(current), true)
+  const adopted = adoptPreparedSceneDocument(current, incoming)
+  assert.equal(adopted.mode, 'retain')
+  assert.equal(adopted.document.layers, current.layers)
+  assert.equal(adopted.document.layers[0].source, 'blob:http://localhost/user-cutout')
+  assert.equal(adopted.document.name, 'Hero shot')
+  assert.equal(adopted.document.duration, 36)
+  assert.equal(adopted.document.sfx.length, 12)
+})
+
+test('Wizard showcase without a document keeps placed 3D speakers', () => {
+  const current = createDefaultScene3DDocument()
+  current.slots[0].sourceUrl = '/api/v1/file/hero.glb?workspace=client-a'
+  const incoming = withFxShowcase(createDefaultScene3DDocument(), 'all')
+  const adopted = adoptPreparedSceneDocument(current, incoming)
+  assert.equal(adopted.mode, 'retain')
+  assert.equal(adopted.document.slots, current.slots)
+  assert.equal(adopted.document.slots[0].sourceUrl, '/api/v1/file/hero.glb?workspace=client-a')
+  assert.equal(adopted.document.sfx.length, FX_CATALOG.length)
+})
+
+test('an empty editor still opens the stock showcase, and apply/speech documents still replace', () => {
+  const empty2d = { version: 1 as const, name: 'Untitled scene', layers: [] as [], width: 1280, height: 720, duration: 5 }
+  const showcase = withFxShowcase({ version: 1 as const, name: 'SFX showcase', layers: [], width: 1280, height: 720, duration: 4 })
+  assert.equal(sceneHasAuthoredContent(empty2d), false)
+  assert.equal(adoptPreparedSceneDocument(empty2d, showcase).mode, 'replace')
+  const current = createDefaultScene3DDocument()
+  current.slots[0].sourceUrl = '/files/hero.glb'
+  const preparedApply = { ...createDefaultScene3DDocument(), duration: 6, sfx: [{ id: 'spark-1', kind: 'sparks', start: 0, end: 1 }] }
+  assert.equal(isFxShowcaseDocument(preparedApply), false)
+  assert.equal(adoptPreparedSceneDocument(current, preparedApply as typeof current).mode, 'replace')
 })

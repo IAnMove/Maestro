@@ -5,7 +5,7 @@ import { encodeSpeechAudio } from '../../features/scene3d/speech/encodeAudio'
 import { useSceneDocumentHandoff } from '../../features/sceneFx/handoff'
 import { SceneFxControls } from '../../features/sceneFx/SceneFxControls'
 import { SceneFxOverlay } from '../../features/sceneFx/SceneFxOverlay'
-import { withFxShowcase } from '../../features/sceneFx/showcase'
+import { adoptPreparedSceneDocument, withFxShowcase } from '../../features/sceneFx/showcase'
 import { KineticTextControls } from '../common/KineticTextControls'
 import { KineticTextOverlay } from '../common/KineticTextOverlay'
 import { paintKineticTexts, parseKineticTexts } from '../../lib/kineticText'
@@ -2184,8 +2184,14 @@ export function SceneAnimatorPanel() {
 
   useSceneDocumentHandoff('2d', raw => {
     if (playing || recording || publishing) throw new Error('Stop playback/export before replacing the scene.')
+    const incoming = raw as AnimatorScene
+    const adopted = adoptPreparedSceneDocument(sceneRef.current, incoming)
+    if (adopted.mode === 'retain') {
+      updateScene(() => adopted.document)
+      return
+    }
     sessionStorage.setItem('hocuspocus:scene-before-command:' + Date.now(), JSON.stringify(sceneRef.current))
-    importScene(JSON.stringify(raw))
+    if (!importScene(JSON.stringify(adopted.document))) throw new Error('The prepared 2D scene could not be opened.')
   })
   const publishRecording = async (blob: Blob, current: Scene) => {
     const context = recipeContextRef.current

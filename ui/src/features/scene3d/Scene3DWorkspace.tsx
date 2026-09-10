@@ -1,7 +1,7 @@
 import { useSceneDocumentHandoff } from '../sceneFx/handoff'
 import { SceneFxControls } from '../sceneFx/SceneFxControls'
 import { SceneFxOverlay } from '../sceneFx/SceneFxOverlay'
-import { withFxShowcase } from '../sceneFx/showcase'
+import { adoptPreparedSceneDocument, withFxShowcase } from '../sceneFx/showcase'
 import { Scene3DMotionControls } from './Scene3DMotionControls'
 import { Scene3DSpeakerControls } from './speech/Scene3DSpeakerControls'
 import { Scene3DSpeechStatus } from './speech/Scene3DSpeechStatus'
@@ -107,9 +107,14 @@ export function Scene3DWorkspace({ width, height, initialDocument }: Props) {
     if (exportingRef.current || playing) throw new Error('Stop playback/export before replacing the scene.')
     const next = parseScene3DDocument(raw)
     if (!next) throw new Error('Invalid prepared 3D document.')
+    const adopted = adoptPreparedSceneDocument(sceneDocRef.current, next)
+    if (adopted.mode === 'retain') {
+      setSceneDoc(adopted.document)
+      return
+    }
     sessionStorage.setItem('hocuspocus:scene-before-command:' + Date.now(), JSON.stringify(sceneDocRef.current))
-    generationRef.current += 1; setSceneDoc(next); setFrame(0)
-    setSelectedId(next.slots[0]?.id ?? 'subject_1'); setSpeechOpen(next.slots.some(slot => Boolean(slot.speech)))
+    generationRef.current += 1; setSceneDoc(adopted.document); setFrame(0)
+    setSelectedId(adopted.document.slots[0]?.id ?? 'subject_1'); setSpeechOpen(adopted.document.slots.some(slot => Boolean(slot.speech)))
   })
   const speechVisible = speechOpen && selected?.media === 'model3d'
 
