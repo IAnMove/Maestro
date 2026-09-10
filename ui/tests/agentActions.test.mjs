@@ -1843,6 +1843,83 @@ test('Spanish para-preposition does not cancel the active GPU task', async () =>
   }
 })
 
+test('quoted cancel or retry language inside a generate command does not hijack the GPU job', async () => {
+  const {
+    isExplicitCancelRequest,
+    isExplicitRetryRequest,
+    isExplicitVideoGenerationRequest,
+    isExplicitImageGenerationRequest,
+    reconcileAgentTurnWithRequest,
+  } = await import('../src/features/agent/agentActions.ts')
+
+  for (const request of [
+    'Generate a video of a director yelling "stop the video"',
+    'Generate a video of a director yelling stop the video',
+    'Generate a video showing a sign that reads "Cancel the generation"',
+    'Generate a video showing a sign that reads "Can I cancel the generation?"',
+    'Genera un vídeo de un director gritando "cancela el vídeo"',
+  ]) {
+    assert.equal(isExplicitVideoGenerationRequest(request), true, request)
+    assert.equal(isExplicitCancelRequest(request), false, request)
+    const turn = await reconcileAgentTurnWithRequest(request, { reply: 'Cancelo.', actions: [] })
+    assert.deepEqual(turn.actions.map(action => action.type), ['prepare_video', 'start_generation'], request)
+  }
+
+  for (const request of [
+    'Generate an image of a poster that says "retry the generation"',
+    'Hazme una imagen de un cartel que dice "reintenta la generación"',
+  ]) {
+    assert.equal(isExplicitImageGenerationRequest(request), true, request)
+    assert.equal(isExplicitRetryRequest(request), false, request)
+    const turn = await reconcileAgentTurnWithRequest(request, { reply: 'Reintento.', actions: [] })
+    assert.deepEqual(turn.actions.map(action => action.type), ['prepare_image', 'start_generation'], request)
+  }
+
+  for (const request of [
+    'cancel the generation',
+    'Can you cancel the generation?',
+    'retry the failed job',
+    'cancela el vídeo',
+  ]) {
+    const turn = await reconcileAgentTurnWithRequest(request, { reply: 'Vale.', actions: [] })
+    assert.equal(
+      turn.actions[0].type,
+      /retry|reintent/i.test(request) ? 'retry_task' : 'cancel_task',
+      request,
+    )
+  }
+})
+
+test('explicit task controls keep their task identity when generation is mentioned too', async () => {
+  const { reconcileAgentTurnWithRequest } = await import('../src/features/agent/agentActions.ts')
+  for (const [request, type] of [
+    ['Retry the failed image task. Create an image of a lighthouse.', 'retry_task'],
+    ['Retry the failed job to generate an image of a lighthouse.', 'retry_task'],
+    ['Cancel the generation. Generate a video of a sunset.', 'cancel_task'],
+    ['Can you cancel the task that was meant to generate an image?', 'cancel_task'],
+    ['Generate a video of a lighthouse. Cancel the active job.', 'cancel_task'],
+    ['Reintenta la tarea fallida. Genera una imagen de un faro.', 'retry_task'],
+    ['Cancela la tarea de generar un vídeo.', 'cancel_task'],
+    ['Please cancel "the video".', 'cancel_task'],
+  ]) {
+    const action = { type, taskId: 'existing-task-42', confirm: true }
+    const turn = await reconcileAgentTurnWithRequest(request, { reply: '', actions: [action] })
+    assert.deepEqual(turn.actions, [action], request)
+  }
+})
+
+test('quoted scene commands with punctuation preserve the exact video proposal', async () => {
+  const { reconcileAgentTurnWithRequest } = await import('../src/features/agent/agentActions.ts')
+  for (const caption of ['"First act. Cancel the generation; retry the job."', "'First act. Stop the video.'", '«First act. Retry the generation.»', '“Stop the video. Retry the job.”']) {
+    const request = `Generate a video showing a sign that reads ${caption}`
+    const proposal = { reply: '', actions: [
+      { type: 'prepare_video', prompt: request }, { type: 'start_generation', confirm: true },
+    ] }
+    const turn = await reconcileAgentTurnWithRequest(request, proposal)
+    assert.deepEqual(turn.actions, proposal.actions, request)
+  }
+})
+
 test('requires confirmation for retry and resolves an explicit latest failure request', async () => {
   const { parseAgentTurn, reconcileAgentTurnWithRequest } = await import('../src/features/agent/agentActions.ts')
   const unsigned = parseAgentTurn(JSON.stringify({
