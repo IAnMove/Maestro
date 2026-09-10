@@ -50,7 +50,7 @@ export function createTransformGizmo(world: GpuWorld, onChange: (id: string, pat
     const rect = canvas.getBoundingClientRect()
     raycaster.setFromCamera(new Vector2((event.clientX - rect.left) / rect.width * 2 - 1, -(event.clientY - rect.top) / rect.height * 2 + 1), world.camera)
     const slotTargets = [...world.slots.entries()].filter(([, slot]) => slot.kind === 'model')
-    const worldTargets = [...(world.worldSfx?.values() ?? [])].map(item => item.root)
+    const worldTargets = [...(world.worldSfx?.values() ?? [])].filter(item => item.root.visible).map(item => item.root)
     const hits = raycaster.intersectObjects([...worldTargets, ...slotTargets.map(([, slot]) => slot.root)], true)
     const hit = hits[0]
     if (!hit) return
@@ -79,7 +79,10 @@ export function createTransformGizmo(world: GpuWorld, onChange: (id: string, pat
       selectedId = id
       if (!controls.dragging) {
         if (worldCue) {
-          proxy.position.set(worldCue.position.x, worldCue.position.y, worldCue.position.z)
+          const posed = world.worldSfx?.get(worldCue.id)?.root.userData.gizmoAt as { x: number; y: number; z: number } | undefined
+          if (posed && Number.isFinite(posed.x) && Number.isFinite(posed.y) && Number.isFinite(posed.z)) {
+            proxy.position.set(posed.x, posed.y, posed.z)
+          } else proxy.position.set(worldCue.position.x, worldCue.position.y, worldCue.position.z)
           proxy.rotation.set(worldCue.rotation.x * Math.PI / 180, worldCue.rotation.y * Math.PI / 180, worldCue.rotation.z * Math.PI / 180)
           proxy.scale.setScalar(worldCue.scale)
         } else {

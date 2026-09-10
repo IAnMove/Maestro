@@ -110,6 +110,15 @@ def test_replace_one_sfx_track_preserves_the_other(service):
     assert [cue['id'] for cue in world_only['worldSfx']] == ['circle-1']
 
 
+def test_catalog_lists_all_world_kinds(service):
+    ops = {item['name']: item for item in command_catalog()}
+    assert 'worldKinds' in ops['scenes.effects.catalog']['description']
+    assert 'energy_beam' in ops['scenes.effects.catalog']['description']
+    kinds = service.execute({'version': 1, 'operation': 'scenes.effects.catalog', 'input': {}})['result']['worldKinds']
+    assert 'energy_beam' in kinds
+    assert 'anime_aura' in kinds
+
+
 def test_speech_rejects_paths_and_unknown_character_before_analysis(service):
     doc = showcase(service)
     doc['slots'][0]['sourceUrl'] = '/api/v1/file/actor.glb?workspace=default'

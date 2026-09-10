@@ -39,6 +39,18 @@ const PRESETS = Object.fromEntries(catalog.map(item => [item.id, item]))
 const number = (value: unknown, fallback: number, min: number, max: number) =>
   typeof value === 'number' && Number.isFinite(value) ? Math.max(min, Math.min(max, value)) : fallback
 
+export function worldAnchorOffsetFromWorldPoint(
+  slot: { position: readonly [number, number, number]; rotationY: number },
+  point: readonly [number, number, number],
+): WorldVec3 {
+  const dx = point[0] - slot.position[0]
+  const dy = point[1] - slot.position[1]
+  const dz = point[2] - slot.position[2]
+  const cos = Math.cos(slot.rotationY)
+  const sin = Math.sin(slot.rotationY)
+  return { x: dx * cos - dz * sin, y: dy, z: dx * sin + dz * cos }
+}
+
 export function worldVec3(raw: unknown, fallback: WorldVec3, min: number, max: number): WorldVec3 {
   const value = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {}
   return {

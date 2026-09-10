@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { useUiTranslation } from '../../i18n'
 import { WORLD_BEAM_KINDS, WORLD_SFX_KINDS, createWorldSfx, parseWorldSfx, type WorldSfx, type WorldSfxKind } from './world'
 import type { WorldSfxDemoId } from './worldDemo'
@@ -12,13 +13,16 @@ export function WorldSfxControls({ cues = [], duration, selectedId, disabled, on
   onDemo: (id: WorldSfxDemoId) => void
 }) {
   const { t } = useUiTranslation('sceneFx')
+  const populated = cues.length > 0
+  const [open, setOpen] = useState(populated)
+  useEffect(() => { if (populated) setOpen(true) }, [populated])
   const update = (id: string, patch: Partial<WorldSfx>) => onChange(parseWorldSfx(cues.map(cue => cue.id === id ? { ...cue, ...patch } : cue)))
   const setAxis = (id: string, field: 'position' | 'rotation', axis: 'x' | 'y' | 'z', value: number) => {
     const cue = cues.find(item => item.id === id)
     if (!cue || !Number.isFinite(value)) return
     update(id, { [field]: { ...cue[field], [axis]: value } })
   }
-  return <details className="rounded-lg border border-violet-400/30 bg-bg-primary p-3" data-testid="world-sfx-controls" open={cues.length > 0}>
+  return <details className="rounded-lg border border-violet-400/30 bg-bg-primary p-3" data-testid="world-sfx-controls" open={open} onToggle={event => setOpen((event.target as HTMLDetailsElement).open)}>
     <summary className="cursor-pointer text-sm font-semibold">{t('worldTitle')} ({cues.length})</summary>
     <p className="my-2 text-xs text-text-muted">{t('worldHelp')}</p>
     <fieldset disabled={disabled} className="space-y-3 disabled:opacity-50">

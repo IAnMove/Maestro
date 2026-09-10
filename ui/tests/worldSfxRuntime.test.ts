@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { Object3D, Scene } from 'three'
-import { parseWorldSfx } from '../src/features/sceneFx/world'
+import { parseWorldSfx, worldAnchorOffsetFromWorldPoint } from '../src/features/sceneFx/world'
 import { syncWorldSfx } from '../src/features/sceneFx/worldRuntime'
 import { transformPatch } from '../src/features/scene3d/transformGizmo.ts'
 
@@ -53,6 +53,29 @@ test('a beam follows two moving slot roots and a missing anchor stays put', () =
   syncWorldSfx(scene, nodes, cues, 1.4, [])
   const marker = nodes.get('beam')?.root.children.find(child => child.userData.kind === 'missing')
   assert.equal(marker?.visible, true)
+})
+
+test('all 64 world cues stay in the scene graph and hidden ones stay unselectable', () => {
+  const scene = new Scene()
+  const nodes = new Map()
+  const cues = parseWorldSfx(Array.from({ length: 40 }, (_, i) => ({
+    id: `fx-${i}`, kind: i % 2 ? 'portal' : 'magic_circle', start: i < 5 ? 0 : 8, end: i < 5 ? 4 : 12,
+    position: { x: i, y: 1, z: 0 },
+  })))
+  syncWorldSfx(scene, nodes, cues, 1, [])
+  assert.equal(nodes.size, 40)
+  assert.equal([...nodes.values()].filter(item => item.root.visible).length, 5)
+  const late = nodes.get('fx-30')
+  assert.equal(late?.root.visible, false)
+  assert.ok(late?.root.userData.gizmoAt)
+})
+
+test('gizmo offset for an anchored cue is the slot-local displacement', () => {
+  const slot = { position: [1, 0, 2] as const, rotationY: Math.PI / 2 }
+  const offset = worldAnchorOffsetFromWorldPoint(slot, [1, 0.4, 3])
+  assert.ok(Math.abs(offset.x + 1) < 1e-6)
+  assert.equal(Number(offset.y.toFixed(4)), 0.4)
+  assert.ok(Math.abs(offset.z) < 1e-6)
 })
 
 test('world gizmo exposes XYZ rotation instead of yaw-only', () => {

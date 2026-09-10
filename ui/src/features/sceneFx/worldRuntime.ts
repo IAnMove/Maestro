@@ -35,7 +35,6 @@ export type WorldSlotPose = {
 
 const DEG = Math.PI / 180
 const UP = new Vector3(0, 1, 0)
-const MAX_LIVE = 24
 const scratch = new Vector3()
 const scratchB = new Vector3()
 
@@ -372,14 +371,14 @@ export function syncWorldSfx(
   slots: readonly WorldSlotPose[],
 ) {
   if (!scene || !nodes || typeof nodes.set !== 'function') return
-  const live = new Set((cues ?? []).slice(0, MAX_LIVE).map(cue => cue.id))
+  const live = new Set((cues ?? []).map(cue => cue.id))
   for (const [id, gpu] of nodes) {
     if (live.has(id)) continue
     scene.remove(gpu.root)
     disposeRoot(gpu.root)
     nodes.delete(id)
   }
-  for (const cue of (cues ?? []).slice(0, MAX_LIVE)) {
+  for (const cue of cues ?? []) {
     let gpu = nodes.get(cue.id)
     if (!gpu || gpu.kind !== cue.kind || gpu.color !== cue.color) {
       if (gpu) { scene.remove(gpu.root); disposeRoot(gpu.root) }
@@ -394,6 +393,7 @@ export function syncWorldSfx(
     const destination = WORLD_BEAM_KINDS.has(cue.kind)
       ? resolvePoint(cue.target, cue.targetPosition ?? { x: cue.position.x, y: cue.position.y, z: cue.position.z + 2.2 }, slots)
       : origin
+    gpu.root.userData.gizmoAt = origin.point.clone()
     const missing = origin.missing || destination.missing
     const marker = gpu.root.children.find(child => child.userData.kind === 'missing')
     if (marker) marker.visible = missing
