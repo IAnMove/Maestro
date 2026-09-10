@@ -2065,6 +2065,25 @@ const HOW_TO_GENERATE = [
 // scene or caption text, not an educational question about the product.
 const OPENS_WITH_GENERATION_COMMAND = /^(?:¿\s*)?(?:(?:por favor|please)[, ]+)?(?:haz(?:me)?|haced(?:me)?|genera(?:me|d)?|gen[eé]rame|crea(?:me|d)?|cr[eé]ame|lanza(?:d)?|encola(?:d)?|renderiza(?:d)?|make|create|generate|render|launch|start|queue)\b/i
 
+// Spoken filler before a real how-to. Do not unanchor the ^ patterns:
+// a caption inside the same generate sentence must stay a launch command.
+const HOW_TO_SPOKEN_PREFIX = /^(?:¿\s*)?(?:(?:hey|hi|hello|wait|ok|okay|so|um+|please|por\s+favor|oye|bueno|mira)[,.]?\s+)+/i
+
+function howToQuestionWindows(text: string): string[] {
+  const window = text.slice(0, 240)
+  const windows = [window]
+  const strippedLead = window.replace(HOW_TO_SPOKEN_PREFIX, '').trim()
+  if (strippedLead && strippedLead !== window) windows.push(strippedLead)
+  // A status sentence plus a capability question ("The job is stuck. Can I
+  // cancel?") must still be educational. Do not split on newlines: a caption
+  // can wrap without becoming a new request.
+  for (const clause of window.split(/[.!?]+/)) {
+    const part = clause.replace(HOW_TO_SPOKEN_PREFIX, '').trim()
+    if (part) windows.push(part)
+  }
+  return windows
+}
+
 export function isHowToGenerateQuestion(request: string): boolean {
   const text = request.trim()
   if (!text) return false
@@ -2072,9 +2091,8 @@ export function isHowToGenerateQuestion(request: string): boolean {
   // "how do I generate a video?" stays educational. A later command
   // after 240 characters is treated as a separate request.
   const window = text.slice(0, 240)
-  if (!HOW_TO_GENERATE.some(pattern => pattern.test(window))) return false
   if (OPENS_WITH_GENERATION_COMMAND.test(window)) return false
-  return true
+  return howToQuestionWindows(text).some(part => HOW_TO_GENERATE.some(pattern => pattern.test(part)))
 }
 
 const LABS_INVENTORY = /(?:¿\s*)?(?:qu[eé]\s+puedes\s+hacer|what\s+can\s+you\s+do)(?:\s+(?:en|in|con|with))?\s+(?:el\s+)?(?:series\s+lab|story\s+lab)/i
