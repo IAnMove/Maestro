@@ -162,6 +162,7 @@ export function AgentAssistantPanel({ workspace, tasks, onClose, embedded = fals
   const [expanded, setExpanded] = useState(false)
   const [errorCardId, setErrorCardId] = useState<string | null>(null)
   const [conversationSaveError, setConversationSaveError] = useState<string | null>(null)
+  const [conversationHydrationFailed, setConversationHydrationFailed] = useState(false)
   const [activeWorkflow, setActiveWorkflow] = useState<WizardWorkflowRecord | null>(null)
   const [pendingInput, setPendingInput] = useState<WizardWorkflowPendingInput | null>(null)
   const endRef = useRef<HTMLDivElement>(null)
@@ -297,6 +298,7 @@ export function AgentAssistantPanel({ workspace, tasks, onClose, embedded = fals
   useEffect(() => {
     if (workspace !== conversationWorkspace) return
     let cancelled = false
+    setConversationHydrationFailed(false)
     void fetchWizardConversation(conversationWorkspace).then(payload => {
       if (cancelled || !isWizardConversationWriteCurrent(conversationWorkspaceRef.current, conversationWorkspace)) return
       const knownSnapshot = conversationSnapshotsRef.current.get(conversationWorkspace)
@@ -336,9 +338,11 @@ export function AgentAssistantPanel({ workspace, tasks, onClose, embedded = fals
       setMessages([...choice.messages] as AgentMessage[])
       setHydratedWorkspace(conversationWorkspace)
     }).catch(() => {
-      // Fall back to the local cache already loaded for this workspace.
+      // Keep persist blocked. Marking the workspace hydrated here used to
+      // PUT revision 0 from the 40-message local cache; a 409 recovery
+      // then wrote that window over the server thread.
       if (!cancelled && isWizardConversationWriteCurrent(conversationWorkspaceRef.current, conversationWorkspace)) {
-        setHydratedWorkspace(conversationWorkspace)
+        setConversationHydrationFailed(true)
       }
     })
     return () => { cancelled = true }
@@ -348,6 +352,7 @@ export function AgentAssistantPanel({ workspace, tasks, onClose, embedded = fals
     if (!shouldFollowWizardWorkspace({ activeWorkspace: workspace, conversationWorkspace, busy })) return
     skipNextConversationSaveRef.current = false
     setConversationSaveError(null)
+    setConversationHydrationFailed(false)
     setHydratedWorkspace(null)
     setMessages(readMessages(workspace))
     setConversationWorkspace(workspace)
@@ -633,6 +638,11 @@ export function AgentAssistantPanel({ workspace, tasks, onClose, embedded = fals
             </div>
           </div>
         ))}
+        {conversationHydrationFailed && (
+          <p role="alert" className="rounded-lg border border-rose-200/20 bg-rose-300/[.06] px-2 py-1.5 text-[10px] leading-relaxed text-rose-100">
+            {t('conversationHydrationError')}
+          </p>
+        )}
         {conversationSaveError && (
           <p role="alert" className="rounded-lg border border-rose-200/20 bg-rose-300/[.06] px-2 py-1.5 text-[10px] leading-relaxed text-rose-100">
             {t('conversationSaveError', { message: conversationSaveError })}
