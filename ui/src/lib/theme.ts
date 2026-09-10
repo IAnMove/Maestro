@@ -36,10 +36,15 @@ export type ThemeId =
   | 'rose-pine' | 'rose-pine-dawn'
   | 'kanagawa' | 'lotus'
   | 'nord' | 'nord-day'
+  | 'solarized' | 'solarized-day'
+  | 'dracula' | 'alucard'
+  | 'ayu' | 'ayu-day'
+  | 'one' | 'one-day'
 export type FamilyId =
   | 'default' | 'golden-hour' | 'onyx'
   | 'tokyo-night' | 'catppuccin' | 'gruvbox' | 'everforest'
   | 'rose-pine' | 'kanagawa' | 'nord'
+  | 'solarized' | 'dracula' | 'ayu' | 'one'
 export type ThemeMode = 'dark' | 'light' | 'auto'
 
 export interface ThemeVariant {
@@ -138,6 +143,38 @@ export const FAMILIES: ThemeFamily[] = [
     light: { id: 'rose-pine-dawn', swatch: { bg: '#faf4ed', surface: '#ffffff', accent: '#907aa9' } },
   },
   {
+    id: 'solarized',
+    label: 'Solarized',
+    description:
+      'Teal-black ground with ochre and rust — built from measured hue relationships, and the only dark theme here that does not read as grey.',
+    dark: { id: 'solarized', swatch: { bg: '#002b36', surface: '#073642', accent: '#268bd2' } },
+    light: { id: 'solarized-day', swatch: { bg: '#fdf6e3', surface: '#fffdf5', accent: '#14567f' } },
+  },
+  {
+    id: 'one',
+    label: 'One',
+    description:
+      'Even blue-grey with a clear blue accent — the most neutral of the community set.',
+    dark: { id: 'one', swatch: { bg: '#21252b', surface: '#2f343d', accent: '#61afef' } },
+    light: { id: 'one-day', swatch: { bg: '#f0f0f0', surface: '#ffffff', accent: '#2f60cc' } },
+  },
+  {
+    id: 'ayu',
+    label: 'Ayu',
+    description:
+      'Near-black with a gold accent — the highest contrast of the set, and the only one that leads with warm light.',
+    dark: { id: 'ayu', swatch: { bg: '#0b0e14', surface: '#131721', accent: '#e6b450' } },
+    light: { id: 'ayu-day', swatch: { bg: '#f4f4f4', surface: '#ffffff', accent: '#a35200' } },
+  },
+  {
+    id: 'dracula',
+    label: 'Dracula',
+    description:
+      'Saturated purple and pink on indigo — the loudest of the set, with Alucard as its own warm paper by day.',
+    dark: { id: 'dracula', swatch: { bg: '#21222c', surface: '#343746', accent: '#bd93f9' } },
+    light: { id: 'alucard', swatch: { bg: '#fffbeb', surface: '#ffffff', accent: '#644ac9' } },
+  },
+  {
     id: 'kanagawa',
     label: 'Kanagawa',
     description:
@@ -169,12 +206,21 @@ const FAMILY_OF: Record<ThemeId, FamilyId> = {
   lotus: 'kanagawa',
   nord: 'nord',
   'nord-day': 'nord',
+  solarized: 'solarized',
+  'solarized-day': 'solarized',
+  dracula: 'dracula',
+  alucard: 'dracula',
+  ayu: 'ayu',
+  'ayu-day': 'ayu',
+  one: 'one',
+  'one-day': 'one',
 }
 
 const LIGHT_IDS: ReadonlySet<string> = new Set([
   'ivory', 'daylight', 'pearl',
   'tokyo-day', 'latte', 'gruvbox-day', 'everforest-day',
   'rose-pine-dawn', 'lotus', 'nord-day',
+  'solarized-day', 'alucard', 'ayu-day', 'one-day',
 ])
 
 export interface ThemePrefs {

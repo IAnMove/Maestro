@@ -571,7 +571,11 @@ model-viewer.scene-animator-model {
 [data-theme="everforest-day"],
 [data-theme="rose-pine-dawn"],
 [data-theme="lotus"],
-[data-theme="nord-day"] {
+[data-theme="nord-day"],
+[data-theme="solarized-day"],
+[data-theme="alucard"],
+[data-theme="ayu-day"],
+[data-theme="one-day"] {
   color-scheme: light;
   --color-indicator-success: #15803d;
   --color-indicator-warning: #b45309;
@@ -660,8 +664,8 @@ model-viewer.scene-animator-model {
   --color-text-primary: #cdd6f4;
   --color-text-secondary: #bac2de;
   --color-text-muted: #9399b2;
-  --color-accent-blue: #89b4fa;
-  --color-accent-blue-hover: #a6c8ff;
+  --color-accent-blue: #cba6f7;
+  --color-accent-blue-hover: #dcc0ff;
   --color-accent-green: #a6e3a1;
   --color-accent-green-hover: #bdeab9;
   --color-accent-warm: #94e2d5;
@@ -689,8 +693,8 @@ model-viewer.scene-animator-model {
   --color-text-primary: #4c4f69;
   --color-text-secondary: #5c5f77;
   --color-text-muted: #5f6278;
-  --color-accent-blue: #1e66f5;
-  --color-accent-blue-hover: #1552cc;
+  --color-accent-blue: #8839ef;
+  --color-accent-blue-hover: #7028cc;
   --color-accent-green: #40a02b;
   --color-accent-green-hover: #348122;
   --color-accent-warm: #179299;
@@ -709,22 +713,22 @@ model-viewer.scene-animator-model {
 
 /* ─── Gruvbox ─────────────────────────────────────────────────────────── */
 [data-theme="gruvbox"] {
-  --color-bg-primary: #1d2021;
-  --color-bg-secondary: #282828;
-  --color-bg-tertiary: #32302f;
-  --color-bg-hover: #3c3836;
-  --color-bg-active: #504945;
-  --color-border: #3c3836;
-  --color-border-light: #504945;
+  --color-bg-primary: #282828;
+  --color-bg-secondary: #32302f;
+  --color-bg-tertiary: #3c3836;
+  --color-bg-hover: #504945;
+  --color-bg-active: #665c54;
+  --color-border: #504945;
+  --color-border-light: #665c54;
   --color-text-primary: #ebdbb2;
   --color-text-secondary: #d5c4a1;
-  --color-text-muted: #a89984;
-  --color-accent-blue: #83a598;
-  --color-accent-blue-hover: #9fbcb1;
+  --color-text-muted: #bdae93;
+  --color-accent-blue: #fe8019;
+  --color-accent-blue-hover: #ff9a45;
   --color-accent-green: #b8bb26;
   --color-accent-green-hover: #cdd047;
-  --color-accent-warm: #fe8019;
-  --color-accent-warm-hover: #ff9a45;
+  --color-accent-warm: #83a598;
+  --color-accent-warm-hover: #9fbcb1;
   --color-accent-cool-from: #d3869b;
   --color-accent-cool-to: #83a598;
   --color-gradient-cta-from: #79740e;
@@ -733,7 +737,7 @@ model-viewer.scene-animator-model {
   --color-gradient-toggle-to: #83a598;
   --color-gradient-active-frame-from: #fabd2f;
   --color-gradient-active-frame-to: #fe8019;
-  --color-media-canvas: #32302f;
+  --color-media-canvas: #3c3836;
   --shadow-accent-glow: 0 0 18px rgba(250, 189, 47, 0.3);
   --shadow-active-ring: 0 0 6px rgba(254, 128, 25, 0.18);
 }
@@ -748,12 +752,12 @@ model-viewer.scene-animator-model {
   --color-text-primary: #3c3836;
   --color-text-secondary: #504945;
   --color-text-muted: #665c54;
-  --color-accent-blue: #076678;
-  --color-accent-blue-hover: #054e5c;
+  --color-accent-blue: #af3a03;
+  --color-accent-blue-hover: #8c2e02;
   --color-accent-green: #79740e;
   --color-accent-green-hover: #5f5b0b;
-  --color-accent-warm: #af3a03;
-  --color-accent-warm-hover: #8c2e02;
+  --color-accent-warm: #076678;
+  --color-accent-warm-hover: #054e5c;
   --color-accent-cool-from: #8f3f71;
   --color-accent-cool-to: #076678;
   --color-gradient-cta-from: #79740e;
@@ -778,8 +782,8 @@ model-viewer.scene-animator-model {
   --color-text-primary: #d3c6aa;
   --color-text-secondary: #9da9a0;
   --color-text-muted: #a4b19f;
-  --color-accent-blue: #7fbbb3;
-  --color-accent-blue-hover: #9bcdc6;
+  --color-accent-blue: #a7c080;
+  --color-accent-blue-hover: #bcd09b;
   --color-accent-green: #a7c080;
   --color-accent-green-hover: #bcd09b;
   --color-accent-warm: #e69875;
@@ -807,12 +811,12 @@ model-viewer.scene-animator-model {
   --color-text-primary: #414d54;
   --color-text-secondary: #55636a;
   --color-text-muted: #5e6c62;
-  --color-accent-blue: #2b7396;
-  --color-accent-blue-hover: #235d7a;
+  --color-accent-blue: #6c7a00;
+  --color-accent-blue-hover: #566100;
   --color-accent-green: #8da101;
   --color-accent-green-hover: #6f7f01;
-  --color-accent-warm: #f57d26;
-  --color-accent-warm-hover: #d0651a;
+  --color-accent-warm: #c25f14;
+  --color-accent-warm-hover: #9e4d10;
   --color-accent-cool-from: #df69ba;
   --color-accent-cool-to: #3a94c5;
   --color-gradient-cta-from: #5f7000;
@@ -837,12 +841,12 @@ model-viewer.scene-animator-model {
   --color-text-primary: #e0def4;
   --color-text-secondary: #c3bfd6;
   --color-text-muted: #9d99b4;
-  --color-accent-blue: #9ccfd8;
-  --color-accent-blue-hover: #b6dde4;
+  --color-accent-blue: #eb6f92;
+  --color-accent-blue-hover: #f08fab;
   --color-accent-green: #31748f;
   --color-accent-green-hover: #3e8dab;
-  --color-accent-warm: #f6c177;
-  --color-accent-warm-hover: #f9d29a;
+  --color-accent-warm: #9ccfd8;
+  --color-accent-warm-hover: #b6dde4;
   --color-accent-cool-from: #c4a7e7;
   --color-accent-cool-to: #9ccfd8;
   --color-gradient-cta-from: #8f4d61;
@@ -866,12 +870,12 @@ model-viewer.scene-animator-model {
   --color-text-primary: #575279;
   --color-text-secondary: #5d5682;
   --color-text-muted: #66627f;
-  --color-accent-blue: #286983;
-  --color-accent-blue-hover: #1f5468;
+  --color-accent-blue: #9e4d63;
+  --color-accent-blue-hover: #843d51;
   --color-accent-green: #56949f;
   --color-accent-green-hover: #457881;
-  --color-accent-warm: #ea9d34;
-  --color-accent-warm-hover: #c9832a;
+  --color-accent-warm: #286983;
+  --color-accent-warm-hover: #1f5468;
   --color-accent-cool-from: #907aa9;
   --color-accent-cool-to: #286983;
   --color-gradient-cta-from: #91506a;
@@ -896,12 +900,12 @@ model-viewer.scene-animator-model {
   --color-text-primary: #dcd7ba;
   --color-text-secondary: #c8c093;
   --color-text-muted: #a6a288;
-  --color-accent-blue: #7e9cd8;
-  --color-accent-blue-hover: #9cb4e4;
+  --color-accent-blue: #e6c384;
+  --color-accent-blue-hover: #f0d3a0;
   --color-accent-green: #98bb6c;
   --color-accent-green-hover: #aecb8b;
-  --color-accent-warm: #ffa066;
-  --color-accent-warm-hover: #ffb98a;
+  --color-accent-warm: #7e9cd8;
+  --color-accent-warm-hover: #9cb4e4;
   --color-accent-cool-from: #957fb8;
   --color-accent-cool-to: #7e9cd8;
   --color-gradient-cta-from: #4a5f8f;
@@ -925,12 +929,12 @@ model-viewer.scene-animator-model {
   --color-text-primary: #545464;
   --color-text-secondary: #43436c;
   --color-text-muted: #5c5a4e;
-  --color-accent-blue: #4d699b;
-  --color-accent-blue-hover: #3d547c;
+  --color-accent-blue: #8f4a00;
+  --color-accent-blue-hover: #733b00;
   --color-accent-green: #6f894e;
   --color-accent-green-hover: #596e3e;
-  --color-accent-warm: #cc6d00;
-  --color-accent-warm-hover: #a35700;
+  --color-accent-warm: #4d699b;
+  --color-accent-warm-hover: #3d547c;
   --color-accent-cool-from: #624c83;
   --color-accent-cool-to: #4d699b;
   --color-gradient-cta-from: #56693c;
@@ -1000,6 +1004,246 @@ model-viewer.scene-animator-model {
   --color-gradient-active-frame-to: #35706e;
   --shadow-accent-glow: 0 2px 12px rgba(94, 129, 172, 0.26);
   --shadow-active-ring: 0 0 0 2px rgba(94, 129, 172, 0.32);
+}
+
+/* ─── Solarized ───────────────────────────────────────────────────────────
+ * The one palette here built from a measured relationship rather than a
+ * mood: a teal-black ground, which is why it is the only dark theme that
+ * does not read as grey. */
+[data-theme="solarized"] {
+  --color-bg-primary: #002b36;
+  --color-bg-secondary: #02323e;
+  --color-bg-tertiary: #073642;
+  --color-bg-hover: #0d4552;
+  --color-bg-active: #14535f;
+  --color-border: #0e4653;
+  --color-border-light: #175a68;
+  --color-text-primary: #93a1a1;
+  --color-text-secondary: #869698;
+  --color-text-muted: #8ba0a6;
+  --color-accent-blue: #268bd2;
+  --color-accent-blue-hover: #4aa3e0;
+  --color-accent-green: #859900;
+  --color-accent-green-hover: #9aad0a;
+  --color-accent-warm: #cb4b16;
+  --color-accent-warm-hover: #e4611f;
+  --color-accent-cool-from: #6c71c4;
+  --color-accent-cool-to: #268bd2;
+  --color-gradient-cta-from: #1c6a9c;
+  --color-gradient-cta-to: #1f7a70;
+  --color-gradient-toggle-from: #268bd2;
+  --color-gradient-toggle-to: #2aa198;
+  --color-gradient-active-frame-from: #b58900;
+  --color-gradient-active-frame-to: #cb4b16;
+  --color-media-canvas: #073642;
+  --shadow-accent-glow: 0 0 18px rgba(38, 139, 210, 0.32);
+  --shadow-active-ring: 0 0 6px rgba(203, 75, 22, 0.2);
+}
+[data-theme="solarized-day"] {
+  --color-bg-primary: #fdf6e3;
+  --color-bg-secondary: #f7f0dd;
+  --color-bg-tertiary: #fffdf5;
+  --color-bg-hover: #eee8d5;
+  --color-bg-active: #ddd6c1;
+  --color-border: #e4ddc8;
+  --color-border-light: #c3bca8;
+  --color-text-primary: #073642;
+  --color-text-secondary: #4e6a72;
+  --color-text-muted: #5b7278;
+  --color-accent-blue: #14567f;
+  --color-accent-blue-hover: #0e4262;
+  --color-accent-green: #6b7c00;
+  --color-accent-green-hover: #556300;
+  --color-accent-warm: #b3400f;
+  --color-accent-warm-hover: #8f330c;
+  --color-accent-cool-from: #5a5fae;
+  --color-accent-cool-to: #14567f;
+  --color-gradient-cta-from: #14567f;
+  --color-gradient-cta-to: #1a6f66;
+  --color-gradient-toggle-from: #14567f;
+  --color-gradient-toggle-to: #1a7d75;
+  --color-gradient-active-frame-from: #92700a;
+  --color-gradient-active-frame-to: #b3400f;
+  --shadow-accent-glow: 0 2px 12px rgba(20, 86, 127, 0.24);
+  --shadow-active-ring: 0 0 0 2px rgba(179, 64, 15, 0.32);
+}
+
+/* ─── Dracula ─────────────────────────────────────────────────────────── */
+[data-theme="dracula"] {
+  --color-bg-primary: #21222c;
+  --color-bg-secondary: #282a36;
+  --color-bg-tertiary: #343746;
+  --color-bg-hover: #44475a;
+  --color-bg-active: #565a71;
+  --color-border: #44475a;
+  --color-border-light: #565a71;
+  --color-text-primary: #f8f8f2;
+  --color-text-secondary: #dcdce4;
+  --color-text-muted: #a9adc4;
+  --color-accent-blue: #bd93f9;
+  --color-accent-blue-hover: #d3b2ff;
+  --color-accent-green: #50fa7b;
+  --color-accent-green-hover: #74ffa0;
+  --color-accent-warm: #ff79c6;
+  --color-accent-warm-hover: #ff9dd6;
+  --color-accent-cool-from: #ff79c6;
+  --color-accent-cool-to: #bd93f9;
+  --color-gradient-cta-from: #7440c8;
+  --color-gradient-cta-to: #b03a76;
+  --color-gradient-toggle-from: #bd93f9;
+  --color-gradient-toggle-to: #8be9fd;
+  --color-gradient-active-frame-from: #ff79c6;
+  --color-gradient-active-frame-to: #8be9fd;
+  --color-media-canvas: #343746;
+  --shadow-accent-glow: 0 0 18px rgba(189, 147, 249, 0.36);
+  --shadow-active-ring: 0 0 6px rgba(255, 121, 198, 0.2);
+}
+/* Alucard is Dracula's own light counterpart — warm paper, not an inversion. */
+[data-theme="alucard"] {
+  --color-bg-primary: #fffbeb;
+  --color-bg-secondary: #fff8e0;
+  --color-bg-tertiary: #ffffff;
+  --color-bg-hover: #f5efd8;
+  --color-bg-active: #e8e0c4;
+  --color-border: #eee6cc;
+  --color-border-light: #cdc4a6;
+  --color-text-primary: #1f1f1f;
+  --color-text-secondary: #3d3a2c;
+  --color-text-muted: #605a42;
+  --color-accent-blue: #644ac9;
+  --color-accent-blue-hover: #5138a8;
+  --color-accent-green: #14710a;
+  --color-accent-green-hover: #0f5a08;
+  --color-accent-warm: #a3144d;
+  --color-accent-warm-hover: #85103f;
+  --color-accent-cool-from: #644ac9;
+  --color-accent-cool-to: #036a96;
+  --color-gradient-cta-from: #5138a8;
+  --color-gradient-cta-to: #8c1144;
+  --color-gradient-toggle-from: #644ac9;
+  --color-gradient-toggle-to: #036a96;
+  --color-gradient-active-frame-from: #846e15;
+  --color-gradient-active-frame-to: #a34d14;
+  --shadow-accent-glow: 0 2px 12px rgba(100, 74, 201, 0.24);
+  --shadow-active-ring: 0 0 0 2px rgba(163, 20, 77, 0.3);
+}
+
+/* ─── Ayu ─────────────────────────────────────────────────────────────── */
+[data-theme="ayu"] {
+  --color-bg-primary: #0b0e14;
+  --color-bg-secondary: #0d1017;
+  --color-bg-tertiary: #131721;
+  --color-bg-hover: #1b1f2a;
+  --color-bg-active: #262b36;
+  --color-border: #1b1f2a;
+  --color-border-light: #2d323d;
+  --color-text-primary: #bfbdb6;
+  --color-text-secondary: #a5a29a;
+  --color-text-muted: #8f8d85;
+  --color-accent-blue: #e6b450;
+  --color-accent-blue-hover: #f5c76a;
+  --color-accent-green: #aad94c;
+  --color-accent-green-hover: #bde36e;
+  --color-accent-warm: #39bae6;
+  --color-accent-warm-hover: #5ecbf0;
+  --color-accent-cool-from: #d2a6ff;
+  --color-accent-cool-to: #39bae6;
+  --color-gradient-cta-from: #8a6110;
+  --color-gradient-cta-to: #1a6f94;
+  --color-gradient-toggle-from: #e6b450;
+  --color-gradient-toggle-to: #ffb454;
+  --color-gradient-active-frame-from: #e6b450;
+  --color-gradient-active-frame-to: #f26d78;
+  --color-media-canvas: #131721;
+  --shadow-accent-glow: 0 0 18px rgba(230, 180, 80, 0.32);
+  --shadow-active-ring: 0 0 6px rgba(57, 186, 230, 0.2);
+}
+[data-theme="ayu-day"] {
+  --color-bg-primary: #f4f4f4;
+  --color-bg-secondary: #fcfcfc;
+  --color-bg-tertiary: #ffffff;
+  --color-bg-hover: #eaeaea;
+  --color-bg-active: #dcdcdc;
+  --color-border: #e2e2e2;
+  --color-border-light: #c2c2c2;
+  --color-text-primary: #3d4147;
+  --color-text-secondary: #5c6166;
+  --color-text-muted: #61676e;
+  --color-accent-blue: #a35200;
+  --color-accent-blue-hover: #854300;
+  --color-accent-green: #5f7f00;
+  --color-accent-green-hover: #4b6500;
+  --color-accent-warm: #2c7f9c;
+  --color-accent-warm-hover: #22657d;
+  --color-accent-cool-from: #7d4fb0;
+  --color-accent-cool-to: #2c7f9c;
+  --color-gradient-cta-from: #854300;
+  --color-gradient-cta-to: #22657d;
+  --color-gradient-toggle-from: #a35200;
+  --color-gradient-toggle-to: #b35a00;
+  --color-gradient-active-frame-from: #a35200;
+  --color-gradient-active-frame-to: #c22020;
+  --shadow-accent-glow: 0 2px 12px rgba(163, 82, 0, 0.24);
+  --shadow-active-ring: 0 0 0 2px rgba(44, 127, 156, 0.3);
+}
+
+/* ─── One ─────────────────────────────────────────────────────────────── */
+[data-theme="one"] {
+  --color-bg-primary: #21252b;
+  --color-bg-secondary: #282c34;
+  --color-bg-tertiary: #2f343d;
+  --color-bg-hover: #3a3f4b;
+  --color-bg-active: #4b5263;
+  --color-border: #3a3f4b;
+  --color-border-light: #4b5263;
+  --color-text-primary: #abb2bf;
+  --color-text-secondary: #9199a6;
+  --color-text-muted: #99a1ae;
+  --color-accent-blue: #61afef;
+  --color-accent-blue-hover: #82c2f5;
+  --color-accent-green: #98c379;
+  --color-accent-green-hover: #aed195;
+  --color-accent-warm: #d19a66;
+  --color-accent-warm-hover: #dfb287;
+  --color-accent-cool-from: #c678dd;
+  --color-accent-cool-to: #61afef;
+  --color-gradient-cta-from: #2f6fa8;
+  --color-gradient-cta-to: #7a3f96;
+  --color-gradient-toggle-from: #61afef;
+  --color-gradient-toggle-to: #56b6c2;
+  --color-gradient-active-frame-from: #e5c07b;
+  --color-gradient-active-frame-to: #c678dd;
+  --color-media-canvas: #2f343d;
+  --shadow-accent-glow: 0 0 18px rgba(97, 175, 239, 0.32);
+  --shadow-active-ring: 0 0 6px rgba(198, 120, 221, 0.2);
+}
+[data-theme="one-day"] {
+  --color-bg-primary: #f0f0f0;
+  --color-bg-secondary: #fafafa;
+  --color-bg-tertiary: #ffffff;
+  --color-bg-hover: #e5e5e6;
+  --color-bg-active: #d3d3d4;
+  --color-border: #e0e0e1;
+  --color-border-light: #c0c0c1;
+  --color-text-primary: #383a42;
+  --color-text-secondary: #4f525d;
+  --color-text-muted: #616570;
+  --color-accent-blue: #2f60cc;
+  --color-accent-blue-hover: #244ba3;
+  --color-accent-green: #3f8b3e;
+  --color-accent-green-hover: #327131;
+  --color-accent-warm: #986600;
+  --color-accent-warm-hover: #7a5200;
+  --color-accent-cool-from: #a626a4;
+  --color-accent-cool-to: #2f60cc;
+  --color-gradient-cta-from: #2f60cc;
+  --color-gradient-cta-to: #8a1f88;
+  --color-gradient-toggle-from: #2f60cc;
+  --color-gradient-toggle-to: #016b99;
+  --color-gradient-active-frame-from: #986600;
+  --color-gradient-active-frame-to: #a626a4;
+  --shadow-accent-glow: 0 2px 12px rgba(47, 96, 204, 0.24);
+  --shadow-active-ring: 0 0 0 2px rgba(166, 38, 164, 0.28);
 }
 
 /* Custom utility classes that use the theme tokens. These let

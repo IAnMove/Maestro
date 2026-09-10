@@ -3,7 +3,6 @@ import { Menu, Settings } from 'lucide-react'
 import { Sidebar } from './components/Sidebar/Sidebar'
 import { WizardSidebar } from './components/Sidebar/WizardSidebar'
 import { MainContent } from './components/MainContent/MainContent'
-import { SettingsDrawer } from './components/SettingsDrawer/SettingsDrawer'
 import { LoraBrowser } from './components/LoraBrowser/LoraBrowser'
 import { StorageDashboard } from './components/StorageDashboard/StorageDashboard'
 import { RetakeDialog } from './components/RetakeDialog'
@@ -28,6 +27,33 @@ const DirectorDashboard = lazy(() => import('./components/DirectorDashboard/Dire
   default: module.DirectorDashboard,
 })))
 
+// Settings is a drawer that boots closed, and the two panels behind it are
+// the largest thing in the app that nobody sees on load — hardware and
+// service configuration, plus the theme catalogue. Loading it on first open
+// keeps all of that out of the initial chunk. The open event is handled in
+// Sidebar.tsx and lands in the store, so nothing here needs to be mounted to
+// receive it.
+const SettingsDrawer = lazy(() => import('./components/SettingsDrawer/SettingsDrawer').then(module => ({
+  default: module.SettingsDrawer,
+})))
+
+export function LazySettingsDrawer({ open }: { open: boolean }) {
+  // Loads on the first open and then stays mounted. The drawer slides itself
+  // with a transform driven by the store, so unmounting it on close would
+  // throw that transition away on every subsequent open. The first open is
+  // the one that appears without the slide, which is the price of not
+  // shipping the panel to people who never open it.
+  // Adjusted during render rather than in an effect: React re-renders on the
+  // spot without committing, so the drawer appears on the same open, and no
+  // cascading-render lint rule is tripped.
+  const [everOpened, setEverOpened] = useState(false)
+  if (open && !everOpened) setEverOpened(true)
+  if (!everOpened) return null
+  return <Suspense fallback={<div role="status" className="sr-only">Loading settings…</div>}>
+    <SettingsDrawer />
+  </Suspense>
+}
+
 export function LazyDirectorOverlay({ open }: { open: boolean }) {
   if (!open) return null
   return <Suspense fallback={<div role="status" className="sr-only">Loading video workflows…</div>}>
@@ -51,6 +77,7 @@ function AppContent() {
   const loadLlmModels = useStore(s => s.loadLlmModels)
   const servicesConfig = useStore(s => s.servicesConfig)
   const dashboardOpen = useStore(s => s.dashboardOpen)
+  const settingsOpen = useStore(s => s.settingsOpen)
   const runtimeIdentity = useStore(s => s.systemStats?.runtime)
   const toggleSidebar = useStore(s => s.toggleSidebar)
   const setSidebarOpen = useStore(s => s.setSidebarOpen)
@@ -188,7 +215,7 @@ function AppContent() {
       </div>
       <GalleryReadyToast />
       <ActivityFooter />
-      <SettingsDrawer />
+      <LazySettingsDrawer open={settingsOpen} />
       <LoraBrowser />
       <LazyDirectorOverlay open={dashboardOpen} />
       <StorageDashboard />
