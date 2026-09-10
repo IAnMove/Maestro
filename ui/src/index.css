@@ -1201,11 +1201,41 @@ input[type="range"]::-webkit-slider-thumb {
 /* The children are drawn rather than moulded. A drop shadow under a pill is
    the stock button of every framework, and at this size, repeated six times
    in a row, it is all you see. A hairline ring and a single-pixel top light
-   say "pressable" just as clearly and leave the feedback to the press. */
+   say "pressable" just as clearly and leave the feedback to the press.
+
+   Second level: these are places to go, not objects to pick up, and six
+   capsules under six capsules is what made the whole bar read as a form. So
+   the children have no body at all and the panel goes back to being the
+   surface. A two-pixel rule says which one you are on without drawing
+   another box, and it shows itself at a third on hover so the target still
+   announces where it ends — which is the one thing bodyless items lose. */
 .hp-navigation-child {
-  background-color: rgba(255, 255, 255, 0.045);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06),
-              inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  position: relative;
+  border-radius: 0.3rem 0.3rem 0 0;
+  background-color: transparent;
+  box-shadow: none;
+}
+.hp-navigation-child::after {
+  content: '';
+  position: absolute;
+  right: 0.4rem;
+  bottom: 0;
+  left: 0.4rem;
+  height: 2px;
+  border-radius: 2px;
+  background-color: rgb(var(--hp-navigation-rgb));
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+/* Tailwind's ring and tint utilities on the featured child lose to these
+   rules — index.css is imported after the framework — so its blue is
+   restated here rather than left to disappear. */
+.hp-navigation-child[data-navigation-featured='true'] {
+  color: var(--color-accent-blue);
+}
+.hp-navigation-child[data-navigation-featured='true']::after {
+  background-color: var(--color-accent-blue);
+  opacity: 0.5;
 }
 /* The icon is the colour sample: dimmed while the section is closed, full
    once it is open or current. */
@@ -1220,11 +1250,8 @@ input[type="range"]::-webkit-slider-thumb {
 .hp-navigation-primary:hover {
   background-color: rgba(var(--hp-navigation-rgb), 0.19);
 }
-.hp-navigation-child:hover {
-  background-color: rgba(255, 255, 255, 0.085);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.11),
-              inset 0 1px 0 rgba(255, 255, 255, 0.07);
-}
+.hp-navigation-child:hover { background-color: rgba(255, 255, 255, 0.05); }
+.hp-navigation-child:hover::after { opacity: 0.32; }
 /* A parent with no panel — Workspaces, Activity — has no selected child to
    stand for it, so it takes the sunken state itself. Current means sunken at
    either level, which is the whole point of having one material. The label is
@@ -1241,11 +1268,16 @@ input[type="range"]::-webkit-slider-thumb {
    selected still answers — otherwise the sunken rule above, and the selected
    child below, would outrank the press and swallow it. */
 .hp-navigation-primary:active,
-.hp-navigation-primary[data-navigation-active='true']:active,
-.hp-navigation-child:active,
-.hp-navigation-child[aria-selected='true']:active {
+.hp-navigation-primary[data-navigation-active='true']:active {
   background-color: rgba(0, 0, 0, 0.34);
   box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.6);
+  transform: translateY(0.5px);
+}
+/* A child has no body to sink, and a box appearing under the finger would
+   contradict the level: the press is a quick darkening and half a pixel. */
+.hp-navigation-child:active,
+.hp-navigation-child[aria-selected='true']:active {
+  background-color: rgba(0, 0, 0, 0.3);
   transform: translateY(0.5px);
 }
 .hp-navigation-primary[data-navigation-expanded='true'] {
@@ -1280,15 +1312,15 @@ input[type="range"]::-webkit-slider-thumb {
   pointer-events: none;
   background-color: #141824;
 }
+/* Current child: the rule at full strength and the section's colour on the
+   label. No fill — that is the point of the level. */
 .hp-navigation-child[aria-selected='true'] {
   outline: 0;
   color: rgb(var(--hp-navigation-rgb));
-  background-color: rgba(0, 0, 0, 0.24);
-  /* the same light, pooled in the recess */
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.55),
-              inset 0 0 13px rgba(var(--hp-navigation-rgb), 0.17),
-              inset 0 -1px 0 rgba(255, 255, 255, 0.05);
+  background-color: transparent;
+  box-shadow: none;
 }
+.hp-navigation-child[aria-selected='true']::after { opacity: 1; }
 [data-wizard-anchor][data-wizard-magic] {
   z-index: 2;
   outline: 1px solid rgba(253, 230, 138, 0.72);
