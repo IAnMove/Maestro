@@ -5,8 +5,9 @@ import { bindScreenMedia } from './screenMediaRuntime'
 import { slotMountKey } from './backdrop'
 import { createTransformGizmo, type TransformMode, type TransformPatch } from './transformGizmo.ts'
 import { TextureLoader } from 'three'
-import { estimateFace, FACE_PROFILES, type FaceProfile } from './speech/calibration'
+import { estimateFace, manualFace, FACE_PROFILES, type PlacementMode } from './speech/calibration'
 import type { FacePlacement } from './speech/types'
+import { pickFace } from './speech/pickFace'
 import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js'
 import { adoptCafeMaps, loadCafeMaps } from './cafeSet.ts'
 import { syncDressing } from './dressing.ts'
@@ -53,7 +54,8 @@ export type Scene3DStageHandle = {
   restoreSize: () => void
   beginExport: (document: Scene3DDocument) => void
   endExport: () => void
-  facePlacement?: (slotId: string, profile: FaceProfile) => FacePlacement | undefined
+  facePlacement?: (slotId: string, profile: PlacementMode) => FacePlacement | undefined
+  pickFace?: (slotId: string, x: number, y: number, previous?: FacePlacement) => FacePlacement | undefined
   prepareFrame?: (seconds: number, document: Scene3DDocument) => Promise<void>
 }
 
@@ -96,7 +98,7 @@ function loadSlotGltf(
         disposeObject(gltf.scene)
         return
       }
-      gltf.scene.userData.speechPlacements = Object.fromEntries(FACE_PROFILES.map(profile => [profile, estimateFace(gltf.scene, profile)]))
+      gltf.scene.userData.speechPlacements = { ...Object.fromEntries(FACE_PROFILES.map(profile => [profile, estimateFace(gltf.scene, profile)])), bounds: manualFace(gltf.scene) }
       const baseScale = fitGltf(gltf.scene, live)
       placeSlot(world, live, gltf.scene, gltf.animations, baseScale, true)
       onLoaded(live, gltf)
@@ -192,6 +194,10 @@ export const Scene3DStage = forwardRef<Scene3DStageHandle, Props>(function Scene
     facePlacement(slotId, profile) {
       const placement = worldRef.current?.slots.get(slotId)?.root.userData.speechPlacements?.[profile] as FacePlacement | undefined
       return placement ? structuredClone(placement) : undefined
+    },
+    pickFace(slotId, x, y, previous) {
+      const world = worldRef.current, root = world?.slots.get(slotId)?.root
+      return world && root ? pickFace(root, world.camera, world.renderer.domElement, x, y, previous) : undefined
     },
     beginExport(next) {
       gizmoRef.current?.hide()

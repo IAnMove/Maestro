@@ -24,7 +24,9 @@ The same visual renderer paints both previews and MP4 frames.
 ## Speaking characters
 
 Use the existing **Video 3D → Voice and lip-sync** controls. Choose a GLB, place
-its mouth/eyes, attach a voice, then **Calculate gestures with Rhubarb (local)**.
+its lips with **Add lips** or **Place with a click on the face**. Attach audio,
+record with a microphone, or use the bundled English example. For new audio,
+**Calculate gestures with Rhubarb (local)** refines the initial volume-based motion.
 Use interventions to schedule different speakers; each intervention keeps its
 literal dialogue, source audio, trim offset, timing and phonetic cues.
 Rhubarb must be installed as described in [VIDEO3D_SPEECH.md](VIDEO3D_SPEECH.md).
