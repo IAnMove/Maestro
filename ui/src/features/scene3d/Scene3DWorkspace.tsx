@@ -4,7 +4,7 @@ import { SceneFxOverlay } from '../sceneFx/SceneFxOverlay'
 import { adoptPreparedSceneDocument, withFxShowcase } from '../sceneFx/showcase'
 import { WorldSfxControls } from '../sceneFx/WorldSfxControls'
 import { worldSfxAudioCues, parseWorldSfx, type WorldSfx } from '../sceneFx/world'
-import { worldSfxDepthDocument } from '../sceneFx/worldDemo'
+import { worldSfxDemoDocument } from '../sceneFx/worldDemo'
 import { WORLD_SFX_SELECT_PREFIX } from './transformGizmo'
 import { Scene3DMotionControls } from './Scene3DMotionControls'
 import { Scene3DSpeakerControls } from './speech/Scene3DSpeakerControls'
@@ -346,9 +346,9 @@ export function Scene3DWorkspace({ width, height, initialDocument }: Props) {
       <WorldSfxControls cues={sceneDoc.worldSfx} duration={sceneDoc.duration} selectedId={selectedWorldSfxId} disabled={editingLocked}
         onSelect={id => { setPickTarget(undefined); setSelectedWorldSfxId(id) }}
         onChange={worldSfx => applyScene(current => ({ ...current, worldSfx }))}
-        onDemo={() => {
+        onDemo={id => {
           if (!canMutateWorld3DScene(exportingRef.current)) return
-          const demo = worldSfxDepthDocument()
+          const demo = worldSfxDemoDocument(id)
           generationRef.current += 1
           setPlaying(false); setFrame(0); applyScene(demo)
           setSelectedId(demo.slots[0]?.id ?? 'subject_1')

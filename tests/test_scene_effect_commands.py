@@ -81,6 +81,10 @@ def test_world_cues_upsert_on_video3d_and_reject_2d(service):
     catalog = service.execute({'version': 1, 'operation': 'scenes.effects.catalog', 'input': {}})['result']
     assert catalog['coordinates']['world'] == 'meters'
     assert 'portal' in catalog['worldKinds']
+    assert 'energy_beam' in catalog['worldKinds']
+    beam = {'id': 'beam-1', 'kind': 'energy_beam', 'start': 0, 'end': 2, 'anchor': {'slotId': 'subject_1'}, 'target': {'slotId': 'subject_2'}}
+    beamed = service.execute({'version': 1, 'operation': 'scenes.effects.apply', 'input': {'document': world, 'worldCues': [beam]}})['result']['document']
+    assert beamed['worldSfx'][0]['target']['slotId'] == 'subject_2'
     flat = showcase(service, '2d')
     with pytest.raises(ValueError, match='Video3D'):
         service.execute({'version': 1, 'operation': 'scenes.effects.apply', 'input': {'document': flat, 'worldCues': [cue]}})

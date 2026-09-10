@@ -1,10 +1,9 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { Scene } from 'three'
+import { Object3D, Scene } from 'three'
 import { parseWorldSfx } from '../src/features/sceneFx/world'
 import { syncWorldSfx } from '../src/features/sceneFx/worldRuntime'
 import { transformPatch } from '../src/features/scene3d/transformGizmo.ts'
-import { Object3D } from 'three'
 
 test('world SFX occupy the scene graph and hide outside their window', () => {
   const scene = new Scene()
@@ -25,6 +24,35 @@ test('world SFX occupy the scene graph and hide outside their window', () => {
   syncWorldSfx(scene, nodes, cues.filter(cue => cue.id === 'ring'), 3, [])
   assert.equal(nodes.has('gate'), false)
   assert.equal(nodes.has('ring'), true)
+})
+
+test('a beam follows two moving slot roots and a missing anchor stays put', () => {
+  const scene = new Scene()
+  const nodes = new Map()
+  const a = new Object3D(); a.position.set(-2, 1, 0)
+  const b = new Object3D(); b.position.set(2, 1, 0)
+  const cues = parseWorldSfx([{
+    id: 'beam', kind: 'energy_beam', start: 0, end: 4,
+    anchor: { slotId: 'subject_1' }, target: { slotId: 'subject_2' },
+  }])
+  syncWorldSfx(scene, nodes, cues, 1, [
+    { id: 'subject_1', position: [-2, 0, 0], rotationY: 0, root: a },
+    { id: 'subject_2', position: [2, 0, 0], rotationY: 0, root: b },
+  ])
+  const shaft = nodes.get('beam')?.root.children.find(child => child.userData.kind === 'beam')
+  assert.ok(shaft)
+  assert.ok(Math.abs(shaft.position.x) < 0.05)
+  a.position.x = -3
+  b.position.x = 3
+  a.updateMatrixWorld(true); b.updateMatrixWorld(true)
+  syncWorldSfx(scene, nodes, cues, 1.2, [
+    { id: 'subject_1', position: [-3, 0, 0], rotationY: 0, root: a },
+    { id: 'subject_2', position: [3, 0, 0], rotationY: 0, root: b },
+  ])
+  assert.ok(Math.abs(shaft.position.x) < 0.05)
+  syncWorldSfx(scene, nodes, cues, 1.4, [])
+  const marker = nodes.get('beam')?.root.children.find(child => child.userData.kind === 'missing')
+  assert.equal(marker?.visible, true)
 })
 
 test('world gizmo exposes XYZ rotation instead of yaw-only', () => {

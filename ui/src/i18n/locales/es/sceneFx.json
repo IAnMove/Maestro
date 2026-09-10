@@ -56,8 +56,14 @@
   "worldPosition": "Posición (m)",
   "worldRotation": "Rotación (°)",
   "addWorld": "Añadir en el mundo",
-  "worldDemo": "Cargar demo de profundidad del portal",
+  "worldDemo": {
+    "depth": "Demo: profundidad del portal",
+    "duel": "Demo: duelo arcano",
+    "mixed": "Demo: persecución mixta"
+  },
   "select": "Seleccionar",
   "anchor": "Seguir id del hueco",
-  "anchorNone": "Ninguno — se queda en el mundo"
+  "anchorNone": "Ninguno — se queda en el mundo",
+  "worldTarget": "Apuntar al id del hueco",
+  "worldTargetPosition": "Apuntar (m)"
 }

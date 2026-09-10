@@ -15,7 +15,11 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator, ValidationEr
 
 CATALOG = json.loads((Path(__file__).parent.parent / 'shared' / 'scene_effects.json').read_text())
 PRESETS = {entry['id']: entry for entry in CATALOG}
-WORLD_KINDS = {'portal', 'magic_circle', 'summoning_gate'}
+WORLD_KINDS = {
+    'portal', 'magic_circle', 'summoning_gate',
+    'lightning', 'energy_beam', 'laser',
+    'energy_orb', 'anime_aura', 'arcane_missiles', 'shockwave',
+}
 
 
 class Strict(BaseModel):
@@ -90,14 +94,19 @@ class WorldFxCue(Strict):
     sound: bool = False
     volume: float = Field(default=.25, ge=0, le=1)
     anchor: dict | None = None
+    target: dict | None = None
+    targetPosition: WorldVec | None = None
 
     @model_validator(mode='after')
     def valid_world_preset(self):
         if self.kind not in WORLD_KINDS or self.end <= self.start:
-            raise ValueError('World SFX need portal, magic_circle or summoning_gate and an end later than start')
+            raise ValueError('World SFX need a supported world kind and an end later than start')
         self.color = self.color or PRESETS[self.kind]['color']
-        if self.anchor is not None:
-            slot_id = self.anchor.get('slotId') if isinstance(self.anchor, dict) else None
+        for field_name in ('anchor', 'target'):
+            value = getattr(self, field_name)
+            if value is None:
+                continue
+            slot_id = value.get('slotId') if isinstance(value, dict) else None
             if not isinstance(slot_id, str) or not slot_id or len(slot_id) > 160:
                 raise ValueError('World SFX anchors need a slotId')
         return self
