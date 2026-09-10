@@ -124,13 +124,32 @@ test('navigation destinations map to visible categories', async () => {
   assert.equal(categoryForNavigationDestination('images'), 'media')
   assert.equal(categoryForNavigationDestination('settings'), null)
   assert.equal(categoryForMediaFilter('character-replacement'), 'studios')
-  const { hidesDirectGenerationSidebar } = await import('../src/lib/navigationCategories.ts')
+  const { hidesDirectGenerationSidebar, revealDirectorWorkspace } = await import('../src/lib/navigationCategories.ts')
   assert.equal(hidesDirectGenerationSidebar('scene3d', 'studio'), true)
   assert.equal(hidesDirectGenerationSidebar('stories', 'studio'), true)
   assert.equal(hidesDirectGenerationSidebar('characters', 'studio'), true)
   assert.equal(hidesDirectGenerationSidebar('videos', 'studio'), false)
   assert.equal(hidesDirectGenerationSidebar('comics', 'director'), false)
   assert.equal(hidesDirectGenerationSidebar('scene3d', 'director'), true)
+  const revealed = { mediaFilter: 'stories' as const, sidebarMode: 'studio' as const, sidebarOpen: false }
+  revealDirectorWorkspace({
+    mediaFilter: revealed.mediaFilter,
+    setSidebarMode: mode => { revealed.sidebarMode = mode },
+    setSidebarOpen: open => { revealed.sidebarOpen = open },
+    setMediaFilter: filter => { revealed.mediaFilter = filter },
+  })
+  assert.equal(revealed.sidebarMode, 'director')
+  assert.equal(revealed.sidebarOpen, true)
+  assert.equal(revealed.mediaFilter, 'all')
+  assert.equal(hidesDirectGenerationSidebar(revealed.mediaFilter, revealed.sidebarMode), false)
+  const comicDirector = { mediaFilter: 'comics' as const, sidebarMode: 'studio' as const, sidebarOpen: false }
+  revealDirectorWorkspace({
+    mediaFilter: comicDirector.mediaFilter,
+    setSidebarMode: mode => { comicDirector.sidebarMode = mode },
+    setSidebarOpen: open => { comicDirector.sidebarOpen = open },
+    setMediaFilter: filter => { comicDirector.mediaFilter = filter },
+  })
+  assert.equal(comicDirector.mediaFilter, 'comics')
 })
 
 test('character replacement is a featured studio beside the video editors in both languages', { concurrency: false }, async () => {
@@ -170,6 +189,33 @@ test('character replacement is a featured studio beside the video editors in bot
     }
   }
   await setUiLanguage('en')
+})
+
+test('opening Director from a studio leaves the studio so the sidebar can mount', { concurrency: false }, async () => {
+  const { render, screen, fireEvent, cleanup } = await import('@testing-library/react')
+  const { ensureUiI18n, setUiLanguage } = await import('../src/i18n/index.ts')
+  const { TabFilter } = await import('../src/components/MainContent/TabFilter.tsx')
+  const { useStore } = await import('../src/stores/useStore.ts')
+  const { hidesDirectGenerationSidebar } = await import('../src/lib/navigationCategories.ts')
+  ensureUiI18n()
+  await setUiLanguage('en')
+  useStore.setState({
+    mediaFilter: 'stories', outputSearchQuery: '', generationMode: 'video',
+    sidebarMode: 'studio', sidebarOpen: false, settingsOpen: false, dashboardOpen: false,
+    activeWorkspace: 'default', loadOutputs: async () => undefined,
+  })
+  try {
+    render(<TabFilter />)
+    fireEvent.click(screen.getByRole('button', { name: 'Production' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Director' }))
+    const state = useStore.getState()
+    assert.equal(state.sidebarMode, 'director')
+    assert.equal(state.sidebarOpen, true)
+    assert.equal(state.mediaFilter, 'all')
+    assert.equal(hidesDirectGenerationSidebar(state.mediaFilter, state.sidebarMode), false)
+  } finally {
+    cleanup()
+  }
 })
 
 test('character replacement releases the tools column and restores its previous collapsed state on exit', { concurrency: false }, async () => {

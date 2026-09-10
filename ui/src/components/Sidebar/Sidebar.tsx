@@ -37,7 +37,7 @@ import { BrandIdentity } from '../BrandIdentity'
 import { DirectorChat } from './DirectorChat'
 import { useUiTranslation } from '../../i18n'
 import { StudioCommandPanels } from '../../features/studio/StudioCommandPanels'
-import { hidesDirectGenerationSidebar } from '../../lib/navigationCategories'
+import { hidesDirectGenerationSidebar, revealDirectorWorkspace } from '../../lib/navigationCategories'
 
 const ViggleControls = lazy(() => import('./ViggleControls').then(module => ({ default: module.ViggleControls })))
 const ToolsPanel = lazy(() => import('./ToolsPanel').then(module => ({ default: module.ToolsPanel })))
@@ -131,9 +131,8 @@ export function Sidebar() {
       setSettingsOpen(true)
     }
     const openDirector = () => {
-      setSidebarMode('director')
+      revealDirectorWorkspace(useStore.getState())
       setToolsSidebarCollapsed(false)
-      setSidebarOpen(true)
     }
     window.addEventListener('hocuspocus:studio-open', openStudio)
     window.addEventListener('hocuspocus:settings-open', openSettings)

@@ -1,5 +1,5 @@
 import { useStore } from '../../stores/useStore'
-import { DIRECT_GENERATION_MEDIA, hidesDirectGenerationSidebar } from '../../lib/navigationCategories'
+import { DIRECT_GENERATION_MEDIA, hidesDirectGenerationSidebar, revealDirectorWorkspace } from '../../lib/navigationCategories'
 import i18n from '../../i18n'
 import type { CommandResult } from '../../lib/commandContract'
 import { rememberedCharacterKitLibrary } from '../characters/session'
@@ -212,6 +212,7 @@ function isTabOpen(tab: AgentTab): boolean {
   if (tab === 'director') {
     return state.sidebarMode === 'director' && state.sidebarOpen
       && !state.settingsOpen && !state.dashboardOpen
+      && !hidesDirectGenerationSidebar(state.mediaFilter, state.sidebarMode)
   }
   if (tab === 'studio') {
     return state.sidebarMode === 'studio' && state.sidebarOpen
@@ -237,8 +238,7 @@ async function navigate(tab: AgentTab): Promise<AdapterOutcome> {
   } else if (tab === 'director') {
     state.setSettingsOpen(false)
     state.setDashboardOpen(false)
-    state.setSidebarMode('director')
-    state.setSidebarOpen(true)
+    revealDirectorWorkspace(state)
     window.dispatchEvent(new Event('maestro:director-open'))
   } else if (tab === 'studio') {
     state.setSettingsOpen(false)

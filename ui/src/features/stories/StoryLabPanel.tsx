@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import JSZip from 'jszip'
 import { Check, Loader2 } from 'lucide-react'
 import * as api from '../../api/client'
+import { revealDirectorWorkspace } from '../../lib/navigationCategories'
 import { getModelMode, resolveResolution, useStore } from '../../stores/useStore'
 import { useUiTranslation } from '../../i18n'
 import { AssetInput } from '../asset-picker/AssetInput.tsx'
@@ -3371,7 +3372,7 @@ export function StoryLabPanel() {
       }
       director.setDirectorResolution(storyVideoResolution)
       director.setDirectorAspectRatio(storyVideoAspectRatio)
-      director.setSidebarMode('director')
+      revealDirectorWorkspace(director)
       director.setDirectorSkill('music_video')
       director.setDirectorAutoMode(false)
       director.setDirectorShotImageGuidance(project.musicVideoGenerationMode === 'direct_video' || project.musicVideoGenerationMode === 'direct_references' ? 'prompt_only' : 'auto')

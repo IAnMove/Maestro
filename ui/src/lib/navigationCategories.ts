@@ -41,6 +41,22 @@ export function hidesDirectGenerationSidebar(filter: MediaFilter, sidebarMode: '
   return true
 }
 
+/** Director is not Direct Generation, but the same sidebar host unmounts on
+ *  studio filters. Film/music staging already uses the gallery (`all`);
+ *  Comic Director stays on comics. */
+export function revealDirectorWorkspace(state: {
+  mediaFilter: MediaFilter
+  setSidebarMode: (mode: 'studio' | 'director') => void
+  setSidebarOpen: (open: boolean) => void
+  setMediaFilter: (filter: MediaFilter) => void
+}): void {
+  state.setSidebarMode('director')
+  state.setSidebarOpen(true)
+  if (hidesDirectGenerationSidebar(state.mediaFilter, 'director')) {
+    state.setMediaFilter('all')
+  }
+}
+
 export function categoryForNavigationDestination(destination: string): NavigationCategory | null {
   if (destination === 'studio') return 'direct-generation'
   if (destination === 'director' || destination === 'productions' || destination === 'video_editor') return 'production'
