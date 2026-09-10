@@ -48,7 +48,7 @@ import { getSceneClipTime } from '../../lib/sceneClip'
 import { sanitizeSceneMotion } from '../../lib/sceneMotion'
 import { applySceneRhythmToLayer, buildSceneRhythmMap, type SceneRhythmCueSource, type SceneRhythmProfile } from '../../lib/sceneRhythm'
 import { applyCutoutDialogue, bindCutoutFaceToPose, ensureCutoutFacePlayback, findCutoutMouthLayers, isCutoutFaceLayer, normalizeFaceBinding, planCutoutDialogue, rebuildCutoutDialogueLayers, type SceneDialogueBeat } from '../../lib/cutoutDialogue'
-import { captureCharacterFaceAnchor, characterKitAssetFromLayer, createCharacterKit, emptyCharacterKitLibrary, mountCharacterKitLayers, syncMountedCharacterKitLayers, syncSceneCharacterKits, type CharacterKit, type CharacterKitAlphaStatus, type CharacterMouthState } from '../../lib/characterKit'
+import { captureCharacterFaceAnchor, characterKitAssetFromLayer, claimUnusedCharacterKitId, createCharacterKit, emptyCharacterKitLibrary, mountCharacterKitLayers, syncMountedCharacterKitLayers, syncSceneCharacterKits, type CharacterKit, type CharacterKitAlphaStatus, type CharacterMouthState } from '../../lib/characterKit'
 import { consumeFaceRigHandoff, FACE_RIG_HANDOFF_EVENT, kitFromFaceRigHandoff } from '../../lib/characterKitHandoff'
 import { rememberCharacterKitLibrary, rememberVideo3dScene } from '../../features/agent/wizardLabSession'
 import { carrySceneSidecars, createNarrativeScene, getNarrativeTemplate, type NarrativeSceneId, type NarrativeTemplateInput } from '../../lib/sceneNarrative'
@@ -2305,7 +2305,11 @@ export function SceneAnimatorPanel() {
   const createKitFromSelected = () => {
     try {
       const asset = kitAssetFromSelected()
-      const next = createCharacterKit(characterKitName || selected?.name || 'Untitled character')
+      const next = createCharacterKit(
+        characterKitName || selected?.name || 'Untitled character',
+        'cutout',
+        Object.keys(characterKitLibraryRef.current.kits),
+      )
       next.base = { ...asset, kind: 'image' }
       next.identityReference = { ...asset, id: `${asset.id}-identity`, kind: 'image' }
       next.provenance = [{ method: 'scene-layer-assignment', sourceLayerId: selected?.id, workspace }]
@@ -2354,7 +2358,10 @@ export function SceneAnimatorPanel() {
   }
   const persistCharacterKitDraft = async (kit: CharacterKit, announce = false) => {
     try {
-      const next = { ...kit, updatedAt: new Date().toISOString() }
+      const next = {
+        ...claimUnusedCharacterKitId(kit, characterKitLibraryRef.current),
+        updatedAt: new Date().toISOString(),
+      }
       const library = await saveCharacterKit(workspace, characterKitLibraryRef.current, next)
       setCharacterKitLibrary(library)
       const saved = library.kits[next.id]

@@ -56,7 +56,7 @@ export function kitFromFaceRigHandoff(handoff: FaceRigHandoff, library: Characte
     anchors: { ...existing.anchors },
     provenance: [...existing.provenance],
   }
-  const kit = createCharacterKit(handoff.name)
+  const kit = createCharacterKit(handoff.name, 'cutout', Object.keys(library.kits))
   const asset = {
     id: `${kit.id}-base`,
     name: kit.name,
