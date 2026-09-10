@@ -20,7 +20,7 @@ A **layered compositor**, not MiniMax H3.
 | MiniMax H3 | Studio / Story Lab | Native video + stereo audio (acting, dialogue, locations) |
 | Video Editor | **Video Editor** | Join compositor clips with H3 clips |
 | Character Kits | **3D Video** sidebar | Reusable 2D cutout puppets + Face Rig mouth overlays. Operator guide: [Character Kits](../character-kits/HOWUSEIT.md) |
-| TV / sprite head | **3D Video** → subject GLB | Animated GLB with a **plane parented to `headfront`**. Bundled example: `/examples/tv-head-humanoid.glb` (template **TV-head walk**). Heavy Meshy exports also work if they expose `headfront`. Do not paint the whole-body mesh. |
+| TV / sprite head | **3D Video** → subject GLB | Animated GLB with a **plane parented to `headfront`**. Bundled example: `/examples/tv-head-humanoid.glb` (~7 KB CRT-head walker, template **CRT-head walk**). Meshy TV-heads work the same if they expose `headfront`. |
 
 Use the compositor when you need **controllable motion of a known object** over plates: a ship crossing stars, a UFO rising behind mountains, a logo flying in, rain over a still. Use H3 when you need **performance, speech, or a living location**. Mix them: H3 for people/places, compositor for the vehicle insert, Video Editor to cut them together. Use a **Character Kit** when the known object is a graphic puppet that must speak with mouth overlays—not a Hunyuan mesh and not H3 lip-sync. Use **Put a face / screen on this character** when the GLB already has a TV/monitor head: the compositor anchors a plane to `headfront` (or another bone) and the clip (Walk/Run) carries the picture with it.
 

@@ -166,7 +166,7 @@ def build() -> None:
     spine = add_node(name="Spine", translation=[0, 0.12, 0], children=[])
     chest = add_node(name="Chest", translation=[0, 0.18, 0], children=[])
     head = add_node(name="Head", translation=[0, 0.22, 0], children=[])
-    headfront = add_node(name="headfront", translation=[0.0, 0.02, 0.085])
+    headfront = add_node(name="headfront", translation=[0.0, 0.09, 0.18])
     head_end = add_node(name="head_end", translation=[0.0, 0.16, 0.0])
     l_sh = add_node(name="LeftShoulder", translation=[0.18, 0.12, 0], rotation=quat_z(-1.15), children=[])
     l_arm = add_node(name="LeftArm", translation=[0.0, 0.16, 0], children=[])
@@ -183,8 +183,11 @@ def build() -> None:
     r_leg = add_node(name="RightLeg", translation=[0.0, -0.36, 0], children=[])
     r_foot = add_node(name="RightFoot", translation=[0.0, -0.34, 0.06], rotation=quat_x(0.2))
 
-    def box_child(parent: int, name: str, translation: list[float], scale: list[float]) -> int:
-        index = add_node(name=name, mesh=0, translation=translation, scale=scale)
+    def box_child(parent: int, name: str, translation: list[float], scale: list[float], mesh: int = 0, rotation: list[float] | None = None) -> int:
+        payload: dict = {"name": name, "mesh": mesh, "translation": translation, "scale": scale}
+        if rotation:
+            payload["rotation"] = rotation
+        index = add_node(**payload)
         nodes[parent].setdefault("children", []).append(index)
         return index
 
@@ -204,23 +207,32 @@ def build() -> None:
     nodes[r_leg]["children"] = [r_foot]
     # Mesh parts are appended after the skeleton links so Walk/Idle still target the bones.
 
-    box_child(hips, "hips_mesh", [0, 0.02, 0], [0.28, 0.14, 0.16])
-    box_child(spine, "spine_mesh", [0, 0.08, 0], [0.26, 0.16, 0.14])
-    box_child(chest, "chest_mesh", [0, 0.08, 0], [0.34, 0.22, 0.16])
-    box_child(head, "tv_frame", [0, 0.04, -0.01], [0.36, 0.30, 0.14])
-    box_child(head, "tv_bezel", [0, 0.04, 0.07], [0.30, 0.24, 0.02])
-    box_child(l_arm, "l_arm_mesh", [0, 0.13, 0], [0.08, 0.26, 0.08])
-    box_child(l_fore, "l_fore_mesh", [0, 0.12, 0], [0.07, 0.24, 0.07])
-    box_child(l_hand, "l_hand_mesh", [0, 0.04, 0], [0.08, 0.10, 0.08])
-    box_child(r_arm, "r_arm_mesh", [0, 0.13, 0], [0.08, 0.26, 0.08])
-    box_child(r_fore, "r_fore_mesh", [0, 0.12, 0], [0.07, 0.24, 0.07])
-    box_child(r_hand, "r_hand_mesh", [0, 0.04, 0], [0.08, 0.10, 0.08])
-    box_child(l_up, "l_up_mesh", [0, -0.18, 0], [0.11, 0.36, 0.11])
-    box_child(l_leg, "l_leg_mesh", [0, -0.16, 0], [0.09, 0.32, 0.09])
-    box_child(l_foot, "l_foot_mesh", [0, -0.04, 0.06], [0.10, 0.08, 0.22])
-    box_child(r_up, "r_up_mesh", [0, -0.18, 0], [0.11, 0.36, 0.11])
-    box_child(r_leg, "r_leg_mesh", [0, -0.16, 0], [0.09, 0.32, 0.09])
-    box_child(r_foot, "r_foot_mesh", [0, -0.04, 0.06], [0.10, 0.08, 0.22])
+    body, crt, glass, metal = 0, 1, 2, 3
+    box_child(hips, "hips_mesh", [0, 0.02, 0], [0.28, 0.14, 0.16], body)
+    box_child(spine, "spine_mesh", [0, 0.08, 0], [0.24, 0.16, 0.14], body)
+    box_child(chest, "chest_mesh", [0, 0.08, 0], [0.32, 0.22, 0.16], body)
+    box_child(chest, "neck_mesh", [0, 0.20, 0], [0.09, 0.08, 0.09], crt)
+    # Old CRT cabinet: deep beige tube, thick bezel, dark glass, knobs, rabbit ears.
+    box_child(head, "tv_cabinet", [0, 0.06, -0.04], [0.44, 0.38, 0.32], crt)
+    box_child(head, "tv_bezel", [0, 0.08, 0.13], [0.40, 0.30, 0.06], crt)
+    box_child(head, "tv_glass", [0, 0.09, 0.165], [0.30, 0.22, 0.02], glass)
+    box_child(head, "tv_controls", [0, -0.12, 0.12], [0.38, 0.07, 0.10], crt)
+    box_child(head, "tv_knob_l", [-0.12, -0.12, 0.18], [0.045, 0.045, 0.04], metal)
+    box_child(head, "tv_knob_r", [-0.05, -0.12, 0.18], [0.045, 0.045, 0.04], metal)
+    box_child(head, "tv_antenna_l", [-0.08, 0.32, -0.02], [0.012, 0.28, 0.012], metal, quat_z(0.35))
+    box_child(head, "tv_antenna_r", [0.08, 0.32, -0.02], [0.012, 0.28, 0.012], metal, quat_z(-0.35))
+    box_child(l_arm, "l_arm_mesh", [0, 0.13, 0], [0.08, 0.26, 0.08], body)
+    box_child(l_fore, "l_fore_mesh", [0, 0.12, 0], [0.07, 0.24, 0.07], body)
+    box_child(l_hand, "l_hand_mesh", [0, 0.04, 0], [0.08, 0.10, 0.08], body)
+    box_child(r_arm, "r_arm_mesh", [0, 0.13, 0], [0.08, 0.26, 0.08], body)
+    box_child(r_fore, "r_fore_mesh", [0, 0.12, 0], [0.07, 0.24, 0.07], body)
+    box_child(r_hand, "r_hand_mesh", [0, 0.04, 0], [0.08, 0.10, 0.08], body)
+    box_child(l_up, "l_up_mesh", [0, -0.18, 0], [0.11, 0.36, 0.11], body)
+    box_child(l_leg, "l_leg_mesh", [0, -0.16, 0], [0.09, 0.32, 0.09], body)
+    box_child(l_foot, "l_foot_mesh", [0, -0.04, 0.06], [0.10, 0.08, 0.22], body)
+    box_child(r_up, "r_up_mesh", [0, -0.18, 0], [0.11, 0.36, 0.11], body)
+    box_child(r_leg, "r_leg_mesh", [0, -0.16, 0], [0.09, 0.32, 0.09], body)
+    box_child(r_foot, "r_foot_mesh", [0, -0.04, 0.06], [0.10, 0.08, 0.22], body)
 
     armature = add_node(name="Armature", children=[hips])
     gltf = {
@@ -228,7 +240,18 @@ def build() -> None:
         "scene": 0,
         "scenes": [{"nodes": [armature], "name": "TVHeadHumanoid"}],
         "nodes": nodes,
-        "meshes": [{"name": "Box", "primitives": [{"attributes": {"POSITION": 0, "NORMAL": 1}, "indices": 2}]}],
+        "materials": [
+            {"name": "body", "pbrMetallicRoughness": {"baseColorFactor": [0.20, 0.26, 0.34, 1], "metallicFactor": 0.05, "roughnessFactor": 0.85}},
+            {"name": "crt", "pbrMetallicRoughness": {"baseColorFactor": [0.78, 0.73, 0.58, 1], "metallicFactor": 0.0, "roughnessFactor": 0.7}},
+            {"name": "glass", "pbrMetallicRoughness": {"baseColorFactor": [0.07, 0.09, 0.11, 1], "metallicFactor": 0.2, "roughnessFactor": 0.35}},
+            {"name": "metal", "pbrMetallicRoughness": {"baseColorFactor": [0.45, 0.46, 0.48, 1], "metallicFactor": 0.6, "roughnessFactor": 0.4}},
+        ],
+        "meshes": [
+            {"name": "BoxBody", "primitives": [{"attributes": {"POSITION": 0, "NORMAL": 1}, "indices": 2, "material": 0}]},
+            {"name": "BoxCrt", "primitives": [{"attributes": {"POSITION": 0, "NORMAL": 1}, "indices": 2, "material": 1}]},
+            {"name": "BoxGlass", "primitives": [{"attributes": {"POSITION": 0, "NORMAL": 1}, "indices": 2, "material": 2}]},
+            {"name": "BoxMetal", "primitives": [{"attributes": {"POSITION": 0, "NORMAL": 1}, "indices": 2, "material": 3}]},
+        ],
         "accessors": accessors,
         "bufferViews": views,
         "buffers": [{"byteLength": len(bin_blob)}],

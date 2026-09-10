@@ -479,8 +479,8 @@
       "description": "A wide product presentation with the lead and three screens."
     },
     "tv-head-walk": {
-      "title": "TV-head walk",
-      "description": "A bundled box humanoid with a television head. The face plane is parented to the headfront bone."
+      "title": "CRT-head walk",
+      "description": "A tiny generated humanoid (legs, body, arms) with an old CRT television for a head. The face plane sits on the headfront bone."
     }
   },
   "gallerySearch": "Search the catalog",
