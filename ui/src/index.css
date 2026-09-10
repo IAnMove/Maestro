@@ -1015,16 +1015,36 @@ input[type="range"]::-webkit-slider-thumb {
   animation: hp-intro-progress linear both;
 }
 
+/* `reduce` asks for no vestibular motion — travel, parallax, zoom — not for
+   no change at all, and a cross-fade is the accepted stand-in. So the plate
+   still resolves instead of appearing as a dead still: every entrance keeps
+   its own duration and delay (the wordmark's stagger is inline, so it still
+   writes itself letter by letter) and only the displacement is dropped.
+   Base rules are already the settled state, so swapping the keyframe for an
+   opacity-only one is the whole edit. What stays off is what exists purely
+   as travel, and the one loop that never ends. */
 @media (prefers-reduced-motion: reduce) {
   .hp-intro-root[data-run='true'] :is(
-    .hp-intro-art-frame,
-    .hp-intro-art,
-    .hp-intro-bloom,
     .hp-intro-beat,
     .hp-intro-glyph,
     .hp-intro-rule
   ) {
+    animation-name: hp-intro-fade;
+    animation-timing-function: ease-out;
+  }
+  /* Camera push-in: it is only the travel, so there is nothing to fade to. */
+  .hp-intro-root[data-run='true'] .hp-intro-art {
     animation: none;
+  }
+  /* The halo over the writing hand keeps breathing. It is the one loop that
+     survives here, and deliberately: it changes luminance and nothing else —
+     no travel, no scale, nothing that could read as movement — and it is
+     what keeps the light alive rather than printed. Only the scale is taken
+     off its entrance. */
+  .hp-intro-root[data-run='true'] .hp-intro-bloom {
+    animation:
+      hp-intro-fade 1400ms ease-out both,
+      hp-intro-breathe 4600ms 1400ms ease-in-out infinite;
   }
   /* The embers only exist as motion, so they leave rather than freeze
      mid-air (their base state is opacity: 0). */
@@ -1161,21 +1181,57 @@ input[type="range"]::-webkit-slider-thumb {
  * the same result without leaving pre-2023 browsers with no fill at all,
  * which is exactly when the seam became visible. */
 .hp-navigation-row {
+  /* Neutral hue for the buttons that are not a section — Workspaces and
+     Activity. A section sets its own on itself, and a declaration on the
+     element always beats an inherited one, so the row separates into two
+     groups without a divider being drawn. */
+  --hp-navigation-rgb: 150, 162, 186;
   border-radius: 0.6rem 0.6rem 0 0;
   background-color: rgba(0, 0, 0, 0.34);
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.55), inset 0 -1px 0 rgba(255, 255, 255, 0.035);
 }
-.hp-navigation-primary,
-.hp-navigation-child {
-  background-color: rgba(255, 255, 255, 0.055);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 1px 2px rgba(0, 0, 0, 0.4);
+/* Drawn rather than moulded. A drop shadow under a pill is the stock
+   button of every framework; a hairline ring and a single-pixel top light
+   say "pressable" just as clearly and leave the feedback to the press
+   itself. The ring is also where each section takes its colour, so the
+   four differ in temperature while at rest — which is the job the colour
+   swatch used to do, without adding an element or a pixel of width. */
+.hp-navigation-primary {
+  background-color: rgba(var(--hp-navigation-rgb), 0.085);
+  box-shadow: inset 0 0 0 1px rgba(var(--hp-navigation-rgb), 0.16),
+              inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
-.hp-navigation-primary:hover,
-.hp-navigation-child:hover { background-color: rgba(255, 255, 255, 0.095); }
+.hp-navigation-child {
+  background-color: rgba(255, 255, 255, 0.045);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06),
+              inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+/* The icon is the colour sample: dimmed while the section is closed, full
+   once it is open or current. */
+.hp-navigation-primary svg {
+  color: rgb(var(--hp-navigation-rgb));
+  opacity: 0.62;
+  transition: opacity 150ms ease;
+}
+.hp-navigation-primary:hover svg { opacity: 0.9; }
+.hp-navigation-primary[data-navigation-active='true'] svg,
+.hp-navigation-primary[data-navigation-expanded='true'] svg { opacity: 1; }
+.hp-navigation-primary:hover {
+  background-color: rgba(var(--hp-navigation-rgb), 0.15);
+  box-shadow: inset 0 0 0 1px rgba(var(--hp-navigation-rgb), 0.3),
+              inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+.hp-navigation-child:hover {
+  background-color: rgba(255, 255, 255, 0.085);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.11),
+              inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+/* All of the button-ness lives here, and only while the finger is down. */
 .hp-navigation-primary:active,
 .hp-navigation-child:active {
-  background-color: rgba(0, 0, 0, 0.2);
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5);
+  background-color: rgba(0, 0, 0, 0.22);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.45);
+  transform: translateY(0.5px);
 }
 .hp-navigation-primary[data-navigation-expanded='true'] {
   z-index: 3;
