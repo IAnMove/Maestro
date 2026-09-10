@@ -1,4 +1,4 @@
-import catalog from '../../../../app/shared/scene_effects.json'
+import catalog from '../../../../app/shared/scene_effects.json' with { type: 'json' }
 
 export const FX_CATALOG = catalog
 export type SceneFx = {

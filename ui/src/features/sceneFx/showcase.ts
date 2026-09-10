@@ -1,4 +1,4 @@
-import bases from '../../../../app/shared/scene_bases.json'
+import bases from '../../../../app/shared/scene_bases.json' with { type: 'json' }
 import { FX_CATALOG, parseSceneFx } from './types'
 
 /** Non-destructive to actors/cameras/audio; the authored effect track is replaced explicitly. */

@@ -39,7 +39,8 @@ export function scheduleFx(context: BaseAudioContext, cues: readonly SceneFx[], 
     for (let at = from; at < end; at += 1) {
       const samples = fxSamples(cue, context.sampleRate, at - cue.start, Math.min(1, end - at))
       const target = Math.round((at - offset) * context.sampleRate)
-      for (let i = 0; i < samples.length && target + i < mixed.length; i++) mixed[target + i] += samples[i]
+      const count = Math.min(samples.length, mixed.length - target)
+      for (let i = 0; i < count; i++) mixed[target + i] += samples[i]
     }
   }
   for (let i = 0; i < mixed.length; i++) mixed[i] = Math.max(-1, Math.min(1, mixed[i]))
