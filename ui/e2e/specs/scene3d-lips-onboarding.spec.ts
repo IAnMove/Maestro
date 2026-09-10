@@ -92,3 +92,28 @@ test('add lips without a recognized rig, apply bundled example, record and keep 
   expect(app.requests).toHaveLength(0)
   await closeApp(page, app.session)
 })
+
+test('reopened isolated voice keeps isolation until explicitly disabled', async ({ page }, info) => {
+  const app = await speechApp(page), doc = speechFixture(false, true)
+  doc.slots[0].speech!.clips![0].driver = 'rhubarb-vocals'
+  await page.route('**/api/v1/character-kits/speech/capabilities', route => route.fulfill({ json: { rhubarb: true, vocalIsolation: { available: true } } }))
+  const requests: boolean[] = []
+  await page.route('**/api/v1/character-kits/speech/analyze*', route => {
+    requests.push(new URL(route.request().url()).searchParams.get('isolate_vocals') === 'true')
+    return route.fulfill({ json: { mouthCues: [{ start: 0, end: 1, value: 'D' }], duration: 1 } })
+  })
+  await openSpeech(page, doc)
+  const option = page.getByLabel('Isolate vocals before calculating lips', { exact: true })
+  await expect(option).toBeChecked()
+  await page.getByRole('button', { name: 'Calculate gestures with Rhubarb (local)', exact: true }).click()
+  await expect.poll(() => requests).toEqual([true])
+  await expect(page.getByTestId('scene3d-speech')).toContainText('1 cue')
+  const saved = await saveSpeech(page, info, 'isolated-reanalysis')
+  expect(saved.slots[0].speech?.clips?.[0].driver).toBe('rhubarb-vocals')
+  await option.uncheck()
+  await page.getByRole('button', { name: 'Calculate gestures with Rhubarb (local)', exact: true }).click()
+  await expect.poll(() => requests).toEqual([true, false])
+  await expect(page.getByTestId('scene3d-speech')).toContainText('1 cue')
+  expect((await saveSpeech(page, info, 'explicit-mixed-reanalysis')).slots[0].speech?.clips?.[0].driver).toBe('rhubarb')
+  await closeApp(page, app.session)
+})

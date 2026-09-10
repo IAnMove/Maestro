@@ -17,6 +17,7 @@ import { QuickVoiceControls } from './QuickVoiceControls'
 import { exampleVoice, recordedVoice } from './quickVoice'
 import { VoicePreview } from './VoicePreview'
 import { VocalIsolationOption } from './VocalIsolationOption'
+import { useVocalIsolation } from './useVocalIsolation'
 
 export type SpeechControlsProps = {
   slot: Scene3DSlot; workspace: string; disabled: boolean
@@ -34,7 +35,7 @@ export function Scene3DSpeechControls({ slot, workspace, disabled, calibrate, on
   const [items, setItems] = useState<ApiOutput[]>([])
   const [busy, setBusy] = useState(false), [error, setError] = useState('')
   const [recording, setRecording] = useState(false)
-  const [isolateVocals, setIsolateVocals] = useState(false)
+  const [isolateVocals, setIsolateVocals] = useVocalIsolation(slot, workspace, speech)
   const [jobs] = useState(() => ({ serial: 0, controller: null as AbortController | null }))
   const jsonInput = useRef<HTMLInputElement>(null), kitInput = useRef<HTMLInputElement>(null)
   useEffect(() => { onBusyChange?.(busy || recording); return () => onBusyChange?.(false) }, [busy, recording, onBusyChange])
