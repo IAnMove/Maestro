@@ -123,6 +123,19 @@ test('Wizard showcase without a document keeps placed 3D speakers', () => {
   assert.equal(adopted.document.sfx.length, FX_CATALOG.length)
 })
 
+test('Wizard showcase without a document keeps authored world SFX on an empty Video3D stage', () => {
+  const current = createDefaultScene3DDocument()
+  current.worldSfx = parseWorldSfx([{ id: 'portal-1', kind: 'portal', start: 0, end: 4, position: { x: 0, y: 1.2, z: -1.5 } }])
+  const incoming = withFxShowcase(createDefaultScene3DDocument(), 'anime')
+  assert.equal(sceneHasAuthoredContent(current), true)
+  const adopted = adoptPreparedSceneDocument(current, incoming)
+  assert.equal(adopted.mode, 'retain')
+  assert.equal(adopted.document.slots, current.slots)
+  assert.equal(adopted.document.worldSfx, current.worldSfx)
+  assert.equal(adopted.document.worldSfx?.[0].id, 'portal-1')
+  assert.equal(adopted.document.sfx.length, 12)
+})
+
 test('an empty editor still opens the stock showcase, and apply/speech documents still replace', () => {
   const empty2d = { version: 1 as const, name: 'Untitled scene', layers: [] as [], width: 1280, height: 720, duration: 5 }
   const showcase = withFxShowcase({ version: 1 as const, name: 'SFX showcase', layers: [], width: 1280, height: 720, duration: 4 })

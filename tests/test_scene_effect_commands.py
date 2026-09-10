@@ -90,6 +90,26 @@ def test_world_cues_upsert_on_video3d_and_reject_2d(service):
         service.execute({'version': 1, 'operation': 'scenes.effects.apply', 'input': {'document': flat, 'worldCues': [cue]}})
 
 
+def test_replace_one_sfx_track_preserves_the_other(service):
+    world = showcase(service, '3d')
+    portal = {'id': 'portal-1', 'kind': 'portal', 'start': 0, 'end': 2, 'position': {'x': 0, 'y': 1, 'z': -1},
+              'rotation': {'x': 0, 'y': 90, 'z': 0}}
+    with_portal = service.execute({'version': 1, 'operation': 'scenes.effects.apply',
+                                   'input': {'document': world, 'worldCues': [portal]}})['result']['document']
+    assert with_portal['worldSfx'][0]['rotation']['y'] == 90
+    spark = {'id': 'spark-1', 'kind': 'sparks', 'start': 0, 'end': 2}
+    screen_only = service.execute({'version': 1, 'operation': 'scenes.effects.apply',
+                                   'input': {'document': with_portal, 'cues': [spark], 'replace': True}})['result']['document']
+    assert [cue['id'] for cue in screen_only['sfx']] == ['spark-1']
+    assert screen_only['worldSfx'][0]['kind'] == 'portal'
+    assert screen_only['worldSfx'][0]['rotation']['y'] == 90
+    circle = {'id': 'circle-1', 'kind': 'magic_circle', 'start': 0, 'end': 2}
+    world_only = service.execute({'version': 1, 'operation': 'scenes.effects.apply',
+                                  'input': {'document': screen_only, 'worldCues': [circle], 'replace': True}})['result']['document']
+    assert [cue['id'] for cue in world_only['sfx']] == ['spark-1']
+    assert [cue['id'] for cue in world_only['worldSfx']] == ['circle-1']
+
+
 def test_speech_rejects_paths_and_unknown_character_before_analysis(service):
     doc = showcase(service)
     doc['slots'][0]['sourceUrl'] = '/api/v1/file/actor.glb?workspace=default'

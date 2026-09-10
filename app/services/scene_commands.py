@@ -75,8 +75,14 @@ class DocumentInput(Strict):
 
 class WorldVec(Strict):
     x: float = Field(ge=-50, le=50)
-    y: float = Field(ge=-20, le=50)
+    y: float = Field(ge=-50, le=50)
     z: float = Field(ge=-50, le=50)
+
+
+class WorldRot(Strict):
+    x: float = Field(default=0, ge=-180, le=180)
+    y: float = Field(default=0, ge=-180, le=180)
+    z: float = Field(default=0, ge=-180, le=180)
 
 
 class WorldFxCue(Strict):
@@ -86,7 +92,7 @@ class WorldFxCue(Strict):
     start: float = Field(ge=0, lt=600)
     end: float = Field(gt=0, le=600)
     position: WorldVec = Field(default_factory=lambda: WorldVec(x=0, y=1.1, z=-1.2))
-    rotation: WorldVec = Field(default_factory=lambda: WorldVec(x=0, y=0, z=0))
+    rotation: WorldRot = Field(default_factory=WorldRot)
     scale: float = Field(default=1.4, ge=0.05, le=20)
     intensity: float = Field(default=1, ge=.1, le=2)
     color: str | None = Field(default=None, pattern=r'^#[0-9a-fA-F]{6}$')
@@ -181,17 +187,19 @@ def _effects(value):
                       size=95, seed=i + 17, sound=value.sound, label=item['id'].replace('speedlines', 'speed lines').title()).model_dump() for i, item in enumerate(presets)]
         document['sfx'] = cues
         return document
-    current = [] if value.replace else [FxCue.model_validate(cue).model_dump() for cue in document.get('sfx', [])]
-    entries = {cue['id']: cue for cue in current}
-    for cue in value.cues:
-        if cue.end > document['duration']:
-            raise ValueError('Effect timing exceeds the scene duration')
-        entries[cue.id] = cue.model_dump()
-    if len(entries) > 64:
-        raise ValueError('Maximum 64 effects per scene')
-    if value.cues or value.replace:
+    # `replace` only rewrites the tracks present in the request. A screen-only
+    # apply must keep worldSfx; a world-only apply must keep overlays.
+    if value.cues or (value.replace and not value.worldCues):
+        current = [] if value.replace else [FxCue.model_validate(cue).model_dump() for cue in document.get('sfx', [])]
+        entries = {cue['id']: cue for cue in current}
+        for cue in value.cues:
+            if cue.end > document['duration']:
+                raise ValueError('Effect timing exceeds the scene duration')
+            entries[cue.id] = cue.model_dump()
+        if len(entries) > 64:
+            raise ValueError('Maximum 64 effects per scene')
         document['sfx'] = list(entries.values())
-    if value.worldCues or (value.replace and 'slots' in document):
+    if value.worldCues:
         if 'slots' not in document:
             raise ValueError('World SFX require a Video3D document. Screen overlays remain available for 2D.')
         world_current = [] if value.replace else [WorldFxCue.model_validate(cue).model_dump() for cue in document.get('worldSfx', [])]
