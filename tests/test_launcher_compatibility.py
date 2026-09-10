@@ -20,8 +20,11 @@ class TestPinokioGpuCompatibility(unittest.TestCase):
     def test_fresh_install_still_uses_pinokios_documented_gpu_variable(self):
         installer = (_ROOT / "install.js").read_text(encoding="utf-8")
 
-        self.assertIn("{{gpu !== 'nvidia'}}", installer)
-        self.assertIn("This app requires an NVIDIA GPU", installer)
+        self.assertIn("...runtime.preflight()", installer)
+        from services.runtime_profiles import select_profiles
+        rejected = select_profiles("win32", "x64", "amd")
+        self.assertFalse(rejected["supported"])
+        self.assertIn("NVIDIA", rejected["engines"]["wangp"]["reason"])
 
     def test_start_url_uses_the_required_capture_object(self):
         start = (_ROOT / "start.js").read_text(encoding="utf-8")
@@ -41,10 +44,10 @@ class TestInstallWindowsAndUltralyticsPins(unittest.TestCase):
         native = (_ROOT / "hunyuan_native.js").read_text(encoding="utf-8")
         installer = (_ROOT / "install.js").read_text(encoding="utf-8")
         updater = (_ROOT / "update.js").read_text(encoding="utf-8")
-        self.assertIn('require("./hunyuan_native")', installer)
-        self.assertIn('require("./hunyuan_native")', updater)
-        self.assertIn("...hunyuanNative.nativeBuildSteps()", installer)
-        self.assertIn("...hunyuanNative.nativeBuildSteps()", updater)
+        self.assertIn("runtime_setup.js", installer)
+        self.assertIn("runtime_setup.js", updater)
+        import subprocess
+        subprocess.run(["node", "scripts/check_runtime_profiles.cjs"], cwd=_ROOT, check=True)
         self.assertIn("targets/x86_64-linux", native)
         self.assertIn("CUDA_PATH", native)
         self.assertIn("{{platform === 'win32'}}", native)

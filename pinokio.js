@@ -15,6 +15,7 @@ module.exports = {
       start: info.running("start.js"),
       start_classic: info.running("start_classic.js"),
       update: info.running("update.js"),
+      ui_build: info.running("ui_build.js"),
       reset: info.running("reset.js")
     }
     if (running.install) {
@@ -24,6 +25,8 @@ module.exports = {
         text: "Installing",
         href: "install.js",
       }]
+    } else if (running.ui_build && !running.start && !running.update) {
+      return [{default: true, icon: "fa-solid fa-display", text: "Preparing Web UI", href: "ui_build.js"}]
     } else if (installed) {
       if (running.start) {
         let local = info.local("start.js")
@@ -124,6 +127,11 @@ module.exports = {
           icon: "fa-solid fa-plug",
           text: "Update",
           href: "update.js",
+        }, {
+          icon: "fa-solid fa-display",
+          text: "Repair Web UI",
+          href: "ui_build.js",
+          params: {force: true},
         }, {
           icon: "fa-solid fa-plug",
           text: "Install",

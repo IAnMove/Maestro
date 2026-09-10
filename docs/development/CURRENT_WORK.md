@@ -117,6 +117,7 @@ priorización en [SLICE_QUEUE](SLICE_QUEUE.md).
 
 | Tarea | Referencia |
 |---|---|
+| Instalación Windows/Linux y aislamiento de motores | [RUNTIME_PROFILES](RUNTIME_PROFILES.md) |
 | Capas y dependencias | [ARCHITECTURE_FOUNDATION](ARCHITECTURE_FOUNDATION.md), [ARCHITECTURE_MAP](ARCHITECTURE_MAP.md) |
 | Planos Video 3D, animaciones y revisión | [VIDEO3D_SHOT_REVIEW](VIDEO3D_SHOT_REVIEW.md) |
 | Identidad y procedencia | [DOMAIN_MODEL_AND_ASSET_PROVENANCE](DOMAIN_MODEL_AND_ASSET_PROVENANCE.md), [GENERATION_RECORD](GENERATION_RECORD.md) |
