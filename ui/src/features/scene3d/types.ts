@@ -67,6 +67,8 @@ export const SCENE3D_TEMPLATE_IDS = [
   'clone-chase',
   ...CINEMATIC_TEMPLATE_IDS,
   ...MEDIA_TEMPLATE_IDS,
+  'reflective-stage',
+  'character-materialization',
 ] as const
 
 export type Scene3DTemplateId = (typeof SCENE3D_TEMPLATE_IDS)[number]
@@ -119,9 +121,10 @@ export type Scene3DSlot = {
   speech?: Scene3DSpeech
   media: Scene3DSlotMedia
   screen?: import('./mediaScreen').MediaScreen
-  surface?: 'wall' | 'floor'
+  surface?: 'wall' | 'floor' | 'environment'
+  appearance?: { start: number; duration: number; color: string }
   textureRepeat?: number
-  performance?: 'typing'
+  performance?: 'typing' | 'idle'
   grounded?: boolean
   clip: Scene3DClipRef | null
   clipPlayback?: Scene3DClipPlayback
@@ -183,6 +186,7 @@ export type Scene3DDocument = {
   templateId: Scene3DTemplateId
   camera: Scene3DCamera
   light: Scene3DLight
+  environment?: { reflectiveFloor: boolean; platform: boolean; bloom: number }
   dressing?: Scene3DDressing
   workshopScreen?: 'code' | 'error' | 'success'
   slots: Scene3DSlot[]

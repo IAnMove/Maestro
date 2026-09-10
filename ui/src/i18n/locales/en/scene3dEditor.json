@@ -481,6 +481,14 @@
     "tv-head-walk": {
       "title": "CRT-head walk",
       "description": "A tiny generated humanoid (legs, body, arms) with an old CRT television for a head. The face plane sits on the headfront bone."
+    },
+    "reflective-stage": {
+      "title": "Reflective stage",
+      "description": "Metal floor, energy gate and soft mist."
+    },
+    "character-materialization": {
+      "title": "Character materialization",
+      "description": "Photos behind, lightning and a centered animated character on a platform."
     }
   },
   "gallerySearch": "Search the catalog",
@@ -587,5 +595,19 @@
     "previewUnavailable": "Wait for the 3D preview to load before saving.",
     "saveFailed": "Could not save the scene.",
     "cancelLoad": "Cancel loading"
+  },
+  "cinematic": {
+    "title": "Cinematic environment",
+    "floor": "Reflective metal floor",
+    "platform": "Materialization platform",
+    "bloom": "Bloom",
+    "help": "Choose a background image and select Full scene background in its Surface control. The image fills the frame; it is an illustrated backdrop, not 3D architecture.",
+    "appearance": "Materialize character",
+    "start": "Start (s)",
+    "duration": "Reveal (s)",
+    "color": "Energy color",
+    "idle": "Hold a living pose",
+    "idleHelp": "Uses the selected animation at its start offset with subtle body movement. Choose a relaxed frame of an idle or walking clip; no animation is transferred between rigs.",
+    "background": "Full scene background"
   }
 }

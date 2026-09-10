@@ -28,6 +28,7 @@ import {
   prepareBackdropTexture,
   pruneSlots,
   resizeWorld,
+  renderWorld,
   setWorldSize,
   slotNeedsReload,
   syncSlotClip,
@@ -65,7 +66,7 @@ function loadScreen(world: GpuWorld, slot: Scene3DSlot, onError: (message: strin
   if (!gpu || !screen?.sourceUrl) return
   const abort = new AbortController(); gpu.screenAbort = abort
   void bindScreenMedia(gpu.root, screen, slot.media === 'screen', abort.signal, () => {
-    if (!abort.signal.aborted && world.slots.get(slot.id) === gpu) world.renderer.render(world.scene, world.camera)
+    if (!abort.signal.aborted && world.slots.get(slot.id) === gpu) renderWorld(world)
   }).then(media => {
     if (world.slots.get(slot.id) !== gpu || abort.signal.aborted) { media.dispose(); return }
     gpu.screen = media

@@ -18,7 +18,7 @@ PRESETS = {entry['id']: entry for entry in CATALOG}
 WORLD_KINDS = {
     'portal', 'magic_circle', 'summoning_gate',
     'lightning', 'energy_beam', 'laser',
-    'energy_orb', 'anime_aura', 'arcane_missiles', 'shockwave',
+    'energy_orb', 'anime_aura', 'arcane_missiles', 'shockwave', 'smoke', 'sparks',
 }
 
 
@@ -156,7 +156,7 @@ class SpeechPrepare(DocumentInput):
 
 OPERATIONS = {
     'scenes.speech.capabilities': (Strict, 'Read local Rhubarb and optional installed-only CPU BS-RoFormer availability. No model downloads or inference.'),
-    'scenes.effects.catalog': (Strict, 'List 30 screen overlays plus world-space kinds in result.worldKinds (portal, magic_circle, summoning_gate, lightning, energy_beam, laser, energy_orb, anime_aura, arcane_missiles, shockwave). Screen uses percent; world uses meters. No AI generation.'),
+    'scenes.effects.catalog': (Strict, 'List 30 screen overlays plus world-space kinds in result.worldKinds (portal, magic_circle, summoning_gate, lightning, energy_beam, laser, energy_orb, anime_aura, arcane_missiles, shockwave, smoke, sparks). Screen uses percent; world uses meters. No AI generation.'),
     'scenes.effects.apply': (EffectsApply, 'Return an editable 2D/3D document with timed SFX. Screen cues go to sfx; worldCues go to worldSfx on Video3D only. Matching IDs replace in place. No save or export.'),
     'scenes.effects.showcase': (EffectsShowcase, 'Return a reusable SFX showcase: all effects 90 seconds, or collection anime 36 seconds. Retains actors/camera and replaces only SFX. No save or export.'),
     'scenes.speech.prepare': (SpeechPrepare, 'Analyze an existing workspace voice with Rhubarb and attach it to an exact 3D speaker/clip. Optional isolate_vocals uses installed-only local CPU BS-RoFormer, preserving original playback. Returns an editable document; face calibration may be needed. No downloads, voice generation, save or video export.'),

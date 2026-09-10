@@ -1,3 +1,4 @@
+import { CinematicControls, AppearanceControls } from './CinematicControls'
 import { useSceneDocumentHandoff } from '../sceneFx/handoff'
 import { SceneFxControls } from '../sceneFx/SceneFxControls'
 import { SceneFxOverlay } from '../sceneFx/SceneFxOverlay'
@@ -348,6 +349,7 @@ export function Scene3DWorkspace({ width, height, initialDocument }: Props) {
         }} />
       <Scene3DSpeechSelector slots={sceneDoc.slots} selected={selected} open={speechOpen}
         onToggle={() => { setPickTarget(undefined); setSpeechOpen(open => !open) }} onSelect={selectSlot} />
+      <CinematicControls environment={sceneDoc.environment} disabled={editingLocked} onChange={environment => applyScene(current => ({ ...current, environment }))} />
       <SceneFxControls cues={sceneDoc.sfx} duration={sceneDoc.duration} disabled={editingLocked} onChange={sfx => applyScene(current => ({ ...current, sfx }))} onShowcase={collection => applyScene(current => withFxShowcase(current, collection))} />
       <WorldSfxControls cues={sceneDoc.worldSfx} duration={sceneDoc.duration} selectedId={selectedWorldSfxId} disabled={editingLocked}
         onSelect={id => { setPickTarget(undefined); setSelectedWorldSfxId(id) }}
@@ -513,11 +515,12 @@ export function Scene3DWorkspace({ width, height, initialDocument }: Props) {
                   })
                 }}
                 onRemove={() => { generationRef.current += 1; applyScene(current => ({ ...current, slots: current.slots.filter(value => value.id !== slot.id), camera: current.camera.framing?.targetSlot === slot.id ? { ...current.camera, framing: undefined } : current.camera })) }} />
+              <AppearanceControls slot={slot} disabled={editingLocked} onChange={patch => applyScene(current => patchScene3DSlot(current, slot.id, patch))} />
               <Scene3DAnimationControls slot={slot} clips={catalogs[slot.id]} duration={sceneDoc.duration} disabled={editingLocked}
                 onChange={patch => applyScene(current => patchScene3DSlot(current, slot.id, patch))} />
-              {slot.slot === 'background' && <label className="my-2 flex min-h-9 items-center gap-2 text-xs"><span>{editorT('travel.surface')}</span><select disabled={exporting} value={slot.surface ?? 'backdrop'} onChange={event => applyScene(current => patchScene3DSlot(current, slot.id, { surface: event.target.value === 'backdrop' ? undefined : event.target.value as 'floor' | 'wall', loop: undefined }))} className="rounded border border-border bg-bg-tertiary p-2"><option value="backdrop">{editorT('travel.backdrop')}</option><option value="wall">{editorT('travel.wall')}</option><option value="floor">{editorT('travel.floor')}</option></select></label>}
-              {slot.slot === 'background' && slot.surface && numberField(editorT('travel.repeat'), slot.textureRepeat ?? (slot.surface === 'floor' ? 4 : 2), value => applyScene(current => patchScene3DSlot(current, slot.id, { textureRepeat: Math.max(1, Math.min(16, value)) })), 1, exporting)}
-              {slot.slot === 'background' && slot.surface !== 'floor' && (
+              {slot.slot === 'background' && <label className="my-2 flex min-h-9 items-center gap-2 text-xs"><span>{editorT('travel.surface')}</span><select disabled={exporting} value={slot.surface ?? 'backdrop'} onChange={event => applyScene(current => patchScene3DSlot(current, slot.id, { surface: event.target.value === 'backdrop' ? undefined : event.target.value as 'floor' | 'wall' | 'environment', loop: undefined }))} className="rounded border border-border bg-bg-tertiary p-2"><option value="backdrop">{editorT('travel.backdrop')}</option><option value="environment">{editorT('cinematic.background')}</option><option value="wall">{editorT('travel.wall')}</option><option value="floor">{editorT('travel.floor')}</option></select></label>}
+              {slot.slot === 'background' && slot.surface && slot.surface !== 'environment' && numberField(editorT('travel.repeat'), slot.textureRepeat ?? (slot.surface === 'floor' ? 4 : 2), value => applyScene(current => patchScene3DSlot(current, slot.id, { textureRepeat: Math.max(1, Math.min(16, value)) })), 1, exporting)}
+              {slot.slot === 'background' && !slot.surface && (
                 <InfiniteBackdropControls
                   loop={slot.loop}
                   disabled={exporting}

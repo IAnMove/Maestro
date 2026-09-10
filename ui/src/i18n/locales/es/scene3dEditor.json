@@ -481,6 +481,14 @@
     "tv-head-walk": {
       "title": "Caminata cabeza CRT",
       "description": "Humanoide generado (piernas, cuerpo, brazos) con un televisor CRT antiguo de cabeza. El plano de la cara va en el hueso headfront."
+    },
+    "reflective-stage": {
+      "title": "Escenario reflectante",
+      "description": "Suelo metálico, portal de energía y niebla suave."
+    },
+    "character-materialization": {
+      "title": "Materialización de personaje",
+      "description": "Fotos detrás, rayo y personaje animado centrado sobre una tarima."
     }
   },
   "gallerySearch": "Buscar en el catálogo",
@@ -587,5 +595,19 @@
     "previewUnavailable": "Espera a que cargue la vista 3D antes de guardar.",
     "saveFailed": "No se pudo guardar la escena.",
     "cancelLoad": "Cancelar carga"
+  },
+  "cinematic": {
+    "title": "Entorno cinematográfico",
+    "floor": "Suelo metálico reflectante",
+    "platform": "Tarima de materialización",
+    "bloom": "Resplandor",
+    "help": "Elige una imagen de fondo y selecciona Fondo de escena completo en su control Superficie. La imagen llena el encuadre; es un fondo ilustrado, no arquitectura 3D.",
+    "appearance": "Materializar personaje",
+    "start": "Inicio (s)",
+    "duration": "Aparición (s)",
+    "color": "Color de energía",
+    "idle": "Mantener una pose viva",
+    "idleHelp": "Usa la animación elegida en su punto de inicio con un movimiento corporal sutil. Elige un fotograma relajado de reposo o de andar; no se transfieren animaciones entre rigs.",
+    "background": "Fondo de escena completo"
   }
 }
