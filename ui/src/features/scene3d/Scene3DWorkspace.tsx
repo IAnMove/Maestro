@@ -3,7 +3,7 @@ import { SceneFxControls } from '../sceneFx/SceneFxControls'
 import { SceneFxOverlay } from '../sceneFx/SceneFxOverlay'
 import { adoptPreparedSceneDocument, withFxShowcase } from '../sceneFx/showcase'
 import { WorldSfxControls } from '../sceneFx/WorldSfxControls'
-import { worldSfxAudioCues, parseWorldSfx, worldAnchorOffsetFromWorldPoint, type WorldSfx } from '../sceneFx/world'
+import { worldSfxAudioCues, parseWorldSfx, applyWorldSfxTranslate, type WorldSfx } from '../sceneFx/world'
 import { worldSfxDemoDocument } from '../sceneFx/worldDemo'
 import { WORLD_SFX_SELECT_PREFIX } from './transformGizmo'
 import { Scene3DMotionControls } from './Scene3DMotionControls'
@@ -36,6 +36,7 @@ import { Scene3DInteraction } from './Scene3DInteraction'
 import type { TransformMode } from './transformGizmo'
 import { clipBindingError, resolveScene3DClip, retainSlotClipCatalogs } from './clips.ts'
 import { scene3dFrameCount, scene3dFrameTime, scene3dPlaybackSpeed } from './clock.ts'
+import { slotPoseAtTime } from './performance.ts'
 import { parseScene3DDocument } from './document.ts'
 import { canMutateWorld3DScene } from './exportLock.ts'
 import { exportWorld3DDocument } from './exportFlow.ts'
@@ -390,14 +391,10 @@ export function Scene3DWorkspace({ width, height, initialDocument }: Props) {
             const DEG = 180 / Math.PI
             return { ...current, worldSfx: parseWorldSfx((current.worldSfx ?? []).map(cue => {
               if (cue.id !== cueId) return cue
-              const next: WorldSfx = { ...cue }
+              let next: WorldSfx = { ...cue }
               if (patch.position) {
                 const slot = cue.anchor?.slotId ? current.slots.find(item => item.id === cue.anchor!.slotId) : undefined
-                if (slot) {
-                  next.anchor = { slotId: slot.id, offset: worldAnchorOffsetFromWorldPoint(slot, patch.position) }
-                } else {
-                  next.position = { x: patch.position[0], y: patch.position[1], z: patch.position[2] }
-                }
+                next = applyWorldSfxTranslate(next, patch.position, slot ? slotPoseAtTime(slot, seconds, current.duration) : undefined, patch.anchorOffset)
               }
               if (patch.worldRotation) next.rotation = { x: patch.worldRotation[0] * DEG, y: patch.worldRotation[1] * DEG, z: patch.worldRotation[2] * DEG }
               if (patch.scale !== undefined) next.scale = patch.scale
