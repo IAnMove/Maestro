@@ -19,6 +19,7 @@ const {
   isWizardConversationWriteCurrent,
   hasExclusiveWizardMessages,
   mergeWizardMessages,
+  applyRemoteWizardConversation,
   shouldFollowWizardWorkspace,
 } = await import('../src/features/agent/wizardConversationSync.ts')
 
@@ -652,6 +653,70 @@ test('rebasing a delayed snapshot keeps a local answer beside its question', () 
   assertOrder(rebased.conversation)
   assertOrder(mergeWizardConversationSnapshots(rebased.conversation, confirmed))
   assert.equal(new Set(rebased.conversation.messages.map(message => message.id)).size, 4)
+})
+
+test('first hydration keeps exclusive local answers that sit beside the oldest shared questions', async () => {
+  const localIds = Array.from({ length: 20 }, (_value, index) => [`u${index + 1}`, `a${index + 1}`]).flat()
+  const remoteIds = Array.from({ length: 40 }, (_value, index) => `u${index + 1}`)
+  const local = payload(1, localIds)
+  const remote = payload(4, remoteIds)
+  const earlyAnswers = Array.from({ length: 10 }, (_value, index) => `a${index + 1}`)
+  const newestRemoteQuestions = Array.from({ length: 19 }, (_value, index) => `u${index + 22}`)
+
+  const choice = applyRemoteWizardConversation({
+    localMessages: local.messages,
+    localRevision: 1,
+    remoteMessages: remote.messages,
+    remoteRevision: 4,
+  })
+  const merged = mergeWizardMessages(local.messages, remote.messages)
+
+  assert.deepEqual(earlyAnswers.filter(id => merged.some(message => message.id === id)), earlyAnswers)
+  assert.deepEqual(earlyAnswers.filter(id => choice.messages.some(message => message.id === id)), earlyAnswers)
+  assert.deepEqual(
+    newestRemoteQuestions.filter(id => merged.some(message => message.id === id)),
+    newestRemoteQuestions,
+  )
+  assert.deepEqual(
+    newestRemoteQuestions.filter(id => choice.messages.some(message => message.id === id)),
+    newestRemoteQuestions,
+  )
+  assert.equal(choice.source, 'local')
+
+  const snapshots = new Map([['workspace-a', clone(remote)]])
+  const saved = await persistQueuedWizardConversation({
+    workspace: 'workspace-a',
+    captured: {
+      ...local,
+      revision: remote.revision,
+      messages: choice.messages,
+    },
+    base: remote,
+  }, snapshots, {
+    async fetch() { return clone(remote) },
+    async save(_workspace, conversation) {
+      return { ...clone(conversation), revision: 5 }
+    },
+  })
+  assert.deepEqual(
+    earlyAnswers.filter(id => saved.conversation.messages.some(message => message.id === id)),
+    earlyAnswers,
+  )
+  assert.deepEqual(
+    newestRemoteQuestions.filter(id => saved.conversation.messages.some(message => message.id === id)),
+    newestRemoteQuestions,
+  )
+
+  const reloaded = applyRemoteWizardConversation({
+    localMessages: choice.messages,
+    localRevision: 0,
+    remoteMessages: saved.conversation.messages.slice(-40),
+    remoteRevision: saved.conversation.revision,
+  })
+  assert.deepEqual(
+    newestRemoteQuestions.filter(id => reloaded.messages.some(message => message.id === id)),
+    newestRemoteQuestions,
+  )
 })
 
 test('an unsaved answer stays after its known question before another client turn', () => {
