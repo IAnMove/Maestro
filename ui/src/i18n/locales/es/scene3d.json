@@ -44,7 +44,8 @@
     "nextPage": "Página siguiente",
     "listFailed": "No se pudieron listar las escenas 3D Video guardadas.",
     "loadFailed": "No se pudo cargar la escena guardada",
-    "openFailed": "No se pudo abrir esta escena 3D Video."
+    "openFailed": "No se pudo abrir esta escena 3D Video.",
+    "world3dExport": "Este clip es una exportación de Video3D. Ábrelo en Video 3D."
   },
   "timeline": {
     "title": "Línea de tiempo · {{current}}s / {{duration}}s · {{fps}} FPS",

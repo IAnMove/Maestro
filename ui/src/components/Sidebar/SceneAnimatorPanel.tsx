@@ -2,7 +2,8 @@ import { sceneAudioWav, supportsSceneAac } from '../../features/sceneFx/audioExp
 import { paintSceneFx } from '../../features/sceneFx/paint'
 import { mixFxAudio } from '../../features/sceneFx/mix'
 import { encodeSpeechAudio } from '../../features/scene3d/speech/encodeAudio'
-import { useSceneDocumentHandoff } from '../../features/sceneFx/handoff'
+import { presentSceneDocument, useSceneDocumentHandoff } from '../../features/sceneFx/handoff'
+import { galleryWorkspaceEpoch, galleryWorkspaceName } from '../../stores/gallerySlice'
 import { SceneFxControls } from '../../features/sceneFx/SceneFxControls'
 import { SceneFxOverlay } from '../../features/sceneFx/SceneFxOverlay'
 import { adoptPreparedSceneDocument, withFxShowcase } from '../../features/sceneFx/showcase'
@@ -3354,6 +3355,14 @@ export function SceneAnimatorPanel() {
       onOpenScene={(next, label) => {
         importScene(JSON.stringify(next), t('animator.openedLabel', { label }))
         setLibraryOpen(false)
+      }}
+      onOpenWorld3D={(document) => {
+        const source = { epoch: galleryWorkspaceEpoch(), workspace: galleryWorkspaceName(useStore.getState()) }
+        const current = () => source.epoch === galleryWorkspaceEpoch()
+          && source.workspace === galleryWorkspaceName(useStore.getState())
+        setLibraryOpen(false)
+        useStore.getState().setMediaFilter('world3d')
+        void presentSceneDocument('3d', document, current)
       }}
     />
   </div>

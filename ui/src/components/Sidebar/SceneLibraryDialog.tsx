@@ -3,8 +3,9 @@ import { ChevronLeft, ChevronRight, FolderOpen, Loader2, X } from 'lucide-react'
 import { fetchOutputMetadata, fetchOutputs, type ApiOutput } from '../../api/client'
 import { useUiTranslation } from '../../i18n'
 import { ModalShell } from '../common/ModalShell'
-import { SCENE_LIBRARY_PAGE_SIZE, isCompositorVideo, sceneFromLibraryPayload, sceneLibraryTitle } from '../../lib/sceneLibrary'
+import { SCENE_LIBRARY_PAGE_SIZE, isCompositorVideo, isWorld3DLibraryRecipe, sceneFromLibraryPayload, sceneLibraryTitle, world3dDocumentFromLibraryPayload } from '../../lib/sceneLibrary'
 import { commitLibraryChoice, purposeFromTab } from '../../lib/sceneLibraryChoice.ts'
+import type { Scene3DDocument } from '../../features/scene3d/types'
 import type { Scene } from '../../types'
 
 type LibraryTab = 'scenes' | 'videos'
@@ -14,12 +15,14 @@ export function SceneLibraryDialog({
   workspace,
   onClose,
   onOpenScene,
+  onOpenWorld3D,
   onPickFile,
 }: {
   open: boolean
   workspace?: string
   onClose: () => void
   onOpenScene: (scene: Scene, label: string) => void
+  onOpenWorld3D?: (document: Scene3DDocument, label: string) => void
   onPickFile: () => void
 }) {
   const { t } = useUiTranslation('scene3d')
@@ -113,6 +116,12 @@ export function SceneLibraryDialog({
       }
       const metadata = await fetchOutputMetadata(commit.item.name, capture.workspaceId || undefined)
       if (commitLibraryChoice(liveChoice(), capture, commit.item).action === 'ignore') return
+      if (isWorld3DLibraryRecipe(metadata)) {
+        const document = world3dDocumentFromLibraryPayload(metadata)
+        if (!document || !onOpenWorld3D) throw new Error(t('library.world3dExport'))
+        onOpenWorld3D(document, sceneLibraryTitle(commit.item.name))
+        return
+      }
       onOpenScene(sceneFromLibraryPayload(metadata), sceneLibraryTitle(commit.item.name))
     } catch (openError) {
       setError(openError instanceof Error ? openError.message : t('library.openFailed'))
