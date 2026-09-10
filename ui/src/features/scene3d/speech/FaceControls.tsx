@@ -12,11 +12,11 @@ export function SpeechNumber({ label, value, onChange, min = -10000, max = 10000
       if (Number.isFinite(next) && next >= min && next <= max) onChange(next)
     }} /></label>
 }
-export function FaceControls({ speech, onChange }: { speech: Scene3DSpeech; onChange: (speech: Scene3DSpeech) => void }) {
+export function FaceControls({ speech, onChange, initiallyOpen = false }: { speech: Scene3DSpeech; onChange: (speech: Scene3DSpeech) => void; initiallyOpen?: boolean }) {
   const { t } = useUiTranslation('scene3dEditor'), face = speech.face
   if (!face) return null
   const change = (patch: Partial<FacePlacement>) => onChange({ ...speech, face: { ...face, ...patch } })
-  return <details className="rounded-lg border border-border p-3"><summary className="cursor-pointer text-sm">{t('speech.adjust')}</summary>
+  return <details open={initiallyOpen || undefined} className="rounded-lg border border-border p-3"><summary className="cursor-pointer text-sm">{t('speech.adjust')}</summary>
     <p className="my-2 text-xs text-text-muted">{t('speech.adjustHint')}</p>
     <div className="flex flex-wrap gap-3">
       {(['x', 'y', 'z'] as const).map((axis, index) => <SpeechNumber key={axis} label={t('speech.mouth') + ' ' + axis.toUpperCase()} value={face.center[index]}

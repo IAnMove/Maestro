@@ -51,20 +51,25 @@
     "twoSpeakers": "Usa uno o dos personajes por plano. Divide las intervenciones si necesitas más.",
     "openProduction": "Preparar plano en Vídeo 3D",
     "productionReady": "Audio y personajes proceden de tu producción. Revisa la boca y los tiempos antes de exportar; el original no se ha sustituido.",
-    "kind": { "song": "Canción", "dialogue": "Diálogo", "episode": "Capítulo", "trailer": "Tráiler" },
+    "kind": {
+      "song": "Canción",
+      "dialogue": "Diálogo",
+      "episode": "Capítulo",
+      "trailer": "Tráiler"
+    },
     "title": "Voz y lip-sync 3D",
-    "intro": "Añade voz al personaje de este plano. La boca, los ojos y el audio se guardan y exportan con tu vídeo 3D.",
+    "intro": "Edita solo este sujeto: añade labios, elige una voz y pulsa Reproducir.",
     "option": "Voz y lip-sync",
     "character": "Personaje",
     "selectCharacter": "Selecciona un personaje",
     "chooseModel": "Primero elige un modelo GLB en la tarjeta de este personaje, debajo del visor.",
     "advancedImport": "Importar ajustes existentes (opcional)",
     "importKit": "Importar kit de Taberna (.zip)",
-    "enabled": "Activar cara animada",
+    "enabled": "Activar labios",
     "profile": "Perfil de colocación",
     "generic": "Humanoide genérico",
-    "calibrate": "Colocar boca y ojos",
-    "noFace": "No se encontró un humanoide compatible o aún está cargando. Importa un kit calibrado.",
+    "calibrate": "Aplicar referencia",
+    "noFace": "Espera a que cargue el GLB y reintenta. La boca necesita una malla con un único material estándar.",
     "voice": "Voz del personaje",
     "pickVoice": "Elige audio (máx. 10 min / 32 MB); analiza fragmentos de hasta 90 s",
     "analyze": "Calcular gestos con Rhubarb (local)",
@@ -75,16 +80,17 @@
     "driver": {
       "imported": "Gestos importados",
       "rhubarb": "Gestos fonéticos · Rhubarb",
-      "amplitude": "Movimiento por volumen"
+      "amplitude": "Movimiento por volumen",
+      "rhubarb-vocals": "Rhubarb · voz aislada"
     },
     "amplitudeHint": "El volumen solo abre/cierra la boca: no reconoce fonemas. Calcula gestos con Rhubarb para mejorar el resultado.",
     "start": "Inicio en escena (s)",
     "offset": "Recortar inicio del audio (s)",
     "gain": "Volumen",
-    "needsPlacement": "Coloca la boca y revisa su encaje en el modelo antes de activar la cara y exportar.",
+    "needsPlacement": "Añade labios a este sujeto antes de visualizar su voz sobre el modelo.",
     "busy": "Preparando voz o kit…",
     "adjust": "Ajustar boca y expresiones",
-    "adjustHint": "Las coordenadas siguen la piel del modelo. Cambiar modelo borra su calibración; no se modifica el GLB original.",
+    "adjustHint": "X: izquierda/derecha; Y: arriba/abajo; Z: profundidad. Orienta la cara hacia delante (+Z), ajusta anchura/altura y reproduce. El GLB se conserva.",
     "mouth": "Boca",
     "width": "Anchura",
     "height": "Altura",
@@ -112,7 +118,39 @@
     "eyeSpacing": "Separación de ojos",
     "eyeWidth": "Anchura de ojos",
     "eyeHeight": "Altura de párpados",
-    "audioBlocked": "No se pudo reproducir la voz. Comprueba el archivo y pulsa Pausar y Reproducir; la exportación avisa si el audio falla."
+    "audioBlocked": "No se pudo reproducir la voz. Comprueba el archivo y pulsa Pausar y Reproducir; la exportación avisa si el audio falla.",
+    "addLips": "Añadir labios",
+    "editLips": "Editar labios",
+    "reviewPlacement": "Revisa la posición y el tamaño de la boca sobre este modelo.",
+    "manualPlacement": "No se reconoce la cabeza. Ajusta esta posición inicial con Boca X/Y/Z y Anchura/Altura.",
+    "placementReferences": "Referencias de colocación avanzadas",
+    "referencesHint": "Aplica la colocación a este sujeto. Revisa el encaje si usas la referencia de otro personaje.",
+    "characterLibraryAdvanced": "Avanzado: personajes reutilizables y voz preferida",
+    "recordVoice": "Grabar con micrófono",
+    "stopRecording": "Detener grabación",
+    "cancelRecording": "Cancelar grabación",
+    "exampleVoice": "Usar ejemplo en inglés",
+    "recording": "Grabando… Se detiene a los 90 segundos.",
+    "microphonePermission": "Esperando permiso para el micrófono…",
+    "microphoneUnavailable": "Para grabar necesitas HTTPS o localhost y un navegador compatible. Aquí puedes usar el ejemplo o subir un audio.",
+    "microphoneDenied": "Se ha denegado el acceso al micrófono. Permítelo en el navegador y reintenta.",
+    "recordingFailed": "Ha fallado la grabación. Comprueba el micrófono y reintenta.",
+    "recordingPreview": "Escuchar grabación",
+    "useRecording": "Usar grabación para este sujeto",
+    "discardRecording": "Descartar grabación",
+    "voicePreview": "Escuchar la voz de este sujeto",
+    "pickLips": "Colocar con un clic sobre la cara",
+    "pickHint": "Haz clic en la boca del sujeto seleccionado. Escape cancela.",
+    "pickMissed": "Haz clic en la cara del modelo seleccionado, no en el fondo.",
+    "cancelPlacement": "Cancelar colocación",
+    "isolation": {
+      "label": "Aislar voz antes de calcular labios",
+      "loading": "Comprobando el modelo local opcional…",
+      "ready": "BS-RoFormer instalado · CPU. Separa la voz solo para analizar los labios; conserva el audio original al reproducir. Hasta 90 segundos; puede tardar varios minutos. Sin descargas ni servicios externos.",
+      "missing": "Modelo opcional no disponible. Necesita audio-separator instalado y el checkpoint BS-RoFormer con su YAML en app/ckpts/roformer. No se descarga nada automáticamente.",
+      "error": "No se pudo comprobar el modelo opcional.",
+      "retry": "Comprobar de nuevo"
+    }
   },
   "title": "Estudio de escenas 3D",
   "subtitle": "Elige un plano, coloca tus objetos y pulsa Reproducir.",
@@ -152,9 +190,18 @@
     "drive": "Conducción"
   },
   "template": {
-    "speech-portrait": {"title":"Retrato hablando","description":"Primer plano con voz, boca integrada y expresiones."},
-    "speech-dialogue": {"title":"Diálogo con lip-sync","description":"Dos personajes, cada uno con su voz e inicio ajustable."},
-    "speech-presenter": {"title":"Presentador con voz","description":"Plano medio para narración y animación corporal con lip-sync."},
+    "speech-portrait": {
+      "title": "Retrato hablando",
+      "description": "Primer plano con voz, boca integrada y expresiones."
+    },
+    "speech-dialogue": {
+      "title": "Diálogo con lip-sync",
+      "description": "Dos personajes, cada uno con su voz e inicio ajustable."
+    },
+    "speech-presenter": {
+      "title": "Presentador con voz",
+      "description": "Plano medio para narración y animación corporal con lip-sync."
+    },
     "two-shot": {
       "title": "Plano de dos",
       "description": "Encuadre equilibrado de dos sujetos con aproximación suave."
@@ -514,5 +561,16 @@
     "clockHelp": "El vídeo sigue el tiempo de la escena. Su audio está silenciado.",
     "remove": "Quitar pantalla",
     "failed": "No se pudo cargar la pantalla. Comprueba la malla y el archivo."
+  },
+  "library": {
+    "name": "Nombre de la escena",
+    "save": "Guardar escena en galería",
+    "open": "Abrir escena",
+    "help": "Elige una escena de Vídeo 3D guardada. Al elegir reemplazas el plano actual; guárdalo antes para conservar tus cambios. También puedes importar y exportar JSON.",
+    "saved": "Escena guardada en esta carpeta. Usa Abrir escena para recuperarla.",
+    "changed": "La escena cambió mientras se cargaba. Vuelve a elegirla para reemplazar la actual.",
+    "previewUnavailable": "Espera a que cargue la vista 3D antes de guardar.",
+    "saveFailed": "No se pudo guardar la escena.",
+    "cancelLoad": "Cancelar carga"
   }
 }

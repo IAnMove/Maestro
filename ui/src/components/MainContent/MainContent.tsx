@@ -7,7 +7,7 @@ import { MediaFeedItem } from './MediaFeedItem'
 import { useStore } from '../../stores/useStore'
 import { jobFitsGalleryFilter } from '../../lib/galleryListQuery'
 import type { GenerationJob } from '../../types'
-import { stageSceneForEditor } from '../../lib/sceneOutput'
+import { openSceneOutput } from '../../lib/sceneOutput'
 import {
   clearVideoEditorReplacementTarget,
   readVideoEditorReplacementTarget,
@@ -447,8 +447,7 @@ export function MainContent() {
   const handleThumbnailClick = useCallback((index: number) => {
     const file = outputs[index]
     if (file?.type === 'scene') {
-      void stageSceneForEditor(file)
-        .then(() => setMediaFilter('scene3d'))
+      void openSceneOutput(file)
         .catch(error => console.error('Failed to open scene:', error))
       return
     }
@@ -524,7 +523,7 @@ export function MainContent() {
       }
     }
     requestAnimationFrame(align)
-  }, [getItemHeight, outputs, placeholderTotalHeight, setMediaFilter, setSelectedOutput])
+  }, [getItemHeight, outputs, placeholderTotalHeight, setSelectedOutput])
 
   // Infinite scroll: load more when near the bottom
   const loadingMore = useRef(false)

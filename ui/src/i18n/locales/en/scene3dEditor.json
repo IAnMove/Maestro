@@ -51,20 +51,25 @@
     "twoSpeakers": "Use one or two characters per shot. Split interventions for a larger cast.",
     "openProduction": "Prepare shot in Video 3D",
     "productionReady": "Audio and characters come from your production. Review mouth placement and timing before export; the original has not been replaced.",
-    "kind": { "song": "Song", "dialogue": "Dialogue", "episode": "Episode", "trailer": "Trailer" },
+    "kind": {
+      "song": "Song",
+      "dialogue": "Dialogue",
+      "episode": "Episode",
+      "trailer": "Trailer"
+    },
     "title": "3D voice and lip-sync",
-    "intro": "Add a voice to this shot's character. Mouth, eyes and audio are saved and exported with your 3D video.",
+    "intro": "Edit only this selected subject: add lips, choose a voice, then press Play.",
     "option": "Voice and lip-sync",
     "character": "Character",
     "selectCharacter": "Select a character",
     "chooseModel": "First choose a GLB model in this character's card below the viewport.",
     "advancedImport": "Import existing settings (optional)",
     "importKit": "Import Taberna kit (.zip)",
-    "enabled": "Enable animated face",
+    "enabled": "Enable lips",
     "profile": "Placement profile",
     "generic": "Generic humanoid",
-    "calibrate": "Place mouth and eyes",
-    "noFace": "No compatible humanoid found, or the model is still loading. Import a calibrated kit.",
+    "calibrate": "Apply reference",
+    "noFace": "Wait for the GLB to load, then retry. Mouth painting needs a mesh with one standard material.",
     "voice": "Character voice",
     "pickVoice": "Choose audio (max. 10 min / 32 MB); analyze fragments up to 90 s",
     "analyze": "Calculate gestures with Rhubarb (local)",
@@ -75,16 +80,17 @@
     "driver": {
       "imported": "Imported cues",
       "rhubarb": "Phonetic cues · Rhubarb",
-      "amplitude": "Volume-driven motion"
+      "amplitude": "Volume-driven motion",
+      "rhubarb-vocals": "Rhubarb · isolated vocals"
     },
     "amplitudeHint": "Volume only opens/closes the mouth: it does not recognize phonemes. Calculate Rhubarb cues for better results.",
     "start": "Scene start (s)",
     "offset": "Trim audio start (s)",
     "gain": "Volume",
-    "needsPlacement": "Place the mouth and review its fit on the model before enabling the face and exporting.",
+    "needsPlacement": "Add lips to this subject before previewing its voice on the model.",
     "busy": "Preparing voice or kit…",
     "adjust": "Adjust mouth and expressions",
-    "adjustHint": "Coordinates follow the model's skin. Changing model clears its calibration; the original GLB is not modified.",
+    "adjustHint": "X: left/right; Y: up/down; Z: depth. Face the model forward (+Z), adjust width/height, then Play. The GLB stays intact.",
     "mouth": "Mouth",
     "width": "Width",
     "height": "Height",
@@ -112,7 +118,39 @@
     "eyeSpacing": "Eye spacing",
     "eyeWidth": "Eye width",
     "eyeHeight": "Eyelid height",
-    "audioBlocked": "Voice playback failed. Check the file, then Pause and Play; export reports audio failures."
+    "audioBlocked": "Voice playback failed. Check the file, then Pause and Play; export reports audio failures.",
+    "addLips": "Add lips",
+    "editLips": "Edit lips",
+    "reviewPlacement": "Review the mouth position and size on this model.",
+    "manualPlacement": "No head landmark found. Adjust this starting position using Mouth X/Y/Z and Width/Height.",
+    "placementReferences": "Advanced placement references",
+    "referencesHint": "Applies placement to this subject. Review the fit after using another character’s reference.",
+    "characterLibraryAdvanced": "Advanced: reusable characters and preferred voice",
+    "recordVoice": "Record with microphone",
+    "stopRecording": "Stop recording",
+    "cancelRecording": "Cancel recording",
+    "exampleVoice": "Use English example",
+    "recording": "Recording… Stops after 90 seconds.",
+    "microphonePermission": "Waiting for microphone permission…",
+    "microphoneUnavailable": "Microphone recording needs HTTPS or localhost and a supported browser. You can use the example or upload audio here.",
+    "microphoneDenied": "Microphone access was denied. Allow it in your browser and retry.",
+    "recordingFailed": "Recording failed. Check the microphone and try again.",
+    "recordingPreview": "Listen to recording",
+    "useRecording": "Use recording for this subject",
+    "discardRecording": "Discard recording",
+    "voicePreview": "Listen to this subject’s voice",
+    "pickLips": "Place with a click on the face",
+    "pickHint": "Click the mouth on the selected subject. Escape cancels.",
+    "pickMissed": "Click the selected model’s face, not the background.",
+    "cancelPlacement": "Cancel placement",
+    "isolation": {
+      "label": "Isolate vocals before calculating lips",
+      "loading": "Checking the optional local model…",
+      "ready": "Installed BS-RoFormer · CPU. Separates vocals for lip analysis only; original playback stays intact. Up to 90 seconds; processing can take several minutes. No downloads or cloud services.",
+      "missing": "Optional model unavailable. Requires installed audio-separator and the BS-RoFormer checkpoint plus YAML in app/ckpts/roformer. Nothing is downloaded automatically.",
+      "error": "Could not check the optional model.",
+      "retry": "Check again"
+    }
   },
   "title": "3D scene studio",
   "subtitle": "Choose a shot, place your objects and press Play.",
@@ -152,9 +190,18 @@
     "drive": "Driving"
   },
   "template": {
-    "speech-portrait": {"title":"Talking portrait","description":"Close-up with voice, an integrated mouth and expressions."},
-    "speech-dialogue": {"title":"Lip-sync dialogue","description":"Two characters, each with their own voice and adjustable start."},
-    "speech-presenter": {"title":"Voiced presenter","description":"Medium shot for narration, body animation and lip-sync."},
+    "speech-portrait": {
+      "title": "Talking portrait",
+      "description": "Close-up with voice, an integrated mouth and expressions."
+    },
+    "speech-dialogue": {
+      "title": "Lip-sync dialogue",
+      "description": "Two characters, each with their own voice and adjustable start."
+    },
+    "speech-presenter": {
+      "title": "Voiced presenter",
+      "description": "Medium shot for narration, body animation and lip-sync."
+    },
     "two-shot": {
       "title": "Two shot",
       "description": "Balanced framing for two subjects with a slow approach."
@@ -514,5 +561,16 @@
     "clockHelp": "Video follows the scene clock. Its audio is muted.",
     "remove": "Remove screen",
     "failed": "The screen could not load. Check the mesh and media file."
+  },
+  "library": {
+    "name": "Scene name",
+    "save": "Save scene to gallery",
+    "open": "Open scene",
+    "help": "Choose a saved Video3D scene. Choosing replaces the current shot; save it first to keep your edits. JSON import and export remain available.",
+    "saved": "Scene saved to this workspace. Open scene to load it again.",
+    "changed": "The scene changed while loading. Choose it again to replace the current scene.",
+    "previewUnavailable": "Wait for the 3D preview to load before saving.",
+    "saveFailed": "Could not save the scene.",
+    "cancelLoad": "Cancel loading"
   }
 }

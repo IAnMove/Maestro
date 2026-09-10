@@ -1,3 +1,4 @@
+import { scheduleFx } from '../../sceneFx/audio'
 import type { Scene3DDocument } from '../types'
 import { scene3dOutputDuration, scene3dPlaybackSpeed } from '../clock'
 import { safeMediaUrl } from './track'
@@ -35,11 +36,12 @@ export function voiceSchedule(start: number, offset: number, audioDuration: numb
 }
 export async function mixSceneSpeech(document: Scene3DDocument): Promise<AudioBuffer | undefined> {
   const tracks = sceneVoiceTracks(document)
-  if (!tracks.length) return undefined
+  if (!tracks.length && !document.sfx?.some(cue => cue.sound && cue.volume)) return undefined
   const duration = scene3dOutputDuration(document), speed = scene3dPlaybackSpeed(document.playbackSpeed)
   // Bound memory explicitly; silent scenes retain the existing 600 s export contract.
   if (duration > 180) throw new Error('Voice exports support up to 180 output seconds per scene.')
   const context = new OfflineAudioContext(1, Math.ceil(duration * 48000), 48000)
+  scheduleFx(context, document.sfx ?? [], document.duration, speed)
   const buffers = new Map<string, Promise<AudioBuffer>>()
   for (const track of tracks) {
     const url = track.audio!.url

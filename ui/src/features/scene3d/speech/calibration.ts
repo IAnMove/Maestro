@@ -1,8 +1,10 @@
-import { Box3, Color, Mesh, MeshStandardMaterial, Raycaster, Vector3, type Object3D } from 'three'
+import { Bone, Box3, Color, Mesh, MeshStandardMaterial, Raycaster, Vector3, type Object3D } from 'three'
 import type { FacePlacement } from './types'
+import { restFaceHit } from './faceCoordinates'
 
 export const FACE_PROFILES = ['generic', 'human_mira', 'elf_seren', 'orc_grog', 'goblin_zik'] as const
 export type FaceProfile = typeof FACE_PROFILES[number]
+export type PlacementMode = FaceProfile | 'bounds'
 const PROFILES = {
   generic: [0, .27, .19, .21, .12, .8],
   human_mira: [-.22, .33, .19, .225, .12, .8],
@@ -15,6 +17,23 @@ export function faceMeshes(root: Object3D): Mesh[] {
   root.traverse(node => { if (node instanceof Mesh) meshes.push(node) })
   return meshes
 }
+/** Editable starting point in ORIGINAL vertex coordinates, also for GLBs without a rig. */
+export function manualFace(root: Object3D): FacePlacement | undefined {
+  const meshes = faceMeshes(root)
+  const supported = meshes.filter(m => !Array.isArray(m.material) && m.material instanceof MeshStandardMaterial && m.geometry.attributes.position)
+  const mesh = supported.find(m => /head|face/i.test(m.name)) ?? supported.sort((a, b) => b.geometry.attributes.position.count - a.geometry.attributes.position.count)[0]
+  if (!mesh) return undefined
+  mesh.geometry.computeBoundingBox()
+  const box = mesh.geometry.boundingBox!
+  const size = box.getSize(new Vector3()), mid = box.getCenter(new Vector3())
+  if (box.isEmpty() || size.y <= 0 || size.x <= 0) return undefined
+  const headOnly = /head|face/i.test(mesh.name), width = Math.max(.0001, size.x * (headOnly ? .3 : .12))
+  const height = Math.max(.0001, size.y * (headOnly ? .16 : .045)), y = box.min.y + size.y * (headOnly ? .35 : .85)
+  const skin = (mesh.material as MeshStandardMaterial).color.toArray() as [number, number, number]
+  return { meshIndex: meshes.indexOf(mesh), center: [mid.x, y, box.max.z], size: [width, height], skin,
+    eyes: { left: [mid.x - width, y + height * 2, box.max.z], right: [mid.x + width, y + height * 2, box.max.z],
+      size: [width * .6, height * .6], skinLeft: [...skin], skinRight: [...skin] } }
+}
 /** Called once on the original GLTF before the scene normalizes or animates it. */
 export function estimateFace(root: Object3D, profile: FaceProfile): FacePlacement | undefined {
   root.updateMatrixWorld(true)
@@ -25,7 +44,7 @@ export function estimateFace(root: Object3D, profile: FaceProfile): FacePlacemen
   const material = mesh.material as MeshStandardMaterial
   const head = root.getObjectByName('Head') ?? root.getObjectByName('mixamorigHead')
   // Generic placement is deliberately opt-in; a head landmark is needed.
-  if (!head) return undefined
+  if (!(head instanceof Bone)) return undefined
   const box = new Box3().setFromObject(root), size = box.getSize(new Vector3())
   const headPos = head.getWorldPosition(new Vector3())
   const headEnd = root.getObjectByName('head_end') ?? root.getObjectByName('Head_end')
@@ -53,13 +72,18 @@ export function estimateFace(root: Object3D, profile: FaceProfile): FacePlacemen
     const at = (Math.min(pixels.height - 1, Math.floor(uv.y * pixels.height)) * pixels.width + Math.min(pixels.width - 1, Math.floor(uv.x * pixels.width))) * 4
     return new Color().setRGB(pixels.data[at] / 255, pixels.data[at + 1] / 255, pixels.data[at + 2] / 255, 'srgb').toArray() as [number, number, number]
   }
-  const y = headPos.y + hh * factor, x = headPos.x
-  const point = (px: number, py: number) => mesh.worldToLocal(hit(px, py)?.point.clone() ?? new Vector3(px, py, box.max.z)).toArray()
-  const localScale = mesh.getWorldScale(new Vector3())
+  const y = headPos.y + hh * factor, x = headPos.x, centerHit = hit(x, y)
+  const center = centerHit && restFaceHit(centerHit)
+  if (!center) return undefined
+  const point = (px: number, py: number) => {
+    const intersection = hit(px, py), rest = intersection && restFaceHit(intersection)
+    return (rest?.point ?? center.point.clone().add(new Vector3((px - x) * center.scale, (py - y) * center.scale, 0))).toArray()
+  }
+  const localHeight = hh * center.scale
   const eyeY = y + hh * rise, eyeX = hh * spacing
-  return { meshIndex: meshes.indexOf(mesh), center: point(x, y), size: [hh * .49 * widthScale / localScale.x, hh * .36 * .85 / localScale.y],
+  return { meshIndex: meshes.indexOf(mesh), center: center.point.toArray(), size: [localHeight * .49 * widthScale, localHeight * .36 * .85],
     skin: skinAt(x + hh * .49 * .48, y + hh * .36 * .3),
-    eyes: { left: point(x - eyeX, eyeY), right: point(x + eyeX, eyeY), size: [hh * ew / localScale.x, hh * eh / localScale.y],
+    eyes: { left: point(x - eyeX, eyeY), right: point(x + eyeX, eyeY), size: [localHeight * ew, localHeight * eh],
       skinLeft: skinAt(x - eyeX + hh * ew * .85, eyeY - hh * eh * 1.05),
       skinRight: skinAt(x + eyeX + hh * ew * .85, eyeY - hh * eh * 1.05) } }
 }

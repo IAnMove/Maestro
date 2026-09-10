@@ -8,6 +8,7 @@ export interface AgentPrepareProgrammaticVideoAction {
   /** Caller authority is derived from the real request, not the model response. */
   generationPolicy: Exclude<SceneGenerationPolicy, 'auto'>
   outputNames: string[]
+  sceneCommand?: import('../sceneFx/wizard').ScenePreparationCommand
 }
 
 const normalize = (text: string) => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
@@ -46,6 +47,7 @@ export function reconcileProgrammaticVideoRequest(request: string, turn: AgentTu
   if (QUESTION.test(value) || !clauses(value).some(part => !NEGATED_COMMAND.test(part) && REQUEST.test(part))) {
     return { ...turn, reply: 'Puedes pedir: «Monta una escena con Video3D, sólo con mis assets, sin vídeo generativo». El Wizard prepara el formulario visible; desde allí revisas los recursos, montas la escena y la exportas. No se lanza ningún generador al preparar.', actions: [] }
   }
+  if (turn.actions.some(action => action.type === 'prepare_programmatic_video' && action.sceneCommand)) return turn
   const rhythmic = turn.actions.find(action => action.type === 'create_rhythmic_3d_video')
   const asksForSong = clauses(value).some(part => !NEGATED_COMMAND.test(part) && /\b(?:crea|genera|haz|create|generate|make)\s+(?:una?\s+|a\s+)?(?:cancion|musica|song|music)\b/.test(part))
   if (rhythmic?.type === 'create_rhythmic_3d_video' && (rhythmic.audioOutputName || (asksForSong && !PROVIDED.test(value)))) {
@@ -63,21 +65,28 @@ export function reconcileProgrammaticVideoRequest(request: string, turn: AgentTu
 export function registerProgrammaticVideoCapability(register: typeof defineCapability) {
   register<AgentPrepareProgrammaticVideoAction>({
     name: 'prepare_programmatic_video', title: 'Prepare programmatic Video3D',
-    description: 'Open the visible Video3D recipe form without running any generator, planning model, render or export. Existing assets only by default.',
+    description: 'Open the visible Video3D recipe form without running any generator, planning model, render or export. Existing assets only by default. For the built-in SFX showcase, set scene_command EXACTLY to {"version":1,"operation":"scenes.effects.showcase","input":{"dimension":"2d","sound":true}} (or dimension 3d). For the magic/anime showcase add collection="anime" (12 effects, 36 seconds). The server supplies all 30 timed effects by default; never add effects, duration_seconds or prompts to this input. This opens an editable scene, with no video export. scenes.effects.apply and scenes.speech.prepare require the exact existing document.',
     useWhen: 'The user asks to compose/edit video with Video3D, the compositor, without generative video, or only supplied assets. Prefer this to prepare_video/start_generation or Director. Preserve literal dialogue and lyrics. Never claim a prepared form is a rendered video.',
-    parameters: ['intent', 'output_names'],
-    inputSchema: { type: 'object', additionalProperties: false, properties: { type: { const: 'prepare_programmatic_video' }, intent: { type: 'string', minLength: 1, maxLength: 12000 }, output_names: { type: 'array', maxItems: 32, items: { type: 'string', maxLength: 300 } } }, required: ['type', 'intent'] },
+    parameters: ['intent', 'output_names', 'scene_command'],
+    inputSchema: { type: 'object', additionalProperties: false, properties: { type: { const: 'prepare_programmatic_video' }, intent: { type: 'string', minLength: 1, maxLength: 12000 }, scene_command: { type: 'object', description: 'Shared scene command: version=1, operation=scenes.effects.apply (input document,cues,replace), scenes.effects.showcase (input accepts ONLY dimension="2d" or "3d",sound:boolean,collection="all" or "anime",document; document optional to retain an existing scene), or scenes.speech.prepare (input document,slot_id,clip_id,workspace,audio_filename,text,start,end,offset,isolate_vocals optional boolean for installed-only local voice isolation). Supply the exact current document, never invent its objects or resource names.' }, output_names: { type: 'array', maxItems: 32, items: { type: 'string', maxLength: 300 } } }, required: ['type', 'intent'] },
     risk: 'edit', confirmation: 'none', progress: 'Preparando el compositor sin lanzar generación…',
     resolve(raw) {
       if (typeof raw.intent !== 'string' || !raw.intent.trim()) return null
       const names = Array.isArray(raw.output_names) ? raw.output_names : []
       if (names.length > 32 || names.some(name => typeof name !== 'string' || !name.trim() || name.length > 300)) return null
       // The LLM cannot grant generation permission through its own schema.
-      return { type: 'prepare_programmatic_video', intent: raw.intent.slice(0, 12000), generationPolicy: 'provided_only', outputNames: [...new Set(names as string[])] }
+      return { type: 'prepare_programmatic_video', intent: raw.intent.slice(0, 12000), generationPolicy: 'provided_only', outputNames: [...new Set(names as string[])], ...(raw.scene_command && typeof raw.scene_command === 'object' ? { sceneCommand: raw.scene_command as import('../sceneFx/wizard').ScenePreparationCommand } : {}) }
     },
     validate(action) { return action.intent.trim() && ['provided_only', 'no_video_generation'].includes(action.generationPolicy) ? [] : ['intent and a restricted generation policy are required'] },
     async prepare(action) { return action },
-    async execute(action, context) { return context.adapters.video3d.prepareProgrammaticVideo(action) },
+    async execute(action, context) {
+      if (action.sceneCommand) {
+        const { isScenePreparationCommand, prepareWizardScene } = await import('../sceneFx/wizard')
+        if (!isScenePreparationCommand(action.sceneCommand)) throw new Error('Invalid scene command.')
+        return prepareWizardScene(action.sceneCommand)
+      }
+      return context.adapters.video3d.prepareProgrammaticVideo(action)
+    },
     correlate(_action, outcome) { return outcome.target }, async track(_action, outcome) { return outcome },
     report: { targetKind: 'video_3d_scene', successState: 'prepared' },
     summarize(_action, outcome) { return outcome.message },

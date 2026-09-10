@@ -1,3 +1,4 @@
+import { sceneFxFields } from '../features/sceneFx/types'
 import { kineticTextFields } from './kineticText'
 import type { Scene, SceneCurve, SceneKeyframe, SceneLayer, SceneLayerType } from '../types'
 import { suggestSeamOccluderKind } from './seamOccluder'
@@ -304,6 +305,7 @@ export const getNarrativeTemplate = (id: NarrativeSceneId) => NARRATIVE_SCENE_TE
  */
 export const carrySceneSidecars = <T extends Scene>(previous: T, next: T): T => ({
   ...next,
+  ...sceneFxFields(previous.sfx),
   ...kineticTextFields(previous.texts),
   ...(previous.audioTracks?.length ? { audioTracks: previous.audioTracks } : {}),
   ...(previous.copilotAudit?.length ? { copilotAudit: previous.copilotAudit } : {}),

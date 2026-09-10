@@ -369,5 +369,23 @@
     "linkedLoraTitle": "Vive en la carpeta loras de una instalación enlazada (solo lectura desde aquí) — no se puede borrar. Libera el espacio en esa instalación o desenlázala.",
     "files": "{{count}} archivos",
     "modelSizeTitle": "{{primary}} se puede borrar aquí; el resto vive en instalaciones enlazadas o pertenece a un modelo base"
+  },
+  "mcp": {
+    "title": "MCP · Asistentes externos",
+    "info": "Cómo funciona MCP",
+    "summary": "Conecta un asistente externo a esta instalación. El Wizard sigue disponible dentro de la aplicación.",
+    "enable": "Activar acceso MCP",
+    "endpoint": "URL de conexión",
+    "token": "Token nuevo — cópialo antes de cerrar Settings",
+    "copyToken": "Copiar token",
+    "environment": "El token procede de HOCUS_MCP_TOKEN. Usa ese valor en tu cliente; desactivar el acceso tiene efecto inmediato.",
+    "rotate": "Sustituir token (desconecta los clientes actuales)",
+    "example": "Ejemplo de conexión",
+    "client": "Selecciona Streamable HTTP y autenticación Bearer en tu cliente. Su formato de configuración puede diferir del ejemplo.",
+    "help": "MCP permite a un asistente externo descubrir herramientas y ejecutar los mismos servicios de la aplicación sin una pestaña abierta. Actívalo, copia la URL y el token y añádelos a tu cliente MCP. Empieza enumerando herramientas y consultando modelos o recursos.",
+    "access": "El token permite las operaciones disponibles de lectura, edición y generación de esta instalación. El alcance de red es el de la app: localhost desde este equipo o la URL local de la app desde otro. Este interruptor no abre puertos del router ni publica la app en internet.",
+    "use": "Conserva los identificadores de los trabajos y consulta su estado. Reintenta con el mismo ID de intención; usa otro para una generación nueva. Las herramientas de escenas devuelven documentos editables: preparar una escena no exporta el vídeo. Desactiva MCP para revocar el acceso al instante.",
+    "failed": "No se pudieron leer o actualizar los ajustes MCP. Abre la app desde su dirección local y reintenta.",
+    "copyFailed": "No se pudo copiar el token. Selecciona y copia el campo manualmente."
   }
 }

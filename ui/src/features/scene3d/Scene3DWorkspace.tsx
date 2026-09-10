@@ -1,7 +1,13 @@
+import { useSceneDocumentHandoff } from '../sceneFx/handoff'
+import { SceneFxControls } from '../sceneFx/SceneFxControls'
+import { SceneFxOverlay } from '../sceneFx/SceneFxOverlay'
+import { withFxShowcase } from '../sceneFx/showcase'
 import { Scene3DMotionControls } from './Scene3DMotionControls'
 import { Scene3DSpeakerControls } from './speech/Scene3DSpeakerControls'
 import { Scene3DSpeechStatus } from './speech/Scene3DSpeechStatus'
 import { Scene3DSpeechSelector } from './speech/Scene3DSpeechSelector'
+import { LipsPickOverlay } from './speech/LipsPickOverlay'
+import { defaultSpeech } from './speech/types'
 import { speechEnd } from './speech/timeline'
 import { useSpeechProfiles } from './speech/useSpeechProfiles'
 import { SPEECH_HANDOFF_EVENT, takeSpeechProduction, preserveSpeechDraft } from './speech/production'
@@ -72,6 +78,7 @@ export function Scene3DWorkspace({ width, height, initialDocument }: Props) {
   const [transformMode, setTransformMode] = useState<TransformMode>('translate')
   const [keepAssets, setKeepAssets] = useState(true)
   const [speechOpen, setSpeechOpen] = useState(Boolean(initialDocument?.slots.some(slot => slot.speech)))
+  const [pickTarget, setPickTarget] = useState<string>()
   const [sceneDoc, setSceneDoc] = useState<Scene3DDocument>(() => initialDocument ? structuredClone(initialDocument) : ({ ...applyScene3DTemplate('two-shot'), width, height }))
   const [playing, setPlaying] = useState(false)
   const [frame, setFrame] = useState(0)
@@ -96,6 +103,14 @@ export function Scene3DWorkspace({ width, height, initialDocument }: Props) {
   const seconds = scene3dFrameTime(frame, sceneDoc.duration, fps)
   const selected = sceneDoc.slots.find(slot => slot.id === selectedId) ?? sceneDoc.slots[0]
   const editingLocked = exporting || playing
+  useSceneDocumentHandoff('3d', raw => {
+    if (exportingRef.current || playing) throw new Error('Stop playback/export before replacing the scene.')
+    const next = parseScene3DDocument(raw)
+    if (!next) throw new Error('Invalid prepared 3D document.')
+    sessionStorage.setItem('hocuspocus:scene-before-command:' + Date.now(), JSON.stringify(sceneDocRef.current))
+    generationRef.current += 1; setSceneDoc(next); setFrame(0)
+    setSelectedId(next.slots[0]?.id ?? 'subject_1'); setSpeechOpen(next.slots.some(slot => Boolean(slot.speech)))
+  })
   const speechVisible = speechOpen && selected?.media === 'model3d'
 
   useEffect(() => {
@@ -303,6 +318,7 @@ export function Scene3DWorkspace({ width, height, initialDocument }: Props) {
       <label className="flex min-h-10 items-center gap-2 px-1 text-xs text-text-secondary"><input type="checkbox" checked={keepAssets} disabled={exporting} onChange={event => setKeepAssets(event.target.checked)} />{editorT('keepAssets')}</label>
       </details>
       <Scene3DDocumentControls document={sceneDoc} disabled={editingLocked}
+        workspace={workspace} preview={() => stageRef.current?.paint(seconds, sceneDoc)?.toDataURL('image/png')}
         onChange={next => { applyScene(next); setFrame(0) }}
         onLoad={next => {
           if (!canMutateWorld3DScene(exportingRef.current)) return
@@ -315,10 +331,11 @@ export function Scene3DWorkspace({ width, height, initialDocument }: Props) {
           setSpeechOpen(next.slots.some(slot => Boolean(slot.speech)))
         }} />
       <Scene3DSpeechSelector slots={sceneDoc.slots} selected={selected} open={speechOpen}
-        onToggle={() => setSpeechOpen(open => !open)} onSelect={setSelectedId} />
+        onToggle={() => { setPickTarget(undefined); setSpeechOpen(open => !open) }} onSelect={id => { setPickTarget(undefined); setSelectedId(id) }} />
+      <SceneFxControls cues={sceneDoc.sfx} duration={sceneDoc.duration} disabled={editingLocked} onChange={sfx => applyScene(current => ({ ...current, sfx }))} onShowcase={collection => applyScene(current => withFxShowcase(current, collection))} />
       <KineticTextControls cues={sceneDoc.texts} duration={sceneDoc.duration} disabled={editingLocked} onChange={texts => applyScene(current => ({ ...current, texts }))} />
       <Scene3DTransport playing={playing} disabled={exporting} seconds={seconds} duration={sceneDoc.duration} speed={speed}
-        onToggle={() => { if (canMutateWorld3DScene(exportingRef.current)) setPlaying(current => !current) }}
+        onToggle={() => { if (canMutateWorld3DScene(exportingRef.current)) { setPickTarget(undefined); setPlaying(current => !current) } }}
         onSeek={time => { if (exportingRef.current) return; setPlaying(false); setFrame(Math.min(count - 1, Math.max(0, Math.round(time * fps)))) }}
         onSpeed={playbackSpeed => applyScene(current => ({ ...current, playbackSpeed }))} />
       <div className={`grid items-start gap-3 ${speechVisible ? 'xl:grid-cols-[minmax(0,1fr)_21rem]' : ''}`}>
@@ -331,12 +348,22 @@ export function Scene3DWorkspace({ width, height, initialDocument }: Props) {
           selectedId={selectedId}
           transformMode={transformMode}
           editing={!playing && !exporting}
-          onSelect={setSelectedId}
+          onSelect={id => { setPickTarget(undefined); setSelectedId(id) }}
           onTransform={(id, patch) => applyScene(current => patchScene3DSlot(current, id, patch))}
           onSlotClips={(slotId, clips) => setCatalogs(current => ({ ...current, [slotId]: clips }))}
           onSlotMeshes={(slotId, names) => setMeshes(current => ({ ...current, [slotId]: names }))}
         />
+        <SceneFxOverlay cues={sceneDoc.sfx} seconds={seconds} width={sceneDoc.width} height={sceneDoc.height} duration={sceneDoc.duration} playing={playing} speed={speed} />
         <KineticTextOverlay cues={sceneDoc.texts} seconds={seconds} width={sceneDoc.width} height={sceneDoc.height} />
+        {speechVisible && !playing && !exporting && selected && pickTarget === `${generationRef.current}/${selected.id}/${selected.sourceUrl}` &&
+          <LipsPickOverlay onCancel={() => setPickTarget(undefined)} onPick={(x, y) => {
+            const face = stageRef.current?.pickFace?.(selected.id, x, y, selected.speech?.face)
+            if (!face) return false
+            applyScene(current => patchScene3DSlot(current, selected.id, {
+              speech: { ...defaultSpeech(), ...selected.speech, face, enabled: true, eyes: selected.speech?.face ? selected.speech.eyes : false, clean: selected.speech?.face ? selected.speech.clean : false },
+            }))
+            setPickTarget(undefined); return true
+          }} />}
         {sceneDoc.clipNumber && <div className="pointer-events-none absolute right-3 top-3 z-[901] rounded bg-black/80 px-3 py-2 font-mono text-sm text-cyan-50">CLIP {String(sceneDoc.clipNumber).padStart(2, '0')}</div>}
         <div className="pointer-events-none absolute left-3 top-3 rounded-lg bg-black/75 px-3 py-2 text-xs text-cyan-200">
           {t('stage.badge')} · {editorT(`template.${sceneDoc.templateId}.title`)}
@@ -346,6 +373,7 @@ export function Scene3DWorkspace({ width, height, initialDocument }: Props) {
         <Scene3DSpeakerControls
           key={`${workspace}/${generationRef.current}/${selected.id}/${selected.sourceUrl}`}
           slot={selected} workspace={workspace} disabled={editingLocked}
+          onPick={() => { setPlaying(false); setPickTarget(`${generationRef.current}/${selected.id}/${selected.sourceUrl}`) }}
           calibrate={profile => stageRef.current?.facePlacement?.(selected.id, profile)}
           onChange={speech => applyScene(current => current.slots.find(slot => slot.id === selected.id)?.sourceUrl === selected.sourceUrl
             ? patchScene3DSlot(current, selected.id, { speech }) : current)}
@@ -397,10 +425,10 @@ export function Scene3DWorkspace({ width, height, initialDocument }: Props) {
           }
           return (
             <div key={slot.id} className={`rounded-xl border p-3 text-xs text-text-secondary ${selectedId === slot.id ? 'border-cyan-300 bg-cyan-400/5' : 'border-border bg-bg-primary'}`}>
-              <button type="button" className="block min-h-10 font-semibold text-text-primary" onClick={() => setSelectedId(slot.id)}>{t(`stage.slot.${slot.slot}`)}</button>
+              <button type="button" className="block min-h-10 font-semibold text-text-primary" onClick={() => { setPickTarget(undefined); setSelectedId(slot.id) }}>{t(`stage.slot.${slot.slot}`)}</button>
               {slot.media === 'model3d' && <button type="button" className="mb-2 min-h-9 rounded-lg border border-border px-3 text-xs hover:bg-bg-hover"
                 onClick={() => {
-                  setSelectedId(slot.id); setSpeechOpen(true)
+                  setPickTarget(undefined); setSelectedId(slot.id); setSpeechOpen(true)
                   window.requestAnimationFrame(() => window.document.getElementById('world3d-speech-inspector')?.scrollIntoView({ block: 'nearest' }))
                 }}>{editorT('speech.option')}{slot.speech?.enabled ? ' · ✓' : ''}</button>}
               {slot.media !== 'screen' && <div className="mt-1">

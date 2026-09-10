@@ -1,5 +1,5 @@
 import type { ProjectCatalogItem, ProjectSource } from '../../api/client'
-import { stageSceneForEditor } from '../../lib/sceneOutput'
+import { openSceneOutput } from '../../lib/sceneOutput'
 import { useStore } from '../../stores/useStore'
 
 export function resolveProjectSource(
@@ -79,7 +79,7 @@ export async function openProject(project: ProjectCatalogItem): Promise<void> {
   }
   if (project.kind === 'scene3d') {
     const query = new URLSearchParams({ workspace: source.workspace_id })
-    await stageSceneForEditor({
+    await openSceneOutput({
       name: source.key,
       type: 'scene',
       url: `/api/v1/file/${encodeURIComponent(source.key)}?${query}`,
@@ -88,7 +88,6 @@ export async function openProject(project: ProjectCatalogItem): Promise<void> {
       size: 0,
       created_at: 0,
     })
-    useStore.getState().setMediaFilter('scene3d')
     return
   }
   if (project.kind === 'character_kit') {

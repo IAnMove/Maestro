@@ -3,10 +3,13 @@ import { useUiTranslation } from '../../i18n'
 import { parseScene3DDocument } from './document.ts'
 import { reviewClipNumber } from './performance.ts'
 import type { Scene3DDocument } from './types.ts'
+import { Scene3DLibraryControls } from './Scene3DLibraryControls'
 
-export function Scene3DDocumentControls({ document, disabled, onChange, onLoad }: {
+export function Scene3DDocumentControls({ document, disabled, workspace, preview, onChange, onLoad }: {
   document: Scene3DDocument
   disabled: boolean
+  workspace: string
+  preview: () => string | undefined
   onChange: (document: Scene3DDocument) => void
   onLoad: (document: Scene3DDocument) => void
 }) {
@@ -23,6 +26,7 @@ export function Scene3DDocumentControls({ document, disabled, onChange, onLoad }
     setTimeout(() => URL.revokeObjectURL(url), 1000)
   }
   return <div className="flex flex-wrap items-center gap-3 text-xs text-text-secondary">
+    <Scene3DLibraryControls document={document} workspace={workspace} disabled={disabled} preview={preview} onLoad={onLoad} />
     <label>{t('clipNumber')}
       <input type="number" min="1" step="1" aria-label={t('clipNumber')} disabled={disabled}
         className="ml-2 min-h-10 w-20 rounded-lg border border-border bg-bg-primary px-2"

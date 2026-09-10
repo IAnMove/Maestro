@@ -24,7 +24,7 @@ export type Scene3DSpeech = {
   audio?: Scene3DSourceRef
   atlas?: Scene3DSourceRef
   cues: MouthCue[]
-  driver: 'rhubarb' | 'amplitude' | 'imported'
+  driver: 'rhubarb' | 'rhubarb-vocals' | 'amplitude' | 'imported'
   start: number
   offset: number
   gain: number

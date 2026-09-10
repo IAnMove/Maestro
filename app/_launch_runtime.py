@@ -26626,6 +26626,7 @@ def _write_scene_recording_sidecar(output_path, sidecar, workspace_id):
 async def save_scene_recording(
     file: UploadFile = File(...),
     metadata: str = Form("{}"),
+    audio: UploadFile | None = File(None),
 ):
     """Convert a browser WebM capture to MP4 and publish it in Videos.
 
@@ -26704,11 +26705,15 @@ async def save_scene_recording(
     output_name = f"{stamp}_{safe_name}_3d_{uuid.uuid4().hex[:6]}.mp4"
     output_path = os.path.join(out_dir, output_name)
     upload_path = os.path.join(out_dir, f".{uuid.uuid4().hex}.scene-recording.webm")
+    upload_audio_path = os.path.join(out_dir, f".{uuid.uuid4().hex}.scene-audio.wav")
     fps = 60 if scene.get("fps") == 60 else 30
     started_at = time.time()
 
     try:
         await _stream_upload(file, upload_path, max_bytes=MAX_IMAGE_UPLOAD_BYTES)
+        if audio is not None:
+            await _stream_upload(audio, upload_audio_path, max_bytes=32 * 1024 * 1024)
+            audio_tracks.append({"path": upload_audio_path, "start_time": 0, "volume": 1})
         async with _UPLOAD_TRANSCODE_SLOTS:
             await asyncio.to_thread(
                 transcode_scene_recording,
@@ -26717,6 +26722,7 @@ async def save_scene_recording(
                 fps=fps,
                 audio_tracks=audio_tracks,
                 duration=float(scene.get("duration") or 0),
+                embedded_audio=details.get("embeddedAudio") is True,
             )
     except UploadTooLargeError as error:
         raise HTTPException(status_code=413, detail="Recording is too large (max 500 MB)") from error
@@ -26725,6 +26731,11 @@ async def save_scene_recording(
     except Exception as error:
         raise HTTPException(status_code=500, detail=f"Could not save MP4 recording: {error}") from error
     finally:
+        try:
+            if os.path.isfile(upload_audio_path):
+                os.remove(upload_audio_path)
+        except OSError:
+            pass
         try:
             if os.path.isfile(upload_path):
                 os.remove(upload_path)
@@ -36891,14 +36902,25 @@ from routers.image_generation_commands import (
 )
 from services.workspace_commands import catalog as workspace_command_catalog
 
+from services.scene_commands import SceneCommands, command_catalog as scene_command_catalog
+from routers.scene_commands import create_scene_commands_router
+_scene_commands = SceneCommands(_workspace_dir)
+api.include_router(create_scene_commands_router(_scene_commands))
+
+from services.mcp_access import McpAccess
+from routers.mcp_access import create_mcp_access_router
+_mcp_access = McpAccess(os.path.join(os.path.dirname(__file__), 'settings', 'mcp-access.json'))
+api.include_router(create_mcp_access_router(_mcp_access))
+
 _image_generation_commands = create_image_generation_commands(globals())
 api.include_router(create_image_generation_commands_router(_image_generation_commands))
 api.include_router(create_wangp_mcp_router(
+    token_getter=_mcp_access.token,
     handlers={"models": lambda args: get_model_options(args['model_type']) if args.get('model_type') else list_models(), "processors": wangp_capabilities, "status": get_status,
               "generate": generate, "recast": recast_endpoint, "upscale": tools_upscale,
-              **wangp_agent_handlers(api), **image_command_handlers(_image_generation_commands)},
+              **wangp_agent_handlers(api), **image_command_handlers(_image_generation_commands), **_scene_commands.handlers()},
     journal_path=os.path.join(os.path.dirname(__file__), "settings", "wangp-mcp-requests.sqlite3"),
-    command_operations=[*workspace_command_catalog()["operations"], *image_command_catalog(
+    command_operations=[*scene_command_catalog(), *workspace_command_catalog()["operations"], *image_command_catalog(
         adapter.catalog for adapter in _image_generation_commands.operations.values())],
 ))
 

@@ -1,6 +1,14 @@
 import type { OutputFile, Scene } from '../types'
+import { useStore } from '../stores/useStore'
+import { galleryWorkspaceEpoch, galleryWorkspaceName } from '../stores/gallerySlice'
 
 export const PENDING_SCENE_KEY = 'maestro_scene_animator_pending_scene'
+
+export async function openSceneOutput(file: OutputFile) {
+  const source = { epoch: galleryWorkspaceEpoch(), workspace: galleryWorkspaceName(useStore.getState()) }
+  const { openSavedScene } = await import('./openSavedScene')
+  return openSavedScene(file, source)
+}
 
 export async function stageSceneForEditor(file: OutputFile): Promise<Scene> {
   const response = await fetch(file.url)
