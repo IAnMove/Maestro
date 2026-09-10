@@ -1,12 +1,13 @@
+import { DirectorModelPicker } from './DirectorModelPicker'
 import { lazy, Suspense, useState, useCallback, useRef, useMemo, useEffect } from 'react'
 import { Upload, Loader2, Music, RotateCcw, Check, X, ChevronRight, ChevronDown, ImageIcon, Play, Film, Mic, Sparkles, Send, Users, FileText, Clock, BookOpen, Zap } from 'lucide-react'
-import { useStore, getFamiliesForMode, getModelsForFamily, resolveResolution } from '../../stores/useStore'
+import { useStore, resolveResolution } from '../../stores/useStore'
 import { fetchModelOptions } from '../../api/client'
-import { MINIMAX_IMAGE_API_LABEL, MINIMAX_IMAGE_API_MODEL } from '../../lib/externalModels'
+import { MINIMAX_IMAGE_API_MODEL } from '../../lib/externalModels'
 import { DirectorLoraSelector } from '../SettingsDrawer/DirectorLoraSelector'
 import { DirectorSongSetup } from './DirectorSongSetup'
 import { InfoTooltip } from './InfoTooltip'
-import type { DirectorPipelineType, DirectorShotImageGuidance, DirectorSkill, ModelOptions, MusicVideoTreatment, ShortFilmCharacter, ShortFilmPath } from '../../types'
+import type { DirectorShotImageGuidance, DirectorSkill, ModelOptions, MusicVideoTreatment, ShortFilmCharacter, ShortFilmPath } from '../../types'
 import { formatSeconds, recommendedWindowProfile } from './DurationSlider'
 import { DirectorClipImagePreview } from './DirectorClipImagePreview'
 import { DirectorPlanRecoveryCard } from './DirectorPlanRecoveryCard'
@@ -2864,99 +2865,6 @@ function DirectorAdvancedAccordion() {
 /** Compact model picker for Director. Director's automated stages have a
  *  stricter input contract than Studio, so the backend publishes explicit
  *  per-workflow compatibility metadata for this selector to enforce. */
-function DirectorModelPicker({ mode, value, onChange }: {
-  mode: 'image' | 'video'
-  value: string
-  onChange: (modelType: string) => void
-}) {
-  const models = useStore(s => s.models)
-  const families = useStore(s => s.families)
-  const enabledModels = useStore(s => s.enabledModels)
-  const nsfwMode = useStore(s => s.servicesConfig?.nsfw_mode ?? false)
-  const directorSkill = useStore(s => s.directorSkill)
-  const shortFilmPath = useStore(s => s.shortFilmPath)
-  const seamless = useStore(s => s.directorSeamless)
-
-  const pipelineType: DirectorPipelineType = directorSkill === 'music_video'
-    ? 'music_video'
-    : shortFilmPath === 'audio'
-      ? 'short_film_audio'
-      : 'short_film_story'
-
-  const groups = useMemo(() =>
-    getFamiliesForMode(mode, families).map(family => ({
-      family,
-      models: getModelsForFamily(family.id, models, mode)
-        .filter(m => enabledModels.has(m.model_type))
-        .filter(m => !m.nsfw_only || nsfwMode)
-        .filter(m => mode === 'image'
-          ? m.director?.image.compatible === true
-          : m.director?.video[pipelineType].compatible === true
-            && (!seamless || m.director?.video.seamless.compatible === true)),
-    })).filter(g => g.models.length > 0),
-  [mode, families, models, enabledModels, nsfwMode, pipelineType, seamless])
-
-  const compatibleModels = useMemo(
-    () => groups.flatMap(group => group.models),
-    [groups],
-  )
-  const externalKnown = mode === 'image' && value === MINIMAX_IMAGE_API_MODEL
-  const known = externalKnown || compatibleModels.some(model => model.model_type === value)
-  const preferredId = mode === 'image' ? 'flux2_klein_9b' : 'ltx2_22B_distilled_1_1'
-  const fallback = compatibleModels.find(model => model.model_type === preferredId)
-    || compatibleModels[0]
-  const selectedValue = known ? value : (fallback?.model_type || '')
-  const selectedModel = compatibleModels.find(model => model.model_type === selectedValue)
-
-  useEffect(() => {
-    if (!known && fallback && fallback.model_type !== value) {
-      onChange(fallback.model_type)
-    }
-  }, [fallback, known, onChange, value])
-
-  const title = mode === 'image'
-    ? 'Only models that can create an establishing image and edit reference-based start frames are shown.'
-    : pipelineType === 'short_film_story'
-      ? 'Only models that can render Director-planned shots with synchronized native audio are shown.'
-      : 'Only models that can follow the uploaded soundtrack or dialogue timeline are shown.'
-
-  return (
-    <div className="flex items-center gap-1.5">
-      <span className="text-[10px] text-text-muted uppercase tracking-wider w-11 shrink-0">
-        {mode === 'image' ? 'Image' : 'Video'}
-      </span>
-      <select
-        value={selectedValue}
-        onChange={e => onChange(e.target.value)}
-        disabled={compatibleModels.length === 0 && mode !== 'image'}
-        title={title}
-        className="flex-1 min-w-0 bg-bg-tertiary border border-border rounded-lg px-2 py-1 text-[11px] text-text-primary focus:outline-none focus:border-accent-blue"
-      >
-        {compatibleModels.length === 0 && mode !== 'image' && (
-          <option value="">No compatible models enabled</option>
-        )}
-        {mode === 'image' && (
-          <optgroup label="External API">
-            <option value={MINIMAX_IMAGE_API_MODEL}>{MINIMAX_IMAGE_API_LABEL}</option>
-          </optgroup>
-        )}
-        {groups.map(({ family, models: famModels }) => (
-          <optgroup key={family.id} label={family.label}>
-            {famModels.map(m => (
-              <option key={m.model_type} value={m.model_type}>{m.name}</option>
-            ))}
-          </optgroup>
-        ))}
-      </select>
-      {selectedModel?.selector_help && (
-        <InfoTooltip
-          text={selectedModel.selector_help}
-          label={`About ${selectedModel.name}`}
-        />
-      )}
-    </div>
-  )
-}
 
 function DirectorLoraAccordion() {
   // Resolve Director's per-shoot image and video models from saved

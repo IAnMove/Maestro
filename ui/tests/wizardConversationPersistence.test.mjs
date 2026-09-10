@@ -606,3 +606,23 @@ test('explicit clear deletes base turns while retaining concurrent canonical add
     'welcome-after-clear',
   ])
 })
+
+test('rebasing a delayed snapshot keeps a local answer beside its question', () => {
+  const visible = payload(2, ['u1', 'a1', 'u2', 'a2'])
+  const confirmed = payload(3, ['u1', 'u2'])
+  const ids = ['u1', 'a1', 'u2', 'a2']
+  const assertOrder = conversation => assert.deepEqual(conversation.messages.map(message => message.id), ids)
+  assertOrder(mergeWizardConversationSnapshots(visible, confirmed))
+  assertOrder(mergeQueuedWizardConversationSnapshots(visible, payload(1, ['u1']), confirmed))
+  const rebased = rebaseWizardConversationAfterSave(visible, payload(1, ['u1']), confirmed)
+  assertOrder(rebased.conversation)
+  assertOrder(mergeWizardConversationSnapshots(rebased.conversation, confirmed))
+  assert.equal(new Set(rebased.conversation.messages.map(message => message.id)).size, 4)
+})
+
+test('an unsaved answer stays after its known question before another client turn', () => {
+  const local = payload(1, ['u1', 'a1'])
+  const remote = payload(2, ['u1', 'remote-u', 'remote-a'])
+  const merged = mergeWizardConversationSnapshots(local, remote)
+  assert.deepEqual(merged.messages.map(message => message.id), ['u1', 'a1', 'remote-u', 'remote-a'])
+})

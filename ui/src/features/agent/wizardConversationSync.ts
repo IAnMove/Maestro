@@ -1,3 +1,4 @@
+import { insertMissingConversationValues } from './wizardMessageOrder'
 import { normalizeVisualEvidence, type VisualEvidence } from './visualEvidence'
 
 export const WIZARD_WELCOME_TEXT = 'Saludos, creador. Soy el mago de HocusPocus: puedo consultar la cola, explicarte el estudio, llevarte a la sección adecuada y preparar o lanzar un vídeo cuando me lo pidas. Dime qué quieres conjurar. 🪄'
@@ -68,26 +69,15 @@ export function normalizeRemoteWizardMessages(
  * Remote order is canonical, but a local value wins for a shared id. Callers
  * use this fallback only when no common ancestor is available, so preserving
  * an in-browser card/workflow update is safer than silently reverting it.
- * Local-only messages are appended in their existing order.
+ * Local-only messages retain their position beside shared turn ids.
  */
 export function mergeWizardMessages(
   localMessages: WizardSyncMessage[],
   remoteMessages: WizardSyncMessage[],
 ): WizardSyncMessage[] {
   const localById = new Map(localMessages.map(message => [message.id, message]))
-  const merged: WizardSyncMessage[] = []
-  const seen = new Set<string>()
-  for (const message of remoteMessages) {
-    if (!message.id || seen.has(message.id)) continue
-    seen.add(message.id)
-    merged.push(localById.get(message.id) ?? message)
-  }
-  for (const message of localMessages) {
-    if (!message.id || seen.has(message.id)) continue
-    seen.add(message.id)
-    merged.push(message)
-  }
-  return merged.slice(-40)
+  const canonical = remoteMessages.map(message => localById.get(message.id) ?? message)
+  return insertMissingConversationValues(canonical, localMessages, message => message.id).slice(-40)
 }
 
 /** True when the visible client state still contains a turn absent from a saved snapshot. */

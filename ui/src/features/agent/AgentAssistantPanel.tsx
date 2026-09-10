@@ -172,10 +172,11 @@ export function AgentAssistantPanel({ workspace, tasks, onClose, embedded = fals
   const conversationClearBasesRef = useRef<Map<string, WizardConversationPayload>>(new Map())
   const conversationWorkspaceRef = useRef(conversationWorkspace)
   conversationWorkspaceRef.current = conversationWorkspace
+  const followMessagesRef = useRef(true)
   const messagesRef = useRef(messages)
   messagesRef.current = messages
   const activeCount = useMemo(() => tasks.filter(task => ACTIVE.has(task.status) && !task.parent_id).length, [tasks])
-  const latestTask = useMemo(() => [...tasks].sort((left, right) => right.updated_at - left.updated_at)[0], [tasks])
+  const latestTask = useMemo(() => [...tasks].sort((left, right) => right.created_at - left.created_at || left.id.localeCompare(right.id))[0], [tasks])
   const panelPresentation = agentPanelPresentation(embedded, expanded)
 
   useEffect(() => {
@@ -233,7 +234,8 @@ export function AgentAssistantPanel({ workspace, tasks, onClose, embedded = fals
 
   useEffect(() => {
     writeMessages(conversationWorkspace, messages)
-    endRef.current?.scrollIntoView({ block: 'end' })
+    const scroller = endRef.current?.parentElement
+    if (scroller && followMessagesRef.current) scroller.scrollTop = scroller.scrollHeight
     if (hydratedWorkspace !== conversationWorkspace) return
     if (skipNextConversationSaveRef.current) {
       skipNextConversationSaveRef.current = false
@@ -354,36 +356,39 @@ export function AgentAssistantPanel({ workspace, tasks, onClose, embedded = fals
 
   useEffect(() => {
     if (workspace !== conversationWorkspace) return
-    setMessages(current => current.map(message => {
-      if (!message.cards?.length) return message
-      let changed = false
-      const cards = message.cards.map(card => {
-        const task = tasks.find(item => (
-          (card.taskId && (item.id === card.taskId || item.root_id === card.taskId || item.backend_job_id === card.taskId))
-          || (card.pipelineId && item.pipeline_id === card.pipelineId)
-        ))
-        if (!task) return card
-        const state = taskExecutionState(task.status)
-        const outputNames = task.result_refs?.length ? task.result_refs : card.outputNames
-        if (state === card.state && (task.message || card.message) === card.message && outputNames === card.outputNames) {
-          return card
-        }
-        changed = true
-        return applyPollToCard(card, {
-          state,
-          message: task.message || card.message,
-          outputNames,
-          taskId: task.id || card.taskId,
-          recoverable: state === 'failed' || card.recoverable,
+    setMessages(current => {
+      const next = current.map(message => {
+        if (!message.cards?.length) return message
+        let changed = false
+        const cards = message.cards.map(card => {
+          const task = tasks.find(item => (
+            (card.taskId && (item.id === card.taskId || item.root_id === card.taskId || item.backend_job_id === card.taskId))
+            || (card.pipelineId && item.pipeline_id === card.pipelineId)
+          ))
+          if (!task) return card
+          const state = taskExecutionState(task.status)
+          const outputNames = task.result_refs?.length ? task.result_refs : card.outputNames
+          if (state === card.state && (task.message || card.message) === card.message && JSON.stringify(outputNames) === JSON.stringify(card.outputNames)) {
+            return card
+          }
+          changed = true
+          return applyPollToCard(card, {
+            state,
+            message: task.message || card.message,
+            outputNames,
+            taskId: task.id || card.taskId,
+            recoverable: state === 'failed' || card.recoverable,
+          })
         })
+        return changed ? { ...message, cards } : message
       })
-      return changed ? { ...message, cards } : message
-    }))
+      return next.some((message, index) => message !== current[index]) ? next : current
+    })
   }, [conversationWorkspace, tasks, workspace])
 
   useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return
+      if (event.key !== 'Escape' || event.defaultPrevented) return
       if (expanded) {
         event.preventDefault()
         setExpanded(false)
@@ -418,6 +423,7 @@ export function AgentAssistantPanel({ workspace, tasks, onClose, embedded = fals
     const turnMedia = visualMedia?.workspace === workspace ? [visualMedia] : undefined
     const userMessage: AgentMessage = { id: newId(), role: 'user', text: question, createdAt: Date.now() }
     const nextMessages = [...messages, userMessage].slice(-40)
+    followMessagesRef.current = true
     setMessages(nextMessages)
     setDraft('')
     setBusy(true)
@@ -577,7 +583,11 @@ export function AgentAssistantPanel({ workspace, tasks, onClose, embedded = fals
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-3 py-3" aria-live="polite">
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-3 py-3" aria-live="polite"
+        onScroll={event => {
+          const node = event.currentTarget
+          followMessagesRef.current = node.scrollHeight - node.scrollTop - node.clientHeight < 40
+        }}>
         {messages.map(message => (
           <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div lang={message.language || undefined} className={message.role === 'user'

@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test'
+import type { WizardConversationPayload } from '../../src/api/wizard'
 
 export const RUNTIME_IDENTITY = {
   instance_id: 'e2e-instance',
@@ -130,7 +131,7 @@ const EMPTY_STORY_LIBRARY = {
   projects: {},
 }
 
-const EMPTY_WIZARD_CONVERSATION = {
+const EMPTY_WIZARD_CONVERSATION: WizardConversationPayload = {
   version: 1,
   revision: 0,
   messages: [],
@@ -370,8 +371,6 @@ function exactCatalog(): Record<string, ReturnType<typeof json> | { sse: true }>
     'GET /api/v1/loras/installed': json({ loras: [], manifest_last_check_at: null }),
     'GET /api/v1/tasks': json({ workspace: 'default', tasks: [], latest_event_id: 0 }),
     'GET /api/v1/tasks/events': { sse: true },
-    'GET /api/v1/wizard/conversations': json(EMPTY_WIZARD_CONVERSATION),
-    'PUT /api/v1/wizard/conversations': json(EMPTY_WIZARD_CONVERSATION),
     'GET /api/v1/wizard/workflows': json(EMPTY_WIZARD_WORKFLOWS),
     'PUT /api/v1/wizard/workflows': json(EMPTY_WIZARD_WORKFLOWS),
     'GET /api/v1/stories/library': json(EMPTY_STORY_LIBRARY),
@@ -453,6 +452,7 @@ function patternedResponse(method: string, pathname: string): ReturnType<typeof 
 export async function installApiRoutes(page: Page, options: ApiRouteOptions = {}): Promise<ApiRouteSession> {
   const session: ApiRouteSession = { unhandled: [] }
   const catalog = exactCatalog()
+  const conversations = new Map<string, WizardConversationPayload>()
   const discover = process.env.E2E_DISCOVER === '1'
   const backgroundRemovalMode = options.backgroundRemovalMode || 'complete'
   let backgroundRemovalSubmitted = false
@@ -518,6 +518,22 @@ export async function installApiRoutes(page: Page, options: ApiRouteOptions = {}
     const method = request.method().toUpperCase()
     const pathname = url.pathname
 
+    // A save must acknowledge the captured messages, otherwise the real UI
+    // endlessly rebases and resubmits against an artificial empty receipt.
+    if (pathname === '/api/v1/wizard/conversations' && (method === 'GET' || method === 'PUT')) {
+      const body = method === 'PUT' ? request.postDataJSON() : null
+      const workspace = String(body?.workspace ?? url.searchParams.get('workspace') ?? 'default')
+      const current = conversations.get(workspace) ?? EMPTY_WIZARD_CONVERSATION
+      if (body) {
+        if (body.baseRevision !== current.revision) {
+          await route.fulfill({ status: 409, json: { detail: 'Conversation revision conflict' } })
+          return
+        }
+        conversations.set(workspace, { ...body.conversation, revision: current.revision + 1 })
+      }
+      await route.fulfill(json(conversations.get(workspace) ?? current))
+      return
+    }
     if (method === 'GET' && pathname === '/api/v1/assets') {
       await route.fulfill(json({ assets: toolAssets(), total: toolAssets().length }))
       return

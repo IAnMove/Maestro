@@ -565,8 +565,9 @@ export function StoryLabPanel() {
   }
 
   const selectStoryVideoModel = (model: string) => {
-    if (project.provider.useGlobalProfile || !model.trim()) return
+    if (!model.trim()) return
     patch({
+      provider: { ...project.provider, useGlobalProfile: false },
       videoOverride: {
         model,
         resolution: storyVideoResolution,

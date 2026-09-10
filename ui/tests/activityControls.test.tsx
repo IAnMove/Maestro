@@ -252,3 +252,48 @@ test('Activity identifies the initiating tool and exposes the complete prompt fo
     Object.defineProperty(globalThis, 'EventSource', { configurable: true, value: originalEventSource })
   }
 })
+
+test('progress and a late refresh keep task order and an open Activity panel stable', { concurrency: false }, async () => {
+  const { render, screen, waitFor, fireEvent, cleanup, act } = await import('@testing-library/react')
+  const { ActivityFooter } = await import('../src/components/ActivityFooter.tsx')
+  const originalFetch = globalThis.fetch
+  const originalEventSource = globalThis.EventSource
+  let emit: (event: MessageEvent<string>) => void = () => undefined
+  class Events extends QuietEventSource {
+    addEventListener(_type?: string, listener?: (event: MessageEvent<string>) => void) { if (listener) emit = listener }
+  }
+  const rows = [
+    { ...task('running'), id: 'older', root_id: 'older', title: 'Older task', created_at: 10, updated_at: 10 },
+    { ...task('running'), id: 'newer', root_id: 'newer', title: 'Newer task', created_at: 20, updated_at: 20 },
+  ]
+  let finishRefresh: (value: Response) => void = () => undefined
+  let reads = 0
+  const response = () => new Response(JSON.stringify({ workspace: 'default', tasks: rows, latest_event_id: 10 }))
+  globalThis.fetch = async () => ++reads === 1 ? response() : new Promise(resolve => { finishRefresh = resolve })
+  Object.defineProperty(globalThis, 'EventSource', { configurable: true, value: Events })
+  const event = (id: number, type: string, changes: object) => new MessageEvent('task', { data: JSON.stringify({
+    task_id: 'older', event_id: id, type, changes, timestamp: 30,
+  }), lastEventId: String(id) })
+  try {
+    render(<ActivityFooter />)
+    await waitFor(() => assert.equal(reads, 1))
+    fireEvent.click(screen.getByRole('button', { name: /Activity/ }))
+    await screen.findByText('Older task')
+    const panel = screen.getByText('HocusPocus tasks').parentElement!.parentElement!
+    const order = () => [...panel.querySelectorAll('[title="Copy task ID"]')].map(node => node.textContent)
+    assert.deepEqual(order(), ['newer', 'older'])
+    const oldNode = screen.getByText('Older task').closest('.rounded-md')
+    await act(async () => { emit(event(11, 'resync_required', {})) })
+    await act(async () => { emit(event(12, 'task.progress', { updated_at: 30, message: 'Fresh progress', current: 5 })) })
+    await act(async () => { finishRefresh(response()) })
+    assert.deepEqual(order(), ['newer', 'older'])
+    assert.equal(screen.getByText('HocusPocus tasks').parentElement!.parentElement! === panel, true)
+    assert.equal(screen.getByText('Older task').closest('.rounded-md') === oldNode, true)
+    assert.equal(panel.textContent?.includes('Fresh progress'), true)
+    assert.equal(screen.getByRole('button', { name: /Activity/ }).getAttribute('aria-expanded'), 'true')
+  } finally {
+    cleanup()
+    globalThis.fetch = originalFetch
+    Object.defineProperty(globalThis, 'EventSource', { configurable: true, value: originalEventSource })
+  }
+})
