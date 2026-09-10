@@ -145,19 +145,26 @@ def test_native_helpers_affect_installation_fingerprint(tmp_path):
         assert profiles.dependency_fingerprint("hunyuan3d", "linux") != before
 
 
+def _engine_lib_dirs(executable):
+    prefix = executable.parent.parent if executable.parent.name.lower() in {"bin", "scripts"} else executable.parent
+    return [] if executable.name.lower() == "python.exe" else [str(prefix / "lib"), str(prefix / "lib64")]
+
+
 def test_native_library_paths_cannot_leak_from_the_parent_engine(tmp_path):
     import os
     parent = tmp_path / "old engine"
     target = tmp_path / "new engine"
     system_cuda = tmp_path / "cuda toolkit"
-    env = isolated_environment(python_path(target), {
+    executable = python_path(target)
+    env = isolated_environment(executable, {
         "VIRTUAL_ENV": str(parent), "CONDA_PREFIX_1": str(parent),
         "PATH": os.pathsep.join([str(parent / "Library/bin"), str(parent / "bin"), str(system_cuda / "bin")]),
         "LD_LIBRARY_PATH": os.pathsep.join([str(parent / "lib"), str(system_cuda / "lib")]),
         "LD_PRELOAD": str(parent / "lib/injected.so"),
     })
     assert str(parent) not in env["PATH"]
-    assert env["LD_LIBRARY_PATH"] == str(system_cuda / "lib")
+    assert str(parent) not in env["LD_LIBRARY_PATH"]
+    assert env["LD_LIBRARY_PATH"].split(os.pathsep) == [*_engine_lib_dirs(executable), str(system_cuda / "lib")]
     assert str(system_cuda / "bin") in env["PATH"]
     assert "LD_PRELOAD" not in env and "CONDA_PREFIX_1" not in env
 
@@ -167,7 +174,8 @@ def test_pinokio_machine_toolchain_survives_engine_isolation(tmp_path):
     base = tmp_path / "pinokio conda base"
     parent = tmp_path / "parent engine"
     target = tmp_path / "selected engine"
-    env = isolated_environment(python_path(target), {
+    executable = python_path(target)
+    env = isolated_environment(executable, {
         "VIRTUAL_ENV": str(parent), "CONDA_PREFIX": str(base),
         "CONDA_PYTHON_EXE": str(python_path(base)),
         "PATH": os.pathsep.join([str(parent / "bin"), str(base / "bin")]),
@@ -175,7 +183,24 @@ def test_pinokio_machine_toolchain_survives_engine_isolation(tmp_path):
     })
     assert str(parent) not in env["PATH"] and str(parent) not in env["LD_LIBRARY_PATH"]
     assert str(base / "bin") in env["PATH"]  # nvcc/ffmpeg remain reachable.
-    assert env["LD_LIBRARY_PATH"] == str(base / "lib")
+    assert env["LD_LIBRARY_PATH"].split(os.pathsep) == [*_engine_lib_dirs(executable), str(base / "lib")]
+
+
+def test_engine_native_libs_outrank_pinokio_base_on_the_loader_path(tmp_path):
+    import os
+    base = tmp_path / "pinokio conda base"
+    target = tmp_path / "h3 engine"
+    executable = python_path(target)
+    env = isolated_environment(executable, {
+        "CONDA_PREFIX": str(base), "CONDA_PYTHON_EXE": str(python_path(base)),
+        "LD_LIBRARY_PATH": str(base / "lib"),
+    })
+    libs = env["LD_LIBRARY_PATH"].split(os.pathsep)
+    assert str(base / "lib") in libs
+    engine_libs = _engine_lib_dirs(executable)
+    if engine_libs:
+        assert libs[:len(engine_libs)] == engine_libs
+        assert libs.index(engine_libs[0]) < libs.index(str(base / "lib"))
 
 
 def test_package_helper_ignores_inherited_destinations_and_configuration(monkeypatch):

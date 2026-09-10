@@ -41,10 +41,12 @@ models as part of this check.
   supplies the selected interpreter, both constraint files and explicit indexes.
 - Inherited Python paths, user packages and pip/uv destination/configuration
   overrides cannot redirect the package helper into a different environment.
-  Worker processes also discard parent environment library paths. Credentials,
-  CUDA visibility and system toolchains retain their existing handling. Pinokio's
-  conda base, identified by `CONDA_PYTHON_EXE`, supplies machine tools such as
-  nvcc/FFmpeg and is preserved; it is distinct from the parent engine environment.
+  Worker processes also discard parent environment library paths and put the
+  selected engine's `lib`/`lib64` ahead of any remaining `LD_LIBRARY_PATH`.
+  Credentials, CUDA visibility and system toolchains retain their existing
+  handling. Pinokio's conda base, identified by `CONDA_PYTHON_EXE`, supplies
+  machine tools such as nvcc/FFmpeg and stays on `PATH` after the engine;
+  its libraries remain reachable but cannot shadow the engine.
 - TorchCodec 0.5 matches the main Torch 2.7 on Linux. Windows uses the existing
   video-reader fallbacks because that TorchCodec version has no Windows wheel.
   SAM uses NumPy 1.26.4, matching its pinned upstream requirements.
