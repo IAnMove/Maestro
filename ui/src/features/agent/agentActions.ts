@@ -2061,27 +2061,22 @@ const HOW_TO_GENERATE = [
   /^(?:¿\s*)?c[oó]mo\s+funciona\b[^.!?\n]{0,80}\b(?:el\s+)?(?:bot[oó]n\s+)?(?:genera|generate)\b/i,
 ]
 
-// Launch verbs at the request opening. How-to language after that is
-// scene or caption text, not an educational question about the product.
-const OPENS_WITH_GENERATION_COMMAND = /^(?:¿\s*)?(?:(?:por favor|please)[, ]+)?(?:haz(?:me)?|haced(?:me)?|genera(?:me|d)?|gen[eé]rame|crea(?:me|d)?|cr[eé]ame|lanza(?:d)?|encola(?:d)?|renderiza(?:d)?|make|create|generate|render|launch|start|queue)\b/i
+// A real launch clause: verb plus a Studio medium in the same sentence.
+// Bare start/create/make must not disable how-to for a later question
+// ("Start over. How do I generate a video?").
+const OPENS_WITH_GENERATION_COMMAND = /^(?:¿\s*)?(?:(?:por favor|please)[, ]+)?(?:haz(?:me)?|haced(?:me)?|genera(?:me|d)?|gen[eé]rame|crea(?:me|d)?|cr[eé]ame|lanza(?:d)?|encola(?:d)?|renderiza(?:d)?|make|create|generate|render|launch|start|queue)\b[^.!?\n]{0,200}\b(?:v[ií]deos?|clips?|imagen(?:es)?|fotos?|retratos?|ilustraci[oó]n(?:es)?|images?|pictures?|photos?|portraits?|illustrations?|audio|canciones?|canci[oó]n|m[uú]sica|songs?|music|voices?|speech|tracks?|voz(?:es)?|3d)\b/i
 
 // Spoken filler before a real how-to. Do not unanchor the ^ patterns:
 // a caption inside the same generate sentence must stay a launch command.
 const HOW_TO_SPOKEN_PREFIX = /^(?:¿\s*)?(?:(?:hey|hi|hello|wait|ok|okay|so|um+|please|por\s+favor|oye|bueno|mira)[,.]?\s+)+/i
 
-function howToQuestionWindows(text: string): string[] {
+function howToQuestionClauses(text: string): string[] {
   const window = text.slice(0, 240)
-  const windows = [window]
-  const strippedLead = window.replace(HOW_TO_SPOKEN_PREFIX, '').trim()
-  if (strippedLead && strippedLead !== window) windows.push(strippedLead)
-  // A status sentence plus a capability question ("The job is stuck. Can I
-  // cancel?") must still be educational. Do not split on newlines: a caption
-  // can wrap without becoming a new request.
-  for (const clause of window.split(/[.!?]+/)) {
-    const part = clause.replace(HOW_TO_SPOKEN_PREFIX, '').trim()
-    if (part) windows.push(part)
-  }
-  return windows
+  // Only clause windows: the raw 240-character span would let unanchored
+  // "how to make" inside a later generate sentence classify the whole turn
+  // as educational ("Start over. Generate a video about how to make pasta").
+  // Do not split on newlines: a caption can wrap without becoming a new request.
+  return window.split(/[.!?]+/).map(clause => clause.replace(HOW_TO_SPOKEN_PREFIX, '').trim()).filter(Boolean)
 }
 
 export function isHowToGenerateQuestion(request: string): boolean {
@@ -2090,9 +2085,14 @@ export function isHowToGenerateQuestion(request: string): boolean {
   // Classify from the opening window so a long explanation after
   // "how do I generate a video?" stays educational. A later command
   // after 240 characters is treated as a separate request.
-  const window = text.slice(0, 240)
-  if (OPENS_WITH_GENERATION_COMMAND.test(window)) return false
-  return howToQuestionWindows(text).some(part => HOW_TO_GENERATE.some(pattern => pattern.test(part)))
+  const clauses = howToQuestionClauses(text)
+  // The first clause is the user intent. If it is already a generate
+  // command, later !/? fragments are scene text, not a product question.
+  if (clauses[0] && OPENS_WITH_GENERATION_COMMAND.test(clauses[0])) return false
+  return clauses.some(part => {
+    if (OPENS_WITH_GENERATION_COMMAND.test(part)) return false
+    return HOW_TO_GENERATE.some(pattern => pattern.test(part))
+  })
 }
 
 const LABS_INVENTORY = /(?:¿\s*)?(?:qu[eé]\s+puedes\s+hacer|what\s+can\s+you\s+do)(?:\s+(?:en|in|con|with))?\s+(?:el\s+)?(?:series\s+lab|story\s+lab)/i

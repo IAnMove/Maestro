@@ -1910,6 +1910,69 @@ test('prefixed and follow-up capability questions stay educational', async () =>
   }
 })
 
+test('bare start/create/make does not disable a later how-to question', async () => {
+  const {
+    isHowToGenerateQuestion,
+    isExplicitCancelRequest,
+    isExplicitRetryRequest,
+    isExplicitVideoGenerationRequest,
+    reconcileAgentTurnWithRequest,
+  } = await import('../src/features/agent/agentActions.ts')
+
+  for (const request of [
+    'Start over. How do I generate a video?',
+    'Start Studio. What does the generate video button do?',
+    'Create a new project. How do I generate a video?',
+    'Make a new scene. How do I generate a video?',
+  ]) {
+    assert.equal(isHowToGenerateQuestion(request), true, request)
+    assert.equal(isExplicitVideoGenerationRequest(request), false, request)
+    const turn = await reconcileAgentTurnWithRequest(request, {
+      reply: 'Lanzo el vídeo.',
+      actions: [{ type: 'prepare_video', prompt: request }, { type: 'start_generation', confirm: true }],
+    })
+    assert.deepEqual(turn.actions.map(action => action.type), [], request)
+  }
+
+  for (const request of [
+    'Start over. Can I cancel the generation?',
+    'Please start. Can I cancel the generation?',
+    'Create a backup. Can I cancel the generation?',
+  ]) {
+    assert.equal(isHowToGenerateQuestion(request), true, request)
+    assert.equal(isExplicitCancelRequest(request), false, request)
+    const turn = await reconcileAgentTurnWithRequest(request, { reply: 'Cancelo.', actions: [
+      { type: 'cancel_task', taskId: 'running-job', confirm: true },
+    ] })
+    assert.deepEqual(turn.actions.map(action => action.type), [], request)
+  }
+
+  for (const request of [
+    'Start over. Can I retry the generation?',
+    'Create a backup. Can I retry the generation?',
+  ]) {
+    assert.equal(isHowToGenerateQuestion(request), true, request)
+    assert.equal(isExplicitRetryRequest(request), false, request)
+    const turn = await reconcileAgentTurnWithRequest(request, { reply: 'Reintento.', actions: [
+      { type: 'retry_task', taskId: 'failed-job', confirm: true },
+    ] })
+    assert.deepEqual(turn.actions.map(action => action.type), [], request)
+  }
+
+  for (const request of [
+    'Start over. Generate a video about how to make pancakes',
+    'Create a new project. Generate a video of a cat',
+    'Generate a video of someone yelling Stop! How to make pasta is the title',
+  ]) {
+    assert.equal(isHowToGenerateQuestion(request), false, request)
+    assert.equal(isExplicitVideoGenerationRequest(request), true, request)
+    const turn = await reconcileAgentTurnWithRequest(request, { reply: 'Ready', actions: [
+      { type: 'prepare_video', prompt: request }, { type: 'start_generation', confirm: true },
+    ] })
+    assert.deepEqual(turn.actions.map(action => action.type), ['prepare_video', 'start_generation'], request)
+  }
+})
+
 test('Spanish para-preposition does not cancel the active GPU task', async () => {
   const { isExplicitCancelRequest, reconcileAgentTurnWithRequest } = await import('../src/features/agent/agentActions.ts')
   for (const request of [
