@@ -2,7 +2,7 @@ import { useUiTranslation } from '../../i18n'
 import { FX_CATALOG, parseSceneFx, type SceneFx } from './types'
 
 export function SceneFxControls({ cues = [], duration, disabled, onChange, onShowcase }: {
-  cues?: SceneFx[]; duration: number; disabled?: boolean; onChange: (cues: SceneFx[]) => void; onShowcase: () => void
+  cues?: SceneFx[]; duration: number; disabled?: boolean; onChange: (cues: SceneFx[]) => void; onShowcase: (collection?: 'all' | 'anime') => void
 }) {
   const { t } = useUiTranslation('sceneFx')
   const update = (id: string, patch: Partial<SceneFx>) => onChange(parseSceneFx(cues.map(cue => cue.id === id ? { ...cue, ...patch } : cue)))
@@ -17,13 +17,14 @@ export function SceneFxControls({ cues = [], duration, disabled, onChange, onSho
           <label><input type="checkbox" checked={cue.sound} onChange={e => update(cue.id, { sound: e.target.checked })} /> {t('sound')}</label>
         </div>
         <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-          {(['start', 'end', 'x', 'y', 'size', 'intensity', 'volume', 'seed'] as const).map(key => <label key={key} className="text-xs">{t(key)}<input type="number" value={cue[key]} min={key === 'end' ? cue.start + .1 : 0} max={key === 'start' || key === 'end' ? duration : undefined} step={key === 'seed' ? 1 : .1} onChange={e => { const value = e.target.valueAsNumber; if (Number.isFinite(value) && (key !== 'start' || value < cue.end) && (key !== 'end' || value > cue.start)) update(cue.id, { [key]: value }) }} className="mt-1 min-h-9 w-full rounded border border-border bg-bg-tertiary px-2" /></label>)}
+          {(['start', 'end', 'x', 'y', 'size', 'rotation', 'intensity', 'volume', 'seed'] as const).map(key => <label key={key} className="text-xs">{t(key)}<input type="number" value={cue[key] ?? 0} min={key === 'rotation' ? -180 : key === 'end' ? cue.start + .1 : 0} max={key === 'start' || key === 'end' ? duration : undefined} step={key === 'seed' ? 1 : .1} onChange={e => { const value = e.target.valueAsNumber; if (Number.isFinite(value) && (key !== 'start' || value < cue.end) && (key !== 'end' || value > cue.start)) update(cue.id, { [key]: value }) }} className="mt-1 min-h-9 w-full rounded border border-border bg-bg-tertiary px-2" /></label>)}
         </div>
         <button type="button" onClick={() => onChange(cues.filter(item => item.id !== cue.id))} className="min-h-9 text-xs text-red-300">{t('remove')}</button>
       </div>)}
       <div className="flex flex-wrap gap-2">
-        <button type="button" disabled={cues.length >= 64} onClick={() => onChange([...cues, ...parseSceneFx([{ id: crypto.randomUUID(), kind: 'sparks', start: 0, end: Math.min(3, duration) }])])} className="min-h-10 rounded border border-border px-3 text-xs">{t('add')}</button>
-        <button type="button" onClick={onShowcase} className="min-h-10 rounded border border-cyan-400/40 px-3 text-xs">{t('showcase')}</button>
+        <button type="button" disabled={cues.length >= 64} onClick={() => onChange([...cues, ...parseSceneFx([{ id: `fx-${Date.now()}-${crypto.getRandomValues(new Uint32Array(1))[0]}`, kind: 'sparks', start: 0, end: Math.min(3, duration) }])])} className="min-h-10 rounded border border-border px-3 text-xs">{t('add')}</button>
+        <button type="button" onClick={() => onShowcase('all')} className="min-h-10 rounded border border-cyan-400/40 px-3 text-xs">{t('showcase')}</button>
+        <button type="button" onClick={() => onShowcase('anime')} className="min-h-10 rounded border border-violet-400/40 px-3 text-xs">{t('animeShowcase')}</button>
       </div>
     </fieldset>
   </details>

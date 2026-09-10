@@ -16,6 +16,7 @@ import { LipsPlacementControls } from './LipsPlacementControls'
 import { QuickVoiceControls } from './QuickVoiceControls'
 import { exampleVoice, recordedVoice } from './quickVoice'
 import { VoicePreview } from './VoicePreview'
+import { VocalIsolationOption } from './VocalIsolationOption'
 
 export type SpeechControlsProps = {
   slot: Scene3DSlot; workspace: string; disabled: boolean
@@ -33,6 +34,7 @@ export function Scene3DSpeechControls({ slot, workspace, disabled, calibrate, on
   const [items, setItems] = useState<ApiOutput[]>([])
   const [busy, setBusy] = useState(false), [error, setError] = useState('')
   const [recording, setRecording] = useState(false)
+  const [isolateVocals, setIsolateVocals] = useState(false)
   const [jobs] = useState(() => ({ serial: 0, controller: null as AbortController | null }))
   const jsonInput = useRef<HTMLInputElement>(null), kitInput = useRef<HTMLInputElement>(null)
   useEffect(() => { onBusyChange?.(busy || recording); return () => onBusyChange?.(false) }, [busy, recording, onBusyChange])
@@ -88,12 +90,13 @@ export function Scene3DSpeechControls({ slot, workspace, disabled, calibrate, on
         <button type="button" className={speechInput} disabled={!speech.audio} onClick={() => void run(async signal => {
           const buffer = await decodeVoice(speech.audio!.url)
           const duration = Math.min(buffer.duration - speech.offset, (speech.end ?? speech.start + buffer.duration - speech.offset) - speech.start)
-          const localCues = await analyzeSceneSpeech(await voiceWav(buffer, speech.offset, duration), signal)
+          const localCues = await analyzeSceneSpeech(await voiceWav(buffer, speech.offset, duration), signal, isolateVocals)
           const cues = localCues.map(cue => ({ ...cue, start: cue.start + speech.offset, end: cue.end + speech.offset }))
-          return () => onChange({ ...speech, cues, driver: 'rhubarb' })
+          return () => onChange({ ...speech, cues, driver: isolateVocals ? 'rhubarb-vocals' : 'rhubarb' })
         })}>{t('speech.analyze')}</button>
         <button type="button" className={speechInput} disabled={!speech.cues.length} onClick={() => onFit(Math.max(.1, speech.start + (speech.cues.at(-1)?.end ?? 0) - speech.offset))}>{t('speech.fit')}</button>
       </div>
+      <VocalIsolationOption checked={isolateVocals} onChange={setIsolateVocals} />
       <p className="text-xs text-cyan-200" role="status">{t(`speech.driver.${speech.driver}`)} · {t('speech.cues', { count: speech.cues.length })}</p>
       {speech.driver === 'amplitude' && <p className="text-xs text-amber-200">{t('speech.amplitudeHint')}</p>}
       <div className="flex flex-wrap gap-3">

@@ -11,7 +11,7 @@ test('2D and 3D preserve all effects and audio settings through save/reopen', ()
   assert.deepEqual(parseScene3DDocument(JSON.parse(JSON.stringify(world)))?.sfx, world.sfx)
   const scene = withFxShowcase({ version: 1 as const, name: 'FX', layers: [], width: 640, height: 360, duration: 3 })
   assert.deepEqual(parseSceneFile(serializeSceneFile(scene)).sfx, scene.sfx)
-  assert.equal(scene.duration, 54)
+  assert.equal(scene.duration, 90)
   assert.deepEqual(scene.sfx.map(cue => cue.kind), FX_CATALOG.map(cue => cue.id))
 })
 
@@ -34,4 +34,18 @@ test('every sound has repeatable finite PCM, a non-silent body and silent edges'
     assert.equal(Math.abs(first[0]), 0)
     assert.ok(Math.abs(first.at(-1)!) < .001)
   }
+})
+
+
+test('anime showcase preserves the scene and supports oriented energy beams', () => {
+  const source = createDefaultScene3DDocument()
+  const next = withFxShowcase(source, 'anime')
+  assert.equal(next.duration, 36)
+  assert.equal(next.sfx.length, 12)
+  assert.equal(next.slots, source.slots)
+  assert.ok(next.sfx.some(cue => cue.kind === 'energy_beam'))
+  const rotated = parseSceneFx([{ ...next.sfx[0], rotation: -45 }])
+  assert.equal(rotated[0].rotation, -45)
+  assert.equal(parseScene3DDocument({ ...next, sfx: rotated })?.sfx?.[0].rotation, -45)
+  assert.equal(source.sfx, undefined)
 })

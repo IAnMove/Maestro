@@ -1,4 +1,6 @@
 import { fxRandom, type SceneFx } from './types'
+import { magicPainters } from './magicPaint'
+import { animePainters } from './animePaint'
 
 type Painter = (ctx: CanvasRenderingContext2D, cue: SceneFx, time: number, progress: number) => void
 const tau = Math.PI * 2
@@ -88,7 +90,7 @@ const laser: Painter = (ctx, _cue, time) => {
   for (let i = 0; i < 4; i++) { ctx.globalAlpha = .15 + i * .18; ctx.lineWidth = .05 / (i + 1); line(ctx, -.65, 0, .65, 0) }
   ctx.strokeStyle = '#ffffff'; ctx.lineWidth = .003; line(ctx, -.65, 0, .65, 0); ctx.restore()
 }
-const special: Record<string, Painter> = { portal: rings, shockwave: rings, lightning, speedlines, scanline, aurora, laser }
+const special: Record<string, Painter> = { portal: rings, shockwave: rings, lightning, speedlines, scanline, aurora, laser, ...magicPainters, ...animePainters }
 
 /** Composited screen-space effects, identical in the 2D and 3D previews/exports. */
 export function paintSceneFx(ctx: CanvasRenderingContext2D, width: number, height: number, seconds: number, cues: readonly SceneFx[] = []) {
@@ -97,6 +99,7 @@ export function paintSceneFx(ctx: CanvasRenderingContext2D, width: number, heigh
     const time = seconds - cue.start, progress = time / (cue.end - cue.start)
     const scale = Math.min(width, height) * cue.size / 100
     ctx.save(); ctx.translate(width * cue.x / 100, height * cue.y / 100); ctx.scale(scale, scale)
+    ctx.rotate((cue.rotation ?? 0) * Math.PI / 180)
     ctx.fillStyle = cue.color; ctx.strokeStyle = cue.color; ctx.lineWidth = .002; ctx.lineCap = 'round'
     ;(special[cue.kind] ?? particles)(ctx, cue, time, progress)
     ctx.restore()

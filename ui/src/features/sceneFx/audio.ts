@@ -20,11 +20,16 @@ export function fxSamples(cue: SceneFx, sampleRate: number, offset = 0, duration
       case 'whoosh': value = noise * Math.pow(Math.sin(p * Math.PI), 3) * .6; break
       case 'scan': value = Math.sin(2 * Math.PI * (400 * t + 80 * t * t)) * .15; break
       case 'laser': value = Math.sin(2 * Math.PI * (900 * t - 300 * t * t / seconds)) * Math.exp(-t * 3) * .5; break
+      case 'magic': value = (Math.sin(TAU * (520 * t + 60 * t * t)) + Math.sin(TAU * 780 * t) * .4) * (.2 + .12 * Math.sin(t * 18)) * Math.sin(p * Math.PI); break
+      case 'power': value = (Math.sin(TAU * (55 * t + 70 * t * t / seconds)) * .45 + noise * .16) * Math.sin(p * Math.PI); break
+      case 'thunder': value = (noise * .55 + Math.sin(TAU * 42 * t) * .35) * Math.exp(-(t % .7) * 5); break
+      case 'slash': value = (noise * .55 + Math.sin(TAU * (1600 * t - 600 * t * t / seconds)) * .2) * Math.pow(Math.sin(p * Math.PI), 4); break
     }
     data[i] = value * edge * cue.volume
   }
   return data
 }
+const TAU = Math.PI * 2
 
 /** Mix into ONE timeline buffer, avoiding 64 retained full-length audio buffers. */
 export function scheduleFx(context: BaseAudioContext, cues: readonly SceneFx[], duration: number, speed = 1, offset = 0) {

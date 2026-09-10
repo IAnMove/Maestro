@@ -31,6 +31,7 @@ class FxCue(Strict):
     y: float = Field(default=50, ge=0, le=100)
     size: float = Field(default=65, ge=1, le=200)
     intensity: float = Field(default=1, ge=.1, le=2)
+    rotation: float = Field(default=0, ge=-180, le=180)
     color: str | None = Field(default=None, pattern=r'^#[0-9a-fA-F]{6}$')
     seed: int = Field(default=1, ge=1, le=1000000)
     sound: bool = False
@@ -76,6 +77,7 @@ class EffectsShowcase(Strict):
     document: dict | None = None
     dimension: Literal['2d', '3d'] = '3d'
     sound: bool = True
+    collection: Literal['all', 'anime'] = 'all'
 
     @model_validator(mode='after')
     def resolve_document(self):
@@ -87,6 +89,7 @@ class EffectsShowcase(Strict):
 
 
 class SpeechPrepare(DocumentInput):
+    isolate_vocals: bool = False
     slot_id: str = Field(min_length=1, max_length=160)
     clip_id: str = Field(min_length=1, max_length=160)
     workspace: str = Field(min_length=1, max_length=120)
@@ -98,10 +101,11 @@ class SpeechPrepare(DocumentInput):
 
 
 OPERATIONS = {
-    'scenes.effects.catalog': (Strict, 'List 18 visual overlays and their local procedural sounds for 2D/3D. No AI generation.'),
+    'scenes.speech.capabilities': (Strict, 'Read local Rhubarb and optional installed-only CPU BS-RoFormer availability. No model downloads or inference.'),
+    'scenes.effects.catalog': (Strict, 'List 30 visual overlays, including magic/anime, and their local procedural sounds for 2D/3D. No AI generation.'),
     'scenes.effects.apply': (EffectsApply, 'Return an editable 2D/3D document with timed SFX. Matching cue IDs replace in place. No save or export.'),
-    'scenes.effects.showcase': (EffectsShowcase, 'Return the 54-second reusable SFX showcase, retaining actors/camera and replacing only SFX. No save or export.'),
-    'scenes.speech.prepare': (SpeechPrepare, 'Analyze an existing workspace voice with Rhubarb and attach it to an exact 3D speaker/clip. Returns an editable document; face calibration may be needed. No voice generation, save or video export.'),
+    'scenes.effects.showcase': (EffectsShowcase, 'Return a reusable SFX showcase: all effects 90 seconds, or collection anime 36 seconds. Retains actors/camera and replaces only SFX. No save or export.'),
+    'scenes.speech.prepare': (SpeechPrepare, 'Analyze an existing workspace voice with Rhubarb and attach it to an exact 3D speaker/clip. Optional isolate_vocals uses installed-only local CPU BS-RoFormer, preserving original playback. Returns an editable document; face calibration may be needed. No downloads, voice generation, save or video export.'),
 }
 
 
@@ -123,9 +127,10 @@ def command_catalog():
 def _effects(value):
     document = deepcopy(value.document)
     if isinstance(value, EffectsShowcase):
-        document['duration'] = max(document['duration'], len(CATALOG) * 3)
+        presets = [item for item in CATALOG if value.collection == 'all' or item['collection'] == value.collection]
+        document['duration'] = max(document['duration'], len(presets) * 3)
         cues = [FxCue(id=f"showcase-{item['id']}", kind=item['id'], start=i * 3, end=i * 3 + 2.8,
-                      size=95, seed=i + 17, sound=value.sound, label=item['id'].replace('speedlines', 'speed lines').title()).model_dump() for i, item in enumerate(CATALOG)]
+                      size=95, seed=i + 17, sound=value.sound, label=item['id'].replace('speedlines', 'speed lines').title()).model_dump() for i, item in enumerate(presets)]
         document['sfx'] = cues
         return document
     current = [] if value.replace else [FxCue.model_validate(cue).model_dump() for cue in document.get('sfx', [])]
@@ -152,6 +157,11 @@ class SceneCommands:
             raise ValueError('Unknown scene operation')
         model = OPERATIONS[name][0]
         value = model.model_validate(command['input'])
+        if name == 'scenes.speech.capabilities':
+            from services.vocal_isolation import isolation_capability
+            from services.scene3d_speech import rhubarb_executable
+            return {'version': 1, 'status': 'completed', 'result': {
+                'rhubarb': bool(rhubarb_executable()), 'vocalIsolation': isolation_capability()}}
         if name == 'scenes.effects.catalog':
             return {'version': 1, 'status': 'completed', 'result': {'effects': deepcopy(CATALOG), 'coordinates': 'screen-percent'}}
         if isinstance(value, SpeechPrepare):

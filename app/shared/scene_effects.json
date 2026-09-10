@@ -1,20 +1,182 @@
 [
-  {"id":"sparks","color":"#ffbb55","sound":"crackle"},
-  {"id":"explosion","color":"#ff7040","sound":"impact"},
-  {"id":"fireworks","color":"#ff88dd","sound":"impact"},
-  {"id":"confetti","color":"#66ddff","sound":"pop"},
-  {"id":"rain","color":"#88bbff","sound":"rain"},
-  {"id":"snow","color":"#e0f4ff","sound":"wind"},
-  {"id":"embers","color":"#ff9955","sound":"crackle"},
-  {"id":"smoke","color":"#b1a4bd","sound":"wind"},
-  {"id":"fog","color":"#aabbcc","sound":"wind"},
-  {"id":"bubbles","color":"#88eeff","sound":"pop"},
-  {"id":"stars","color":"#fff1aa","sound":"chime"},
-  {"id":"portal","color":"#bb77ff","sound":"rise"},
-  {"id":"shockwave","color":"#77ddff","sound":"impact"},
-  {"id":"lightning","color":"#bbddff","sound":"crackle"},
-  {"id":"speedlines","color":"#99ddff","sound":"whoosh"},
-  {"id":"scanline","color":"#66ffbb","sound":"scan"},
-  {"id":"aurora","color":"#66ffcc","sound":"rise"},
-  {"id":"laser","color":"#ff5577","sound":"laser"}
+  {
+    "id": "sparks",
+    "color": "#ffbb55",
+    "sound": "crackle",
+    "collection": "classic"
+  },
+  {
+    "id": "explosion",
+    "color": "#ff7040",
+    "sound": "impact",
+    "collection": "classic"
+  },
+  {
+    "id": "fireworks",
+    "color": "#ff88dd",
+    "sound": "impact",
+    "collection": "classic"
+  },
+  {
+    "id": "confetti",
+    "color": "#66ddff",
+    "sound": "pop",
+    "collection": "classic"
+  },
+  {
+    "id": "rain",
+    "color": "#88bbff",
+    "sound": "rain",
+    "collection": "classic"
+  },
+  {
+    "id": "snow",
+    "color": "#e0f4ff",
+    "sound": "wind",
+    "collection": "classic"
+  },
+  {
+    "id": "embers",
+    "color": "#ff9955",
+    "sound": "crackle",
+    "collection": "classic"
+  },
+  {
+    "id": "smoke",
+    "color": "#b1a4bd",
+    "sound": "wind",
+    "collection": "classic"
+  },
+  {
+    "id": "fog",
+    "color": "#aabbcc",
+    "sound": "wind",
+    "collection": "classic"
+  },
+  {
+    "id": "bubbles",
+    "color": "#88eeff",
+    "sound": "pop",
+    "collection": "classic"
+  },
+  {
+    "id": "stars",
+    "color": "#fff1aa",
+    "sound": "chime",
+    "collection": "classic"
+  },
+  {
+    "id": "portal",
+    "color": "#bb77ff",
+    "sound": "rise",
+    "collection": "classic"
+  },
+  {
+    "id": "shockwave",
+    "color": "#77ddff",
+    "sound": "impact",
+    "collection": "classic"
+  },
+  {
+    "id": "lightning",
+    "color": "#bbddff",
+    "sound": "crackle",
+    "collection": "classic"
+  },
+  {
+    "id": "speedlines",
+    "color": "#99ddff",
+    "sound": "whoosh",
+    "collection": "classic"
+  },
+  {
+    "id": "scanline",
+    "color": "#66ffbb",
+    "sound": "scan",
+    "collection": "classic"
+  },
+  {
+    "id": "aurora",
+    "color": "#66ffcc",
+    "sound": "rise",
+    "collection": "classic"
+  },
+  {
+    "id": "laser",
+    "color": "#ff5577",
+    "sound": "laser",
+    "collection": "classic"
+  },
+  {
+    "id": "magic_circle",
+    "color": "#ffc96b",
+    "sound": "magic",
+    "collection": "anime"
+  },
+  {
+    "id": "arcane_missiles",
+    "color": "#c794ff",
+    "sound": "magic",
+    "collection": "anime"
+  },
+  {
+    "id": "summoning_gate",
+    "color": "#ba88ff",
+    "sound": "power",
+    "collection": "anime"
+  },
+  {
+    "id": "black_hole",
+    "color": "#bc77ff",
+    "sound": "power",
+    "collection": "anime"
+  },
+  {
+    "id": "ice_burst",
+    "color": "#99eeff",
+    "sound": "slash",
+    "collection": "anime"
+  },
+  {
+    "id": "meteor_shower",
+    "color": "#ff9548",
+    "sound": "thunder",
+    "collection": "anime"
+  },
+  {
+    "id": "lightning_storm",
+    "color": "#99ccff",
+    "sound": "thunder",
+    "collection": "anime"
+  },
+  {
+    "id": "anime_aura",
+    "color": "#ffe36c",
+    "sound": "power",
+    "collection": "anime"
+  },
+  {
+    "id": "energy_orb",
+    "color": "#65e9ff",
+    "sound": "power",
+    "collection": "anime"
+  },
+  {
+    "id": "energy_beam",
+    "color": "#70dcff",
+    "sound": "power",
+    "collection": "anime"
+  },
+  {
+    "id": "sword_slash",
+    "color": "#ff98dc",
+    "sound": "slash",
+    "collection": "anime"
+  },
+  {
+    "id": "manga_impact",
+    "color": "#ffec77",
+    "sound": "impact",
+    "collection": "anime"
+  }
 ]

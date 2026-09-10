@@ -3,14 +3,15 @@
 ## Scene effects
 
 Video 2.5D and Video 3D share **Scene SFX → Apply SFX showcase template**.
-The template adds a 54-second track demonstrating 18 effects, three seconds each:
+The template adds a 90-second track demonstrating 30 effects, three seconds each:
 sparks, explosion, fireworks, confetti, rain, snow, embers, smoke, fog, bubbles,
-stars, portal, shockwave, lightning, speed lines, scanline, aurora and laser.
+stars, portal, shockwave, lightning, speed lines, scanline, aurora and laser; plus magic circle, arcane missiles, summoning gate, black hole, ice burst, meteor shower, lightning storm, anime aura, energy orb, energy beam, sword slash and manga impact.
+The separate magic/anime template demonstrates the 12 additions in 36 seconds.
 It preserves existing layers, actors, camera and voices, replaces the SFX track,
 and extends the scene if necessary. An empty 2D scene gets the bundled stage SVG.
 Save the resulting scene JSON to reuse it with other assets.
 
-Each cue has start/end, position in screen percent, size, intensity, color, seed,
+Each cue has start/end, position in screen percent, size, intensity, rotation, color, seed,
 and optional sound/volume. These are canvas overlays in screen space, including
 in the 3D editor; they do not simulate volumetric particles or physical collisions.
 Absolute scene time and a fixed seed make scrubbing and exports repeatable.
@@ -50,10 +51,11 @@ MP4 download also retrieves the finalized file in this case.
 
 | Operation | Inputs and result |
 | --- | --- |
-| `scenes.effects.catalog` | Empty input; returns the 18 presets and coordinate system. |
-| `scenes.effects.showcase` | `dimension` 2d/3d, `sound`, optional native `document`. Returns the built-in template. Do not supply prompts or an effect list. |
+| `scenes.effects.catalog` | Empty input; returns the 30 presets and coordinate system. |
+| `scenes.effects.showcase` | `dimension` 2d/3d, `sound`, `collection` all/anime, optional native `document`. Returns the built-in template. Do not supply prompts or an effect list. |
 | `scenes.effects.apply` | Native `document`, `cues`, optional `replace`. Cue IDs upsert; repeats do not append duplicates. |
-| `scenes.speech.prepare` | Native `document`, exact `slot_id`, `clip_id`, `workspace`, existing `audio_filename`, literal `text`, scene `start`/`end`, source `offset`. Rhubarb analyzes up to 90 seconds and returns a scene with the intervention attached. |
+| `scenes.speech.capabilities` | Empty input; returns installed Rhubarb and optional local vocal-isolation availability without loading a model. |
+| `scenes.speech.prepare` | Native `document`, exact `slot_id`, `clip_id`, `workspace`, existing `audio_filename`, literal `text`, scene `start`/`end`, source `offset`, optional `isolate_vocals`. Rhubarb analyzes up to 90 seconds and returns a scene with the intervention attached. |
 
 These operations return a detached document, SHA-256, `state: prepared`,
 `saved: false`, and `exported: false`. They do not save over a project, generate
@@ -63,7 +65,7 @@ are rejected. The caller supplies the actual document and existing workspace
 filenames; remote/host audio paths are not accepted.
 
 Ask to the Wizard exposes these operations through `prepare_programmatic_video`
-with `scene_command`. Try: “Prepare the 2D SFX showcase with all 18 effects and
+with `scene_command`. Try: “Prepare the 2D SFX showcase with all 30 effects and
 sounds, and open the resulting scene.” The Wizard calls the same service,
 validates the result, and opens it in the corresponding editor. It keeps the
 returned document and a backup of the previous scene in session storage before
@@ -71,7 +73,7 @@ presentation; save/export remains explicit. A presentation failure reports an
 error and retains the prepared document instead of claiming a video was made.
 To attach speech through Wizard, supply the exact scene document and audio name.
 
-MCP exposes the four operation names directly; its `tools/call` arguments use
+MCP exposes the five operation names directly; its `tools/call` arguments use
 `{"version":1,"input":{...}}` (the tool name selects the operation). Preparation
 and Rhubarb run without an open browser. Rendering these scenes still uses the
 native editor; this slice does not implement a headless server renderer.
@@ -135,3 +137,33 @@ its shared operation and visible handoff were exercised independently. The
 settings test uses the built app origin; a Vite proxy with another Origin is
 rejected by the settings origin guard. Demo files and captures are local outputs,
 not Git content. Independent agent review is still a separate evidence state.
+
+
+## Optional vocal isolation
+
+In a character's lip controls, **Isolate vocals before calculating lips** enables
+CPU BS-RoFormer before Rhubarb. The source track, trim and scene clocks remain
+unchanged. Cues store `driver: rhubarb-vocals`; save/reopen preserves provenance.
+Only the already installed `audio-separator` package and
+`app/ckpts/roformer/model_bs_roformer_ep_317_sdr_12.9755.ckpt` with its matching
+`.yaml` are accepted. There is no automatic install, discovery or download.
+The worker blocks networking, uses two CPU threads and a single process at a time,
+with a 15-minute timeout and a 90-second input limit. Closing the UI discards its
+pending result; an admitted CPU analysis finishes or times out on the server.
+Missing dependencies and failed analysis are explicit errors; existing cues stay
+intact. HTTP uses `GET /api/v1/character-kits/speech/capabilities` and
+`POST /api/v1/character-kits/speech/analyze?isolate_vocals=true` (mono16k PCM WAV).
+Wizard `scenes.speech.prepare` and direct MCP use the same service/flag.
+Isolation reduces instrumental interference; phonetic cues still need review.
+
+## Native Video3D gallery
+
+**Save scene to gallery** writes a new immutable scene revision and PNG preview
+in the explicit current workspace. **Open scene** uses the shared full-screen
+resource picker and offers only native Video3D documents. Choose commits; Cancel,
+workspace changes and stale loads preserve the current scene. JSON import/export
+remains available. New `*.world3d.scene.json` outputs open in the 3D editor from
+the media gallery as well. Saving references uploads/workspace resources; it is
+not a portable asset package. The server rejects transient blob/file references.
+The native save endpoint is `POST /api/v1/scenes/world3d` with `document`, `name`,
+`workspace` and PNG data-URL `preview`. Existing 2D scene persistence is unchanged.

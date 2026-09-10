@@ -80,7 +80,8 @@
     "driver": {
       "imported": "Imported cues",
       "rhubarb": "Phonetic cues · Rhubarb",
-      "amplitude": "Volume-driven motion"
+      "amplitude": "Volume-driven motion",
+      "rhubarb-vocals": "Rhubarb · isolated vocals"
     },
     "amplitudeHint": "Volume only opens/closes the mouth: it does not recognize phonemes. Calculate Rhubarb cues for better results.",
     "start": "Scene start (s)",
@@ -141,7 +142,15 @@
     "pickLips": "Place with a click on the face",
     "pickHint": "Click the mouth on the selected subject. Escape cancels.",
     "pickMissed": "Click the selected model’s face, not the background.",
-    "cancelPlacement": "Cancel placement"
+    "cancelPlacement": "Cancel placement",
+    "isolation": {
+      "label": "Isolate vocals before calculating lips",
+      "loading": "Checking the optional local model…",
+      "ready": "Installed BS-RoFormer · CPU. Separates vocals for lip analysis only; original playback stays intact. Up to 90 seconds; processing can take several minutes. No downloads or cloud services.",
+      "missing": "Optional model unavailable. Requires installed audio-separator and the BS-RoFormer checkpoint plus YAML in app/ckpts/roformer. Nothing is downloaded automatically.",
+      "error": "Could not check the optional model.",
+      "retry": "Check again"
+    }
   },
   "title": "3D scene studio",
   "subtitle": "Choose a shot, place your objects and press Play.",
@@ -552,5 +561,16 @@
     "clockHelp": "Video follows the scene clock. Its audio is muted.",
     "remove": "Remove screen",
     "failed": "The screen could not load. Check the mesh and media file."
+  },
+  "library": {
+    "name": "Scene name",
+    "save": "Save scene to gallery",
+    "open": "Open scene",
+    "help": "Choose a saved Video3D scene. Choosing replaces the current shot; save it first to keep your edits. JSON import and export remain available.",
+    "saved": "Scene saved to this workspace. Open scene to load it again.",
+    "changed": "The scene changed while loading. Choose it again to replace the current scene.",
+    "previewUnavailable": "Wait for the 3D preview to load before saving.",
+    "saveFailed": "Could not save the scene.",
+    "cancelLoad": "Cancel loading"
   }
 }

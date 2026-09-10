@@ -5,6 +5,7 @@ export type SceneFx = {
   id: string; kind: string; label?: string; start: number; end: number
   x: number; y: number; size: number; intensity: number; color: string
   seed: number; sound: boolean; volume: number
+  rotation?: number
 }
 const number = (value: unknown, fallback: number, min: number, max: number) =>
   typeof value === 'number' && Number.isFinite(value) ? Math.max(min, Math.min(max, value)) : fallback
@@ -22,6 +23,7 @@ export function parseSceneFx(raw: unknown): SceneFx[] {
     ids.add(id)
     return [{ id, kind: preset.id, ...(typeof value.label === 'string' ? { label: value.label.slice(0, 80) } : {}), start, end, x: number(value.x, 50, 0, 100), y: number(value.y, 50, 0, 100),
       size: number(value.size, 65, 1, 200), intensity: number(value.intensity, 1, .1, 2),
+      rotation: number(value.rotation, 0, -180, 180),
       color: typeof value.color === 'string' && /^#[\da-f]{6}$/i.test(value.color) ? value.color : preset.color,
       seed: Math.round(number(value.seed, index + 1, 1, 1000000)), sound: value.sound === true,
       volume: number(value.volume, .25, 0, 1) }]
@@ -44,6 +46,7 @@ export const SCENE_FX_SCHEMA = {
       end: { type: 'number', minimum: 0, maximum: 600 }, x: { type: 'number', minimum: 0, maximum: 100 },
       y: { type: 'number', minimum: 0, maximum: 100 }, size: { type: 'number', minimum: 1, maximum: 200 },
       intensity: { type: 'number', minimum: .1, maximum: 2 }, color: { type: 'string', pattern: '^#[0-9a-fA-F]{6}$' },
+      rotation: { type: 'number', minimum: -180, maximum: 180 },
       seed: { type: 'integer', minimum: 1, maximum: 1000000 }, sound: { type: 'boolean' }, volume: { type: 'number', minimum: 0, maximum: 1 } },
     required: ['id', 'kind', 'start', 'end'] },
 } as const

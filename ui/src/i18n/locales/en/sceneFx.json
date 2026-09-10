@@ -1,6 +1,6 @@
 {
   "title": "Scene SFX",
-  "help": "Timed visual overlays for 2D and 3D. Optional procedural sounds are synthesized locally. The showcase extends this scene to 54 seconds and replaces its SFX; other content stays editable.",
+  "help": "Visual overlays for 2D and 3D with optional local sound. Demos replace SFX and extend duration: full collection 90 s; magic and anime 36 s. Actors, camera and audio are retained.",
   "effect": "Effect",
   "color": "Color",
   "sound": "Sound",
@@ -34,6 +34,20 @@
     "speedlines": "Speed Lines",
     "scanline": "Scanner",
     "aurora": "Aurora",
-    "laser": "Laser"
-  }
+    "laser": "Laser",
+    "magic_circle": "Arcane circle",
+    "arcane_missiles": "Arcane missiles",
+    "summoning_gate": "Summoning gate",
+    "black_hole": "Black hole",
+    "ice_burst": "Ice burst",
+    "meteor_shower": "Meteor shower",
+    "lightning_storm": "Lightning storm",
+    "anime_aura": "Anime power aura",
+    "energy_orb": "Energy orb",
+    "energy_beam": "Energy beam",
+    "sword_slash": "Sword slash",
+    "manga_impact": "Manga impact"
+  },
+  "rotation": "Rotation (°)",
+  "animeShowcase": "Apply magic and anime demo"
 }

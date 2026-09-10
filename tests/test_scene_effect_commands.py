@@ -23,8 +23,8 @@ def showcase(service, dimension='3d'):
 def test_both_templates_use_all_catalog_effects_and_are_replayable(service):
     for dimension in ('2d', '3d'):
         doc = showcase(service, dimension)
-        assert doc['duration'] == 54
-        assert len(doc['sfx']) == 18
+        assert doc['duration'] == 90
+        assert len(doc['sfx']) == 30
         assert all(cue['sound'] and cue['label'] for cue in doc['sfx'])
         assert doc == showcase(service, dimension)
         assert ('slots' in doc) == (dimension == '3d')
@@ -39,7 +39,7 @@ def test_apply_replaces_exact_cue_preserving_scene_and_caller(service):
     assert original == before
     assert first == service.execute(command)
     actual = first['result']['document']
-    assert len(actual['sfx']) == 18
+    assert len(actual['sfx']) == 30
     assert actual['sfx'][3] == cue
     assert actual['slots'] == original['slots']
     assert not first['result']['saved'] and not first['result']['exported']
@@ -68,7 +68,7 @@ def test_http_and_mcp_return_identical_documents_without_browser(service, tmp_pa
     assert not mcp.json()['result']['isError']
     assert mcp.json()['result']['structuredContent'] == http.json()
     schema = client.get('/api/v1/scenes/commands').json()
-    assert len(schema['operations']) == 4
+    assert len(schema['operations']) == 5
 
 
 def test_speech_rejects_paths_and_unknown_character_before_analysis(service):
@@ -85,7 +85,7 @@ def test_speech_rejects_paths_and_unknown_character_before_analysis(service):
 
 def test_shared_catalog_remains_a_packaged_resource():
     path = Path(__file__).parents[1] / 'app/shared/scene_effects.json'
-    assert len(json.loads(path.read_text())) == 18
+    assert len(json.loads(path.read_text())) == 30
 
 
 def test_speech_append_preserves_previous_voice_and_rejects_overlap():
@@ -98,3 +98,12 @@ def test_speech_append_preserves_previous_voice_and_rejects_overlap():
     with pytest.raises(ValueError, match='overlap'):
         with_speech_clip(original, {**clip, 'start': 1}, 6)
     assert 'clips' not in original
+
+
+def test_anime_showcase_uses_36_seconds_and_preserves_longer_authored_scenes(service):
+    command = {'version': 1, 'operation': 'scenes.effects.showcase', 'input': {'collection': 'anime'}}
+    scene = service.execute(command)['result']['document']
+    assert scene['duration'] == 36 and len(scene['sfx']) == 12
+    scene['duration'] = 72
+    command['input']['document'] = scene
+    assert service.execute(command)['result']['document']['duration'] == 72

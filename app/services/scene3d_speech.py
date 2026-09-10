@@ -47,7 +47,7 @@ def validate_voice_wav(data: bytes) -> float:
         raise SpeechAnalysisError("Invalid PCM WAV.") from exc
 
 
-def analyze_voice(data: bytes) -> dict:
+def analyze_voice(data: bytes, isolate_vocals: bool = False) -> dict:
     duration = validate_voice_wav(data)
     executable = rhubarb_executable()
     if not executable:
@@ -55,6 +55,9 @@ def analyze_voice(data: bytes) -> dict:
     if not _LOCK.acquire(blocking=False):
         raise SpeechAnalysisUnavailable("Another local speech analysis is running. Try again shortly.")
     try:
+        if isolate_vocals:
+            from services.vocal_isolation import isolate_voice
+            data = isolate_voice(data)
         # Keep diagnostic files: never delete user audio or imported assets.
         folder = Path(tempfile.mkdtemp(prefix="hocuspocus-speech-"))
         source, output = folder / "voice.wav", folder / "cues.json"
@@ -83,6 +86,7 @@ def analyze_voice(data: bytes) -> dict:
                 previous = end
         except (KeyError, ValueError, TypeError, OSError) as exc:
             raise SpeechAnalysisUnavailable("Local speech analysis produced invalid cues.") from exc
-        return {"mouthCues": cues, "recognizer": "phonetic", "duration": duration}
+        return {"mouthCues": cues, "recognizer": "phonetic", "duration": duration,
+                "analysisSource": "isolated-vocals" if isolate_vocals else "original"}
     finally:
         _LOCK.release()

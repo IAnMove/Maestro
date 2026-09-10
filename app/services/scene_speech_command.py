@@ -40,11 +40,11 @@ def prepare_speech(value, workspace_dir):
     data = io.BytesIO()
     with wave.open(data, 'wb') as output:
         output.setnchannels(1); output.setsampwidth(2); output.setframerate(16000); output.writeframes(pcm)
-    analysis = analyze_voice(data.getvalue())
+    analysis = analyze_voice(data.getvalue(), isolate_vocals=value.isolate_vocals)
     reference = {'workspaceId': value.workspace, 'filename': value.audio_filename,
                  'url': f'/api/v1/file/{quote(value.audio_filename, safe="")}?workspace={quote(value.workspace, safe="")}'}
     clip = {'id': value.clip_id, 'text': value.text, 'start': value.start, 'end': value.end, 'offset': value.offset,
-            'gain': 1, 'audible': True, 'audio': reference, 'driver': 'rhubarb',
+            'gain': 1, 'audible': True, 'audio': reference, 'driver': 'rhubarb-vocals' if value.isolate_vocals else 'rhubarb',
             'cues': [{'start': cue['start'] + value.offset, 'end': cue['end'] + value.offset,
                       'viseme': VISEMES[cue['value']]} for cue in analysis['mouthCues']]}
     slot = matches[0]

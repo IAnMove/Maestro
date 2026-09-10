@@ -1,6 +1,6 @@
 {
   "title": "Efectos SFX",
-  "help": "Efectos visuales sobre el encuadre 2D y 3D. Los sonidos opcionales se sintetizan localmente. La plantilla amplía la escena a 54 segundos y sustituye sus SFX; el resto del contenido sigue siendo editable.",
+  "help": "Efectos visuales sobre el encuadre 2D y 3D, con sonido local opcional. Las demos sustituyen los SFX y amplían la duración: colección completa 90 s; magia y anime 36 s. Conservan los actores, la cámara y el audio.",
   "effect": "Efecto",
   "color": "Color",
   "sound": "Sonido",
@@ -34,6 +34,20 @@
     "speedlines": "Líneas de velocidad",
     "scanline": "Escáner",
     "aurora": "Aurora",
-    "laser": "Láser"
-  }
+    "laser": "Láser",
+    "magic_circle": "Círculo arcano",
+    "arcane_missiles": "Proyectiles mágicos",
+    "summoning_gate": "Portal de invocación",
+    "black_hole": "Agujero negro",
+    "ice_burst": "Estallido de hielo",
+    "meteor_shower": "Lluvia de meteoros",
+    "lightning_storm": "Tormenta de rayos",
+    "anime_aura": "Aura de poder anime",
+    "energy_orb": "Esfera de energía",
+    "energy_beam": "Rayo de energía",
+    "sword_slash": "Corte de espada",
+    "manga_impact": "Impacto manga"
+  },
+  "rotation": "Rotación (°)",
+  "animeShowcase": "Aplicar demo magia y anime"
 }

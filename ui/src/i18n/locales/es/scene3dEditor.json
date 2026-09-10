@@ -80,7 +80,8 @@
     "driver": {
       "imported": "Gestos importados",
       "rhubarb": "Gestos fonéticos · Rhubarb",
-      "amplitude": "Movimiento por volumen"
+      "amplitude": "Movimiento por volumen",
+      "rhubarb-vocals": "Rhubarb · voz aislada"
     },
     "amplitudeHint": "El volumen solo abre/cierra la boca: no reconoce fonemas. Calcula gestos con Rhubarb para mejorar el resultado.",
     "start": "Inicio en escena (s)",
@@ -141,7 +142,15 @@
     "pickLips": "Colocar con un clic sobre la cara",
     "pickHint": "Haz clic en la boca del sujeto seleccionado. Escape cancela.",
     "pickMissed": "Haz clic en la cara del modelo seleccionado, no en el fondo.",
-    "cancelPlacement": "Cancelar colocación"
+    "cancelPlacement": "Cancelar colocación",
+    "isolation": {
+      "label": "Aislar voz antes de calcular labios",
+      "loading": "Comprobando el modelo local opcional…",
+      "ready": "BS-RoFormer instalado · CPU. Separa la voz solo para analizar los labios; conserva el audio original al reproducir. Hasta 90 segundos; puede tardar varios minutos. Sin descargas ni servicios externos.",
+      "missing": "Modelo opcional no disponible. Necesita audio-separator instalado y el checkpoint BS-RoFormer con su YAML en app/ckpts/roformer. No se descarga nada automáticamente.",
+      "error": "No se pudo comprobar el modelo opcional.",
+      "retry": "Comprobar de nuevo"
+    }
   },
   "title": "Estudio de escenas 3D",
   "subtitle": "Elige un plano, coloca tus objetos y pulsa Reproducir.",
@@ -552,5 +561,16 @@
     "clockHelp": "El vídeo sigue el tiempo de la escena. Su audio está silenciado.",
     "remove": "Quitar pantalla",
     "failed": "No se pudo cargar la pantalla. Comprueba la malla y el archivo."
+  },
+  "library": {
+    "name": "Nombre de la escena",
+    "save": "Guardar escena en galería",
+    "open": "Abrir escena",
+    "help": "Elige una escena de Vídeo 3D guardada. Al elegir reemplazas el plano actual; guárdalo antes para conservar tus cambios. También puedes importar y exportar JSON.",
+    "saved": "Escena guardada en esta carpeta. Usa Abrir escena para recuperarla.",
+    "changed": "La escena cambió mientras se cargaba. Vuelve a elegirla para reemplazar la actual.",
+    "previewUnavailable": "Espera a que cargue la vista 3D antes de guardar.",
+    "saveFailed": "No se pudo guardar la escena.",
+    "cancelLoad": "Cancelar carga"
   }
 }

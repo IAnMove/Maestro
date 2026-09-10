@@ -7,8 +7,9 @@ Es una fotografía con evidencia, no un sustituto de Git. Antes de reservar trab
 ## SFX, habla y MCP — 10 septiembre 2026
 
 PR **#299** (draft hacia development), base integrada `729f784c`. Contrato:
-[SCENE_EFFECTS_AND_MCP](SCENE_EFFECTS_AND_MCP.md). 18 efectos compartidos y
-plantillas 2D/3D, preparación de voces con Rhubarb y configuración MCP.
+[SCENE_EFFECTS_AND_MCP](SCENE_EFFECTS_AND_MCP.md). 30 efectos compartidos y
+plantillas 2D/3D, galería de escenas nativas, voces con Rhubarb y separación
+local opcional mediante BS-RoFormer instalado. Configuración MCP y operaciones compartidas.
 Tres MP4 reales validados; la preparación MCP no equivale a render en servidor.
 Ampliación de labios: controles por sujeto, colocación mediante clic, micrófono
 y ejemplo inglés. Corregida conversión de coordenadas de piel animada. Contrato

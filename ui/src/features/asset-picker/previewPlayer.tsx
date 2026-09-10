@@ -49,6 +49,11 @@ export function AssetPreviewPlayer({ item }: { item: PickerItem }) {
   if (failed) {
     return <p className="p-2 text-center text-[10px] text-text-muted">{t('explorer.previewFailed')}</p>
   }
+  if (item.kind === 'scene') {
+    return item.thumbnailUrl
+      ? <img src={item.thumbnailUrl} alt={t('explorer.previewAria', { name: item.filename })} className="h-full w-full object-contain" onError={() => setFailed(true)} />
+      : <p className="p-2 text-center text-[10px] text-text-muted">{t('explorer.selectHint')}</p>
+  }
   if (item.kind === 'image') {
     return <img src={item.url} alt={t('explorer.previewAria', { name: item.filename })} className="h-full w-full object-contain" onError={() => setFailed(true)} />
   }
