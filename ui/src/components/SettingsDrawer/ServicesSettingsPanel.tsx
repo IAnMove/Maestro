@@ -1,41 +1,11 @@
 import { lazy, Suspense, useState, useCallback, useEffect, useRef } from 'react'
 import { RefreshCw, ShieldAlert, ShieldCheck, Lock, Loader2 } from 'lucide-react'
 import { useUiTranslation } from '../../i18n'
-import { useStore, getFamiliesForMode } from '../../stores/useStore'
+import { useStore } from '../../stores/useStore'
 import { testLlmConnection } from '../../api/client'
-import {
-  HUNYUAN3D_PROFILE_MODELS,
-  MINIMAX_IMAGE_MODELS,
-  MINIMAX_MUSIC_MODELS,
-  downloadedModelOptions,
-  keepCurrentOption,
-  textModelOptions,
-} from '../../lib/productionProfileCatalog'
 
 const McpSettingsPanel = lazy(() => import('./McpSettingsPanel').then(module => ({ default: module.McpSettingsPanel })))
-
-function CatalogSelect({
-  value, options, disabled, onChange, emptyLabel,
-}: {
-  value: string
-  options: { id: string; label: string }[]
-  disabled?: boolean
-  onChange: (value: string) => void
-  emptyLabel?: string
-}) {
-  const listed = keepCurrentOption(options, value)
-  return (
-    <select
-      value={value}
-      disabled={disabled || listed.length === 0}
-      onChange={e => onChange(e.target.value)}
-      className="mt-1 w-full min-w-0 flex-1 bg-bg-tertiary border border-border rounded-lg px-2 py-1.5 text-xs text-text-primary"
-    >
-      {listed.length === 0 && <option value="">{emptyLabel || '—'}</option>}
-      {listed.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}
-    </select>
-  )
-}
+const ProductionProfileSettings = lazy(() => import('./ProductionProfileSettings').then(module => ({ default: module.ProductionProfileSettings })))
 
 function ApiKeyField({ label, maskedValue, isSet, onSave }: {
   label: string
@@ -300,17 +270,11 @@ export function ServicesSettingsPanel() {
   const servicesConfig = useStore(s => s.servicesConfig)
   const servicesConfigLoading = useStore(s => s.servicesConfigLoading)
   const updateConfig = useStore(s => s.updateServicesConfig)
-  const savedProductionProfile = useStore(s => s.productionProfile)
-  const productionProfileConfigured = useStore(s => s.productionProfileConfigured)
-  const productionProfileLoading = useStore(s => s.productionProfileLoading)
-  const updateProductionProfile = useStore(s => s.updateProductionProfile)
   const systemConfig = useStore(s => s.systemConfig)
   const updateSystemConfig = useStore(s => s.updateSystemConfig)
   const llmStatus = useStore(s => s.llmStatus)
   const llmModels = useStore(s => s.llmModels)
   const loadLlmModels = useStore(s => s.loadLlmModels)
-  const installedModels = useStore(s => s.models)
-  const families = useStore(s => s.families)
   const [refreshing, setRefreshing] = useState(false)
   const [llmTest, setLlmTest] = useState<{ status: 'idle' | 'testing' | 'ok' | 'error'; message: string }>({
     status: 'idle',
@@ -318,8 +282,6 @@ export function ServicesSettingsPanel() {
   })
   const pendingLlmConfig = useRef<Promise<void>>(Promise.resolve())
   const [llmConfigSaving, setLlmConfigSaving] = useState(false)
-  const [productionProfileDraft, setProductionProfile] = useState<typeof savedProductionProfile | null>(null)
-  const productionProfile = productionProfileDraft ?? savedProductionProfile
   if (servicesConfigLoading && !servicesConfig) {
     return <div className="text-xs text-text-muted py-4 text-center">{tCommon('status.loading')}</div>
   }
@@ -336,14 +298,14 @@ export function ServicesSettingsPanel() {
   const isLocal = provider === 'local'
   const needsUrl = isRemote || isOllama || isOpenAI || isMiniMax || isGrok
 
-  const handleRefreshModels = async (providerOverride?: string, urlOverride?: string) => {
+  const handleRefreshModels = async () => {
     setRefreshing(true)
     try {
       await pendingLlmConfig.current
       const latest = useStore.getState().servicesConfig
       await loadLlmModels({
-        provider: providerOverride || latest?.llm_provider || provider,
-        url: urlOverride || latest?.llm_remote_url,
+        provider: latest?.llm_provider || provider,
+        url: latest?.llm_remote_url,
       })
     } finally {
       setRefreshing(false)
@@ -395,283 +357,7 @@ export function ServicesSettingsPanel() {
 
       {/* LLM Provider */}
       <div className="space-y-4">
-        <div className="space-y-3 rounded-xl border border-border bg-bg-secondary/40 p-3">
-          <div>
-            <h3 className="text-[11px] text-text-secondary uppercase tracking-wider font-medium">
-              {t('services.profileTitle')}
-            </h3>
-            <p className="text-[10px] text-text-muted mt-1">
-              {t('services.profileHint')}
-            </p>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <label className="text-[10px] text-text-muted">
-              {t('services.textProvider')}
-              <select
-                value={productionProfile.text.provider}
-                onChange={e => setProductionProfile({
-                  ...productionProfile,
-                  text: {
-                    ...productionProfile.text,
-                    provider: e.target.value as typeof productionProfile.text.provider,
-                    base_url: e.target.value === 'ollama'
-                      ? (productionProfile.text.base_url || 'http://127.0.0.1:11434')
-                      : e.target.value === 'grok'
-                        ? 'https://api.x.ai'
-                        : e.target.value === 'minimax'
-                          ? 'https://api.minimax.io'
-                          : productionProfile.text.base_url,
-                  },
-                })}
-                disabled={productionProfileLoading}
-                className="mt-1 w-full bg-bg-tertiary border border-border rounded-lg px-2 py-1.5 text-xs text-text-primary"
-              >
-                <option value="local">{t('services.providers.local')}</option>
-                <option value="ollama">{t('services.providers.ollama')}</option>
-                <option value="minimax">{t('services.providers.minimax')}</option>
-                <option value="grok">{t('services.providers.grok')}</option>
-                <option value="remote">{t('services.providers.remote')}</option>
-                <option value="openai">{t('services.providers.openai')}</option>
-                <option value="anthropic">{t('services.providers.anthropic')}</option>
-                <option value="deepseek">{t('services.providers.deepseek')}</option>
-              </select>
-            </label>
-            <label className="text-[10px] text-text-muted">
-              {t('services.textModel')}
-              <CatalogSelect
-                value={productionProfile.text.model}
-                options={textModelOptions(llmModels, productionProfile.text.provider, productionProfile.text.model)}
-                disabled={productionProfileLoading}
-                emptyLabel={t('services.noRemoteModels')}
-                onChange={value => setProductionProfile({
-                  ...productionProfile,
-                  text: { ...productionProfile.text, model: value },
-                })}
-              />
-            </label>
-            {(productionProfile.text.provider === 'ollama' || productionProfile.text.provider === 'remote') && (
-              <label className="col-span-2 text-[10px] text-text-muted">
-                {t('services.textServerUrl')}
-                <div className="mt-1 flex gap-1">
-                  <input
-                    value={productionProfile.text.base_url || ''}
-                    onChange={e => setProductionProfile({
-                      ...productionProfile,
-                      text: { ...productionProfile.text, base_url: e.target.value },
-                    })}
-                    placeholder="http://192.168.1.10:11434"
-                    disabled={productionProfileLoading}
-                    className="min-w-0 flex-1 bg-bg-tertiary border border-border rounded-lg px-2 py-1.5 text-xs text-text-primary"
-                  />
-                  <button
-                    type="button"
-                    disabled={productionProfileLoading || refreshing}
-                    onClick={() => void handleRefreshModels(productionProfile.text.provider, productionProfile.text.base_url)}
-                    className="shrink-0 rounded-lg border border-border px-2 text-[10px] text-accent-blue disabled:opacity-50"
-                  >
-                    {refreshing ? t('services.loadingRemoteModels') : t('services.loadRemoteModels')}
-                  </button>
-                </div>
-              </label>
-            )}
-            <label className="text-[10px] text-text-muted">
-              {t('services.imageProviderModel')}
-              <div className="mt-1 flex gap-1">
-                <select
-                  value={productionProfile.image.provider}
-                  onChange={e => setProductionProfile({
-                    ...productionProfile,
-                    image: { ...productionProfile.image, provider: e.target.value as typeof productionProfile.image.provider },
-                  })}
-                  disabled={productionProfileLoading}
-                  className="w-2/5 bg-bg-tertiary border border-border rounded-lg px-2 py-1.5 text-xs text-text-primary"
-                >
-                  <option value="minimax">{t('services.providers.minimaxImage')}</option>
-                  <option value="local">{t('services.providers.localGeneric')}</option>
-                  <option value="maestro">{t('services.providers.maestro')}</option>
-                </select>
-                <CatalogSelect
-                  value={productionProfile.image.model}
-                  options={productionProfile.image.provider === 'minimax'
-                    ? MINIMAX_IMAGE_MODELS
-                    : downloadedModelOptions(installedModels, getFamiliesForMode('image', families).map(family => family.id))}
-                  disabled={productionProfileLoading}
-                  onChange={value => setProductionProfile({
-                    ...productionProfile,
-                    image: { ...productionProfile.image, model: value },
-                  })}
-                />
-              </div>
-            </label>
-            <label className="text-[10px] text-text-muted">
-              {t('services.musicProviderModel')}
-              <div className="mt-1 flex gap-1">
-                <select
-                  value={productionProfile.music.provider}
-                  onChange={e => setProductionProfile({
-                    ...productionProfile,
-                    music: {
-                      ...productionProfile.music,
-                      provider: e.target.value as typeof productionProfile.music.provider,
-                      model: e.target.value === 'minimax' ? 'music-3.0' : 'ace_step_v1_5_xl_sft_lm_4b',
-                    },
-                  })}
-                  disabled={productionProfileLoading}
-                  className="w-2/5 bg-bg-tertiary border border-border rounded-lg px-2 py-1.5 text-xs text-text-primary"
-                >
-                  <option value="local">{t('services.providers.aceLocal')}</option>
-                  <option value="minimax">{t('services.providers.minimaxMusic')}</option>
-                  <option value="maestro">{t('services.providers.maestro')}</option>
-                </select>
-                <CatalogSelect
-                  value={productionProfile.music.model}
-                  options={productionProfile.music.provider === 'minimax'
-                    ? MINIMAX_MUSIC_MODELS
-                    : downloadedModelOptions(installedModels, ['tts']).filter(option =>
-                      option.id.startsWith('ace_step') || option.id.startsWith('heartmula') || option.id === 'minimax_music3')}
-                  disabled={productionProfileLoading}
-                  onChange={value => setProductionProfile({
-                    ...productionProfile,
-                    music: { ...productionProfile.music, model: value },
-                  })}
-                />
-              </div>
-              {productionProfile.music.provider === 'minimax' && (
-                <p className="mt-1 text-[10px] text-amber-300">{t('services.minimaxMusicWarn')}</p>
-              )}
-            </label>
-            <label className="text-[10px] text-text-muted">
-              {t('services.model3dProviderModel')}
-              <div className="mt-1 flex gap-1">
-                <select
-                  value={productionProfile.model3d?.provider || 'local'}
-                  onChange={e => setProductionProfile({
-                    ...productionProfile,
-                    model3d: {
-                      ...(productionProfile.model3d || { provider: 'local', model: 'hunyuan3d-2mini-turbo' }),
-                      provider: e.target.value as NonNullable<typeof productionProfile.model3d>['provider'],
-                    },
-                  })}
-                  disabled={productionProfileLoading}
-                  className="w-2/5 bg-bg-tertiary border border-border rounded-lg px-2 py-1.5 text-xs text-text-primary"
-                >
-                  <option value="local">{t('services.providers.hunyuanLocal')}</option>
-                  <option value="meshy">{t('services.providers.meshy')}</option>
-                  <option value="hi3d">{t('services.providers.hi3d')}</option>
-                </select>
-                <CatalogSelect
-                  value={productionProfile.model3d?.model || 'hunyuan3d-2mini-turbo'}
-                  options={(() => {
-                    const local = downloadedModelOptions(installedModels, getFamiliesForMode('model3d', families).map(family => family.id))
-                    return local.length ? local : HUNYUAN3D_PROFILE_MODELS
-                  })()}
-                  disabled={productionProfileLoading}
-                  onChange={value => setProductionProfile({
-                    ...productionProfile,
-                    model3d: {
-                      ...(productionProfile.model3d || { provider: 'local', model: 'hunyuan3d-2mini-turbo' }),
-                      model: value,
-                    },
-                  })}
-                />
-              </div>
-            </label>
-          </div>
-          <label className="text-[10px] text-text-muted block">
-            {t('services.videoModel')}
-            <CatalogSelect
-              value={productionProfile.video.model}
-              options={downloadedModelOptions(installedModels, getFamiliesForMode('video', families).map(family => family.id))}
-              disabled={productionProfileLoading}
-              onChange={value => setProductionProfile({
-                ...productionProfile,
-                video: { ...productionProfile.video, model: value },
-              })}
-            />
-          </label>
-          <div className="grid grid-cols-4 gap-2">
-            <label className="text-[10px] text-text-muted">
-              {t('services.resolution')}
-              <select
-                value={productionProfile.video.settings.resolution}
-                onChange={e => setProductionProfile({
-                  ...productionProfile,
-                  video: { ...productionProfile.video, settings: { ...productionProfile.video.settings, resolution: e.target.value as typeof productionProfile.video.settings.resolution } },
-                })}
-                disabled={productionProfileLoading}
-                className="mt-1 w-full bg-bg-tertiary border border-border rounded-lg px-2 py-1.5 text-xs text-text-primary"
-              >
-                {['480p', '540p', '720p', '768p', '1080p'].map(value => <option key={value}>{value}</option>)}
-              </select>
-            </label>
-            <label className="text-[10px] text-text-muted">
-              {t('services.canvas')}
-              <select
-                value={productionProfile.video.settings.aspectRatio}
-                onChange={e => setProductionProfile({
-                  ...productionProfile,
-                  video: { ...productionProfile.video, settings: { ...productionProfile.video.settings, aspectRatio: e.target.value as typeof productionProfile.video.settings.aspectRatio } },
-                })}
-                disabled={productionProfileLoading}
-                className="mt-1 w-full bg-bg-tertiary border border-border rounded-lg px-2 py-1.5 text-xs text-text-primary"
-              >
-                {['16:9', '9:16', '1:1', '4:3', '3:4'].map(value => <option key={value}>{value}</option>)}
-              </select>
-            </label>
-            <label className="text-[10px] text-text-muted">
-              {t('services.steps')}
-              <input
-                type="number"
-                value={productionProfile.video.settings.steps}
-                onChange={e => setProductionProfile({
-                  ...productionProfile,
-                  video: { ...productionProfile.video, settings: { ...productionProfile.video.settings, steps: Number(e.target.value) } },
-                })}
-                disabled={productionProfileLoading}
-                className="mt-1 w-full bg-bg-tertiary border border-border rounded-lg px-2 py-1.5 text-xs text-text-primary"
-              />
-            </label>
-            <label className="text-[10px] text-text-muted">
-              {t('services.flowAudioShift')}
-              <div className="mt-1 flex gap-1">
-                <input
-                  type="number"
-                  value={productionProfile.video.settings.flowShift}
-                  onChange={e => setProductionProfile({
-                    ...productionProfile,
-                    video: { ...productionProfile.video, settings: { ...productionProfile.video.settings, flowShift: Number(e.target.value) } },
-                  })}
-                  disabled={productionProfileLoading}
-                  className="min-w-0 w-1/2 bg-bg-tertiary border border-border rounded-lg px-2 py-1.5 text-xs text-text-primary"
-                />
-                <input
-                  type="number"
-                  value={productionProfile.video.settings.audioShift}
-                  onChange={e => setProductionProfile({
-                    ...productionProfile,
-                    video: { ...productionProfile.video, settings: { ...productionProfile.video.settings, audioShift: Number(e.target.value) } },
-                  })}
-                  disabled={productionProfileLoading}
-                  className="min-w-0 w-1/2 bg-bg-tertiary border border-border rounded-lg px-2 py-1.5 text-xs text-text-primary"
-                />
-              </div>
-            </label>
-          </div>
-          <p className="text-[10px] text-text-muted">
-            {productionProfileConfigured ? t('services.profileSaved') : t('services.profileDefaults')}
-            {' '}{t('services.profileSizeHint')}
-          </p>
-          <div className="flex justify-end">
-            <button
-              type="button"
-              disabled={productionProfileLoading || JSON.stringify(productionProfile) === JSON.stringify(savedProductionProfile)}
-              onClick={() => void updateProductionProfile(productionProfile).then(() => setProductionProfile(null))}
-              className="rounded-lg bg-accent-blue px-3 py-1.5 text-xs text-white disabled:opacity-40"
-            >
-              {productionProfileLoading ? t('services.saving') : t('services.saveProfile')}
-            </button>
-          </div>
-        </div>
+        <Suspense fallback={null}><ProductionProfileSettings /></Suspense>
         <h3 className="text-[11px] text-text-secondary uppercase tracking-wider font-medium">{t('services.llmTitle')}</h3>
 
         <div className="flex items-center justify-between">
