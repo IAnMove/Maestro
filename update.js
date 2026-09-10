@@ -1,4 +1,5 @@
 const vendors = require("./vendor_revisions")
+const hunyuanNative = require("./hunyuan_native")
 const hunyuan3d2 = vendors.hunyuan3d2
 const hunyuan3d21 = vendors.hunyuan3d21
 const sam3 = vendors.sam3
@@ -261,48 +262,9 @@ module.exports = {
     params: {
       path: "app/services/hunyuan3d/vendor/Hunyuan3D-2/hy3dgen/texgen/custom_rasterizer/app"
     }
-  }, {
-    method: "shell.run",
-    params: {
-      conda: { path: "../../../../../env", python: "3.10" },
-      env: {
-        CUDA_HOME: "{{path.resolve(path.dirname(which('nvcc')), '..')}}",
-        CPATH: "{{path.resolve(path.dirname(which('nvcc')), '../targets/x86_64-linux/include')}}",
-        LIBRARY_PATH: "{{path.resolve(path.dirname(which('nvcc')), '../targets/x86_64-linux/lib')}}",
-        LD_LIBRARY_PATH: "{{path.resolve(path.dirname(which('nvcc')), '../targets/x86_64-linux/lib')}}"
-      },
-      path: "app/services/hunyuan3d/vendor/Hunyuan3D-2/hy3dgen/texgen/custom_rasterizer",
-      message: "uv pip install --no-build-isolation -e ."
-    }
-  }, {
-    method: "shell.run",
-    params: {
-      conda: { path: "../../../../../env", python: "3.10" },
-      path: "app/services/hunyuan3d/vendor/Hunyuan3D-2/hy3dgen/texgen/differentiable_renderer",
-      message: "uv pip install --no-build-isolation -e ."
-    }
-  }, {
-    method: "shell.run",
-    params: {
-      conda: { path: "../../../../env", python: "3.10" },
-      env: {
-        CUDA_HOME: "{{path.resolve(path.dirname(which('nvcc')), '..')}}",
-        CPATH: "{{path.resolve(path.dirname(which('nvcc')), '../targets/x86_64-linux/include')}}",
-        LIBRARY_PATH: "{{path.resolve(path.dirname(which('nvcc')), '../targets/x86_64-linux/lib')}}",
-        LD_LIBRARY_PATH: "{{path.resolve(path.dirname(which('nvcc')), '../targets/x86_64-linux/lib')}}"
-      },
-      path: "app/services/hunyuan3d/vendor/Hunyuan3D-2.1/hy3dpaint/custom_rasterizer",
-      message: "uv pip install --no-build-isolation -e ."
-    }
-  }, {
-    method: "shell.run",
-    params: {
-      conda: { path: "../../../../env", python: "3.10" },
-      shell: "{{which('bash')}}",
-      path: "app/services/hunyuan3d/vendor/Hunyuan3D-2.1/hy3dpaint/DifferentiableRenderer",
-      message: "bash compile_mesh_painter.sh"
-    }
-  }, {
+  },
+  ...hunyuanNative.nativeBuildSteps(),
+  {
     when: "{{!exists('app/services/hunyuan3d/vendor/Hunyuan3D-2.1/hy3dpaint/ckpt/RealESRGAN_x4plus.pth')}}",
     method: "fs.download",
     params: {
