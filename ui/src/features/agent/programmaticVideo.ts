@@ -47,7 +47,15 @@ export function reconcileProgrammaticVideoRequest(request: string, turn: AgentTu
   if (QUESTION.test(value) || !clauses(value).some(part => !NEGATED_COMMAND.test(part) && REQUEST.test(part))) {
     return { ...turn, reply: 'Puedes pedir: «Monta una escena con Video3D, sólo con mis assets, sin vídeo generativo». El Wizard prepara el formulario visible; desde allí revisas los recursos, montas la escena y la exportas. No se lanza ningún generador al preparar.', actions: [] }
   }
-  if (turn.actions.some(action => action.type === 'prepare_programmatic_video' && action.sceneCommand)) return turn
+  const prepared = turn.actions.find(action => action.type === 'prepare_programmatic_video' && action.sceneCommand)
+  if (prepared?.type === 'prepare_programmatic_video') {
+    // Keep the exact shared command, but never a guessed Studio/Director GPU fallback.
+    return {
+      ...turn,
+      reply: 'Preparo Video3D con tu petición literal y sin vídeo generativo. No crearé recursos nuevos salvo permiso explícito. Revisa los assets y la receta en el formulario antes de montar o exportar; todavía no hay un vídeo terminado.',
+      actions: [prepared],
+    }
+  }
   const rhythmic = turn.actions.find(action => action.type === 'create_rhythmic_3d_video')
   const asksForSong = clauses(value).some(part => !NEGATED_COMMAND.test(part) && /\b(?:crea|genera|haz|create|generate|make)\s+(?:una?\s+|a\s+)?(?:cancion|musica|song|music)\b/.test(part))
   if (rhythmic?.type === 'create_rhythmic_3d_video' && (rhythmic.audioOutputName || (asksForSong && !PROVIDED.test(value)))) {
