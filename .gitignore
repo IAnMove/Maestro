@@ -137,3 +137,7 @@ app/wgp_config.json.bak
 # Runtime detection and verified local installation receipts
 app/.runtime/
 app/services/rigging/env/
+
+# UI compilation staging and last-good backup (never source or model data).
+/ui/.hocus-ui-*/
+/ui/.hocus-ui-*.lock

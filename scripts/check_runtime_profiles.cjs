@@ -49,7 +49,7 @@ for (const input of [undefined, null, {}, {success: false}]) {
   assert.equal(guard.next, null)
 }
 assert.equal(render(guard.when, {input: {success: true}}), 'false')
-for (const filename of ['torch', 'runtime_setup', 'sam_install', 'rigging_install']) {
+for (const filename of ['torch', 'runtime_setup', 'sam_install', 'rigging_install', 'ui_build']) {
   const final = require(`../${filename}.js`).run.at(-1)
   assert.equal(final.method, 'script.return')
   assert.equal(final.params.success, true)
@@ -72,3 +72,20 @@ for (const exitCode of [0, 7]) {
   assert.equal(output.includes('Error: HOCUS_RUNTIME_FAILED'), exitCode !== 0, output)
 }
 console.log('Runtime profile launcher execution contract: PASS')
+
+async function checkUiLaunchers() {
+  for (const plan of [require('../runtime_setup'), await require('../start')({port: async () => 7860})]) {
+    assert.equal(plan.run[0].method, 'script.start')
+    assert.equal(plan.run[0].params.uri, 'ui_build.js')
+    assert.equal(plan.run[1].next, null, 'A failed UI child must stop setup/start')
+  }
+  const menu = require('../pinokio').menu
+  const info = {exists: () => true, running: () => false, local: () => ({})}
+  const repair = (await menu({}, info)).find(item => item.href === 'ui_build.js')
+  assert.equal(repair.params.force, true)
+  const busy = await menu({}, {...info, running: name => name === 'ui_build.js'})
+  assert.equal(busy[0].href, 'ui_build.js')
+  assert.equal(busy[0].default, true)
+  console.log('React repair/start/menu contract: PASS')
+}
+checkUiLaunchers().catch(error => { console.error(error); process.exitCode = 1 })

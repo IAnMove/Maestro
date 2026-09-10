@@ -63,6 +63,8 @@ def run_server() -> None:
         app_dir = _app_directory()
         if app_dir not in sys.path:
             sys.path.insert(0, app_dir)
+        from services.ui_distribution import report_identity
+        report_identity()
         runpy.run_module("_launch_runtime", run_name="__main__")
     finally:
         sys.path[:] = previous_path
