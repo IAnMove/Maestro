@@ -3,7 +3,10 @@ import { defaultMediaScreen, defaultModelScreen } from './mediaScreen'
 import { MEDIA_TEMPLATE_IDS } from './mediaTemplateIds'
 import type { Scene3DDocument, Scene3DSlot, Vec3 } from './types'
 
-export const MEDIA_TEMPLATES = MEDIA_TEMPLATE_IDS.map(id => ({ id, camera: 'establishment' as const, duration: 6, slots: ['subject_1', 'prop'] as ('subject_1' | 'prop')[] }))
+export const MEDIA_TEMPLATES = MEDIA_TEMPLATE_IDS.map(id => ({ id, camera: 'establishment' as const,
+  duration: id === 'tv-head-walk' ? 4 : 6,
+  slots: (id === 'tv-head-walk' ? ['subject_1'] : ['subject_1', 'prop']) as ('subject_1' | 'prop')[],
+}))
 export const MEDIA_CATEGORIES = Object.fromEntries(MEDIA_TEMPLATE_IDS.map(id => [id, 'product'])) as Record<typeof MEDIA_TEMPLATE_IDS[number], 'product'>
 
 export function createScreenSlot(id: string, position: Vec3, width = 4, height = 2.25): Scene3DSlot {

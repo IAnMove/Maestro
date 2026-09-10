@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { defaultMediaScreen, mediaScreenTime, mediaScreenRect, parseMediaScreen } from '../src/features/scene3d/mediaScreen.ts'
-import { applyScene3DTemplate, remountScene3DTemplate } from '../src/features/scene3d/templates.ts'
+import { applyScene3DTemplate, remountScene3DTemplate, SCENE3D_TEMPLATES } from '../src/features/scene3d/templates.ts'
 import { parseScene3DDocument } from '../src/features/scene3d/document.ts'
 import { MEDIA_TEMPLATE_IDS } from '../src/features/scene3d/mediaTemplateIds.ts'
 import { slotMountKey } from '../src/features/scene3d/backdrop.ts'
@@ -51,6 +51,9 @@ test('all product templates reopen and keep unique world objects; corridor trave
   assert.equal(tv.slots[0].screen.mode, 'plane')
   assert.equal(tv.slots[0].screen.anchor, 'headfront')
   assert.equal(tv.slots[0].clip.name, 'Walking')
+  const catalog = SCENE3D_TEMPLATES.find(item => item.id === tv.templateId)
+  assert.equal(catalog.duration, tv.duration)
+  assert.deepEqual(catalog.slots, tv.slots.map(slot => slot.slot))
 })
 
 test('changing template can retain selected screen content without copying its geometry', () => {
