@@ -2061,32 +2061,13 @@ const HOW_TO_GENERATE = [
   /^(?:¿\s*)?c[oó]mo\s+funciona\b[^.!?\n]{0,80}\b(?:el\s+)?(?:bot[oó]n\s+)?(?:genera|generate)\b/i,
 ]
 
-// Spoken filler before a real how-to. Do not unanchor the ^ patterns:
-// a caption inside the same generate sentence must stay a launch command.
-const HOW_TO_SPOKEN_PREFIX = /^(?:¿\s*)?(?:(?:hey|hi|hello|wait|ok|okay|so|um+|please|por\s+favor|oye|bueno|mira)[,.]?\s+)+/i
-
-function howToQuestionWindows(text: string): string[] {
-  const window = text.slice(0, 240)
-  const windows = [window]
-  const strippedLead = window.replace(HOW_TO_SPOKEN_PREFIX, '').trim()
-  if (strippedLead && strippedLead !== window) windows.push(strippedLead)
-  // A status sentence plus a capability question ("The job is stuck. Can I
-  // cancel?") must still be educational. Do not split on newlines: a caption
-  // can wrap without becoming a new request.
-  for (const clause of window.split(/[.!?]+/)) {
-    const part = clause.replace(HOW_TO_SPOKEN_PREFIX, '').trim()
-    if (part) windows.push(part)
-  }
-  return windows
-}
-
 export function isHowToGenerateQuestion(request: string): boolean {
   const text = request.trim()
   if (!text) return false
   // Classify from the opening window so a long explanation after
   // "how do I generate a video?" stays educational. A later command
   // after 240 characters is treated as a separate request.
-  return howToQuestionWindows(text).some(window => HOW_TO_GENERATE.some(pattern => pattern.test(window)))
+  return HOW_TO_GENERATE.some(pattern => pattern.test(text.slice(0, 240)))
 }
 
 const LABS_INVENTORY = /(?:¿\s*)?(?:qu[eé]\s+puedes\s+hacer|what\s+can\s+you\s+do)(?:\s+(?:en|in|con|with))?\s+(?:el\s+)?(?:series\s+lab|story\s+lab)/i
