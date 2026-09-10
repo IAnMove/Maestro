@@ -41,6 +41,7 @@ import { applyTypingPose, resetTypingPose } from './typingPose.ts'
 import { paintWorkshop } from './workshopSet.ts'
 import { paintCitadel } from './citadelSet.ts'
 import type { Scene3DClipCatalogEntry, Scene3DDocument, Scene3DLight, Scene3DSlot } from './types.ts'
+import { syncWorldSfx, type WorldSfxGpu } from '../sceneFx/worldRuntime'
 
 export const CYLINDER_RADIUS = 12
 export const CYLINDER_HEIGHT = 18
@@ -82,6 +83,7 @@ export type GpuWorld = {
   driveMovers: Object3D[]
   driveSpeed: number
   slots: Map<string, SlotGpu>
+  worldSfx: Map<string, WorldSfxGpu>
 }
 
 export function clipKeyOf(clip: Scene3DSlot['clip']): string {
@@ -367,6 +369,7 @@ export function paintWorld(world: GpuWorld, document: Scene3DDocument, sceneSeco
   world.camera.lookAt(...look)
   if (shot) world.camera.rotateZ(shot.roll)
   world.camera.updateProjectionMatrix()
+  syncWorldSfx(world.scene, world.worldSfx, document.worldSfx, sceneSeconds, posedSlots)
   world.renderer.render(world.scene, world.camera)
 }
 
@@ -436,11 +439,13 @@ export function createWorld(host: HTMLDivElement, light: Scene3DLight, fov: numb
     renderer, scene, camera, dir, floor, dressing: null, dressingReady: true,
     driveWheels: [], driveRoad: null, driveMovers: [], driveSpeed: 0,
     slots: new Map(),
+    worldSfx: new Map(),
   }
 }
 
 export function disposeWorld(world: GpuWorld) {
   for (const id of [...world.slots.keys()]) dropSlot(world, id)
+  syncWorldSfx(world.scene, world.worldSfx, [], 0, [])
   disposeObject(world.scene)
   world.renderer.dispose()
   world.renderer.forceContextLoss()

@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { FX_CATALOG, parseSceneFx } from '../src/features/sceneFx/types'
+import { parseWorldSfx, worldSfxAudioCues, WORLD_SFX_KINDS } from '../src/features/sceneFx/world'
+import { worldSfxDepthDocument } from '../src/features/sceneFx/worldDemo'
 import { fxSamples } from '../src/features/sceneFx/audio'
 import { adoptPreparedSceneDocument, isFxShowcaseDocument, sceneHasAuthoredContent, withFxShowcase } from '../src/features/sceneFx/showcase'
 import { createDefaultScene3DDocument, parseScene3DDocument } from '../src/features/scene3d/document'
@@ -49,6 +51,20 @@ test('anime showcase preserves the scene and supports oriented energy beams', ()
   assert.equal(rotated[0].rotation, -45)
   assert.equal(parseScene3DDocument({ ...next, sfx: rotated })?.sfx?.[0].rotation, -45)
   assert.equal(source.sfx, undefined)
+})
+
+test('world SFX stay in meters and do not rewrite screen overlays', () => {
+  const demo = worldSfxDepthDocument()
+  const reopened = parseScene3DDocument(JSON.parse(JSON.stringify(demo)))
+  assert.equal(reopened?.worldSfx?.length, 2)
+  assert.equal(reopened?.worldSfx?.[0].kind, 'portal')
+  assert.equal(reopened?.worldSfx?.[0].position.z, -1.35)
+  assert.equal(reopened?.sfx?.[0].kind, 'speedlines')
+  assert.equal(parseWorldSfx([{ kind: 'sparks', start: 0, end: 1 }]).length, 0)
+  assert.equal(parseWorldSfx([{ id: 'a', kind: 'portal', start: 3, end: 2 }]).length, 0)
+  const audio = worldSfxAudioCues(demo.worldSfx)
+  assert.equal(audio.every(cue => (WORLD_SFX_KINDS as readonly string[]).includes(cue.kind)), true)
+  assert.equal(parseScene3DDocument({ ...createDefaultScene3DDocument(), worldSfx: demo.worldSfx })?.sfx?.length ?? 0, 0)
 })
 
 test('2D showcase background matches the requested collection after reopening', () => {

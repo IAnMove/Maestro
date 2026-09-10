@@ -39,6 +39,7 @@ type Props = {
   document: Scene3DDocument
   sceneSeconds: number
   selectedId?: string
+  selectedWorldSfxId?: string
   transformMode?: TransformMode
   editing?: boolean
   onTransform?: (slotId: string, patch: TransformPatch) => void
@@ -138,7 +139,7 @@ function loadSlotImage(
 }
 
 export const Scene3DStage = forwardRef<Scene3DStageHandle, Props>(function Scene3DStage(
-  { document, sceneSeconds, onSlotClips, onSlotMeshes, selectedId, transformMode = 'translate', editing = false, onTransform, onSelect },
+  { document, sceneSeconds, onSlotClips, onSlotMeshes, selectedId, selectedWorldSfxId, transformMode = 'translate', editing = false, onTransform, onSelect },
   ref,
 ) {
   const { t } = useUiTranslation('scene3dEditor')
@@ -313,9 +314,14 @@ export const Scene3DStage = forwardRef<Scene3DStageHandle, Props>(function Scene
   useEffect(() => {
     const world = worldRef.current
     if (!world || exportLockRef.current) return
-    gizmoRef.current?.sync(document.slots.find(slot => slot.id === selectedId), transformMode, editing)
+    gizmoRef.current?.sync(
+      selectedWorldSfxId ? undefined : document.slots.find(slot => slot.id === selectedId),
+      transformMode,
+      editing,
+      document.worldSfx?.find(cue => cue.id === selectedWorldSfxId),
+    )
     paintWorld(world, document, sceneSeconds)
-  }, [document, sceneSeconds, selectedId, transformMode, editing])
+  }, [document, sceneSeconds, selectedId, selectedWorldSfxId, transformMode, editing])
 
   return <><div ref={hostRef} className="absolute inset-0" data-testid="scene3d-stage" />
     {screenError && <p role="alert" className="absolute bottom-2 left-2 z-10 rounded bg-black/90 p-2 text-xs text-red-200">{t('screens.failed')}</p>}</>
