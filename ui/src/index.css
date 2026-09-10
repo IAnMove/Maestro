@@ -91,6 +91,34 @@ model-viewer.scene-animator-model {
    * area dark). */
   --color-media-canvas: #1a1a25;
 
+
+  /* Ask to the Wizard. Its warm light used to be 62 literal ambers in the
+   * block below plus a ramp of amber-50/100/200 utilities in its two
+   * components, which is why the wizard stayed the same colour in every
+   * theme — and it is the whole left column, so it dragged the whole app
+   * towards looking themeless. The ramp is five stops of one hue, and every
+   * palette here has a yellow of its own to point it at. The defaults are
+   * the original ambers, so any theme that says nothing keeps exactly the
+   * look it had. Triplets, because the block composites them at a dozen
+   * different alphas. */
+  --hp-wizard-lit: 255, 251, 235;
+  --hp-wizard-pale: 254, 243, 199;
+  --hp-wizard-soft: 253, 230, 138;
+  --hp-wizard-core: 251, 191, 36;
+  --hp-wizard-deep: 245, 158, 11;
+  /* The panel's ground is the theme's own surface, so the wizard belongs to
+   * whatever palette is on rather than being a black box parked inside it.
+   * The light variants are the exception below: this ramp is warm light on
+   * dark, and on paper it would be invisible. */
+  --hp-wizard-ground: var(--color-bg-secondary);
+  /* Same five stops as Tailwind colours, so the components can drop their
+   * hardcoded amber utilities for `text-wizard-pale` and friends. */
+  --color-wizard-lit: rgb(var(--hp-wizard-lit));
+  --color-wizard-pale: rgb(var(--hp-wizard-pale));
+  --color-wizard-soft: rgb(var(--hp-wizard-soft));
+  --color-wizard-core: rgb(var(--hp-wizard-core));
+  --color-wizard-ground: var(--hp-wizard-ground);
+
   /* Warm accent (selection rings, "TAKES" label, active highlights).
      In default theme this is amber too — the cool palette uses
      accent-blue for those affordances, so warm is mostly unused. */
@@ -575,7 +603,10 @@ model-viewer.scene-animator-model {
 [data-theme="solarized-day"],
 [data-theme="alucard"],
 [data-theme="ayu-day"],
-[data-theme="one-day"] {
+[data-theme="one-day"],
+[data-theme="workbench"],
+[data-theme="phosphor-day"],
+[data-theme="studio-day"] {
   color-scheme: light;
   --color-indicator-success: #15803d;
   --color-indicator-warning: #b45309;
@@ -595,6 +626,13 @@ model-viewer.scene-animator-model {
 
 /* ─── Tokyo Night ─────────────────────────────────────────────────────── */
 [data-theme="tokyo-night"] {
+  /* La luz del mago toma el amarillo de esta paleta. */
+  --hp-wizard-lit: 250, 243, 232;
+  --hp-wizard-pale: 246, 231, 210;
+  --hp-wizard-soft: 237, 209, 167;
+  --hp-wizard-core: 224, 175, 104;
+  --hp-wizard-deep: 179, 140, 83;
+
   --color-bg-primary: #16161e;
   --color-bg-secondary: #1a1b26;
   --color-bg-tertiary: #24283b;
@@ -624,6 +662,13 @@ model-viewer.scene-animator-model {
   --shadow-active-ring: 0 0 6px rgba(125, 207, 255, 0.2);
 }
 [data-theme="tokyo-day"] {
+  /* La luz del mago toma el amarillo de esta paleta. */
+  --hp-wizard-lit: 250, 243, 232;
+  --hp-wizard-pale: 246, 231, 210;
+  --hp-wizard-soft: 237, 209, 167;
+  --hp-wizard-core: 224, 175, 104;
+  --hp-wizard-deep: 179, 140, 83;
+
   --color-bg-primary: #e1e2e7;
   --color-bg-secondary: #e9e9ec;
   --color-bg-tertiary: #f2f2f5;
@@ -654,6 +699,13 @@ model-viewer.scene-animator-model {
 
 /* ─── Catppuccin ──────────────────────────────────────────────────────── */
 [data-theme="catppuccin"] {
+  /* La luz del mago toma el amarillo de esta paleta. */
+  --hp-wizard-lit: 254, 251, 243;
+  --hp-wizard-pale: 253, 246, 231;
+  --hp-wizard-soft: 252, 238, 209;
+  --hp-wizard-core: 249, 226, 175;
+  --hp-wizard-deep: 199, 181, 140;
+
   --color-bg-primary: #11111b;
   --color-bg-secondary: #181825;
   --color-bg-tertiary: #1e1e2e;
@@ -683,6 +735,13 @@ model-viewer.scene-animator-model {
   --shadow-active-ring: 0 0 6px rgba(137, 180, 250, 0.2);
 }
 [data-theme="latte"] {
+  /* La luz del mago toma el amarillo de esta paleta. */
+  --hp-wizard-lit: 254, 251, 243;
+  --hp-wizard-pale: 253, 246, 231;
+  --hp-wizard-soft: 252, 238, 209;
+  --hp-wizard-core: 249, 226, 175;
+  --hp-wizard-deep: 199, 181, 140;
+
   --color-bg-primary: #eff1f5;
   --color-bg-secondary: #e6e9ef;
   --color-bg-tertiary: #ffffff;
@@ -713,6 +772,13 @@ model-viewer.scene-animator-model {
 
 /* ─── Gruvbox ─────────────────────────────────────────────────────────── */
 [data-theme="gruvbox"] {
+  /* La luz del mago toma el amarillo de esta paleta. */
+  --hp-wizard-lit: 254, 245, 224;
+  --hp-wizard-pale: 254, 235, 193;
+  --hp-wizard-soft: 252, 217, 134;
+  --hp-wizard-core: 250, 189, 47;
+  --hp-wizard-deep: 200, 151, 38;
+
   --color-bg-primary: #282828;
   --color-bg-secondary: #32302f;
   --color-bg-tertiary: #3c3836;
@@ -742,6 +808,13 @@ model-viewer.scene-animator-model {
   --shadow-active-ring: 0 0 6px rgba(254, 128, 25, 0.18);
 }
 [data-theme="gruvbox-day"] {
+  /* La luz del mago toma el amarillo de esta paleta. */
+  --hp-wizard-lit: 254, 245, 224;
+  --hp-wizard-pale: 254, 235, 193;
+  --hp-wizard-soft: 252, 217, 134;
+  --hp-wizard-core: 250, 189, 47;
+  --hp-wizard-deep: 200, 151, 38;
+
   --color-bg-primary: #f2e5bc;
   --color-bg-secondary: #fbf1c7;
   --color-bg-tertiary: #f9f5d7;
@@ -772,6 +845,13 @@ model-viewer.scene-animator-model {
 
 /* ─── Everforest ──────────────────────────────────────────────────────── */
 [data-theme="everforest"] {
+  /* La luz del mago toma el amarillo de esta paleta. */
+  --hp-wizard-lit: 250, 245, 236;
+  --hp-wizard-pale: 244, 235, 217;
+  --hp-wizard-soft: 234, 216, 181;
+  --hp-wizard-core: 219, 188, 127;
+  --hp-wizard-deep: 175, 150, 102;
+
   --color-bg-primary: #272e33;
   --color-bg-secondary: #2d353b;
   --color-bg-tertiary: #343f44;
@@ -801,6 +881,13 @@ model-viewer.scene-animator-model {
   --shadow-active-ring: 0 0 6px rgba(127, 187, 179, 0.18);
 }
 [data-theme="everforest-day"] {
+  /* La luz del mago toma el amarillo de esta paleta. */
+  --hp-wizard-lit: 250, 245, 236;
+  --hp-wizard-pale: 244, 235, 217;
+  --hp-wizard-soft: 234, 216, 181;
+  --hp-wizard-core: 219, 188, 127;
+  --hp-wizard-deep: 175, 150, 102;
+
   --color-bg-primary: #f4f0d9;
   --color-bg-secondary: #fdf6e3;
   --color-bg-tertiary: #fffbef;
@@ -831,6 +918,13 @@ model-viewer.scene-animator-model {
 
 /* ─── Rosé Pine ───────────────────────────────────────────────────────── */
 [data-theme="rose-pine"] {
+  /* La luz del mago toma el amarillo de esta paleta. */
+  --hp-wizard-lit: 254, 246, 235;
+  --hp-wizard-pale: 252, 236, 214;
+  --hp-wizard-soft: 250, 219, 176;
+  --hp-wizard-core: 246, 193, 119;
+  --hp-wizard-deep: 197, 154, 95;
+
   --color-bg-primary: #191724;
   --color-bg-secondary: #1f1d2e;
   --color-bg-tertiary: #26233a;
@@ -860,6 +954,13 @@ model-viewer.scene-animator-model {
   --shadow-active-ring: 0 0 6px rgba(235, 111, 146, 0.2);
 }
 [data-theme="rose-pine-dawn"] {
+  /* La luz del mago toma el amarillo de esta paleta. */
+  --hp-wizard-lit: 254, 246, 235;
+  --hp-wizard-pale: 252, 236, 214;
+  --hp-wizard-soft: 250, 219, 176;
+  --hp-wizard-core: 246, 193, 119;
+  --hp-wizard-deep: 197, 154, 95;
+
   --color-bg-primary: #faf4ed;
   --color-bg-secondary: #fffaf3;
   --color-bg-tertiary: #ffffff;
@@ -890,6 +991,13 @@ model-viewer.scene-animator-model {
 
 /* ─── Kanagawa ────────────────────────────────────────────────────────── */
 [data-theme="kanagawa"] {
+  /* La luz del mago toma el amarillo de esta paleta. */
+  --hp-wizard-lit: 251, 246, 237;
+  --hp-wizard-pale: 248, 237, 218;
+  --hp-wizard-soft: 240, 220, 184;
+  --hp-wizard-core: 230, 195, 132;
+  --hp-wizard-deep: 184, 156, 106;
+
   --color-bg-primary: #16161d;
   --color-bg-secondary: #1f1f28;
   --color-bg-tertiary: #2a2a37;
@@ -919,6 +1027,13 @@ model-viewer.scene-animator-model {
   --shadow-active-ring: 0 0 6px rgba(126, 156, 216, 0.2);
 }
 [data-theme="lotus"] {
+  /* La luz del mago toma el amarillo de esta paleta. */
+  --hp-wizard-lit: 251, 246, 237;
+  --hp-wizard-pale: 248, 237, 218;
+  --hp-wizard-soft: 240, 220, 184;
+  --hp-wizard-core: 230, 195, 132;
+  --hp-wizard-deep: 184, 156, 106;
+
   --color-bg-primary: #f2ecbc;
   --color-bg-secondary: #faf6d8;
   --color-bg-tertiary: #fffcea;
@@ -949,6 +1064,13 @@ model-viewer.scene-animator-model {
 
 /* ─── Nord ────────────────────────────────────────────────────────────── */
 [data-theme="nord"] {
+  /* La luz del mago toma el amarillo de esta paleta. */
+  --hp-wizard-lit: 252, 247, 238;
+  --hp-wizard-pale: 249, 239, 220;
+  --hp-wizard-soft: 243, 225, 188;
+  --hp-wizard-core: 235, 203, 139;
+  --hp-wizard-deep: 188, 162, 111;
+
   --color-bg-primary: #242933;
   --color-bg-secondary: #2e3440;
   --color-bg-tertiary: #3b4252;
@@ -978,6 +1100,13 @@ model-viewer.scene-animator-model {
   --shadow-active-ring: 0 0 6px rgba(129, 161, 193, 0.2);
 }
 [data-theme="nord-day"] {
+  /* La luz del mago toma el amarillo de esta paleta. */
+  --hp-wizard-lit: 252, 247, 238;
+  --hp-wizard-pale: 249, 239, 220;
+  --hp-wizard-soft: 243, 225, 188;
+  --hp-wizard-core: 235, 203, 139;
+  --hp-wizard-deep: 188, 162, 111;
+
   --color-bg-primary: #e5e9f0;
   --color-bg-secondary: #eceff4;
   --color-bg-tertiary: #ffffff;
@@ -1011,6 +1140,13 @@ model-viewer.scene-animator-model {
  * mood: a teal-black ground, which is why it is the only dark theme that
  * does not read as grey. */
 [data-theme="solarized"] {
+  /* La luz del mago toma el amarillo de esta paleta. */
+  --hp-wizard-lit: 244, 237, 217;
+  --hp-wizard-pale: 233, 220, 178;
+  --hp-wizard-soft: 212, 187, 107;
+  --hp-wizard-core: 181, 137, 0;
+  --hp-wizard-deep: 145, 110, 0;
+
   --color-bg-primary: #002b36;
   --color-bg-secondary: #02323e;
   --color-bg-tertiary: #073642;
@@ -1040,6 +1176,13 @@ model-viewer.scene-animator-model {
   --shadow-active-ring: 0 0 6px rgba(203, 75, 22, 0.2);
 }
 [data-theme="solarized-day"] {
+  /* La luz del mago toma el amarillo de esta paleta. */
+  --hp-wizard-lit: 244, 237, 217;
+  --hp-wizard-pale: 233, 220, 178;
+  --hp-wizard-soft: 212, 187, 107;
+  --hp-wizard-core: 181, 137, 0;
+  --hp-wizard-deep: 145, 110, 0;
+
   --color-bg-primary: #fdf6e3;
   --color-bg-secondary: #f7f0dd;
   --color-bg-tertiary: #fffdf5;
@@ -1070,6 +1213,13 @@ model-viewer.scene-animator-model {
 
 /* ─── Dracula ─────────────────────────────────────────────────────────── */
 [data-theme="dracula"] {
+  /* La luz del mago toma el amarillo de esta paleta. */
+  --hp-wizard-lit: 253, 254, 238;
+  --hp-wizard-pale: 251, 254, 220;
+  --hp-wizard-soft: 247, 252, 188;
+  --hp-wizard-core: 241, 250, 140;
+  --hp-wizard-deep: 193, 200, 112;
+
   --color-bg-primary: #21222c;
   --color-bg-secondary: #282a36;
   --color-bg-tertiary: #343746;
@@ -1100,6 +1250,13 @@ model-viewer.scene-animator-model {
 }
 /* Alucard is Dracula's own light counterpart — warm paper, not an inversion. */
 [data-theme="alucard"] {
+  /* La luz del mago toma el amarillo de esta paleta. */
+  --hp-wizard-lit: 253, 254, 238;
+  --hp-wizard-pale: 251, 254, 220;
+  --hp-wizard-soft: 247, 252, 188;
+  --hp-wizard-core: 241, 250, 140;
+  --hp-wizard-deep: 193, 200, 112;
+
   --color-bg-primary: #fffbeb;
   --color-bg-secondary: #fff8e0;
   --color-bg-tertiary: #ffffff;
@@ -1130,6 +1287,13 @@ model-viewer.scene-animator-model {
 
 /* ─── Ayu ─────────────────────────────────────────────────────────────── */
 [data-theme="ayu"] {
+  /* La luz del mago toma el amarillo de esta paleta. */
+  --hp-wizard-lit: 251, 244, 229;
+  --hp-wizard-pale: 248, 232, 202;
+  --hp-wizard-soft: 240, 212, 154;
+  --hp-wizard-core: 230, 180, 80;
+  --hp-wizard-deep: 184, 144, 64;
+
   --color-bg-primary: #0b0e14;
   --color-bg-secondary: #0d1017;
   --color-bg-tertiary: #131721;
@@ -1159,6 +1323,13 @@ model-viewer.scene-animator-model {
   --shadow-active-ring: 0 0 6px rgba(57, 186, 230, 0.2);
 }
 [data-theme="ayu-day"] {
+  /* La luz del mago toma el amarillo de esta paleta. */
+  --hp-wizard-lit: 251, 244, 229;
+  --hp-wizard-pale: 248, 232, 202;
+  --hp-wizard-soft: 240, 212, 154;
+  --hp-wizard-core: 230, 180, 80;
+  --hp-wizard-deep: 184, 144, 64;
+
   --color-bg-primary: #f4f4f4;
   --color-bg-secondary: #fcfcfc;
   --color-bg-tertiary: #ffffff;
@@ -1189,6 +1360,13 @@ model-viewer.scene-animator-model {
 
 /* ─── One ─────────────────────────────────────────────────────────────── */
 [data-theme="one"] {
+  /* La luz del mago toma el amarillo de esta paleta. */
+  --hp-wizard-lit: 251, 246, 235;
+  --hp-wizard-pale: 247, 236, 215;
+  --hp-wizard-soft: 240, 218, 178;
+  --hp-wizard-core: 229, 192, 123;
+  --hp-wizard-deep: 183, 154, 98;
+
   --color-bg-primary: #21252b;
   --color-bg-secondary: #282c34;
   --color-bg-tertiary: #2f343d;
@@ -1218,6 +1396,13 @@ model-viewer.scene-animator-model {
   --shadow-active-ring: 0 0 6px rgba(198, 120, 221, 0.2);
 }
 [data-theme="one-day"] {
+  /* La luz del mago toma el amarillo de esta paleta. */
+  --hp-wizard-lit: 251, 246, 235;
+  --hp-wizard-pale: 247, 236, 215;
+  --hp-wizard-soft: 240, 218, 178;
+  --hp-wizard-core: 229, 192, 123;
+  --hp-wizard-deep: 183, 154, 98;
+
   --color-bg-primary: #f0f0f0;
   --color-bg-secondary: #fafafa;
   --color-bg-tertiary: #ffffff;
@@ -1244,6 +1429,237 @@ model-viewer.scene-animator-model {
   --color-gradient-active-frame-to: #a626a4;
   --shadow-accent-glow: 0 2px 12px rgba(47, 96, 204, 0.24);
   --shadow-active-ring: 0 0 0 2px rgba(166, 38, 164, 0.28);
+}
+
+/* ─── Amiga Workbench ─────────────────────────────────────────────────────
+ * Workbench 1.3 blue with its orange gadgets, and the 2.0 grey desktop as
+ * the daylight side. The grey is a genuine mid-tone rather than paper, which
+ * is a lightness this set had nowhere else. */
+[data-theme="amiga"] {
+  --hp-wizard-lit: 255, 237, 214; --hp-wizard-pale: 255, 222, 191;
+  --hp-wizard-soft: 255, 190, 128; --hp-wizard-core: 255, 136, 0;
+  --hp-wizard-deep: 204, 109, 0;
+  --color-bg-primary: #003c72;
+  --color-bg-secondary: #00468a;
+  --color-bg-tertiary: #0055aa;
+  --color-bg-hover: #0a66c4;
+  --color-bg-active: #1a7ad6;
+  --color-border: #0b4d8f;
+  --color-border-light: #2a86d8;
+  --color-text-primary: #ffffff;
+  --color-text-secondary: #d6e8fb;
+  --color-text-muted: #b3d0ec;
+  --color-accent-blue: #ff8800;
+  --color-accent-blue-hover: #ffa033;
+  --color-accent-green: #3ad17a;
+  --color-accent-green-hover: #5fdd95;
+  --color-accent-warm: #ffffff;
+  --color-accent-warm-hover: #e6f0ff;
+  --color-accent-cool-from: #ff8800;
+  --color-accent-cool-to: #ffffff;
+  --color-gradient-cta-from: #a85a00;
+  --color-gradient-cta-to: #00417a;
+  --color-gradient-toggle-from: #ff8800;
+  --color-gradient-toggle-to: #0055aa;
+  --color-gradient-active-frame-from: #ff8800;
+  --color-gradient-active-frame-to: #ffffff;
+  --color-media-canvas: #001a33;
+  --shadow-accent-glow: 0 0 18px rgba(255, 136, 0, 0.4);
+  --shadow-active-ring: 0 0 6px rgba(255, 255, 255, 0.28);
+}
+[data-theme="workbench"] {
+  --hp-wizard-lit: 255, 237, 214; --hp-wizard-pale: 255, 222, 191;
+  --hp-wizard-soft: 255, 190, 128; --hp-wizard-core: 255, 136, 0;
+  --hp-wizard-deep: 204, 109, 0;
+  --color-bg-primary: #a0a0a0;
+  --color-bg-secondary: #b4b4b4;
+  --color-bg-tertiary: #c8c8c8;
+  --color-bg-hover: #8e8e8e;
+  --color-bg-active: #7a7a7a;
+  --color-border: #6f6f6f;
+  --color-border-light: #ffffff;
+  --color-text-primary: #000000;
+  --color-text-secondary: #1f1f1f;
+  --color-text-muted: #2e2e2e;
+  --color-accent-blue: #0a3d91;
+  --color-accent-blue-hover: #072d6b;
+  --color-accent-green: #0a6b33;
+  --color-accent-green-hover: #075224;
+  --color-accent-warm: #a34700;
+  --color-accent-warm-hover: #7d3600;
+  --color-accent-cool-from: #0a3d91;
+  --color-accent-cool-to: #a34700;
+  --color-gradient-cta-from: #0a3d91;
+  --color-gradient-cta-to: #a34700;
+  --color-gradient-toggle-from: #0a3d91;
+  --color-gradient-toggle-to: #072d6b;
+  --color-gradient-active-frame-from: #0a3d91;
+  --color-gradient-active-frame-to: #ffffff;
+  --shadow-accent-glow: 0 2px 12px rgba(10, 61, 145, 0.3);
+  --shadow-active-ring: 0 0 0 2px rgba(0, 0, 0, 0.45);
+}
+
+/* ─── Phosphor ────────────────────────────────────────────────────────────
+ * Amber CRT. The glow token earns its keep here: on a real tube the light
+ * bled past the character cell, so the active ring blooms rather than
+ * outlines. The daylight side is the printout, not the screen. */
+[data-theme="phosphor"] {
+  --hp-wizard-lit: 255, 236, 191; --hp-wizard-pale: 255, 226, 166;
+  --hp-wizard-soft: 255, 205, 107; --hp-wizard-core: 255, 176, 0;
+  --hp-wizard-deep: 204, 141, 0;
+  --color-bg-primary: #0a0800;
+  --color-bg-secondary: #120e00;
+  --color-bg-tertiary: #1a1400;
+  --color-bg-hover: #241c00;
+  --color-bg-active: #2e2400;
+  --color-border: #3d2f00;
+  --color-border-light: #574400;
+  --color-text-primary: #ffb000;
+  --color-text-secondary: #d99600;
+  --color-text-muted: #b37d00;
+  --color-accent-blue: #ffb000;
+  --color-accent-blue-hover: #ffc740;
+  --color-accent-green: #33ff33;
+  --color-accent-green-hover: #66ff66;
+  --color-accent-warm: #ff7b00;
+  --color-accent-warm-hover: #ff9633;
+  --color-accent-cool-from: #ffb000;
+  --color-accent-cool-to: #33ff33;
+  --color-gradient-cta-from: #8a5f00;
+  --color-gradient-cta-to: #1f6b1f;
+  --color-gradient-toggle-from: #ffb000;
+  --color-gradient-toggle-to: #ff7b00;
+  --color-gradient-active-frame-from: #ffb000;
+  --color-gradient-active-frame-to: #33ff33;
+  --color-media-canvas: #0a0800;
+  --shadow-accent-glow: 0 0 22px rgba(255, 176, 0, 0.45);
+  --shadow-active-ring: 0 0 10px rgba(255, 176, 0, 0.35);
+}
+[data-theme="phosphor-day"] {
+  --hp-wizard-lit: 255, 236, 191; --hp-wizard-pale: 255, 226, 166;
+  --hp-wizard-soft: 255, 205, 107; --hp-wizard-core: 255, 176, 0;
+  --hp-wizard-deep: 204, 141, 0;
+  --color-bg-primary: #efe6cf;
+  --color-bg-secondary: #f6efdd;
+  --color-bg-tertiary: #fdf8ea;
+  --color-bg-hover: #e4d9be;
+  --color-bg-active: #d3c6a6;
+  --color-border: #d9cdb2;
+  --color-border-light: #b3a483;
+  --color-text-primary: #2b2200;
+  --color-text-secondary: #4a3c00;
+  --color-text-muted: #5c4c10;
+  --color-accent-blue: #8a5f00;
+  --color-accent-blue-hover: #6d4b00;
+  --color-accent-green: #2f6b1f;
+  --color-accent-green-hover: #235217;
+  --color-accent-warm: #a33b00;
+  --color-accent-warm-hover: #822f00;
+  --color-accent-cool-from: #8a5f00;
+  --color-accent-cool-to: #2f6b1f;
+  --color-gradient-cta-from: #8a5f00;
+  --color-gradient-cta-to: #a33b00;
+  --color-gradient-toggle-from: #8a5f00;
+  --color-gradient-toggle-to: #6d4b00;
+  --color-gradient-active-frame-from: #8a5f00;
+  --color-gradient-active-frame-to: #a33b00;
+  --shadow-accent-glow: 0 2px 12px rgba(138, 95, 0, 0.28);
+  --shadow-active-ring: 0 0 0 2px rgba(138, 95, 0, 0.35);
+}
+
+/* ─── Studio ──────────────────────────────────────────────────────────────
+ * A grading suite: neutral greys with no tint at all, around an 18% grey
+ * surround, which is the surface a colourist judges an image against. It is
+ * the one theme here chosen for what it does to the CONTENT rather than for
+ * how the chrome looks — nothing in it pulls the thumbnails warm or cool.
+ * The accents are the teal-and-orange of the trade, and they appear only on
+ * controls, never on a surface. */
+[data-theme="studio"] {
+  --hp-wizard-lit: 250, 236, 214; --hp-wizard-pale: 246, 225, 193;
+  --hp-wizard-soft: 240, 203, 151; --hp-wizard-core: 232, 163, 61;
+  --hp-wizard-deep: 186, 130, 49;
+  --color-bg-primary: #1c1c1c;
+  --color-bg-secondary: #232323;
+  --color-bg-tertiary: #2b2b2b;
+  --color-bg-hover: #343434;
+  --color-bg-active: #3f3f3f;
+  --color-border: #333333;
+  --color-border-light: #4a4a4a;
+  --color-text-primary: #e6e6e6;
+  --color-text-secondary: #b3b3b3;
+  --color-text-muted: #999999;
+  --color-accent-blue: #35b0c9;
+  --color-accent-blue-hover: #5cc4d9;
+  --color-accent-green: #66c06b;
+  --color-accent-green-hover: #85cf89;
+  --color-accent-warm: #ff8c42;
+  --color-accent-warm-hover: #ffa76b;
+  --color-accent-cool-from: #ff8c42;
+  --color-accent-cool-to: #35b0c9;
+  --color-gradient-cta-from: #1f7f92;
+  --color-gradient-cta-to: #a8511f;
+  --color-gradient-toggle-from: #35b0c9;
+  --color-gradient-toggle-to: #2a8ca1;
+  --color-gradient-active-frame-from: #ff8c42;
+  --color-gradient-active-frame-to: #35b0c9;
+  --color-media-canvas: #1c1c1c;
+  --shadow-accent-glow: 0 0 18px rgba(53, 176, 201, 0.28);
+  --shadow-active-ring: 0 0 6px rgba(255, 140, 66, 0.24);
+}
+[data-theme="studio-day"] {
+  --hp-wizard-lit: 250, 236, 214; --hp-wizard-pale: 246, 225, 193;
+  --hp-wizard-soft: 240, 203, 151; --hp-wizard-core: 232, 163, 61;
+  --hp-wizard-deep: 186, 130, 49;
+  --color-bg-primary: #d6d6d6;
+  --color-bg-secondary: #e3e3e3;
+  --color-bg-tertiary: #f0f0f0;
+  --color-bg-hover: #c7c7c7;
+  --color-bg-active: #b5b5b5;
+  --color-border: #bdbdbd;
+  --color-border-light: #949494;
+  --color-text-primary: #1a1a1a;
+  --color-text-secondary: #333333;
+  --color-text-muted: #474747;
+  --color-accent-blue: #10697c;
+  --color-accent-blue-hover: #0b5163;
+  --color-accent-green: #2f7a34;
+  --color-accent-green-hover: #235f27;
+  --color-accent-warm: #a8511f;
+  --color-accent-warm-hover: #853f18;
+  --color-accent-cool-from: #a8511f;
+  --color-accent-cool-to: #10697c;
+  --color-gradient-cta-from: #10697c;
+  --color-gradient-cta-to: #a8511f;
+  --color-gradient-toggle-from: #10697c;
+  --color-gradient-toggle-to: #0b5163;
+  --color-gradient-active-frame-from: #a8511f;
+  --color-gradient-active-frame-to: #10697c;
+  --shadow-accent-glow: 0 2px 12px rgba(16, 105, 124, 0.26);
+  --shadow-active-ring: 0 0 0 2px rgba(168, 81, 31, 0.32);
+}
+
+
+/* Warm light on dark is the whole of the wizard's ramp, so on paper it has
+   nowhere to land. Every light variant keeps a dark alcove, tinted just
+   enough to read as the same room. */
+[data-theme="ivory"],
+[data-theme="daylight"],
+[data-theme="pearl"],
+[data-theme="tokyo-day"],
+[data-theme="latte"],
+[data-theme="gruvbox-day"],
+[data-theme="everforest-day"],
+[data-theme="rose-pine-dawn"],
+[data-theme="lotus"],
+[data-theme="nord-day"],
+[data-theme="solarized-day"],
+[data-theme="alucard"],
+[data-theme="ayu-day"],
+[data-theme="one-day"],
+[data-theme="workbench"],
+[data-theme="phosphor-day"],
+[data-theme="studio-day"] {
+  --hp-wizard-ground: #14120c;
 }
 
 /* Custom utility classes that use the theme tokens. These let
@@ -1794,7 +2210,7 @@ input[type="range"]::-webkit-slider-thumb {
   width: 82%;
   height: 82%;
   object-fit: contain;
-  filter: drop-shadow(0 0 8px rgba(251, 191, 36, 0.32));
+  filter: drop-shadow(0 0 8px rgba(var(--hp-wizard-core), 0.32));
   animation: hp-agent-float 4.8s ease-in-out infinite;
 }
 .hp-agent-halo {
@@ -1802,7 +2218,7 @@ input[type="range"]::-webkit-slider-thumb {
   inset: 7%;
   z-index: 0;
   border-radius: 999px;
-  background: radial-gradient(circle, rgba(251, 191, 36, 0.24), rgba(124, 58, 237, 0.08) 52%, transparent 72%);
+  background: radial-gradient(circle, rgba(var(--hp-wizard-core), 0.24), rgba(124, 58, 237, 0.08) 52%, transparent 72%);
   animation: hp-agent-halo 3.8s ease-in-out infinite;
 }
 .hp-agent-mote {
@@ -1811,8 +2227,8 @@ input[type="range"]::-webkit-slider-thumb {
   width: 2px;
   height: 2px;
   border-radius: 999px;
-  background: rgba(254, 215, 170, 0.95);
-  box-shadow: 0 0 5px rgba(251, 191, 36, 0.8);
+  background: rgba(var(--hp-wizard-soft), 0.95);
+  box-shadow: 0 0 5px rgba(var(--hp-wizard-core), 0.8);
   opacity: 0;
 }
 .hp-agent-mote-a { left: 9%; top: 58%; animation: hp-agent-spark 3.4s 0s ease-out infinite; }
@@ -1824,9 +2240,9 @@ input[type="range"]::-webkit-slider-thumb {
 .hp-agent-avatar[data-state='acting'] .hp-agent-halo { animation: hp-agent-cast-halo 0.82s ease-out infinite; }
 .hp-agent-avatar[data-state='acting'] .hp-agent-mote { animation-duration: 0.9s; }
 .hp-agent-avatar[data-state='listening'] img { transform: rotate(-4deg) translateY(-1px); }
-.hp-agent-avatar[data-state='success'] .hp-agent-halo { background: radial-gradient(circle, rgba(110, 231, 183, 0.38), rgba(251, 191, 36, 0.12) 55%, transparent 74%); }
+.hp-agent-avatar[data-state='success'] .hp-agent-halo { background: radial-gradient(circle, rgba(110, 231, 183, 0.38), rgba(var(--hp-wizard-core), 0.12) 55%, transparent 74%); }
 .hp-agent-avatar[data-state='error'] .hp-agent-halo { background: radial-gradient(circle, rgba(248, 113, 113, 0.34), rgba(124, 58, 237, 0.08) 55%, transparent 74%); }
-.hp-agent-trigger:hover .hp-agent-avatar img { filter: drop-shadow(0 0 10px rgba(253, 230, 138, 0.55)); }
+.hp-agent-trigger:hover .hp-agent-avatar img { filter: drop-shadow(0 0 10px rgba(var(--hp-wizard-soft), 0.55)); }
 .hp-agent-panel { transform-origin: bottom left; animation: hp-agent-panel-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both; }
 .hp-agent-panel--expanded { transform-origin: center; }
 .hp-agent-panel--expanded .hp-agent-markdown { font-size: 0.95rem; line-height: 1.55; }
@@ -1836,7 +2252,7 @@ input[type="range"]::-webkit-slider-thumb {
   position: absolute;
   inset: -80% -20% auto -25%;
   height: 180px;
-  background: radial-gradient(ellipse, rgba(245, 158, 11, 0.18), rgba(124, 58, 237, 0.08) 45%, transparent 70%);
+  background: radial-gradient(ellipse, rgba(var(--hp-wizard-deep), 0.18), rgba(124, 58, 237, 0.08) 45%, transparent 70%);
   pointer-events: none;
 }
 .hp-agent-markdown > * + * { margin-top: 0.55rem; }
@@ -1844,7 +2260,7 @@ input[type="range"]::-webkit-slider-thumb {
 .hp-agent-markdown blockquote { white-space: pre-wrap; }
 .hp-agent-markdown h2,
 .hp-agent-markdown h3,
-.hp-agent-markdown h4 { color: rgba(255, 251, 235, 0.96); font-weight: 650; line-height: 1.25; }
+.hp-agent-markdown h4 { color: rgba(var(--hp-wizard-lit), 0.96); font-weight: 650; line-height: 1.25; }
 .hp-agent-markdown h2 { font-size: 0.9rem; }
 .hp-agent-markdown h3 { font-size: 0.82rem; }
 .hp-agent-markdown h4 { font-size: 0.76rem; }
@@ -1853,12 +2269,12 @@ input[type="range"]::-webkit-slider-thumb {
 .hp-agent-markdown ul { list-style: disc; }
 .hp-agent-markdown ol { list-style: decimal; }
 .hp-agent-markdown li + li { margin-top: 0.28rem; }
-.hp-agent-markdown strong { color: rgba(255, 251, 235, 0.98); font-weight: 650; }
-.hp-agent-markdown em { color: rgba(254, 243, 199, 0.8); }
-.hp-agent-markdown code { border: 1px solid rgba(253, 230, 138, 0.14); border-radius: 0.3rem; background: rgba(0, 0, 0, 0.28); padding: 0.08rem 0.28rem; color: rgba(254, 243, 199, 0.92); font-size: 0.92em; }
-.hp-agent-markdown pre { max-width: 100%; overflow-x: auto; border: 1px solid rgba(253, 230, 138, 0.14); border-radius: 0.55rem; background: rgba(0, 0, 0, 0.35); padding: 0.55rem; white-space: pre; }
+.hp-agent-markdown strong { color: rgba(var(--hp-wizard-lit), 0.98); font-weight: 650; }
+.hp-agent-markdown em { color: rgba(var(--hp-wizard-pale), 0.8); }
+.hp-agent-markdown code { border: 1px solid rgba(var(--hp-wizard-soft), 0.14); border-radius: 0.3rem; background: rgba(0, 0, 0, 0.28); padding: 0.08rem 0.28rem; color: rgba(var(--hp-wizard-pale), 0.92); font-size: 0.92em; }
+.hp-agent-markdown pre { max-width: 100%; overflow-x: auto; border: 1px solid rgba(var(--hp-wizard-soft), 0.14); border-radius: 0.55rem; background: rgba(0, 0, 0, 0.35); padding: 0.55rem; white-space: pre; }
 .hp-agent-markdown pre code { border: 0; background: transparent; padding: 0; }
-.hp-agent-markdown blockquote { border-left: 2px solid rgba(253, 230, 138, 0.35); padding-left: 0.65rem; color: rgba(254, 243, 199, 0.72); }
+.hp-agent-markdown blockquote { border-left: 2px solid rgba(var(--hp-wizard-soft), 0.35); padding-left: 0.65rem; color: rgba(var(--hp-wizard-pale), 0.72); }
 .hp-agent-markdown a { color: rgb(147, 197, 253); text-decoration: underline; text-underline-offset: 2px; }
 .hp-agent-markdown a:hover { color: rgb(191, 219, 254); }
 
@@ -2034,10 +2450,10 @@ input[type="range"]::-webkit-slider-thumb {
 .hp-navigation-child[aria-selected='true']::after { opacity: 1; }
 [data-wizard-anchor][data-wizard-magic] {
   z-index: 2;
-  outline: 1px solid rgba(253, 230, 138, 0.72);
+  outline: 1px solid rgba(var(--hp-wizard-soft), 0.72);
   outline-offset: 3px;
   border-radius: 0.65rem;
-  box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.16), 0 0 24px rgba(245, 158, 11, 0.28);
+  box-shadow: 0 0 0 1px rgba(var(--hp-wizard-deep), 0.16), 0 0 24px rgba(var(--hp-wizard-deep), 0.28);
 }
 [data-wizard-anchor][data-wizard-magic]::after {
   content: '';
@@ -2047,10 +2463,10 @@ input[type="range"]::-webkit-slider-thumb {
   border-radius: inherit;
   pointer-events: none;
   background:
-    radial-gradient(circle at 14% 72%, rgba(255, 251, 235, 0.98) 0 1px, transparent 2px),
-    radial-gradient(circle at 78% 18%, rgba(253, 230, 138, 0.95) 0 1.5px, transparent 2.5px),
+    radial-gradient(circle at 14% 72%, rgba(var(--hp-wizard-lit), 0.98) 0 1px, transparent 2px),
+    radial-gradient(circle at 78% 18%, rgba(var(--hp-wizard-soft), 0.95) 0 1.5px, transparent 2.5px),
     radial-gradient(circle at 91% 68%, rgba(196, 181, 253, 0.9) 0 1px, transparent 2px),
-    linear-gradient(100deg, transparent 12%, rgba(253, 230, 138, 0.2) 48%, transparent 76%);
+    linear-gradient(100deg, transparent 12%, rgba(var(--hp-wizard-soft), 0.2) 48%, transparent 76%);
   background-size: 100% 100%, 100% 100%, 100% 100%, 220% 100%;
   animation: hp-wizard-anchor-cast 720ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }

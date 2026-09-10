@@ -40,11 +40,15 @@ export type ThemeId =
   | 'dracula' | 'alucard'
   | 'ayu' | 'ayu-day'
   | 'one' | 'one-day'
+  | 'amiga' | 'workbench'
+  | 'phosphor' | 'phosphor-day'
+  | 'studio' | 'studio-day'
 export type FamilyId =
   | 'default' | 'golden-hour' | 'onyx'
   | 'tokyo-night' | 'catppuccin' | 'gruvbox' | 'everforest'
   | 'rose-pine' | 'kanagawa' | 'nord'
   | 'solarized' | 'dracula' | 'ayu' | 'one'
+  | 'amiga' | 'phosphor' | 'studio'
 export type ThemeMode = 'dark' | 'light' | 'auto'
 
 export interface ThemeVariant {
@@ -143,6 +147,30 @@ export const FAMILIES: ThemeFamily[] = [
     light: { id: 'rose-pine-dawn', swatch: { bg: '#faf4ed', surface: '#ffffff', accent: '#907aa9' } },
   },
   {
+    id: 'studio',
+    label: 'Studio',
+    description:
+      'A grading suite: untinted greys around an 18% surround, so nothing in the chrome pulls your thumbnails warm or cool. Teal and orange on the controls only.',
+    dark: { id: 'studio', swatch: { bg: '#1c1c1c', surface: '#2b2b2b', accent: '#35b0c9' } },
+    light: { id: 'studio-day', swatch: { bg: '#d6d6d6', surface: '#f0f0f0', accent: '#10697c' } },
+  },
+  {
+    id: 'phosphor',
+    label: 'Phosphor',
+    description:
+      'Amber CRT — light that blooms past the edge instead of outlining it, with the printout rather than the screen by day.',
+    dark: { id: 'phosphor', swatch: { bg: '#0a0800', surface: '#1a1400', accent: '#ffb000' } },
+    light: { id: 'phosphor-day', swatch: { bg: '#efe6cf', surface: '#fdf8ea', accent: '#8a5f00' } },
+  },
+  {
+    id: 'amiga',
+    label: 'Amiga Workbench',
+    description:
+      'Workbench 1.3 blue with its orange gadgets, and the 2.0 grey desktop by day — a true mid-grey, not paper.',
+    dark: { id: 'amiga', swatch: { bg: '#003c72', surface: '#0055aa', accent: '#ff8800' } },
+    light: { id: 'workbench', swatch: { bg: '#a0a0a0', surface: '#c8c8c8', accent: '#0a3d91' } },
+  },
+  {
     id: 'solarized',
     label: 'Solarized',
     description:
@@ -214,6 +242,12 @@ const FAMILY_OF: Record<ThemeId, FamilyId> = {
   'ayu-day': 'ayu',
   one: 'one',
   'one-day': 'one',
+  amiga: 'amiga',
+  workbench: 'amiga',
+  phosphor: 'phosphor',
+  'phosphor-day': 'phosphor',
+  studio: 'studio',
+  'studio-day': 'studio',
 }
 
 const LIGHT_IDS: ReadonlySet<string> = new Set([
@@ -221,6 +255,7 @@ const LIGHT_IDS: ReadonlySet<string> = new Set([
   'tokyo-day', 'latte', 'gruvbox-day', 'everforest-day',
   'rose-pine-dawn', 'lotus', 'nord-day',
   'solarized-day', 'alucard', 'ayu-day', 'one-day',
+  'workbench', 'phosphor-day', 'studio-day',
 ])
 
 export interface ThemePrefs {
