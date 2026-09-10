@@ -47,7 +47,7 @@ Tiempo de voz/gestos = tiempo de escena - inicio + recorte. Cámara, esqueleto, 
 
 La velocidad de escena se aplica una vez tanto al vídeo como a la voz; cambia también el tono del audio. Las voces se mezclan en mono a 48 kHz con OfflineAudioContext. El documento de exportación se congela antes de cargar la mezcla y renderizar los frames.
 
-Se utiliza [AudioEncoder](https://developer.mozilla.org/en-US/docs/Web/API/AudioEncoder) y el [mp4-muxer ya presente en el proyecto](https://github.com/Vanilagy/mp4-muxer). Si AAC no está disponible, se informa del error: no se publica silenciosamente un plano mudo. AAC usa dequeue para controlar la cola y un solo flush al terminar; múltiples flush intermedios fallaban en Edge/Windows con la pista real de 8,83 s. El último bloque se rellena con silencio hasta 1024 muestras (máximo 21,3 ms).
+Se utiliza [AudioEncoder](https://developer.mozilla.org/en-US/docs/Web/API/AudioEncoder) y el [mp4-muxer ya presente en el proyecto](https://github.com/Vanilagy/mp4-muxer). Si AAC no está disponible, se envía PCM junto al vídeo para finalizar el MP4 con FFmpeg en el servidor. La descarga 3D recupera ese MP4 audible; si falla la finalización se informa del error. Véase [SFX y MCP](SCENE_EFFECTS_AND_MCP.md). AAC usa dequeue para controlar la cola y un solo flush al terminar; múltiples flush intermedios fallaban en Edge/Windows con la pista real de 8,83 s. El último bloque se rellena con silencio hasta 1024 muestras (máximo 21,3 ms).
 
 ## Revisión local sin cargar modelos generativos
 

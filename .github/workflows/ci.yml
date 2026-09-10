@@ -167,6 +167,8 @@ jobs:
       - name: Install Chrome for native H.264 and AAC speech export checks
         working-directory: ui
         run: npx playwright install chrome
+      - name: Install FFmpeg for Linux scene audio finalization
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
       - name: UI E2E
         working-directory: ui
         run: npm run test:e2e

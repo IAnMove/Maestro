@@ -583,6 +583,7 @@ export interface SceneLayer {
 }
 
 export interface Scene {
+  sfx?: import('../features/sceneFx/types').SceneFx[]
   texts?: import('../lib/kineticText').KineticText[]
   version: 1
   name: string

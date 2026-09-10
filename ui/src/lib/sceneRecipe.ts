@@ -1,3 +1,4 @@
+import { sceneFxFields, SCENE_FX_SCHEMA } from '../features/sceneFx/types'
 import { kineticTextFields, KINETIC_TEXT_SCHEMA, type KineticText } from './kineticText'
 import type { Scene, SceneAtmosphereKind, SceneBlendMode, SceneCurve, SceneKeyframe, SceneLayer, SceneLayerType, SceneMask } from '../types'
 import { applyCutoutDialogue, findCutoutMouthLayers, normalizeFaceBinding, planCutoutDialogue } from './cutoutDialogue'
@@ -208,6 +209,7 @@ export interface SceneRecipe {
   dialogueBeats?: SceneRecipeDialogueBeat[]
   shots?: SceneRecipeShot[]
   scene: {
+    sfx?: import('../features/sceneFx/types').SceneFx[]
     texts?: KineticText[]
     width?: number
     height?: number
@@ -618,6 +620,7 @@ export const SCENE_RECIPE_JSON_SCHEMA: Record<string, unknown> = {
     scene: {
       type: 'object',
       properties: {
+        sfx: SCENE_FX_SCHEMA,
         texts: KINETIC_TEXT_SCHEMA,
         width: { type: 'integer', minimum: 256, maximum: 3840 },
         height: { type: 'integer', minimum: 256, maximum: 3840 },
@@ -1272,6 +1275,7 @@ export function parseSceneRecipe(value: unknown): SceneRecipe {
     dialogueBeats,
     shots,
     scene: {
+      ...sceneFxFields(sceneRaw.sfx),
       ...kineticTextFields(sceneRaw.texts),
       width: Math.round(boundedNumber(sceneRaw.width, 1280, 256, 3840)),
       height: Math.round(boundedNumber(sceneRaw.height, 720, 256, 3840)),
@@ -1371,6 +1375,7 @@ export function compileRecipeShot(
     const dialogue = compileRecipeDialogue(scene.layers, scopedRecipe.dialogueBeats, scene.fps ?? 30, scene.duration)
     return {
       ...scene,
+      ...sceneFxFields(recipe.scene.sfx),
       ...kineticTextFields(recipe.scene.texts),
       ...sceneGenerationPolicyFields(recipe.generationPolicy),
       layers: dialogue.layers,
@@ -1614,6 +1619,7 @@ export function compileSceneRecipe(
   return {
     version: 1,
     name: recipe.name,
+    ...sceneFxFields(recipe.scene.sfx),
     ...kineticTextFields(recipe.scene.texts),
     ...sceneGenerationPolicyFields(recipe.generationPolicy),
     width: recipe.scene.width || 1280,

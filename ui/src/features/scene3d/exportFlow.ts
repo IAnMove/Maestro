@@ -1,3 +1,5 @@
+import { paintSceneFx } from '../sceneFx/paint'
+import { sceneAudioWav, supportsSceneAac } from '../sceneFx/audioExport'
 import { paintKineticTexts } from '../../lib/kineticText.ts'
 import { mixSceneSpeech } from './speech/audio'
 import { scene3dOutputDuration, scene3dPlaybackSpeed } from './clock.ts'
@@ -36,8 +38,9 @@ export async function exportWorld3DDocument(
   try {
     await waitForWorld3DAssets(handle, snapshot)
     const audio = await mixSceneSpeech(snapshot)
+    const serverAudio = audio && !(await supportsSceneAac()) ? sceneAudioWav(audio) : undefined
     const blob = await encodeWorld3DFrames({
-      audio,
+      audio: serverAudio ? undefined : audio,
       width: size.width,
       height: size.height,
       fps: snapshot.fps,
@@ -48,15 +51,24 @@ export async function exportWorld3DDocument(
         return paintWorld3DExportFrame(handle, snapshot, time)
       },
       overlay: (context, width, height, seconds) => {
+        paintSceneFx(context, width, height, seconds * scene3dPlaybackSpeed(snapshot.playbackSpeed), snapshot.sfx)
         paintKineticTexts(context, width, height, seconds * scene3dPlaybackSpeed(snapshot.playbackSpeed), snapshot.texts)
         paintClipNumber(context, width, height, snapshot.clipNumber)
       },
       onProgress,
     })
     try {
-      const saved = await publishWorld3DRecording(blob, snapshot, workspace)
+      const saved = await publishWorld3DRecording(blob, snapshot, workspace, serverAudio)
+      if (serverAudio) {
+        const url = new URL(saved.url, window.location.origin)
+        if (workspace) url.searchParams.set('workspace', workspace)
+        const response = await fetch(url)
+        if (!response.ok) throw new Error('The voiced MP4 was saved but could not be downloaded. Open it from Videos.')
+        return { blob: await response.blob(), saved }
+      }
       return { blob, saved }
     } catch (error) {
+      if (serverAudio) throw error // Never offer the intermediate silent frames as a finished voiced MP4.
       return { blob, saved: null, error: error instanceof Error ? error : new Error(String(error)) }
     }
   } finally {

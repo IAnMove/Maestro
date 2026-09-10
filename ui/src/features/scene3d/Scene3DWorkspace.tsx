@@ -1,3 +1,7 @@
+import { useSceneDocumentHandoff } from '../sceneFx/handoff'
+import { SceneFxControls } from '../sceneFx/SceneFxControls'
+import { SceneFxOverlay } from '../sceneFx/SceneFxOverlay'
+import { withFxShowcase } from '../sceneFx/showcase'
 import { Scene3DMotionControls } from './Scene3DMotionControls'
 import { Scene3DSpeakerControls } from './speech/Scene3DSpeakerControls'
 import { Scene3DSpeechStatus } from './speech/Scene3DSpeechStatus'
@@ -96,6 +100,14 @@ export function Scene3DWorkspace({ width, height, initialDocument }: Props) {
   const seconds = scene3dFrameTime(frame, sceneDoc.duration, fps)
   const selected = sceneDoc.slots.find(slot => slot.id === selectedId) ?? sceneDoc.slots[0]
   const editingLocked = exporting || playing
+  useSceneDocumentHandoff('3d', raw => {
+    if (exportingRef.current || playing) throw new Error('Stop playback/export before replacing the scene.')
+    const next = parseScene3DDocument(raw)
+    if (!next) throw new Error('Invalid prepared 3D document.')
+    sessionStorage.setItem('hocuspocus:scene-before-command:' + Date.now(), JSON.stringify(sceneDocRef.current))
+    generationRef.current += 1; setSceneDoc(next); setFrame(0)
+    setSelectedId(next.slots[0]?.id ?? 'subject_1'); setSpeechOpen(next.slots.some(slot => Boolean(slot.speech)))
+  })
   const speechVisible = speechOpen && selected?.media === 'model3d'
 
   useEffect(() => {
@@ -316,6 +328,7 @@ export function Scene3DWorkspace({ width, height, initialDocument }: Props) {
         }} />
       <Scene3DSpeechSelector slots={sceneDoc.slots} selected={selected} open={speechOpen}
         onToggle={() => setSpeechOpen(open => !open)} onSelect={setSelectedId} />
+      <SceneFxControls cues={sceneDoc.sfx} duration={sceneDoc.duration} disabled={editingLocked} onChange={sfx => applyScene(current => ({ ...current, sfx }))} onShowcase={() => applyScene(current => withFxShowcase(current))} />
       <KineticTextControls cues={sceneDoc.texts} duration={sceneDoc.duration} disabled={editingLocked} onChange={texts => applyScene(current => ({ ...current, texts }))} />
       <Scene3DTransport playing={playing} disabled={exporting} seconds={seconds} duration={sceneDoc.duration} speed={speed}
         onToggle={() => { if (canMutateWorld3DScene(exportingRef.current)) setPlaying(current => !current) }}
@@ -336,6 +349,7 @@ export function Scene3DWorkspace({ width, height, initialDocument }: Props) {
           onSlotClips={(slotId, clips) => setCatalogs(current => ({ ...current, [slotId]: clips }))}
           onSlotMeshes={(slotId, names) => setMeshes(current => ({ ...current, [slotId]: names }))}
         />
+        <SceneFxOverlay cues={sceneDoc.sfx} seconds={seconds} width={sceneDoc.width} height={sceneDoc.height} duration={sceneDoc.duration} playing={playing} speed={speed} />
         <KineticTextOverlay cues={sceneDoc.texts} seconds={seconds} width={sceneDoc.width} height={sceneDoc.height} />
         {sceneDoc.clipNumber && <div className="pointer-events-none absolute right-3 top-3 z-[901] rounded bg-black/80 px-3 py-2 font-mono text-sm text-cyan-50">CLIP {String(sceneDoc.clipNumber).padStart(2, '0')}</div>}
         <div className="pointer-events-none absolute left-3 top-3 rounded-lg bg-black/75 px-3 py-2 text-xs text-cyan-200">

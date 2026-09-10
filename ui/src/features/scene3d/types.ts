@@ -174,6 +174,7 @@ export type Scene3DDocument = {
   duration: number
   /** Stable review number, baked into exported frames when present. */
   clipNumber?: number
+  sfx?: import('../sceneFx/types').SceneFx[]
   texts?: import('../../lib/kineticText').KineticText[]
   /** Timeline rate; exported duration is duration / playbackSpeed. */
   playbackSpeed?: number

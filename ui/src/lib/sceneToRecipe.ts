@@ -1,3 +1,4 @@
+import { sceneFxFields } from '../features/sceneFx/types'
 import { kineticTextFields } from './kineticText'
 import type { Scene, SceneLayer } from '../types'
 import type { SceneRecipe, SceneRecipeAsset, SceneRecipeLayer } from './sceneRecipe'
@@ -106,6 +107,7 @@ export function sceneToRecipe(scene: Scene): SceneRecipe {
     })),
     dialogueBeats: scene.dialogueBeats?.map(beat => ({ ...beat, mouthLayerIds: [...beat.mouthLayerIds] })),
     scene: {
+      ...sceneFxFields(scene.sfx),
       ...kineticTextFields(scene.texts),
       width: scene.width,
       height: scene.height,

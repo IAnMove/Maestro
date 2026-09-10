@@ -1,3 +1,11 @@
+import { sceneAudioWav, supportsSceneAac } from '../../features/sceneFx/audioExport'
+import { paintSceneFx } from '../../features/sceneFx/paint'
+import { mixFxAudio } from '../../features/sceneFx/mix'
+import { encodeSpeechAudio } from '../../features/scene3d/speech/encodeAudio'
+import { useSceneDocumentHandoff } from '../../features/sceneFx/handoff'
+import { SceneFxControls } from '../../features/sceneFx/SceneFxControls'
+import { SceneFxOverlay } from '../../features/sceneFx/SceneFxOverlay'
+import { withFxShowcase } from '../../features/sceneFx/showcase'
 import { KineticTextControls } from '../common/KineticTextControls'
 import { KineticTextOverlay } from '../common/KineticTextOverlay'
 import { paintKineticTexts, parseKineticTexts } from '../../lib/kineticText'
@@ -1892,6 +1900,7 @@ export function SceneAnimatorPanel() {
           context.restore()
         })
       })
+    paintSceneFx(context, canvas.width, canvas.height, sceneSeconds, current.sfx)
     paintKineticTexts(context, canvas.width, canvas.height, sceneSeconds, current.texts)
     return true
   }
@@ -1903,7 +1912,7 @@ export function SceneAnimatorPanel() {
     prepareFacePlayback()
     const current = sceneRef.current
     const currentFps: SceneFrameRate = current.fps === 60 ? 60 : 30
-    if (!current.layers.some(layer => layer.visible && isVisualLayer(layer))) { const error = new Error(t('animator.addVisibleLayer')); setMessage(error.message); reject(error); return }
+    if (!current.sfx?.length && !current.layers.some(layer => layer.visible && isVisualLayer(layer))) { const error = new Error(t('animator.addVisibleLayer')); setMessage(error.message); reject(error); return }
     if (!('MediaRecorder' in window)) { const error = new Error(t('animator.cannotRecord')); setMessage(error.message); reject(error); return }
     const canvas = document.createElement('canvas'); canvas.width = current.width; canvas.height = current.height; const context = canvas.getContext('2d'); if (!context) { reject(new Error('Could not create a recording canvas.')); return }
     if (!('filter' in context) && current.layers.some(layer => isVisualLayer(layer) && hasCanvasFilterEffects(normalizedEffects(layer.effects)))) { const error = new Error(t('animator.filterCapture')); setMessage(error.message); reject(error); return }
@@ -2108,7 +2117,7 @@ export function SceneAnimatorPanel() {
     }
     const current = sceneRef.current
     const fps: SceneFrameRate = current.fps === 60 ? 60 : 30
-    if (!current.layers.some(layer => layer.visible && isVisualLayer(layer))) throw new Error(t('animator.addVisibleLayer'))
+    if (!current.sfx?.length && !current.layers.some(layer => layer.visible && isVisualLayer(layer))) throw new Error(t('animator.addVisibleLayer'))
     const canvas = document.createElement('canvas')
     canvas.width = current.width
     canvas.height = current.height
@@ -2126,9 +2135,11 @@ export function SceneAnimatorPanel() {
       throw new Error('This browser cannot encode a deterministic H.264 MP4 at the selected resolution.')
     }
 
+    const fxAudio = await supportsSceneAac() ? await mixFxAudio(current.sfx, current.duration) : undefined
     const target = new ArrayBufferTarget()
     const muxer = new Muxer({
       target,
+      ...(fxAudio ? { audio: { codec: 'aac' as const, sampleRate: fxAudio.sampleRate, numberOfChannels: 1 } } : {}),
       video: { codec: 'avc', width: current.width, height: current.height, frameRate: fps },
       fastStart: 'in-memory',
       firstTimestampBehavior: 'strict',
@@ -2160,6 +2171,7 @@ export function SceneAnimatorPanel() {
       }
       await encoder.flush()
       if (encoderError) throw encoderError
+      if (fxAudio) await encodeSpeechAudio(muxer, fxAudio)
       muxer.finalize()
       return new Blob([target.buffer], { type: 'video/mp4' })
     } finally {
@@ -2170,17 +2182,25 @@ export function SceneAnimatorPanel() {
     }
   }
 
+  useSceneDocumentHandoff('2d', raw => {
+    if (playing || recording || publishing) throw new Error('Stop playback/export before replacing the scene.')
+    sessionStorage.setItem('hocuspocus:scene-before-command:' + Date.now(), JSON.stringify(sceneRef.current))
+    importScene(JSON.stringify(raw))
+  })
   const publishRecording = async (blob: Blob, current: Scene) => {
     const context = recipeContextRef.current
+    const buffer = !(await supportsSceneAac()) ? await mixFxAudio(current.sfx, current.duration) : undefined
+    const serverAudio = buffer ? sceneAudioWav(buffer) : undefined
     const saved = await saveSceneRecording(blob, {
       scene: current,
+      embeddedAudio: !serverAudio && Boolean(current.sfx?.some(cue => cue.sound && cue.volume)),
       prompt: context?.prompt ?? '',
       // A user can change every frame-affecting field after mounting the LLM
       // recipe. Persist the current scene as the recipe, rather than calling
       // the stale planning JSON a reproduction of the rendered MP4.
       recipe: sceneToRecipe(current) as unknown as Record<string, unknown>,
       workspace,
-    })
+    }, serverAudio)
     await loadOutputs()
     setMessage(t('animator.mp4Saved', { name: saved.name }))
     return saved
@@ -2250,7 +2270,7 @@ export function SceneAnimatorPanel() {
   }
   const persistScene = async (): Promise<string | null> => {
     const current = sceneRef.current
-    if (!current.layers.length) { setMessage(t('animator.addLayerBeforeSave')); return null }
+    if (!current.layers.length && !current.sfx?.length) { setMessage(t('animator.addLayerBeforeSave')); return null }
     setSaving(true); setMessage(null)
     try {
       const preview = document.createElement('canvas')
@@ -2613,7 +2633,7 @@ export function SceneAnimatorPanel() {
     }
     if (request.type === 'export_3d_scene') {
       const current = assertScene()
-      if (!current.layers.some(layer => layer.visible && isVisualLayer(layer))) throw new Error(t('agent.needVisibleLayer'))
+      if (!current.sfx?.length && !current.layers.some(layer => layer.visible && isVisualLayer(layer))) throw new Error(t('agent.needVisibleLayer'))
       await waitForModelViewersRef.current()
       const saved = await publishRecordingRef.current(await recordToBlobRef.current(), sceneRef.current)
       return { message: t('agent.publishedMp4', { name: saved.name }), sceneId: current.name, outputNames: [saved.name] }
@@ -2635,7 +2655,7 @@ export function SceneAnimatorPanel() {
       if (request.sceneName && normalizeSceneLookupName(request.sceneName) !== normalizeSceneLookupName(current.name)) {
         throw new Error(t('agent.sceneMismatchExport', { open: current.name, requested: request.sceneName }))
       }
-      if (!current.layers.some(layer => layer.visible && isVisualLayer(layer))) {
+      if (!current.sfx?.length && !current.layers.some(layer => layer.visible && isVisualLayer(layer))) {
         throw new Error(t('agent.addVisibleLayer'))
       }
       setPublishing(true); setMessage(null)
@@ -3010,7 +3030,7 @@ export function SceneAnimatorPanel() {
 
   return <div className="flex min-h-[620px] flex-col overflow-hidden rounded-xl border border-border bg-bg-tertiary xl:flex-row">
     <section className="flex min-w-0 flex-1 flex-col p-3 md:p-4">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div className="flex items-center gap-1.5 text-xs font-medium"><Film size={15} className="text-accent-blue" /><input value={scene.name} onChange={event => updateScene(current => ({ ...current, name: event.target.value }))} aria-label={t('animator.sceneNameAria')} className="w-44 rounded border border-transparent bg-transparent px-1 py-0.5 text-xs font-medium hover:border-border focus:border-accent-blue focus:outline-none" /><span className="text-[10px] font-normal text-text-muted">{scene.width}×{scene.height}</span></div><div className="flex flex-wrap gap-2"><button type="button" onClick={() => setLibraryOpen(true)} disabled={playing || recording || publishing} className="rounded border border-border bg-bg-primary px-2.5 py-1.5 text-[10px] flex items-center gap-1 disabled:opacity-50"><FolderOpen size={12} /> {t('animator.openScene')}</button><button type="button" onClick={() => void persistScene()} disabled={saving || !scene.layers.length || playing || recording || publishing} className="rounded border border-accent-blue/40 bg-accent-blue/10 px-2.5 py-1.5 text-[10px] text-accent-blue flex items-center gap-1 disabled:opacity-50">{saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}{saving ? t('animator.saving') : t('animator.saveScene')}</button><button onClick={play} disabled={!scene.layers.length || playing || recording || publishing} className="min-h-12 min-w-36 rounded-lg bg-cyan-300 px-5 py-3 text-sm font-bold text-slate-950 shadow-lg flex items-center justify-center gap-2 hover:bg-cyan-200 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan-200 disabled:opacity-50"><Play size={22} fill="currentColor" /> {t('animator.preview')}</button><button onClick={record} disabled={recording || playing || publishing} className="rounded bg-cta px-2.5 py-1.5 text-[10px] text-white flex items-center gap-1 disabled:opacity-50">{recording || publishing ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}{recording ? t('animator.recording') : publishing ? t('animator.savingMp4') : t('animator.exportMp4')}</button></div></div>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div className="flex items-center gap-1.5 text-xs font-medium"><Film size={15} className="text-accent-blue" /><input value={scene.name} onChange={event => updateScene(current => ({ ...current, name: event.target.value }))} aria-label={t('animator.sceneNameAria')} className="w-44 rounded border border-transparent bg-transparent px-1 py-0.5 text-xs font-medium hover:border-border focus:border-accent-blue focus:outline-none" /><span className="text-[10px] font-normal text-text-muted">{scene.width}×{scene.height}</span></div><div className="flex flex-wrap gap-2"><button type="button" onClick={() => setLibraryOpen(true)} disabled={playing || recording || publishing} className="rounded border border-border bg-bg-primary px-2.5 py-1.5 text-[10px] flex items-center gap-1 disabled:opacity-50"><FolderOpen size={12} /> {t('animator.openScene')}</button><button type="button" onClick={() => void persistScene()} disabled={saving || (!scene.layers.length && !scene.sfx?.length) || playing || recording || publishing} className="rounded border border-accent-blue/40 bg-accent-blue/10 px-2.5 py-1.5 text-[10px] text-accent-blue flex items-center gap-1 disabled:opacity-50">{saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}{saving ? t('animator.saving') : t('animator.saveScene')}</button><button onClick={play} disabled={(!scene.layers.length && !scene.sfx?.length) || playing || recording || publishing} className="min-h-12 min-w-36 rounded-lg bg-cyan-300 px-5 py-3 text-sm font-bold text-slate-950 shadow-lg flex items-center justify-center gap-2 hover:bg-cyan-200 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan-200 disabled:opacity-50"><Play size={22} fill="currentColor" /> {t('animator.preview')}</button><button onClick={record} disabled={recording || playing || publishing} className="rounded bg-cta px-2.5 py-1.5 text-[10px] text-white flex items-center gap-1 disabled:opacity-50">{recording || publishing ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}{recording ? t('animator.recording') : publishing ? t('animator.savingMp4') : t('animator.exportMp4')}</button></div></div>
       <div className="mb-2 flex items-center justify-end gap-1.5"><button type="button" onClick={undoScene} disabled={!canUndo} title={t('animator.undoTitle')} className="rounded border border-border bg-bg-primary p-1.5 disabled:opacity-30"><Undo2 size={12} /></button><button type="button" onClick={redoScene} disabled={!canRedo} title={t('animator.redoTitle')} className="rounded border border-border bg-bg-primary p-1.5 disabled:opacity-30"><Redo2 size={12} /></button><span className="ml-1 text-[8px] text-text-muted">{lastAutosaveAt ? t('animator.autosaved', { time: new Date(lastAutosaveAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }) : t('animator.autosaveWaiting')}</span></div>
       <div className="mb-3 flex flex-wrap items-center gap-1">{RESOLUTIONS.map(([label, width, height]) => <button key={label} disabled={playing || recording} onClick={() => updateScene(current => ({ ...current, width, height }))} className={`rounded border px-1.5 py-1 text-[9px] disabled:opacity-40 ${scene.width === width && scene.height === height ? 'border-accent-blue bg-accent-blue/15 text-accent-blue' : 'border-border bg-bg-primary text-text-muted'}`}>{t(`resolutions.${label === 'HD landscape' ? 'hdLandscape' : label === 'Full HD landscape' ? 'fullHdLandscape' : label === '4K landscape' ? 'fourKLandscape' : label === 'Square' ? 'square' : label === 'HD portrait' ? 'hdPortrait' : label === 'Full HD portrait' ? 'fullHdPortrait' : 'fourKPortrait'}`)}</button>)}<span className="ml-auto flex items-center gap-1 pl-2 text-[8px] text-text-muted">{t('animator.frameRate')}{([30, 60] as SceneFrameRate[]).map(rate => <button key={rate} type="button" disabled={playing || recording} onClick={() => updateScene(current => ({ ...current, fps: rate }))} className={`rounded border px-1.5 py-1 text-[9px] disabled:opacity-40 ${fps === rate ? 'border-purple-300 bg-purple-400/10 text-purple-200' : 'border-border bg-bg-primary text-text-muted'}`}>{t('animator.fps', { rate })}</button>)}</span></div>
       <div className="mb-3 flex flex-wrap items-center gap-1.5 rounded border border-border bg-bg-secondary p-1.5">
@@ -3029,6 +3049,7 @@ export function SceneAnimatorPanel() {
         {(composition.safeArea === 'action' || composition.safeArea === 'all') && <div className="pointer-events-none absolute inset-[5%] z-[991] border border-dashed border-emerald-300/80"><span className="absolute left-1 top-1 rounded bg-black/55 px-1 text-[7px] text-emerald-200">{t('animator.actionSafeBadge')}</span></div>}
         {(composition.safeArea === 'title' || composition.safeArea === 'all') && <div className="pointer-events-none absolute inset-[10%] z-[992] border border-dashed border-amber-300/80"><span className="absolute right-1 top-1 rounded bg-black/55 px-1 text-[7px] text-amber-200">{t('animator.titleSafeBadge')}</span></div>}
         {(composition.safeArea === 'vertical' || composition.safeArea === 'all') && <div className="pointer-events-none absolute inset-y-0 left-1/2 z-[993] -translate-x-1/2 border-x border-dashed border-fuchsia-300/90 bg-fuchsia-400/[.03]" style={{ width: `${verticalSafeWidth}%` }}><span className="absolute left-1 top-1 rounded bg-black/55 px-1 text-[7px] text-fuchsia-200">{t('animator.verticalBadge')}</span></div>}
+        <SceneFxOverlay cues={scene.sfx} seconds={progress * scene.duration} width={scene.width} height={scene.height} duration={scene.duration} playing={playing} />
         <KineticTextOverlay cues={scene.texts} seconds={progress * scene.duration} width={scene.width} height={scene.height} />
         {activeCamera && <div className="pointer-events-none absolute left-2 top-2 z-[997] flex items-center gap-1 rounded bg-black/55 px-1.5 py-1 text-[8px] text-cyan-200"><Camera size={10} /> {activeCamera.name}</div>}
         {orbitPivot && <div className="pointer-events-none absolute z-[998] h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border border-cyan-300 bg-cyan-400/20 shadow-[0_0_8px_rgba(103,232,249,.9)]" style={{ left: `${orbitPivot.x}%`, top: `${orbitPivot.y}%` }}><span className="absolute left-1/2 top-[-5px] h-6 w-px -translate-x-1/2 bg-cyan-300/80" /><span className="absolute left-[-5px] top-1/2 h-px w-6 -translate-y-1/2 bg-cyan-300/80" /></div>}
@@ -3037,6 +3058,7 @@ export function SceneAnimatorPanel() {
       </div>
       </div>
       <p className="mt-2 text-[9px] text-text-muted">{t('animator.canvasHelp')}</p>
+      <SceneFxControls cues={scene.sfx} duration={scene.duration} disabled={playing || recording || publishing} onChange={sfx => updateScene(current => ({ ...current, sfx }))} onShowcase={() => updateScene(current => withFxShowcase(current))} />
       <KineticTextControls cues={scene.texts} duration={scene.duration} disabled={playing || recording || publishing} onChange={texts => updateScene(current => ({ ...current, texts }))} />
       <SceneTimeline
         layers={scene.layers}

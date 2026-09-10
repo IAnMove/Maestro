@@ -1,0 +1,20 @@
+[
+  {"id":"sparks","color":"#ffbb55","sound":"crackle"},
+  {"id":"explosion","color":"#ff7040","sound":"impact"},
+  {"id":"fireworks","color":"#ff88dd","sound":"impact"},
+  {"id":"confetti","color":"#66ddff","sound":"pop"},
+  {"id":"rain","color":"#88bbff","sound":"rain"},
+  {"id":"snow","color":"#e0f4ff","sound":"wind"},
+  {"id":"embers","color":"#ff9955","sound":"crackle"},
+  {"id":"smoke","color":"#b1a4bd","sound":"wind"},
+  {"id":"fog","color":"#aabbcc","sound":"wind"},
+  {"id":"bubbles","color":"#88eeff","sound":"pop"},
+  {"id":"stars","color":"#fff1aa","sound":"chime"},
+  {"id":"portal","color":"#bb77ff","sound":"rise"},
+  {"id":"shockwave","color":"#77ddff","sound":"impact"},
+  {"id":"lightning","color":"#bbddff","sound":"crackle"},
+  {"id":"speedlines","color":"#99ddff","sound":"whoosh"},
+  {"id":"scanline","color":"#66ffbb","sound":"scan"},
+  {"id":"aurora","color":"#66ffcc","sound":"rise"},
+  {"id":"laser","color":"#ff5577","sound":"laser"}
+]

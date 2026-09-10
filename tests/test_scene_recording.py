@@ -33,6 +33,37 @@ def test_command_mixes_scene_audio_without_shortening_the_video():
     assert command[command.index("-frames:v") + 1] == "300"
 
 
+def test_embedded_voice_and_effects_are_explicitly_mixed_with_existing_tracks():
+    command = scene_recording.build_scene_recording_command(
+        'capture.mp4', 'scene.mp4', fps=30, duration=4, embedded_audio=True,
+        audio_tracks=[{'path': 'music.wav', 'start_time': 0, 'volume': .3}],
+    )
+    graph = command[command.index('-filter_complex') + 1]
+    assert '[0:a]aresample=48000[embedded_audio]' in graph
+    assert '[embedded_audio][audio1]amix=inputs=2' in graph
+    assert '-an' not in command
+    assert 'atrim=0:4.000' in graph
+
+
+def test_real_embedded_audio_survives_publication(tmp_path):
+    import shutil
+    import subprocess
+    import array
+    if not shutil.which('ffmpeg') or not shutil.which('ffprobe'):
+        pytest.skip('FFmpeg is required for real audio publication verification')
+    source = tmp_path / 'voiced.mp4'
+    subprocess.run(['ffmpeg', '-v', 'error', '-f', 'lavfi', '-i', 'color=s=64x64:r=30:d=1',
+                    '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=48000:duration=1',
+                    '-c:v', 'libx264', '-threads', '1', '-c:a', 'aac', str(source)], check=True, capture_output=True)
+    output = tmp_path / 'published.mp4'
+    scene_recording.transcode_scene_recording(source, output, fps=30, duration=1, embedded_audio=True)
+    decoded = subprocess.run(['ffmpeg', '-v', 'error', '-i', str(output), '-map', '0:a:0', '-ac', '1',
+                              '-f', 'f32le', 'pipe:1'], check=True, capture_output=True)
+    samples = array.array('f', decoded.stdout)
+    rms = (sum(value * value for value in samples) / len(samples)) ** .5
+    assert .07 < rms < .1  # Original tone, not silence or a doubled track.
+
+
 def test_validate_output_checks_h264_audio_and_target_duration(monkeypatch, tmp_path: Path):
     output = tmp_path / "scene.mp4"
     output.write_bytes(b"mp4")

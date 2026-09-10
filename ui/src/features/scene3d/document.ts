@@ -1,3 +1,4 @@
+import { parseSceneFx } from '../sceneFx/types'
 import { parseKineticTexts } from '../../lib/kineticText.ts'
 import { parseSoundtrack } from './speech/track'
 import { validScene3DShape } from './documentValidation.ts'
@@ -98,5 +99,5 @@ export function parseScene3DDocument(raw: unknown): Scene3DDocument | null {
   const templateId = knownTemplateId(value.templateId)
   const dressing = parseDressing(value.dressing)
   const workshopScreen = parseWorkshopScreen(value.workshopScreen)
-  return { ...value, ...(soundtrack !== undefined ? { soundtrack } : {}), workshopScreen, texts: parseKineticTexts(value.texts), slots, templateId, dressing, clipNumber: reviewClipNumber(value.clipNumber), playbackSpeed: scene3dPlaybackSpeed(value.playbackSpeed) } as Scene3DDocument
+  return { ...value, ...(soundtrack !== undefined ? { soundtrack } : {}), workshopScreen, sfx: parseSceneFx(value.sfx), texts: parseKineticTexts(value.texts), slots, templateId, dressing, clipNumber: reviewClipNumber(value.clipNumber), playbackSpeed: scene3dPlaybackSpeed(value.playbackSpeed) } as Scene3DDocument
 }

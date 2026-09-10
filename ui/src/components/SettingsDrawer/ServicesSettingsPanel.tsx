@@ -1,3 +1,4 @@
+import { McpSettingsPanel } from './McpSettingsPanel'
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { RefreshCw, ShieldAlert, ShieldCheck, Lock, Loader2 } from 'lucide-react'
 import { useUiTranslation } from '../../i18n'
@@ -345,6 +346,7 @@ export function ServicesSettingsPanel() {
 
   return (
     <div className="space-y-5">
+      <McpSettingsPanel />
       {/* Beta-features toggle moved to the bottom of this panel. See
           the "BETA FEATURES" section near the end of the return for
           rationale on the demotion + restyle. */}
