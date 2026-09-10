@@ -56,6 +56,23 @@ def test_missing_empty_and_partial_dist_are_not_ready(project):
     assert not distribution.build_status(project)["ready"]
 
 
+def test_directory_in_place_of_index_can_be_repaired(project, capsys):
+    (project / "ui/dist/index.html").mkdir(parents=True)
+    distribution.report_identity(project)
+    assert "Errno" not in capsys.readouterr().out
+    build_ui.ensure_build(project, run=compile_ui)
+    assert distribution.build_status(project, current=True)["ready"]
+
+
+def test_unreadable_old_build_diagnostic_does_not_abort_pinokio(project, monkeypatch, capsys):
+    def unreadable(*args, **kwargs):
+        raise PermissionError(13, "Permission denied")
+    monkeypatch.setattr(distribution, "validate_artifact", unreadable)
+    distribution.report_identity(project)
+    assert "Errno" not in capsys.readouterr().out
+    assert not distribution.build_status(project)["ready"]
+
+
 def test_real_receipt_skip_corruption_and_source_update(project):
     result = build_ui.ensure_build(project, run=compile_ui)
     assert result["version"] == "0.9.0"

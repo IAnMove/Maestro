@@ -110,7 +110,11 @@ def build_status(root: Path = ROOT, *, current: bool = False) -> dict:
         # Missing output is expected on fresh installs. Pinokio treats literal
         # 'Errno' in any output as a shell failure, even while recovery succeeds.
         return {"ready": False, "reason": "React build files are missing", "build": {}}
-    except (OSError, ValueError, TypeError) as exc:
+    except OSError:
+        # A directory in place of index.html (or an unreadable old asset) may
+        # also be repairable. Do not trip shell.run before trying that repair.
+        return {"ready": False, "reason": "React build files are unreadable or incomplete", "build": {}}
+    except (ValueError, TypeError) as exc:
         return {"ready": False, "reason": str(exc), "build": {}}
 
 
