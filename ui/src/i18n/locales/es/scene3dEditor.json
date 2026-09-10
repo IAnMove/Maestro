@@ -477,6 +477,10 @@
     "product-finale": {
       "title": "Final de producto",
       "description": "Presentación amplia con protagonista y tres pantallas."
+    },
+    "tv-head-walk": {
+      "title": "Caminata cabeza CRT",
+      "description": "Humanoide generado (piernas, cuerpo, brazos) con un televisor CRT antiguo de cabeza. El plano de la cara va en el hueso headfront."
     }
   },
   "gallerySearch": "Buscar en el catálogo",
