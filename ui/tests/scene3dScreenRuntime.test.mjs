@@ -1,8 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { Group, Mesh, MeshBasicMaterial } from 'three'
+import { Group, Mesh, MeshBasicMaterial, Object3D } from 'three'
 import { bindScreenMedia } from '../src/features/scene3d/screenMediaRuntime.ts'
 import { defaultMediaScreen } from '../src/features/scene3d/mediaScreen.ts'
+import { SCREEN_PLANE_NAME } from '../src/features/scene3d/screenPlane.ts'
 
 // Browser currentTime changes before decoding finishes. Keep seeked under the
 // test's control to exercise overlapping preview/export requests independently.
@@ -80,5 +81,21 @@ test('disposing a pending video seek rejects it and restores the GLB material', 
     await rejected
     assert.equal(h.mesh.material, h.original)
     assert.deepEqual(h.frames, [0])
+  } finally { runtime.dispose(); h.restore() }
+})
+
+for (const flipY of [false, true]) test(`a bone plane uses native plane UV orientation (flip=${flipY})`, async () => {
+  const h = mediaHarness(), head = new Object3D(); head.name = 'headfront'; h.root.add(head)
+  const screen = { ...defaultMediaScreen(), mode: 'plane', anchor: 'headfront', media: 'video', sourceUrl: '/test.mp4', flipY }
+  const runtime = await bindScreenMedia(h.root, screen, false, new AbortController().signal)
+  try {
+    const plane = head.getObjectByName(SCREEN_PLANE_NAME)
+    assert.equal(plane.material.map.flipY, !flipY, 'new geometry uses the same UV convention as a standalone screen')
+    assert.equal(h.mesh.material, h.original, 'the original GLB material stays intact')
+    let disposed = 0
+    plane.geometry.addEventListener('dispose', () => { disposed++ })
+    runtime.dispose(); runtime.dispose()
+    assert.equal(disposed, 1)
+    assert.equal(head.children.length, 0)
   } finally { runtime.dispose(); h.restore() }
 })

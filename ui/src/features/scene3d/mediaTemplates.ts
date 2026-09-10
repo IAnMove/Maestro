@@ -1,9 +1,12 @@
 import { createDefaultScene3DDocument } from './document'
-import { defaultMediaScreen } from './mediaScreen'
+import { defaultMediaScreen, defaultModelScreen } from './mediaScreen'
 import { MEDIA_TEMPLATE_IDS } from './mediaTemplateIds'
 import type { Scene3DDocument, Scene3DSlot, Vec3 } from './types'
 
-export const MEDIA_TEMPLATES = MEDIA_TEMPLATE_IDS.map(id => ({ id, camera: 'establishment' as const, duration: 6, slots: ['subject_1', 'prop'] as ('subject_1' | 'prop')[] }))
+export const MEDIA_TEMPLATES = MEDIA_TEMPLATE_IDS.map(id => ({ id, camera: 'establishment' as const,
+  duration: id === 'tv-head-walk' ? 4 : 6,
+  slots: (id === 'tv-head-walk' ? ['subject_1'] : ['subject_1', 'prop']) as ('subject_1' | 'prop')[],
+}))
 export const MEDIA_CATEGORIES = Object.fromEntries(MEDIA_TEMPLATE_IDS.map(id => [id, 'product'])) as Record<typeof MEDIA_TEMPLATE_IDS[number], 'product'>
 
 export function createScreenSlot(id: string, position: Vec3, width = 4, height = 2.25): Scene3DSlot {
@@ -48,6 +51,22 @@ export function mediaTemplateDocument(id: string): Scene3DDocument | null {
     doc.slots = [mascot]; mascot.position = [0, .2, -5]; mascot.motion = { to: [0, .2, 4], faceTravel: true, easing: 'linear' }
     for (let i = 0; i < 3; i++) for (const sign of [-1, 1]) { const screen = createScreenSlot(`screen-${i}-${sign}`, [sign * 4, 1.2, 3 - i * 5], 4.2, 2.6); screen.rotationY = -sign * Math.PI / 2; doc.slots.push(screen) }
     doc.camera = { family: 'follow', eye: [0, 2, 6], look: [0, 1.2, 0], fov: 52, eyeOffset: [0, .5, 6], targetOffset: [0, 0, 0] }
+  }
+  if (id === 'tv-head-walk') {
+    mascot.sourceUrl = '/examples/tv-head-humanoid.glb'
+    mascot.position = [0, 0, 0.35]
+    mascot.scale = 1
+    mascot.grounded = true
+    mascot.clip = { index: 0, name: 'Walking' }
+    mascot.clipPlayback = { speed: 1, start: 0, loop: true }
+    // This procedural rig uses +Z forward; the imported Meshy preset uses +Y.
+    mascot.screen = { ...defaultModelScreen(['headfront', 'Head', 'tv_frame']), pitch: 0, yaw: 0, roll: 0 }
+    mascot.screen.sourceUrl = '/examples/tv-head-face.png'
+    mascot.screen.media = 'image'
+    doc.slots = [mascot]
+    doc.duration = 4
+    doc.dressing = 'observatory'
+    doc.camera = { family: 'establishment', eye: [1.6, 1.7, 4.2], look: [0, 1.35, 0], fov: 40 }
   }
   return doc
 }
