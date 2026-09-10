@@ -477,6 +477,10 @@
     "product-finale": {
       "title": "Final de producto",
       "description": "Presentación amplia con protagonista y tres pantallas."
+    },
+    "tv-head-walk": {
+      "title": "Caminata cabeza-tele",
+      "description": "Humanoide de cajas con cabeza de televisor. El plano de la cara va anclado al hueso headfront."
     }
   },
   "gallerySearch": "Buscar en el catálogo",

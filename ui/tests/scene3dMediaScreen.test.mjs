@@ -46,6 +46,11 @@ test('all product templates reopen and keep unique world objects; corridor trave
   }
   const lead = applyScene3DTemplate('screen-corridor').slots[0]
   assert.notDeepEqual(lead.position, lead.motion.to)
+  const tv = applyScene3DTemplate('tv-head-walk')
+  assert.equal(tv.slots[0].sourceUrl, '/examples/tv-head-humanoid.glb')
+  assert.equal(tv.slots[0].screen.mode, 'plane')
+  assert.equal(tv.slots[0].screen.anchor, 'headfront')
+  assert.equal(tv.slots[0].clip.name, 'Walking')
 })
 
 test('changing template can retain selected screen content without copying its geometry', () => {

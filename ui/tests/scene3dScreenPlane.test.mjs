@@ -1,5 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { Group, Object3D, Vector3 } from 'three'
 import { defaultMediaScreen, defaultModelScreen, parseMediaScreen, pickScreenAnchor } from '../src/features/scene3d/mediaScreen.ts'
 import { SCREEN_PLANE_NAME, attachScreenPlane, detachScreenPlane } from '../src/features/scene3d/screenPlane.ts'
@@ -43,4 +46,15 @@ test('plane attachment and offset survive JSON reopen', () => {
   assert.equal(parsed.yaw, 0.5)
   assert.equal(parsed.width, 0.28)
   assert.equal(parsed.sourceUrl, '/api/v1/uploads/face.png')
+})
+
+test('bundled TV-head example is a small GLB with headfront and Walking', () => {
+  const glb = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../public/examples/tv-head-humanoid.glb'))
+  assert.ok(glb.length > 1000)
+  assert.ok(glb.length < 20000)
+  const jsonLength = glb.readUInt32LE(12)
+  const json = glb.subarray(20, 20 + jsonLength).toString('utf8').replace(/\0+$/, '')
+  assert.match(json, /"name":"headfront"/)
+  assert.match(json, /"name":"Walking"/)
+  assert.match(json, /"name":"LeftUpLeg"/)
 })
