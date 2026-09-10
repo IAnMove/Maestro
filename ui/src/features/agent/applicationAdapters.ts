@@ -1,4 +1,5 @@
 import { useStore } from '../../stores/useStore'
+import { DIRECT_GENERATION_MEDIA, hidesDirectGenerationSidebar } from '../../lib/navigationCategories'
 import i18n from '../../i18n'
 import type { CommandResult } from '../../lib/commandContract'
 import { rememberedCharacterKitLibrary } from '../characters/session'
@@ -215,6 +216,7 @@ function isTabOpen(tab: AgentTab): boolean {
   if (tab === 'studio') {
     return state.sidebarMode === 'studio' && state.sidebarOpen
       && !state.settingsOpen && !state.dashboardOpen
+      && !hidesDirectGenerationSidebar(state.mediaFilter, state.sidebarMode)
   }
   const mediaFilter = TAB_TARGETS[tab]
   return Boolean(mediaFilter && state.mediaFilter === mediaFilter
@@ -242,6 +244,7 @@ async function navigate(tab: AgentTab): Promise<AdapterOutcome> {
     state.setSettingsOpen(false)
     state.setDashboardOpen(false)
     state.setSidebarMode('studio')
+    state.setMediaFilter(DIRECT_GENERATION_MEDIA[state.generationMode] || 'videos')
     state.setSidebarOpen(true)
   } else {
     const mediaFilter = TAB_TARGETS[tab]

@@ -124,6 +124,13 @@ test('navigation destinations map to visible categories', async () => {
   assert.equal(categoryForNavigationDestination('images'), 'media')
   assert.equal(categoryForNavigationDestination('settings'), null)
   assert.equal(categoryForMediaFilter('character-replacement'), 'studios')
+  const { hidesDirectGenerationSidebar } = await import('../src/lib/navigationCategories.ts')
+  assert.equal(hidesDirectGenerationSidebar('scene3d', 'studio'), true)
+  assert.equal(hidesDirectGenerationSidebar('stories', 'studio'), true)
+  assert.equal(hidesDirectGenerationSidebar('characters', 'studio'), true)
+  assert.equal(hidesDirectGenerationSidebar('videos', 'studio'), false)
+  assert.equal(hidesDirectGenerationSidebar('comics', 'director'), false)
+  assert.equal(hidesDirectGenerationSidebar('scene3d', 'director'), true)
 })
 
 test('character replacement is a featured studio beside the video editors in both languages', { concurrency: false }, async () => {
@@ -146,6 +153,9 @@ test('character replacement is a featured studio beside the video editors in bot
       const replacement = screen.getByRole('tab', { name: language === 'en' ? 'Replace character' : 'Reemplazar personaje' })
       assert.equal(replacement.getAttribute('data-navigation-featured'), 'true')
       assert.equal(replacement.previousElementSibling?.textContent, language === 'en' ? 'Video 3D' : 'Vídeo 3D')
+      fireEvent.click(screen.getByRole('tab', { name: language === 'en' ? 'Video 2.5D' : 'Vídeo 2,5D' }))
+      assert.equal(useStore.getState().mediaFilter, 'scene3d')
+      assert.equal(useStore.getState().sidebarOpen, false)
       fireEvent.click(replacement)
       assert.equal(useStore.getState().mediaFilter, 'character-replacement')
       assert.equal(useStore.getState().sidebarOpen, false)

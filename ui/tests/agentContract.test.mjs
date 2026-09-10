@@ -198,6 +198,7 @@ test('application adapters navigate and verify targets without rendering React',
     const studio = await adapters.studio.open()
     assert.equal(useStore.getState().sidebarMode, 'studio')
     assert.equal(useStore.getState().sidebarOpen, true)
+    assert.notEqual(useStore.getState().mediaFilter, 'stories')
     assert.equal(studio.target.id, 'studio')
     const { executeAgentActions } = await import('../src/features/agent/agentActions.ts')
     const [executed] = await executeAgentActions([{ type: 'open_tab', tab: 'series_lab' }])

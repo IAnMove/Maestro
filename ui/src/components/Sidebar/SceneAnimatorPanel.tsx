@@ -511,6 +511,7 @@ export function SceneAnimatorPanel() {
   const workspace = useStore(s => s.activeWorkspace)
   const setGenerationMode = useStore(s => s.setGenerationMode)
   const setSidebarMode = useStore(s => s.setSidebarMode)
+  const setMediaFilter = useStore(s => s.setMediaFilter)
   const setSidebarOpen = useStore(s => s.setSidebarOpen)
   const selectedSpeechModel = useStore(s => s.selectedModelPerAudioSubMode.speech ?? 'kugelaudio_0_open')
   const [scene, setScene] = useState<AnimatorScene>(blankScene)
@@ -2453,7 +2454,7 @@ export function SceneAnimatorPanel() {
   const sendImageToPanoramaLoop = () => {
     if (!selected || selected.type !== 'image' || !selected.source) return
     window.sessionStorage.setItem('hocuspocus:panorama-loop-source', JSON.stringify({ url: selected.source, name: selected.name }))
-    setGenerationMode('image'); setSidebarMode('studio'); setSidebarOpen(true)
+    setGenerationMode('image'); setSidebarMode('studio'); setMediaFilter('images'); setSidebarOpen(true)
   }
   const attachSceneAudio = (filename: string, name = filename, kind: 'speech' | 'music' | 'sfx' | 'audio' = 'audio', prompt?: string, model?: string) => {
     if (!filename) return

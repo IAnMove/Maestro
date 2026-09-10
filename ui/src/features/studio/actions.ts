@@ -97,6 +97,7 @@ export function openStudioAudio(subMode: PrepareAudioCommand['subMode']): void {
   state.setSidebarMode('studio')
   state.setSidebarOpen(true)
   state.setGenerationMode('audio')
+  state.setMediaFilter('audio')
   state.setAudioSubMode(subMode)
 }
 
