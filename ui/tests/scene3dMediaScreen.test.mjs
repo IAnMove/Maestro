@@ -33,7 +33,8 @@ test('screen source identity, mesh, video trim and style survive JSON reopening'
 test('transient screen uploads cannot masquerade as durable restored assets', () => {
   const parsed = parseMediaScreen({ sourceUrl: 'blob:expired', sourceRef: { workspaceId: 'promo', filename: 'lost.png', url: 'blob:expired' }, width: Infinity, height: -20, speed: NaN })
   assert.equal(parsed.sourceUrl, ''); assert.equal(parsed.sourceRef, undefined)
-  assert.equal(parsed.width, 4); assert.equal(parsed.height, .1); assert.equal(parsed.speed, 1)
+  assert.equal(parsed.width, 4); assert.equal(parsed.height, .02); assert.equal(parsed.speed, 1)
+  assert.equal(parsed.mode, 'mesh')
 })
 
 test('all product templates reopen and keep unique world objects; corridor travels', () => {

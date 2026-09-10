@@ -1,5 +1,6 @@
 import { CanvasTexture, DoubleSide, Mesh, MeshBasicMaterial, SRGBColorSpace, type Object3D } from 'three'
 import { mediaScreenRect, mediaScreenTime, type MediaScreen } from './mediaScreen.ts'
+import { SCREEN_PLANE_NAME, attachScreenPlane, detachScreenPlane, screenUsesPlane } from './screenPlane.ts'
 
 export type ScreenMediaRuntime = {
   ready: boolean
@@ -23,9 +24,15 @@ function waitMedia(video: HTMLVideoElement, event: 'loadeddata' | 'seeked', sign
 
 /** Video is paused and sought from the scene clock, including during export. */
 export async function bindScreenMedia(root: Object3D, screen: MediaScreen, standalone: boolean, signal: AbortSignal, onFrame: () => void = () => {}): Promise<ScreenMediaRuntime> {
+  const plane = screenUsesPlane(screen, standalone)
+  if (plane) attachScreenPlane(root, screen)
+  const targetName = standalone ? 'SCREEN_CONTENT' : plane ? SCREEN_PLANE_NAME : screen.targetMesh
   const targets: Mesh[] = []
-  root.traverse(child => { if (child instanceof Mesh && child.name === (standalone ? 'SCREEN_CONTENT' : screen.targetMesh)) targets.push(child) })
-  if (targets.length !== 1) throw new Error(targets.length ? 'screen-mesh-ambiguous' : 'screen-mesh-missing')
+  root.traverse(child => { if (child instanceof Mesh && child.name === targetName) targets.push(child) })
+  if (targets.length !== 1) {
+    if (plane) detachScreenPlane(root)
+    throw new Error(targets.length ? 'screen-mesh-ambiguous' : 'screen-mesh-missing')
+  }
   const canvas = document.createElement('canvas')
   const aspect = screen.width / screen.height
   canvas.width = Math.max(2, Math.round(Math.min(1920, 1080 * aspect))); canvas.height = Math.max(2, Math.round(canvas.width / aspect))
@@ -39,6 +46,7 @@ export async function bindScreenMedia(root: Object3D, screen: MediaScreen, stand
   const runtime: ScreenMediaRuntime = { ready: false, error: null, seek: async () => {}, dispose: () => {
     abort.abort(); if (video) { video.pause(); video.removeAttribute('src'); video.load() }
     if (image) image.src = ''; target.material = previous; texture.dispose(); material.dispose()
+    if (plane) detachScreenPlane(root)
   } }
   const disposed = () => runtime.dispose()
   signal.addEventListener('abort', disposed, { once: true })

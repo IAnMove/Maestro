@@ -1,5 +1,4 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
-import { Mesh } from 'three'
 import { useUiTranslation } from '../../i18n'
 import { bindScreenMedia } from './screenMediaRuntime'
 import { slotMountKey } from './backdrop'
@@ -303,8 +302,8 @@ export const Scene3DStage = forwardRef<Scene3DStageHandle, Props>(function Scene
         paintWorld(world, documentRef.current, secondsRef.current)
       }, (loaded, gltf) => {
         const names: string[] = []
-        gltf.scene.traverse(child => { if (child instanceof Mesh) names.push(child.name) })
-        onSlotMeshesRef.current?.(loaded.id, names)
+        gltf.scene.traverse(child => { if (child.name) names.push(child.name) })
+        onSlotMeshesRef.current?.(loaded.id, [...new Set(names)])
         bindScreen(loaded)
         repaint()
       })
