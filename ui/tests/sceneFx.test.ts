@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { FX_CATALOG, parseSceneFx } from '../src/features/sceneFx/types'
+import { parseWorldSfx, worldSfxAudioCues, WORLD_SFX_KINDS } from '../src/features/sceneFx/world'
+import { worldSfxDepthDocument, worldSfxDuelDocument, worldSfxMixedDocument } from '../src/features/sceneFx/worldDemo'
 import { fxSamples } from '../src/features/sceneFx/audio'
 import { adoptPreparedSceneDocument, isFxShowcaseDocument, sceneHasAuthoredContent, withFxShowcase } from '../src/features/sceneFx/showcase'
 import { createDefaultScene3DDocument, parseScene3DDocument } from '../src/features/scene3d/document'
@@ -49,6 +51,25 @@ test('anime showcase preserves the scene and supports oriented energy beams', ()
   assert.equal(rotated[0].rotation, -45)
   assert.equal(parseScene3DDocument({ ...next, sfx: rotated })?.sfx?.[0].rotation, -45)
   assert.equal(source.sfx, undefined)
+})
+
+test('world SFX stay in meters and do not rewrite screen overlays', () => {
+  const demo = worldSfxDepthDocument()
+  const reopened = parseScene3DDocument(JSON.parse(JSON.stringify(demo)))
+  assert.equal(reopened?.worldSfx?.length, 2)
+  assert.equal(reopened?.worldSfx?.[0].kind, 'portal')
+  assert.equal(reopened?.worldSfx?.[0].position.z, -1.55)
+  assert.equal(reopened?.sfx?.[0].kind, 'speedlines')
+  assert.equal(parseWorldSfx([{ kind: 'sparks', start: 0, end: 1 }]).length, 0)
+  assert.equal(parseWorldSfx([{ id: 'a', kind: 'portal', start: 3, end: 2 }]).length, 0)
+  const audio = worldSfxAudioCues(demo.worldSfx)
+  assert.equal(audio.every(cue => (WORLD_SFX_KINDS as readonly string[]).includes(cue.kind)), true)
+  assert.equal(parseScene3DDocument({ ...createDefaultScene3DDocument(), worldSfx: demo.worldSfx })?.sfx?.length ?? 0, 0)
+  const duel = parseScene3DDocument(JSON.parse(JSON.stringify(worldSfxDuelDocument())))
+  assert.equal(duel?.worldSfx?.some(cue => cue.kind === 'energy_beam' && cue.anchor?.slotId === 'subject_1' && cue.target?.slotId === 'subject_2'), true)
+  const mixed = parseScene3DDocument(JSON.parse(JSON.stringify(worldSfxMixedDocument())))
+  assert.equal(mixed?.sfx?.some(cue => cue.kind === 'speedlines'), true)
+  assert.equal(mixed?.worldSfx?.some(cue => cue.kind === 'lightning'), true)
 })
 
 test('2D showcase background matches the requested collection after reopening', () => {
@@ -100,6 +121,19 @@ test('Wizard showcase without a document keeps placed 3D speakers', () => {
   assert.equal(adopted.document.slots, current.slots)
   assert.equal(adopted.document.slots[0].sourceUrl, '/api/v1/file/hero.glb?workspace=client-a')
   assert.equal(adopted.document.sfx.length, FX_CATALOG.length)
+})
+
+test('Wizard showcase without a document keeps authored world SFX on an empty Video3D stage', () => {
+  const current = createDefaultScene3DDocument()
+  current.worldSfx = parseWorldSfx([{ id: 'portal-1', kind: 'portal', start: 0, end: 4, position: { x: 0, y: 1.2, z: -1.5 } }])
+  const incoming = withFxShowcase(createDefaultScene3DDocument(), 'anime')
+  assert.equal(sceneHasAuthoredContent(current), true)
+  const adopted = adoptPreparedSceneDocument(current, incoming)
+  assert.equal(adopted.mode, 'retain')
+  assert.equal(adopted.document.slots, current.slots)
+  assert.equal(adopted.document.worldSfx, current.worldSfx)
+  assert.equal(adopted.document.worldSfx?.[0].id, 'portal-1')
+  assert.equal(adopted.document.sfx.length, 12)
 })
 
 test('an empty editor still opens the stock showcase, and apply/speech documents still replace', () => {

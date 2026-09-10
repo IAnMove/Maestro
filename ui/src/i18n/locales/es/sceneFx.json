@@ -49,5 +49,21 @@
     "manga_impact": "Impacto manga"
   },
   "rotation": "Rotación (°)",
-  "animeShowcase": "Aplicar demo magia y anime"
+  "animeShowcase": "Aplicar demo magia y anime",
+  "worldTitle": "SFX en el mundo 3D",
+  "worldHelp": "Estos efectos ocupan una posición en metros. La cámara puede orbitarlos y un objeto opaco puede taparlos. Los overlays de pantalla siguen en 2D.",
+  "worldScale": "Tamaño (m)",
+  "worldPosition": "Posición (m)",
+  "worldRotation": "Rotación (°)",
+  "addWorld": "Añadir en el mundo",
+  "worldDemo": {
+    "depth": "Demo: profundidad del portal",
+    "duel": "Demo: duelo arcano",
+    "mixed": "Demo: persecución mixta"
+  },
+  "select": "Seleccionar",
+  "anchor": "Seguir id del hueco",
+  "anchorNone": "Ninguno — se queda en el mundo",
+  "worldTarget": "Apuntar al id del hueco",
+  "worldTargetPosition": "Apuntar (m)"
 }

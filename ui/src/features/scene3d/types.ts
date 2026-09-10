@@ -175,6 +175,8 @@ export type Scene3DDocument = {
   /** Stable review number, baked into exported frames when present. */
   clipNumber?: number
   sfx?: import('../sceneFx/types').SceneFx[]
+  /** Spatial effects in world meters. Screen overlays stay on `sfx`. */
+  worldSfx?: import('../sceneFx/world').WorldSfx[]
   texts?: import('../../lib/kineticText').KineticText[]
   /** Timeline rate; exported duration is duration / playbackSpeed. */
   playbackSpeed?: number

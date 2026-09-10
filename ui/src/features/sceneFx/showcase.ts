@@ -43,7 +43,7 @@ export function sceneHasAuthoredContent(document: unknown): boolean {
     return Boolean(String(item.sourceUrl ?? '').trim() || item.speech)
   })) return true
   return Boolean(value.production)
-    || ['sfx', 'texts', 'soundtrack'].some(key => Array.isArray(value[key]) && (value[key] as unknown[]).length > 0)
+    || ['sfx', 'worldSfx', 'texts', 'soundtrack'].some(key => Array.isArray(value[key]) && (value[key] as unknown[]).length > 0)
 }
 
 /** Keep the open scene when Wizard/MCP presents a stock showcase without its document. */

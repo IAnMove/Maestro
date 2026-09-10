@@ -14,6 +14,13 @@ Save the resulting scene JSON to reuse it with other assets.
 Each cue has start/end, position in screen percent, size, intensity, rotation, color, seed,
 and optional sound/volume. These are canvas overlays in screen space, including
 in the 3D editor; they do not simulate volumetric particles or physical collisions.
+
+Video 3D also stores a separate `worldSfx` track in meters. Portal, magic circle,
+summoning gate, lightning, energy beam, laser, orb, aura, missiles and shockwave
+occupy the scene graph: the camera changes their perspective and opaque meshes can
+occlude them. Beams use `anchor`/`target` slot ids. Screen overlays remain available.
+Do not convert legacy percent coordinates to meters. `scenes.effects.apply` accepts
+`worldCues` only on a world3d document.
 Absolute scene time and a fixed seed make scrubbing and exports repeatable.
 The sounds are local procedural synthesis, not a neural sound library or MMAudio.
 MMAudio remains available separately in the existing audio tools.
@@ -51,9 +58,9 @@ MP4 download also retrieves the finalized file in this case.
 
 | Operation | Inputs and result |
 | --- | --- |
-| `scenes.effects.catalog` | Empty input; returns the 30 presets and coordinate system. |
+| `scenes.effects.catalog` | Empty input; returns the 30 presets, screen/world coordinates, and world kinds. |
 | `scenes.effects.showcase` | `dimension` 2d/3d, `sound`, `collection` all/anime, optional native `document`. Returns the built-in template. Do not supply prompts or an effect list. |
-| `scenes.effects.apply` | Native `document`, `cues`, optional `replace`. Cue IDs upsert; repeats do not append duplicates. |
+| `scenes.effects.apply` | Native `document`, `cues` and/or `worldCues`, optional `replace`. Cue IDs upsert; world cues require Video3D. |
 | `scenes.speech.capabilities` | Empty input; returns installed Rhubarb and optional local vocal-isolation availability without loading a model. |
 | `scenes.speech.prepare` | Native `document`, exact `slot_id`, `clip_id`, `workspace`, existing `audio_filename`, literal `text`, scene `start`/`end`, source `offset`, optional `isolate_vocals`. Rhubarb analyzes up to 90 seconds and returns a scene with the intervention attached. |
 

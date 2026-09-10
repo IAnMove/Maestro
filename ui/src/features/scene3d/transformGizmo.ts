@@ -1,16 +1,25 @@
 import { Object3D, Raycaster, Vector2 } from 'three'
 import { TransformControls } from 'three/addons/controls/TransformControls.js'
+import { worldSfxIdFromObject } from '../sceneFx/worldRuntime'
 import type { GpuWorld } from './gpu'
 import type { Scene3DSlot } from './types'
+import type { WorldSfx } from '../sceneFx/world'
 
 export type TransformMode = 'translate' | 'rotate' | 'scale'
-export type TransformPatch = Partial<Pick<Scene3DSlot, 'position' | 'rotationY' | 'scale'>>
+export type TransformPatch = Partial<Pick<Scene3DSlot, 'position' | 'rotationY' | 'scale'>> & {
+  worldRotation?: [number, number, number]
+}
 
-export function transformPatch(proxy: Object3D, mode: TransformMode, axis: string | null): TransformPatch {
+export const WORLD_SFX_SELECT_PREFIX = 'wsfx:'
+
+export function transformPatch(proxy: Object3D, mode: TransformMode, axis: string | null, worldAxes = false): TransformPatch {
   if (mode === 'translate') return { position: [proxy.position.x, proxy.position.y, proxy.position.z] }
-  if (mode === 'rotate') return { rotationY: proxy.rotation.y }
+  if (mode === 'rotate') {
+    if (worldAxes) return { worldRotation: [proxy.rotation.x, proxy.rotation.y, proxy.rotation.z] }
+    return { rotationY: proxy.rotation.y }
+  }
   const value = axis === 'Y' ? proxy.scale.y : axis === 'Z' ? proxy.scale.z : proxy.scale.x
-  return { scale: Math.max(0.05, Math.min(100, value)) }
+  return { scale: Math.max(0.05, Math.min(worldAxes ? 20 : 100, value)) }
 }
 
 /** A document-space proxy keeps GLB normalization and animation bones separate
@@ -23,13 +32,14 @@ export function createTransformGizmo(world: GpuWorld, onChange: (id: string, pat
   const helper = controls.getHelper()
   world.scene.add(proxy, helper)
   let selectedId: string | null = null
+  let worldAxes = false
   let allowed = true
   let mode: TransformMode = 'translate'
   const redraw = () => world.renderer.render(world.scene, world.camera)
   let uniformScale = 1
   const objectChange = () => {
     if (!allowed || !selectedId) return
-    const patch = transformPatch(proxy, mode, controls.axis)
+    const patch = transformPatch(proxy, mode, controls.axis, worldAxes)
     if (patch.scale !== undefined) uniformScale = patch.scale
     onChange(selectedId, patch)
   }
@@ -39,11 +49,14 @@ export function createTransformGizmo(world: GpuWorld, onChange: (id: string, pat
     if (!allowed || controls.axis || event.button !== 0) return
     const rect = canvas.getBoundingClientRect()
     raycaster.setFromCamera(new Vector2((event.clientX - rect.left) / rect.width * 2 - 1, -(event.clientY - rect.top) / rect.height * 2 + 1), world.camera)
-    const targets = [...world.slots.entries()].filter(([, slot]) => slot.kind === 'model')
-    const hits = raycaster.intersectObjects(targets.map(([, slot]) => slot.root), true)
+    const slotTargets = [...world.slots.entries()].filter(([, slot]) => slot.kind === 'model')
+    const worldTargets = [...(world.worldSfx?.values() ?? [])].filter(item => item.root.visible).map(item => item.root)
+    const hits = raycaster.intersectObjects([...worldTargets, ...slotTargets.map(([, slot]) => slot.root)], true)
     const hit = hits[0]
     if (!hit) return
-    const selected = targets.find(([, slot]) => {
+    const worldId = worldSfxIdFromObject(hit.object)
+    if (worldId) { onSelect(WORLD_SFX_SELECT_PREFIX + worldId); return }
+    const selected = slotTargets.find(([, slot]) => {
       let object: Object3D | null = hit.object
       while (object) { if (object === slot.root) return true; object = object.parent }
       return false
@@ -55,24 +68,34 @@ export function createTransformGizmo(world: GpuWorld, onChange: (id: string, pat
   controls.addEventListener('mouseUp', finishDrag)
   canvas.addEventListener('pointerdown', select)
   return {
-    sync(slot: Scene3DSlot | undefined, nextMode: TransformMode, enabled: boolean) {
+    sync(slot: Scene3DSlot | undefined, nextMode: TransformMode, enabled: boolean, worldCue?: WorldSfx) {
       allowed = enabled
       mode = nextMode
       controls.enabled = enabled
-      if (!slot || slot.media === 'image' || !enabled) { controls.pointerUp(null); controls.detach(); return }
-      if (selectedId !== slot.id) controls.pointerUp(null)
-      selectedId = slot.id
+      if ((!slot && !worldCue) || slot?.media === 'image' || !enabled) { controls.pointerUp(null); controls.detach(); return }
+      worldAxes = Boolean(worldCue)
+      const id = worldCue ? WORLD_SFX_SELECT_PREFIX + worldCue.id : slot!.id
+      if (selectedId !== id) controls.pointerUp(null)
+      selectedId = id
       if (!controls.dragging) {
-        proxy.position.fromArray(slot.position)
-        proxy.rotation.set(0, slot.rotationY, 0)
-        proxy.scale.setScalar(slot.scale)
+        if (worldCue) {
+          const posed = world.worldSfx?.get(worldCue.id)?.root.userData.gizmoAt as { x: number; y: number; z: number } | undefined
+          if (posed && Number.isFinite(posed.x) && Number.isFinite(posed.y) && Number.isFinite(posed.z)) {
+            proxy.position.set(posed.x, posed.y, posed.z)
+          } else proxy.position.set(worldCue.position.x, worldCue.position.y, worldCue.position.z)
+          proxy.rotation.set(worldCue.rotation.x * Math.PI / 180, worldCue.rotation.y * Math.PI / 180, worldCue.rotation.z * Math.PI / 180)
+          proxy.scale.setScalar(worldCue.scale)
+        } else {
+          proxy.position.fromArray(slot!.position)
+          proxy.rotation.set(0, slot!.rotationY, 0)
+          proxy.scale.setScalar(slot!.scale)
+        }
         proxy.updateMatrixWorld(true)
       }
       controls.setMode(mode)
-      // Uniform scale uses the centre handle; yaw is the document's rotation axis.
-      controls.showX = mode !== 'rotate'
+      controls.showX = worldAxes || mode !== 'rotate'
       controls.showY = true
-      controls.showZ = mode !== 'rotate'
+      controls.showZ = worldAxes || mode !== 'rotate'
       controls.attach(proxy)
     },
     hide() { allowed = false; controls.pointerUp(null); controls.enabled = false; controls.detach() },

@@ -25,7 +25,7 @@ export async function publishWorld3DRecording(
 ) {
   return saveSceneRecording(blob, {
     scene: world3dRecordingStub(document) as import('../../types').Scene,
-    embeddedAudio: !audio && Boolean(sceneVoiceTracks(document).length || document.sfx?.some(cue => cue.sound && cue.volume)),
+    embeddedAudio: !audio && Boolean(sceneVoiceTracks(document).length || document.sfx?.some(cue => cue.sound && cue.volume) || document.worldSfx?.some(cue => cue.sound && cue.volume)),
     prompt: '',
     recipe: {
       engine: 'world3d',
