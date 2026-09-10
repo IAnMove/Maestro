@@ -46,10 +46,14 @@ const AGENT_ACTIONS_IMPORTS = [
   './characterKitActions',
   './commandContract',
   './sfxPack',
+  // Pure request filtering; no new UI/API/store-writing port is authorized.
+  './storyVisualRequest',
   './storyWorkflowIdentity',
   './toolCapabilities',
   './videoEditorActions',
   './wizardContext',
+  // Pure validation/result formatting; no store, transport or execution port.
+  './wizardTurnReport',
 ]
 
 const LAB_ACTIONS_IMPORTS = [
@@ -196,11 +200,11 @@ test('capabilities execute through adapters except the frozen legacy executors',
     'New capabilities must call context.adapters.*. Moving a legacy executor onto an adapter must shrink this list. '
       + `added=${JSON.stringify(added)} removed=${JSON.stringify(removed)}`,
   )
-  assert.equal(registered.length, 77)
+  assert.equal(registered.length, 80) // Adds standalone Tools upscale on the durable command handoff.
   assert.equal(legacy.length, 0)
 })
 
-test('agentActions.ts and labActions.ts keep their current module graph until a slice PR shrinks it', () => {
+test('agentActions.ts and labActions.ts keep their explicitly reviewed module graph', () => {
   const agentActions = importSpecifiers(readFileSync(join(AGENT_ROOT, 'agentActions.ts'), 'utf8'))
   const labActions = importSpecifiers(readFileSync(join(AGENT_ROOT, 'labActions.ts'), 'utf8'))
   const agentDiff = diffLists(agentActions, AGENT_ACTIONS_IMPORTS)
@@ -215,4 +219,12 @@ test('agentActions.ts and labActions.ts keep their current module graph until a 
     { labActions: LAB_ACTIONS_IMPORTS, added: [], removed: [] },
     `labActions imports changed: added=${JSON.stringify(labDiff.added)} removed=${JSON.stringify(labDiff.removed)}`,
   )
+})
+
+test('the Story artwork request filter has no runtime imports or execution ports', () => {
+  const source = readFileSync(join(AGENT_ROOT, 'storyVisualRequest.ts'), 'utf8')
+  assert.deepEqual(importSpecifiers(source), ['./agentActions'])
+  assert.match(source, /^import type \{[^}]+\} from '\.\/agentActions'/)
+  assert.equal((source.match(/\bimport\b/g) || []).length, 1)
+  assert.doesNotMatch(source, /\b(?:fetch|useStore|window|document|localStorage|sessionStorage|require)\b/)
 })

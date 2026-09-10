@@ -1,3 +1,4 @@
+import { catalogEntry, REMOTE_PROMPT_LIMIT } from '../../lib/musicGenerationSpec'
 import type { StoryMusicCandidate, StoryMusicCue, StoryProject } from './types'
 
 export type StoryMusicCandidateOption = {
@@ -62,10 +63,57 @@ export function storySongBrief(
 
 export const MINIMAX_LYRIC_SECTION = /^\[(Intro|Verse|Pre Chorus|Chorus|Post Chorus|Interlude|Bridge|Transition|Build Up|Break|Hook|Inst|Solo|Outro)\]\s*$/m
 
+export function musicPromptLimit(model: string | undefined): number {
+  return catalogEntry(model)?.promptLimit ?? REMOTE_PROMPT_LIMIT
+}
+
+export function musicRequiresLyricSections(model: string | undefined): boolean {
+  const family = catalogEntry(model)?.family
+  return family === 'minimax_remote' || family === 'minimax_music3'
+}
+
+export function compiledMusicCuePrompt(cue: Pick<StoryMusicCue, 'style'>, model: string | undefined): string {
+  return cue.style.trim().slice(0, musicPromptLimit(model))
+}
+
+export function musicRequestTitleKey(model: string | undefined): 'music.aceRequest' | 'music.minimaxLocalRequest' | 'music.minimaxRequest' {
+  const family = catalogEntry(model)?.family
+  if (family === 'ace_step') return 'music.aceRequest'
+  if (family === 'minimax_music3') return 'music.minimaxLocalRequest'
+  return 'music.minimaxRequest'
+}
+
+export type MusicCueBlock =
+  | { key: 'notice.reviewPromptFirst'; params: { title: string } }
+  | { key: 'notice.reviewPromptAndLyricsFirst'; params: { title: string } }
+  | { key: 'music.promptOverLimit'; params: { count: number; limit: number; title: string } }
+  | { key: 'notice.needsSectionTags'; params: { title: string } }
+
+export function musicCueBlock(cue: StoryMusicCue, model: string | undefined): MusicCueBlock | null {
+  const style = cue.style.trim()
+  if (!style) {
+    return {
+      key: cue.instrumental ? 'notice.reviewPromptFirst' : 'notice.reviewPromptAndLyricsFirst',
+      params: { title: cue.title },
+    }
+  }
+  if (!cue.instrumental && !cue.lyrics.trim()) {
+    return { key: 'notice.reviewPromptAndLyricsFirst', params: { title: cue.title } }
+  }
+  const limit = musicPromptLimit(model)
+  if (style.length > limit) {
+    return { key: 'music.promptOverLimit', params: { count: style.length, limit, title: cue.title } }
+  }
+  if (!cue.instrumental && musicRequiresLyricSections(model) && !MINIMAX_LYRIC_SECTION.test(cue.lyrics)) {
+    return { key: 'notice.needsSectionTags', params: { title: cue.title } }
+  }
+  return null
+}
+
 export function miniMaxCuePayload(cue: StoryMusicCue, model: StoryProject['music']['model']): string {
   return JSON.stringify({
     model,
-    prompt: cue.style.trim().slice(0, 300),
+    prompt: compiledMusicCuePrompt(cue, model),
     lyrics: cue.instrumental ? '' : cue.lyrics,
     instrumental: cue.instrumental,
     count: 1,

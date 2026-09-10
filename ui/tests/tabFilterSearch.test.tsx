@@ -117,12 +117,70 @@ test('semantic Wizard navigation reveals the matching category without DOM-coord
 })
 
 test('navigation destinations map to visible categories', async () => {
-  const { categoryForNavigationDestination } = await import('../src/lib/navigationCategories.ts')
+  const { categoryForNavigationDestination, categoryForMediaFilter } = await import('../src/lib/navigationCategories.ts')
   assert.equal(categoryForNavigationDestination('studio'), 'direct-generation')
   assert.equal(categoryForNavigationDestination('story_lab'), 'studios')
   assert.equal(categoryForNavigationDestination('video_editor'), 'production')
   assert.equal(categoryForNavigationDestination('images'), 'media')
   assert.equal(categoryForNavigationDestination('settings'), null)
+  assert.equal(categoryForMediaFilter('character-replacement'), 'studios')
+})
+
+test('character replacement is a featured studio beside the video editors in both languages', { concurrency: false }, async () => {
+  const { render, screen, fireEvent, cleanup } = await import('@testing-library/react')
+  const { ensureUiI18n, setUiLanguage } = await import('../src/i18n/index.ts')
+  const { TabFilter } = await import('../src/components/MainContent/TabFilter.tsx')
+  const { useStore } = await import('../src/stores/useStore.ts')
+  ensureUiI18n()
+  for (const language of ['en', 'es'] as const) {
+    await setUiLanguage(language)
+    useStore.setState({
+      mediaFilter: 'all', outputSearchQuery: '', generationMode: 'avatar',
+      sidebarMode: 'studio', sidebarOpen: true, settingsOpen: true, dashboardOpen: true,
+      activeWorkspace: 'default', loadOutputs: async () => undefined,
+    })
+    try {
+      render(<TabFilter />)
+      const studios = screen.getByRole('button', { name: language === 'en' ? 'Studios' : 'Estudios' })
+      fireEvent.click(studios)
+      const replacement = screen.getByRole('tab', { name: language === 'en' ? 'Replace character' : 'Reemplazar personaje' })
+      assert.equal(replacement.getAttribute('data-navigation-featured'), 'true')
+      assert.equal(replacement.previousElementSibling?.textContent, language === 'en' ? 'Video 3D' : 'Vídeo 3D')
+      fireEvent.click(replacement)
+      assert.equal(useStore.getState().mediaFilter, 'character-replacement')
+      assert.equal(useStore.getState().sidebarOpen, false)
+      assert.equal(useStore.getState().settingsOpen, false)
+      assert.equal(useStore.getState().dashboardOpen, false)
+      assert.equal(replacement.getAttribute('aria-selected'), 'true')
+      assert.equal(studios.getAttribute('data-navigation-active'), 'true')
+      assert.equal(document.querySelectorAll('.hp-navigation-primary[data-navigation-category]').length, 4)
+      assert.equal(document.querySelectorAll('.hp-navigation-children').length, 1)
+    } finally {
+      cleanup()
+    }
+  }
+  await setUiLanguage('en')
+})
+
+test('character replacement releases the tools column and restores its previous collapsed state on exit', { concurrency: false }, async () => {
+  const { render, screen, cleanup, act } = await import('@testing-library/react')
+  const { useStore } = await import('../src/stores/useStore.ts')
+  const { Sidebar } = await import('../src/components/Sidebar/Sidebar.tsx')
+  const previousMatchMedia = window.matchMedia
+  window.matchMedia = (() => ({ matches: false, addEventListener() {}, removeEventListener() {} })) as typeof window.matchMedia
+  window.localStorage.setItem('hocuspocus-tools-sidebar-collapsed', 'true')
+  useStore.setState({ mediaFilter: 'character-replacement', generationMode: 'image', sidebarMode: 'studio' })
+  try {
+    const view = render(<Sidebar />)
+    assert.equal(view.container.querySelector('aside'), null)
+    await act(async () => { useStore.setState({ mediaFilter: 'videos' }) })
+    assert.ok(screen.getByRole('button', { name: 'Expand Studio tools' }))
+    assert.equal(window.localStorage.getItem('hocuspocus-tools-sidebar-collapsed'), 'true')
+  } finally {
+    cleanup()
+    window.localStorage.removeItem('hocuspocus-tools-sidebar-collapsed')
+    window.matchMedia = previousMatchMedia
+  }
 })
 
 test('favorites compact label stays empty instead of leaking the catalog key', { concurrency: false }, async () => {

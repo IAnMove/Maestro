@@ -1,14 +1,39 @@
 import { useState } from 'react'
-import { Check, Plus, Trash2, Upload } from 'lucide-react'
+import { Check, Plus, Trash2 } from 'lucide-react'
 import * as api from '../../api/client'
+import type { ApiOutput } from '../../api/client'
+import { AssetInput } from '../asset-picker/AssetInput.tsx'
+import { ensureUploadsPath, useWorkspaceImageOutputs } from '../../lib/labsImagePick'
 import { createSeriesCharacter, createSeriesLocation, createSeriesProp, createVisualVariant, seriesId } from './model'
 import { Pill, SectionCard, SeriesField, seriesStatusLabel } from './components'
 import { inputClass, primaryButton, secondaryButton, textareaClass } from './styles'
 import type { SeriesProject, SeriesVisualVariant } from './types'
 import { useUiTranslation } from '../../i18n'
+import { SeriesVoiceFields } from './SeriesVoiceFields'
 
-type CanonTab = 'world' | 'characters' | 'relationships' | 'locations' | 'props' | 'arcs' | 'timeline' | 'voices'
-const CANON_TABS: CanonTab[] = ['world', 'characters', 'relationships', 'locations', 'props', 'arcs', 'timeline', 'voices']
+function SeriesReferenceField({
+  label, items, disabled, onPick,
+}: {
+  label: string
+  items: ApiOutput[]
+  disabled?: boolean
+  onPick: (item: ApiOutput) => void
+}) {
+  return (
+    <AssetInput
+      label={label}
+      placeholder={label}
+      items={items}
+      accept="image/*"
+      disabled={disabled}
+      constraints={{ kinds: ['image'], maxCount: 1, optional: false }}
+      onChoose={item => { if (item) onPick(item) }}
+    />
+  )
+}
+
+type CanonTab = 'world' | 'characters' | 'locations' | 'continuity' | 'advanced'
+const CANON_TABS: CanonTab[] = ['world', 'characters', 'locations', 'continuity', 'advanced']
 const CHARACTER_FIELDS = ['name', 'role', 'personality', 'desire', 'need', 'flaw', 'longArc', 'voiceAndDialogue', 'appearance', 'identityLock'] as const
 
 function ReferenceStrip({ series, assetIds }: { series: SeriesProject; assetIds: string[] }) {
@@ -52,6 +77,7 @@ export function SeriesCanonPanel({
   saveNow: () => Promise<unknown>
 }) {
   const { t } = useUiTranslation('seriesLab')
+  const imageItems = useWorkspaceImageOutputs(workspace)
   const [tab, setTab] = useState<CanonTab>('world')
   const [uploading, setUploading] = useState('')
   const [approving, setApproving] = useState(false)
@@ -69,14 +95,14 @@ export function SeriesCanonPanel({
       ? { ...item, voiceProfile: { ...item.voiceProfile, ...patch } } : item),
   }))
   const uploadReference = async (
-    file: File, ownerType: 'character' | 'location' | 'prop', ownerId: string,
+    item: ApiOutput, ownerType: 'character' | 'location' | 'prop', ownerId: string,
   ) => {
     setUploading(ownerId); setError(null)
     try {
       await saveNow()
-      const upload = await api.uploadImage(file)
+      const ensured = await ensureUploadsPath(item)
       const result = await api.importSeriesAsset(workspace, series.id, {
-        uploadPath: upload.path, name: file.name, ownerType, ownerId,
+        uploadPath: ensured.path, name: item.name, ownerType, ownerId,
         kind: ownerType, referenceRole: ownerType === 'character' ? 'primary_portrait' : 'reference',
       })
       replaceSeries(result.series)
@@ -131,8 +157,14 @@ export function SeriesCanonPanel({
         <VariantEditor label={t('canon.wardrobeVariants')} variants={character.wardrobeVariants} onChange={variants => update(current => ({ ...current, characters: current.characters.map((item, i) => i === index ? { ...item, wardrobeVariants: variants, defaultWardrobeVariantId: variants.some(variant => variant.id === item.defaultWardrobeVariantId) ? item.defaultWardrobeVariantId : variants[0]?.id } : item) }))} />
         {character.wardrobeVariants.length > 0 && <label className="mt-2 block text-[10px] uppercase text-text-muted">{t('canon.defaultWardrobe')}<select className={`${inputClass} mt-1`} value={character.defaultWardrobeVariantId || ''} onChange={event => update(current => ({ ...current, characters: current.characters.map((item, i) => i === index ? { ...item, defaultWardrobeVariantId: event.target.value || undefined } : item) }))}><option value="">{t('canon.noDefault')}</option>{character.wardrobeVariants.map(variant => <option key={variant.id} value={variant.id}>{variant.label}</option>)}</select></label>}
         <div className="mt-3"><ReferenceStrip series={series} assetIds={character.referenceAssetIds} /></div>
-        <div className="mt-3 flex gap-2"><label className={secondaryButton}><Upload size={13} />{uploading === character.id ? t('canon.importing') : t('canon.addIdentity')}<input type="file" accept="image/*" className="hidden" disabled={Boolean(uploading)} onChange={event => { const file = event.target.files?.[0]; if (file) void uploadReference(file, 'character', character.id) }} /></label><button className={secondaryButton} onClick={() => update(current => ({ ...current, characters: current.characters.map((item, i) => i === index ? { ...item, approval: item.approval === 'approved' ? 'draft' : 'approved' } : item) }))}>{character.approval === 'approved' ? t('canon.returnDraft') : t('canon.approveCharacter')}</button></div>
+        <div className="mt-3 space-y-2">
+          <SeriesReferenceField label={uploading === character.id ? t('canon.importing') : t('canon.addIdentity')} items={imageItems} disabled={Boolean(uploading)} onPick={item => void uploadReference(item, 'character', character.id)} />
+          <button className={secondaryButton} onClick={() => update(current => ({ ...current, characters: current.characters.map((item, i) => i === index ? { ...item, approval: item.approval === 'approved' ? 'draft' : 'approved' } : item) }))}>{character.approval === 'approved' ? t('canon.returnDraft') : t('canon.approveCharacter')}</button>
+        </div>
       </div>)}</div>
+    </SectionCard>}
+    {tab === 'characters' && <SectionCard title={t('canon.relationshipsTitle')} action={<button className={primaryButton} disabled={series.characters.length < 2} onClick={() => update(current => ({ ...current, relationships: [...current.relationships, { id: seriesId('relationship'), fromCharacterId: current.characters[0]?.id || '', toCharacterId: current.characters[1]?.id || '', label: '', dynamic: '', evolution: '' }] }))}><Plus size={13} />{t('canon.relationship')}</button>}>
+      <div className="space-y-3">{series.relationships.map((relationship, index) => <div key={relationship.id} className="grid gap-2 rounded-lg border border-border p-3 md:grid-cols-[1fr_1fr_auto]"><select className={inputClass} value={relationship.fromCharacterId} onChange={event => update(current => ({ ...current, relationships: current.relationships.map((item, i) => i === index ? { ...item, fromCharacterId: event.target.value } : item) }))}>{series.characters.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select><select className={inputClass} value={relationship.toCharacterId} onChange={event => update(current => ({ ...current, relationships: current.relationships.map((item, i) => i === index ? { ...item, toCharacterId: event.target.value } : item) }))}>{series.characters.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select><button onClick={() => update(current => ({ ...current, relationships: current.relationships.filter((_, i) => i !== index) }))} aria-label={t('canon.deleteRelationship')}><Trash2 size={14} className="text-red-400" /></button><input className={inputClass} value={relationship.label} placeholder={t('canon.relationshipPlaceholder')} onChange={event => update(current => ({ ...current, relationships: current.relationships.map((item, i) => i === index ? { ...item, label: event.target.value } : item) }))} /><textarea className={inputClass} value={relationship.dynamic} placeholder={t('canon.dynamicPlaceholder')} onChange={event => update(current => ({ ...current, relationships: current.relationships.map((item, i) => i === index ? { ...item, dynamic: event.target.value } : item) }))} /><textarea className={inputClass} value={relationship.evolution} placeholder={t('canon.evolutionPlaceholder')} onChange={event => update(current => ({ ...current, relationships: current.relationships.map((item, i) => i === index ? { ...item, evolution: event.target.value } : item) }))} /></div>)}</div>
     </SectionCard>}
 
     {tab === 'locations' && <SectionCard title={t('canon.locationsTitle')} action={<button className={primaryButton} onClick={() => update(current => ({ ...current, locations: [...current.locations, createSeriesLocation()] }))}><Plus size={13} />{t('canon.location')}</button>}>
@@ -141,36 +173,24 @@ export function SeriesCanonPanel({
         <textarea className={`${textareaClass} mt-2`} value={location.description} onChange={event => update(current => ({ ...current, locations: current.locations.map((item, i) => i === index ? { ...item, description: event.target.value } : item) }))} placeholder={t('canon.locationPlaceholder')} />
         <VariantEditor label={t('canon.locationVariants')} variants={location.variants} onChange={variants => update(current => ({ ...current, locations: current.locations.map((item, i) => i === index ? { ...item, variants } : item) }))} />
         <div className="my-3"><ReferenceStrip series={series} assetIds={location.referenceAssetIds} /></div>
-        <div className="flex gap-2"><label className={secondaryButton}><Upload size={13} />{t('canon.addReference')}<input type="file" accept="image/*" className="hidden" onChange={event => { const file = event.target.files?.[0]; if (file) void uploadReference(file, 'location', location.id) }} /></label><button className={secondaryButton} onClick={() => update(current => ({ ...current, locations: current.locations.map((item, i) => i === index ? { ...item, approval: item.approval === 'approved' ? 'draft' : 'approved' } : item) }))}>{t('canon.toggleApproval')}</button></div>
-      </div>)}</div>
-    </SectionCard>}
-
-    {tab === 'props' && <SectionCard title={t('canon.propsTitle')} action={<button className={primaryButton} onClick={() => update(current => ({ ...current, props: [...current.props, createSeriesProp()] }))}><Plus size={13} />{t('canon.prop')}</button>}>
-      <div className="space-y-3">{series.props.map((prop, index) => <div key={prop.id} className="rounded-xl border border-border p-3"><div className="grid gap-2 md:grid-cols-3"><input className={inputClass} value={prop.name} onChange={event => update(current => ({ ...current, props: current.props.map((item, i) => i === index ? { ...item, name: event.target.value } : item) }))} /><input className={inputClass} value={prop.kind} placeholder={t('canon.kindPlaceholder')} onChange={event => update(current => ({ ...current, props: current.props.map((item, i) => i === index ? { ...item, kind: event.target.value } : item) }))} /><button className={secondaryButton} onClick={() => update(current => ({ ...current, props: current.props.map((item, i) => i === index ? { ...item, approval: item.approval === 'approved' ? 'draft' : 'approved' } : item) }))}>{seriesStatusLabel(t, prop.approval)}</button></div><textarea className={`${textareaClass} mt-2`} value={prop.description} onChange={event => update(current => ({ ...current, props: current.props.map((item, i) => i === index ? { ...item, description: event.target.value } : item) }))} /><VariantEditor label={t('canon.propVariants')} variants={prop.variants} onChange={variants => update(current => ({ ...current, props: current.props.map((item, i) => i === index ? { ...item, variants } : item) }))} /><div className="my-2"><ReferenceStrip series={series} assetIds={prop.referenceAssetIds} /></div><label className={secondaryButton}><Upload size={13} />{t('canon.addReference')}<input type="file" accept="image/*" className="hidden" onChange={event => { const file = event.target.files?.[0]; if (file) void uploadReference(file, 'prop', prop.id) }} /></label></div>)}</div>
-    </SectionCard>}
-
-    {tab === 'relationships' && <SectionCard title={t('canon.relationshipsTitle')} action={<button className={primaryButton} disabled={series.characters.length < 2} onClick={() => update(current => ({ ...current, relationships: [...current.relationships, { id: seriesId('relationship'), fromCharacterId: current.characters[0]?.id || '', toCharacterId: current.characters[1]?.id || '', label: '', dynamic: '', evolution: '' }] }))}><Plus size={13} />{t('canon.relationship')}</button>}>
-      <div className="space-y-3">{series.relationships.map((relationship, index) => <div key={relationship.id} className="grid gap-2 rounded-lg border border-border p-3 md:grid-cols-[1fr_1fr_auto]"><select className={inputClass} value={relationship.fromCharacterId} onChange={event => update(current => ({ ...current, relationships: current.relationships.map((item, i) => i === index ? { ...item, fromCharacterId: event.target.value } : item) }))}>{series.characters.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select><select className={inputClass} value={relationship.toCharacterId} onChange={event => update(current => ({ ...current, relationships: current.relationships.map((item, i) => i === index ? { ...item, toCharacterId: event.target.value } : item) }))}>{series.characters.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select><button onClick={() => update(current => ({ ...current, relationships: current.relationships.filter((_, i) => i !== index) }))} aria-label={t('canon.deleteRelationship')}><Trash2 size={14} className="text-red-400" /></button><input className={inputClass} value={relationship.label} placeholder={t('canon.relationshipPlaceholder')} onChange={event => update(current => ({ ...current, relationships: current.relationships.map((item, i) => i === index ? { ...item, label: event.target.value } : item) }))} /><textarea className={inputClass} value={relationship.dynamic} placeholder={t('canon.dynamicPlaceholder')} onChange={event => update(current => ({ ...current, relationships: current.relationships.map((item, i) => i === index ? { ...item, dynamic: event.target.value } : item) }))} /><textarea className={inputClass} value={relationship.evolution} placeholder={t('canon.evolutionPlaceholder')} onChange={event => update(current => ({ ...current, relationships: current.relationships.map((item, i) => i === index ? { ...item, evolution: event.target.value } : item) }))} /></div>)}</div>
-    </SectionCard>}
-
-    {tab === 'arcs' && <SectionCard title={t('canon.arcsTitle')} action={<button className={primaryButton} onClick={() => patchCanon({ longArcs: [...series.canon.longArcs, { id: seriesId('arc'), title: '', description: '', status: 'planned' }] })}><Plus size={13} />{t('canon.arc')}</button>}><div className="space-y-2">{series.canon.longArcs.map((arc, index) => <div key={arc.id} className="grid gap-2 rounded-lg border border-border p-3 md:grid-cols-[1fr_2fr_auto]"><input className={inputClass} value={arc.title} onChange={event => patchCanon({ longArcs: series.canon.longArcs.map((item, i) => i === index ? { ...item, title: event.target.value } : item) })} /><textarea className={inputClass} value={arc.description} onChange={event => patchCanon({ longArcs: series.canon.longArcs.map((item, i) => i === index ? { ...item, description: event.target.value } : item) })} /><select className={inputClass} value={arc.status} onChange={event => patchCanon({ longArcs: series.canon.longArcs.map((item, i) => i === index ? { ...item, status: event.target.value as typeof item.status } : item) })}><option value="planned">{t('status.planned')}</option><option value="active">{t('status.active')}</option><option value="resolved">{t('status.resolved')}</option><option value="abandoned">{t('status.abandoned')}</option></select></div>)}</div></SectionCard>}
-
-    {tab === 'timeline' && <SectionCard title={t('canon.timelineTitle')} action={<button className={primaryButton} onClick={() => patchCanon({ timeline: [...series.canon.timeline, { id: seriesId('event'), description: '', status: 'draft', occurredAt: '' }] })}><Plus size={13} />{t('canon.event')}</button>}><div className="space-y-2">{series.canon.timeline.map((event, index) => <div key={event.id} className="grid gap-2 md:grid-cols-[1fr_3fr]"><input className={inputClass} value={event.occurredAt} placeholder={t('canon.when')} onChange={change => patchCanon({ timeline: series.canon.timeline.map((item, i) => i === index ? { ...item, occurredAt: change.target.value } : item) })} /><input className={inputClass} value={event.description} placeholder={t('canon.whatHappened')} onChange={change => patchCanon({ timeline: series.canon.timeline.map((item, i) => i === index ? { ...item, description: change.target.value } : item) })} /></div>)}</div></SectionCard>}
-
-    {tab === 'voices' && <SectionCard title={t('canon.voicesTitle')} description={t('canon.voicesDescription')}>
-      <div className="space-y-3">{series.characters.map((character, index) => <div key={character.id} className="rounded-lg border border-border p-3">
-        <strong className="text-xs text-text-primary">{character.name}</strong>
-        <div className="mt-2 grid gap-2 md:grid-cols-3">
-          <input className={inputClass} value={String(character.voiceProfile?.provider || '')} placeholder={t('canon.provider')} onChange={event => patchVoice(index, { provider: event.target.value })} />
-          <input className={inputClass} value={String(character.voiceProfile?.voiceId || '')} placeholder={t('canon.voiceId')} onChange={event => patchVoice(index, { voiceId: event.target.value })} />
-          <input className={inputClass} value={String(character.voiceProfile?.language || '')} placeholder={t('canon.language')} onChange={event => patchVoice(index, { language: event.target.value })} />
-          <input className={inputClass} type="number" step="0.05" value={Number(character.voiceProfile?.pace ?? 1)} placeholder={t('canon.pace')} onChange={event => patchVoice(index, { pace: Number(event.target.value) })} />
-          <input className={inputClass} type="number" step="0.05" value={Number(character.voiceProfile?.pitch ?? 0)} placeholder={t('canon.pitch')} onChange={event => patchVoice(index, { pitch: Number(event.target.value) })} />
-          <input className={inputClass} value={String(character.voiceProfile?.emotionalDefaults || '')} placeholder={t('canon.emotion')} onChange={event => patchVoice(index, { emotionalDefaults: event.target.value })} />
-          <textarea className={textareaClass} value={Object.entries(character.voiceProfile?.pronunciationDictionary || {}).map(([word, pronunciation]) => `${word}=${pronunciation}`).join('\n')} placeholder={t('canon.pronunciationPlaceholder')} onChange={event => patchVoice(index, { pronunciationDictionary: Object.fromEntries(event.target.value.split('\n').map(line => line.split('=', 2).map(value => value.trim())).filter(parts => parts.length === 2 && parts[0])) })} />
-          <textarea className={textareaClass} value={String(character.voiceProfile?.consentSourceNote || '')} placeholder={t('canon.consent')} onChange={event => patchVoice(index, { consentSourceNote: event.target.value })} />
+        <div className="space-y-2">
+          <SeriesReferenceField label={t('canon.addReference')} items={imageItems} disabled={Boolean(uploading)} onPick={item => void uploadReference(item, 'location', location.id)} />
+          <button className={secondaryButton} onClick={() => update(current => ({ ...current, locations: current.locations.map((item, i) => i === index ? { ...item, approval: item.approval === 'approved' ? 'draft' : 'approved' } : item) }))}>{t('canon.toggleApproval')}</button>
         </div>
       </div>)}</div>
+    </SectionCard>}
+
+    {tab === 'advanced' && <SectionCard title={t('canon.propsTitle')} action={<button className={primaryButton} onClick={() => update(current => ({ ...current, props: [...current.props, createSeriesProp()] }))}><Plus size={13} />{t('canon.prop')}</button>}>
+      <div className="space-y-3">{series.props.map((prop, index) => <div key={prop.id} className="rounded-xl border border-border p-3"><div className="grid gap-2 md:grid-cols-3"><input className={inputClass} value={prop.name} onChange={event => update(current => ({ ...current, props: current.props.map((item, i) => i === index ? { ...item, name: event.target.value } : item) }))} /><input className={inputClass} value={prop.kind} placeholder={t('canon.kindPlaceholder')} onChange={event => update(current => ({ ...current, props: current.props.map((item, i) => i === index ? { ...item, kind: event.target.value } : item) }))} /><button className={secondaryButton} onClick={() => update(current => ({ ...current, props: current.props.map((item, i) => i === index ? { ...item, approval: item.approval === 'approved' ? 'draft' : 'approved' } : item) }))}>{seriesStatusLabel(t, prop.approval)}</button></div><textarea className={`${textareaClass} mt-2`} value={prop.description} onChange={event => update(current => ({ ...current, props: current.props.map((item, i) => i === index ? { ...item, description: event.target.value } : item) }))} /><VariantEditor label={t('canon.propVariants')} variants={prop.variants} onChange={variants => update(current => ({ ...current, props: current.props.map((item, i) => i === index ? { ...item, variants } : item) }))} /><div className="my-2"><ReferenceStrip series={series} assetIds={prop.referenceAssetIds} /></div><SeriesReferenceField label={t('canon.addReference')} items={imageItems} disabled={Boolean(uploading)} onPick={item => void uploadReference(item, 'prop', prop.id)} /></div>)}</div>
+    </SectionCard>}
+
+    {tab === 'continuity' && <>
+      <SectionCard title={t('canon.arcsTitle')} action={<button className={primaryButton} onClick={() => patchCanon({ longArcs: [...series.canon.longArcs, { id: seriesId('arc'), title: '', description: '', status: 'planned' }] })}><Plus size={13} />{t('canon.arc')}</button>}><div className="space-y-2">{series.canon.longArcs.map((arc, index) => <div key={arc.id} className="grid gap-2 rounded-lg border border-border p-3 md:grid-cols-[1fr_2fr_auto]"><input className={inputClass} value={arc.title} onChange={event => patchCanon({ longArcs: series.canon.longArcs.map((item, i) => i === index ? { ...item, title: event.target.value } : item) })} /><textarea className={inputClass} value={arc.description} onChange={event => patchCanon({ longArcs: series.canon.longArcs.map((item, i) => i === index ? { ...item, description: event.target.value } : item) })} /><select className={inputClass} value={arc.status} onChange={event => patchCanon({ longArcs: series.canon.longArcs.map((item, i) => i === index ? { ...item, status: event.target.value as typeof item.status } : item) })}><option value="planned">{t('status.planned')}</option><option value="active">{t('status.active')}</option><option value="resolved">{t('status.resolved')}</option><option value="abandoned">{t('status.abandoned')}</option></select></div>)}</div></SectionCard>
+      <SectionCard title={t('canon.timelineTitle')} action={<button className={primaryButton} onClick={() => patchCanon({ timeline: [...series.canon.timeline, { id: seriesId('event'), description: '', status: 'draft', occurredAt: '' }] })}><Plus size={13} />{t('canon.event')}</button>}><div className="space-y-2">{series.canon.timeline.map((event, index) => <div key={event.id} className="grid gap-2 md:grid-cols-[1fr_3fr]"><SeriesField label={t('canon.when')}><input className={inputClass} value={event.occurredAt} onChange={change => patchCanon({ timeline: series.canon.timeline.map((item, i) => i === index ? { ...item, occurredAt: change.target.value } : item) })} /></SeriesField><SeriesField label={t('canon.whatHappened')}><input className={inputClass} value={event.description} onChange={change => patchCanon({ timeline: series.canon.timeline.map((item, i) => i === index ? { ...item, description: change.target.value } : item) })} /></SeriesField></div>)}</div></SectionCard>
+    </>}
+
+    {tab === 'advanced' && <SectionCard title={t('canon.voicesTitle')} description={t('canon.voicesDescription')}>
+      <SeriesVoiceFields series={series} onPatchVoice={patchVoice} />
     </SectionCard>}
   </div>
 }

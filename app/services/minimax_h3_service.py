@@ -796,6 +796,11 @@ def build_workflow(params: dict, job_id: str) -> tuple[dict, str]:
         raw_prompt,
         reference_mode=prompt_mode,
         audio_direction=audio_direction,
+        h3_audio_policy=str(
+            params.get("minimax_h3_audio_policy")
+            or params.get("h3_audio_policy")
+            or "native"
+        ),
     )
     copy_index = 0
 

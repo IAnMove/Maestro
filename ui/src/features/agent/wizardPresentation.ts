@@ -25,9 +25,10 @@ function configuredSpeed(fallback: PresentationSpeed): PresentationSpeed {
 }
 
 function editable(element: Element | null): boolean {
-  return element instanceof HTMLInputElement
-    || element instanceof HTMLTextAreaElement
-    || element instanceof HTMLSelectElement
+  if (!element || typeof HTMLElement === 'undefined') return false
+  return (typeof HTMLInputElement !== 'undefined' && element instanceof HTMLInputElement)
+    || (typeof HTMLTextAreaElement !== 'undefined' && element instanceof HTMLTextAreaElement)
+    || (typeof HTMLSelectElement !== 'undefined' && element instanceof HTMLSelectElement)
     || (element instanceof HTMLElement && element.isContentEditable)
 }
 
@@ -36,11 +37,34 @@ function focusTarget(anchor: HTMLElement): HTMLElement | null {
   return anchor.querySelector<HTMLElement>('textarea, input, select, button, [contenteditable="true"]')
 }
 
+function elementById(root: ParentNode, name: string): HTMLElement | null {
+  if (typeof HTMLElement === 'undefined') return null
+  if (typeof document !== 'undefined' && (root === document || root === document.documentElement || root === document.body)) {
+    const node = document.getElementById(name)
+    return node instanceof HTMLElement ? node : null
+  }
+  const node = root.querySelector(`[id="${name}"]`)
+  return node instanceof HTMLElement ? node : null
+}
+
 function semanticAnchors(root: ParentNode, names: string[]): HTMLElement[] {
   const wanted = new Set(names)
-  return [...root.querySelectorAll<HTMLElement>('[data-wizard-anchor]')]
+  const byAttr = [...root.querySelectorAll<HTMLElement>('[data-wizard-anchor]')]
     .filter(element => wanted.has(element.dataset.wizardAnchor || ''))
-    .sort((left, right) => names.indexOf(left.dataset.wizardAnchor || '') - names.indexOf(right.dataset.wizardAnchor || ''))
+  const byId = names.flatMap(name => {
+    const node = elementById(root, name)
+    return node ? [node] : []
+  })
+  const seen = new Set<HTMLElement>()
+  return [...byAttr, ...byId].filter(element => {
+    if (seen.has(element)) return false
+    seen.add(element)
+    return true
+  }).sort((left, right) => {
+    const leftName = left.dataset.wizardAnchor || left.id
+    const rightName = right.dataset.wizardAnchor || right.id
+    return names.indexOf(leftName) - names.indexOf(rightName)
+  })
 }
 
 const defaultWait = (milliseconds: number) => new Promise<void>(resolve => {

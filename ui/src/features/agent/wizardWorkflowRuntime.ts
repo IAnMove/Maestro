@@ -709,6 +709,10 @@ export class WizardWorkflowRuntime {
     const workflow = this.find(workflowId)
     const definition = this.definitions.get(workflow.type)
     if (!definition) return
+    // `execute()` can yield. `open()` may replace `this.collection` before the
+    // step writes its checkpoint, so persist must keep the collection that
+    // still holds this workflow object.
+    const owner = this.capturePersistOwner()
     while (workflow.currentStep < workflow.steps.length) {
       if (workflow.cancelRequested) return
       const step = workflow.steps[workflow.currentStep]
@@ -717,7 +721,7 @@ export class WizardWorkflowRuntime {
         workflow.state = failureState(workflow)
         workflow.recoverableError = `Missing workflow step definition ${step.stepId}.`
         workflow.updatedAt = Date.now()
-        await this.persistAndEmit(workflow)
+        await this.persistAndEmit(workflow, owner)
         return
       }
       if (step.state === 'completed') {
@@ -731,7 +735,7 @@ export class WizardWorkflowRuntime {
         step.state = 'failed'
         step.error = workflow.recoverableError
         workflow.updatedAt = Date.now()
-        await this.persistAndEmit(workflow)
+        await this.persistAndEmit(workflow, owner)
         return
       }
       const now = Date.now()
@@ -741,7 +745,7 @@ export class WizardWorkflowRuntime {
       step.error = ''
       workflow.state = workflow.resumeRequested ? 'retrying' : 'running'
       workflow.updatedAt = now
-      await this.persistAndEmit(workflow)
+      await this.persistAndEmit(workflow, owner)
       let result: WizardWorkflowStepResult
       try {
         result = await stepDefinition.execute({
@@ -753,7 +757,7 @@ export class WizardWorkflowRuntime {
         workflow.state = failureState(workflow)
         workflow.recoverableError = step.error
         workflow.updatedAt = Date.now()
-        await this.persistAndEmit(workflow)
+        await this.persistAndEmit(workflow, owner)
         return
       }
       step.output = clone(result.output || {})
@@ -771,7 +775,7 @@ export class WizardWorkflowRuntime {
         step.completedAt = workflow.updatedAt
         workflow.currentStep += 1
         workflow.state = workflow.currentStep >= workflow.steps.length ? 'completed' : 'running'
-        await this.persistAndEmit(workflow)
+        await this.persistAndEmit(workflow, owner)
         continue
       }
       if (result.state === 'awaiting_input') {
@@ -781,7 +785,7 @@ export class WizardWorkflowRuntime {
           step.error = `Step ${step.stepId} requested input without a reason and declared fields.`
           workflow.state = failureState(workflow)
           workflow.recoverableError = step.error
-          await this.persistAndEmit(workflow)
+          await this.persistAndEmit(workflow, owner)
           return
         }
         const previousPending = workflow.pendingInput
@@ -812,7 +816,7 @@ export class WizardWorkflowRuntime {
         }
         step.state = 'awaiting_input'
         workflow.state = 'awaiting_input'
-        await this.persistAndEmit(workflow)
+        await this.persistAndEmit(workflow, owner)
         return
       }
       if (!step.taskId) {
@@ -820,17 +824,17 @@ export class WizardWorkflowRuntime {
         step.error = `Step ${step.stepId} returned ${result.state} without a canonical task id.`
         workflow.state = failureState(workflow)
         workflow.recoverableError = step.error
-        await this.persistAndEmit(workflow)
+        await this.persistAndEmit(workflow, owner)
         return
       }
       step.state = 'waiting'
       workflow.state = result.state === 'queued' ? 'queued' : 'waiting'
-      await this.persistAndEmit(workflow)
+      await this.persistAndEmit(workflow, owner)
       return
     }
     workflow.state = 'completed'
     workflow.updatedAt = Date.now()
-    await this.persistAndEmit(workflow)
+    await this.persistAndEmit(workflow, owner)
   }
 
   private find(workflowId: string): WizardWorkflowRecord {
@@ -843,21 +847,62 @@ export class WizardWorkflowRuntime {
     return this.openSequence === openSequence && this.workspace === workspace
   }
 
-  private async persistAndEmit(workflow: WizardWorkflowRecord): Promise<void> {
-    await this.persist()
+  private capturePersistOwner(): {
+    workspace: string
+    collection: WizardWorkflowCollection
+    openSequence: number
+  } {
+    return {
+      workspace: this.workspace,
+      collection: this.collection,
+      openSequence: this.openSequence,
+    }
+  }
+
+  /**
+   * A CAS retry builds a merged snapshot, but `advanceUnlocked` keeps mutating
+   * the live workflow object captured in `owner.collection`. Adopt remote-only
+   * siblings into that same collection instead of pointing persist at the clone
+   * — otherwise the next persist in this advance overwrites those siblings.
+   */
+  private adoptPersistMerge(
+    owner: {
+      workspace: string
+      collection: WizardWorkflowCollection
+      openSequence: number
+    },
+    merged: WizardWorkflowCollection,
+  ): void {
+    const liveById = new Map(owner.collection.workflows.map(workflow => [workflow.workflowId, workflow]))
+    owner.collection.workflows = merged.workflows.map(workflow => {
+      const live = liveById.get(workflow.workflowId)
+      return live && live.updatedAt >= workflow.updatedAt ? live : workflow
+    })
+    owner.collection.revision = merged.revision
+    if (this.ownsOpen(owner.openSequence, owner.workspace)) {
+      this.collection = owner.collection
+    }
+  }
+
+  private async persistAndEmit(
+    workflow: WizardWorkflowRecord,
+    owner = this.capturePersistOwner(),
+  ): Promise<void> {
+    await this.persist(owner)
     const current = this.collection.workflows.find(item => item.workflowId === workflow.workflowId)
     if (!current || current.workspace !== this.workspace) return
     this.emit(current)
   }
 
-  private async persist(): Promise<void> {
-    // Pin the workspace that owns this snapshot. `open()` rebinds
-    // `this.workspace` immediately, so a conflict retry must not follow the
-    // live pointer or it will merge the source checkpoint into the destination
+  private async persist(owner = this.capturePersistOwner()): Promise<void> {
+    // Pin the workspace and collection that own this snapshot. `open()`
+    // rebinds both pointers immediately. A conflict retry — or a persist
+    // that starts after `execute()` yields — must not follow the live
+    // pointer or it will write the source checkpoint into the destination
     // store and then poison the in-memory collection.
-    const targetWorkspace = this.workspace
-    const openSequence = this.openSequence
-    let candidate = clone(this.collection)
+    const targetWorkspace = owner.workspace
+    const openSequence = owner.openSequence
+    let candidate = clone(owner.collection)
     let lastError: unknown
     // Workflow updates can race with conversation/library autosaves in another
     // tab. Re-read and merge a few times before surfacing a real persistence
@@ -865,6 +910,7 @@ export class WizardWorkflowRuntime {
     for (let attempt = 0; attempt < 3; attempt += 1) {
       try {
         const saved = await this.persistence.save(targetWorkspace, clone(candidate))
+        owner.collection.revision = saved.revision
         if (this.ownsOpen(openSequence, targetWorkspace)) {
           this.collection.revision = saved.revision
         }
@@ -873,9 +919,8 @@ export class WizardWorkflowRuntime {
         lastError = error
         const remote = await this.persistence.load(targetWorkspace)
         candidate = mergeCollections(candidate, remote)
-        if (this.ownsOpen(openSequence, targetWorkspace)) {
-          this.collection = candidate
-        }
+        this.adoptPersistMerge(owner, candidate)
+        candidate = clone(owner.collection)
       }
     }
     throw lastError instanceof Error ? lastError : new Error('Could not persist Wizard workflow.')

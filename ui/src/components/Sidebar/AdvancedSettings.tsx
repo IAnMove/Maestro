@@ -210,6 +210,7 @@ export function AdvancedSettings() {
     )
   )
   const isScailHq = isScailEdit && scailModelType === 'scail2_14B'
+  const { inference_steps_min: minimumSteps = 1, inference_steps_max: maximumSteps = 50 } = modelOptions ?? {}
   const h3TurboMode = (
     params.minimax_h3_turbo_mode === true
     && modelOptions?.minimax_h3_turbo != null
@@ -531,7 +532,7 @@ export function AdvancedSettings() {
                           <label className="text-[10px] text-text-muted">{t('advanced.attack')}</label>
                           <span className="text-[10px] text-text-secondary">{Number(params.tts_comp_attack ?? 5)}ms</span>
                         </div>
-                        <input type="range" min={1} max={50} step={1}
+                        <input type="range" min={minimumSteps} max={maximumSteps} step={1}
                           value={Number(params.tts_comp_attack ?? 5)}
                           onChange={e => setParam('tts_comp_attack', parseInt(e.target.value))}
                           className="w-full" />
@@ -815,13 +816,14 @@ export function AdvancedSettings() {
                     <input
                       type="number"
                       value={params.num_inference_steps}
+                      min={minimumSteps} max={maximumSteps}
                       disabled={h3TurboMode}
                       onChange={e => setParam('num_inference_steps', Number(e.target.value))}
                       className="w-16 bg-bg-tertiary border border-border rounded px-2 py-0.5 text-xs text-text-primary text-center focus:outline-none focus:border-accent-blue disabled:cursor-not-allowed disabled:opacity-50"
                     />
                   </div>
                   <input
-                    type="range" min={1} max={50} step={1}
+                    type="range" min={minimumSteps} max={maximumSteps} step={1}
                     value={params.num_inference_steps}
                     disabled={h3TurboMode}
                     onChange={e => setParam('num_inference_steps', Number(e.target.value))}

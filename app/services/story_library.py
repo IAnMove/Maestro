@@ -29,6 +29,16 @@ class StoryLibraryRevisionConflict(ValueError):
         self.current = current
 
 
+class StorySongAttachConflict(ValueError):
+    """A ready Story song row already belongs to a different published job."""
+
+    def __init__(self, candidate_id: str):
+        super().__init__(
+            f"Story song {candidate_id!r} is already published by another job",
+        )
+        self.candidate_id = candidate_id
+
+
 def empty_story_library() -> dict[str, Any]:
     return {"version": 2, "revision": 0, "activeId": "", "projects": {}}
 
@@ -222,6 +232,25 @@ def _apply_song_candidate_patch(
     return patched
 
 
+def _already_published_by_other_job(
+    current: dict[str, Any],
+    *,
+    job_id: str | None,
+    filename: str,
+) -> bool:
+    if str(current.get("status") or "") != "ready":
+        return False
+    if not str(current.get("source") or current.get("name") or "").strip():
+        return False
+    current_job = str((current.get("provenance") or {}).get("jobId") or "").strip()
+    incoming_job = str(job_id or "").strip()
+    if current_job and incoming_job:
+        return current_job != incoming_job
+    current_name = str(current.get("name") or "").strip()
+    incoming_name = str(filename or "").strip()
+    return bool(current_name and incoming_name and current_name != incoming_name)
+
+
 def attach_story_song_candidate(
     workspace_dir: str,
     *,
@@ -236,11 +265,13 @@ def attach_story_song_candidate(
     task_id: str | None = None,
     root_task_id: str | None = None,
     job_id: str | None = None,
+    update_selection: bool = True,
 ) -> dict[str, Any]:
     """CAS-patch one pending Story song row by project/cue/candidate IDs.
 
     Operates only on the library file inside ``workspace_dir``. A matching
-    candidate in another folder is never visible here.
+    candidate in another folder is never visible here. ``update_selection``
+    false leaves the user's current selection untouched.
     """
     token_project = _story_id_token(project_id)
     token_cue = _story_id_token(cue_id)
@@ -260,6 +291,9 @@ def attach_story_song_candidate(
         music, cues, cue_index, candidates, candidate_index = _require_music_row(
             project, token_cue, token_candidate,
         )
+        existing_row = dict(candidates[candidate_index])
+        if _already_published_by_other_job(existing_row, job_id=job_id, filename=filename):
+            raise StorySongAttachConflict(token_candidate)
         cue = dict(cues[cue_index])
         candidates[candidate_index] = _apply_song_candidate_patch(
             dict(candidates[candidate_index]),
@@ -275,10 +309,12 @@ def attach_story_song_candidate(
             job_id=job_id,
         )
         cue["candidates"] = candidates
-        cue["selectedCandidateId"] = token_candidate
+        if update_selection:
+            cue["selectedCandidateId"] = token_candidate
         cues[cue_index] = cue
         music["cues"] = cues
-        music["selectedCandidateId"] = token_candidate
+        if update_selection:
+            music["selectedCandidateId"] = token_candidate
         next_project = dict(project)
         next_project["music"] = music
         return write_story_library(

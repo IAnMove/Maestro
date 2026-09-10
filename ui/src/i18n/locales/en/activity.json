@@ -1,4 +1,5 @@
 {
+  "settingsUnavailable": "Saved settings could not be restored. Select the file again.",
   "title": "Activity",
   "openHistory": "Show canonical task history",
   "inboxLegacy": "Inbox / Legacy",
@@ -120,5 +121,11 @@
     "openSource": "Open source",
     "installManually": "install manually",
     "downloadStarted": "started ↓ (see download bar)"
+  },
+  "view": {
+    "label": "Gallery layout",
+    "feed": "One at a time",
+    "grid": "Grid",
+    "masonry": "Mosaic"
   }
 }

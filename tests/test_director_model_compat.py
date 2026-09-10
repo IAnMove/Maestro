@@ -1297,12 +1297,12 @@ class TestDirectorVideoExecutionProfile(unittest.TestCase):
             pipeline._prepare_director_generation_params(params)
 
         self.assertTrue(params["sliding_window_memory_override"])
-        self.assertEqual(params["num_inference_steps"], 6)
+        self.assertEqual(params["num_inference_steps"], 8)
         self.assertEqual(
             params["activated_loras"],
-            ["minimax_h3_turbo_4step_ckpt500.safetensors"],
+            ["MiniMax-H3-FL2VA-Acc-8Step.safetensors"],
         )
-        self.assertEqual(params["loras_multipliers"], "0.50")
+        self.assertEqual(params["loras_multipliers"], "1.00")
 
 
 class TestDirectorBackendValidation(unittest.TestCase):

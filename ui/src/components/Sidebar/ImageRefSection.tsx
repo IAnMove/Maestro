@@ -1,7 +1,11 @@
 import { useState, useCallback, useEffect } from 'react'
-import { Upload, X } from 'lucide-react'
+import { X } from 'lucide-react'
 import { useStore } from '../../stores/useStore'
 import { useUiTranslation } from '../../i18n'
+import type { ApiOutput } from '../../api/outputs'
+import { AssetInput } from '../../features/asset-picker/AssetInput.tsx'
+import { fileFromStudioOutput } from '../../lib/studioInputsPick.ts'
+import { useWorkspaceOutputs } from '../../lib/studioAssetPick.ts'
 
 export function ImageRefSection() {
   const { t } = useUiTranslation('studio')
@@ -17,6 +21,8 @@ export function ImageRefSection() {
   const setImageRefType = useStore(s => s.setImageRefType)
   const setRemoveBackgroundRefs = useStore(s => s.setRemoveBackgroundRefs)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
+  const activeWorkspace = useStore(s => s.activeWorkspace)
+  const imageItems = useWorkspaceOutputs(activeWorkspace, 'image')
 
   const config = modelOptions?.image_ref_choices
   const bgLabel = modelOptions?.background_removal_label
@@ -54,16 +60,8 @@ export function ImageRefSection() {
     addFiles(files)
   }, [addFiles])
 
-  const handleFileSelect = useCallback(() => {
-    const input = document.createElement('input')
-    input.type = 'file'
-    input.accept = '.png,.jpg,.jpeg,.webp,.bmp'
-    input.multiple = true
-    input.onchange = () => {
-      const files = Array.from(input.files || [])
-      addFiles(files)
-    }
-    input.click()
+  const chooseImage = useCallback((item: ApiOutput) => {
+    void fileFromStudioOutput(item).then(file => addFiles([file]))
   }, [addFiles])
 
   if (!config) return null
@@ -126,14 +124,16 @@ export function ImageRefSection() {
 
         {/* Add button / drop zone */}
         {canAddMore && (
-          <div
-            className="w-[90px] h-[90px] border border-dashed border-border rounded-lg flex flex-col items-center justify-center gap-0.5 cursor-pointer hover:border-border-light transition-colors"
-            onDrop={handleDrop}
-            onDragOver={e => e.preventDefault()}
-            onClick={handleFileSelect}
-          >
-            <Upload size={14} className="text-text-muted" />
-            <span className="text-[8px] text-text-muted">{tCommon('actions.add')}</span>
+          <div className="min-w-[10rem]" onDrop={handleDrop} onDragOver={e => e.preventDefault()}>
+            <AssetInput
+              label={tCommon('actions.add')}
+              placeholder={tCommon('actions.add')}
+              items={imageItems}
+              accept=".png,.jpg,.jpeg,.webp,.bmp,image/*"
+              workspaceId={activeWorkspace}
+              constraints={{ kinds: ['image'], maxCount: 1, optional: false }}
+              onChoose={item => { if (item) chooseImage(item) }}
+            />
           </div>
         )}
       </div>

@@ -41,6 +41,8 @@ export interface MiniMaxMusicJob {
   candidates: MiniMaxMusicCandidate[]
   error?: string | null
   statusCode?: number
+  candidateId?: string
+  generationId?: string
 }
 
 export interface StoryMusicCandidateRequest {
@@ -51,6 +53,7 @@ export interface StoryMusicCandidateRequest {
   reference_audio_filename?: string
   instrumental?: boolean
   workspace?: string
+  idempotency_key?: string
   provenance?: {
     actor?: 'user' | 'wizard' | 'system' | 'unknown'
     capability?: string
@@ -99,50 +102,73 @@ export async function cancelStoryMusicCandidatesJob(jobId: string): Promise<Mini
   return res.json()
 }
 
-export async function generateStoryMusicCandidates(
-  params: StoryMusicCandidateRequest,
-  options: {
-    onJobSubmitted?: (job: MiniMaxMusicJob) => void
-    onProgress?: (job: MiniMaxMusicJob) => void
-  } = {},
-): Promise<{
+const MUSIC_JOB_TERMINAL = new Set(['completed', 'failed', 'cancelled', 'interrupted'])
+
+export type StoryMusicJobWatchers = {
+  onJobSubmitted?: (job: MiniMaxMusicJob) => void | Promise<void>
+  onProgress?: (job: MiniMaxMusicJob) => void | Promise<void>
+}
+
+export type StoryMusicJobResult = {
   candidates: MiniMaxMusicCandidate[]
   status: 'completed' | 'cancelled' | 'failed' | 'interrupted'
   jobId: string
   taskId: string
   message: string
-}> {
-  let job = await startStoryMusicCandidatesJob(params)
-  options.onJobSubmitted?.(job)
+}
+
+async function resolveStoryMusicJob(
+  job: MiniMaxMusicJob,
+  options: StoryMusicJobWatchers,
+): Promise<StoryMusicJobResult> {
+  await options.onJobSubmitted?.(job)
   let pollFailures = 0
-  while (!['completed', 'failed', 'cancelled', 'interrupted'].includes(job.status)) {
-    await new Promise(resolve => window.setTimeout(resolve, pollFailures ? Math.min(10_000, pollFailures * 1_500) : 1_000))
+  let current = job
+  while (!MUSIC_JOB_TERMINAL.has(current.status)) {
+    await new Promise(resolve => window.setTimeout(
+      resolve,
+      pollFailures ? Math.min(10_000, pollFailures * 1_500) : 1_000,
+    ))
     try {
-      job = await fetchStoryMusicCandidatesJob(job.jobId)
+      current = await fetchStoryMusicCandidatesJob(current.jobId)
       pollFailures = 0
-      options.onProgress?.(job)
+      await options.onProgress?.(current)
     } catch (error) {
       pollFailures += 1
       if (pollFailures >= 20) {
         throw new Error(
-          `Could not reconnect to MiniMax Music job ${job.jobId}; its ID was preserved: ${(error as Error).message}`,
+          `Could not reconnect to MiniMax Music job ${current.jobId}; its ID was preserved: ${(error as Error).message}`,
         )
       }
     }
   }
-  if (job.status === 'completed' || job.candidates.length > 0) {
+  if (current.status === 'completed' || current.candidates.length > 0) {
     return {
-      candidates: job.candidates,
-      status: job.status as 'completed' | 'cancelled' | 'failed' | 'interrupted',
-      jobId: job.jobId,
-      taskId: job.taskId,
-      message: job.message,
+      candidates: current.candidates,
+      status: current.status as StoryMusicJobResult['status'],
+      jobId: current.jobId,
+      taskId: current.taskId,
+      message: current.message,
     }
   }
   throw new Error(
-    `${job.statusCode ? `HTTP ${job.statusCode}: ` : ''}`
-    + (job.error || job.message || `MiniMax Music job ${job.status}`),
+    `${current.statusCode ? `HTTP ${current.statusCode}: ` : ''}`
+    + (current.error || current.message || `MiniMax Music job ${current.status}`),
   )
+}
+
+export async function watchStoryMusicCandidatesJob(
+  jobId: string,
+  options: StoryMusicJobWatchers = {},
+): Promise<StoryMusicJobResult> {
+  return resolveStoryMusicJob(await fetchStoryMusicCandidatesJob(jobId), options)
+}
+
+export async function generateStoryMusicCandidates(
+  params: StoryMusicCandidateRequest,
+  options: StoryMusicJobWatchers = {},
+): Promise<StoryMusicJobResult> {
+  return resolveStoryMusicJob(await startStoryMusicCandidatesJob(params), options)
 }
 
 export async function translateStoryLyrics(params: {

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { applyCutoutDialogue, bindCutoutFaceToPose, ensureCutoutFacePlayback, findCutoutMouthLayers, planCutoutDialogue, rebuildCutoutDialogueLayers } from '../src/lib/cutoutDialogue.ts'
+import { applyCutoutDialogue, bindCutoutFaceToPose, ensureCutoutFacePlayback, findCutoutMouthLayers, normalizeFaceBinding, planCutoutDialogue, rebuildCutoutDialogueLayers } from '../src/lib/cutoutDialogue.ts'
+import { evaluateSceneLayer } from '../src/lib/sceneTimeline.ts'
 
 const layer = id => ({ id, animation: { start: { x: 50, y: 48, scale: .12, opacity: 1 }, end: { x: 50, y: 48, scale: .12, opacity: 1 }, duration: 5, curve: 'hold' } })
 
@@ -183,7 +184,20 @@ test('playback fills talking and blink keyframes when the kit is still at rest',
     animation: { start: { x: 32, y: 40, scale: .12, opacity: 1 }, end: { x: 32, y: 40, scale: .12, opacity: 1 }, duration: 6, curve: 'hold' },
     faceBinding: { poseLayerId: 'pose', role: 'eyes', state: 'open' },
   }
-  const next = ensureCutoutFacePlayback([closed, wide, blink, open], 6, 30)
+  // Import must retain the open-eye state, otherwise playback cannot hide it
+  // while the closed-eye overlay is visible.
+  const imported = [closed, wide, blink, open].map(layer => ({
+    ...layer, faceBinding: normalizeFaceBinding(layer.faceBinding),
+  }))
+  assert.equal(imported.at(-1).faceBinding.state, 'open')
+  const silent = ensureCutoutFacePlayback(imported, 6, 30)
+  for (let frame = 0; frame <= 180; frame += 1) {
+    const at = id => evaluateSceneLayer(silent.find(layer => layer.id === id), frame / 30).opacity
+    assert.equal(at(closed.id), 1, 'a silent character keeps the closed mouth')
+    assert.equal(at(wide.id), 0, 'no fabricated speech during silence')
+    assert.equal(at(blink.id) + at(open.id), 1, 'exactly one eye state at each frame')
+  }
+  const next = ensureCutoutFacePlayback(imported, 6, 30, [], 'Hola, una frase explícita.')
   const closedFrames = next.find(layer => layer.id === closed.id).animation.keyframes
   const wideFrames = next.find(layer => layer.id === wide.id).animation.keyframes
   const blinkFrames = next.find(layer => layer.id === blink.id).animation.keyframes

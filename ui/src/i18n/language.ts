@@ -1,7 +1,8 @@
 import { safeStorageGet, safeStorageSet } from '../lib/safeStorage'
 import { DEFAULT_LANGUAGE, UI_LANGUAGES, type UiLanguage } from './resources'
+import { LANGUAGE_STORAGE_KEY } from './storageKey'
 
-export const LANGUAGE_STORAGE_KEY = 'hocuspocus-ui-language'
+export { LANGUAGE_STORAGE_KEY }
 
 export function isUiLanguage(value: string | null | undefined): value is UiLanguage {
   return UI_LANGUAGES.includes(value as UiLanguage)

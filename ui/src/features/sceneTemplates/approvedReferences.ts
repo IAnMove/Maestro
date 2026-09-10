@@ -1,0 +1,28 @@
+/** Only hashes/byte lengths from the published coral v1 manifest, not media or
+ * generated scene outputs. Approval covers these originals, never new bindings. */
+export const APPROVED_REFERENCE_JSON: Readonly<Record<string, { sha256: string; bytes: number }>> = {
+  'cinema-establishing': { sha256: '22fa838c65ddb0563acaa60e92949aea651c57bac0f6c3a432a85dfc95bbe3e7', bytes: 57785 },
+  'cinema-reveal': { sha256: '75ce7abb5ed499fd53284189569c8ea17794ed5ba5fe9af679962e0a07a95cbd', bytes: 56775 },
+  'cinema-closeup': { sha256: '75ea708539735d95e2c3e0b26e813c7849424b2f5b6df5a55d929182db64c919', bytes: 57780 },
+  'cinema-two-shot': { sha256: 'cd7c916289aa098b930decd0d910b4bf2dbeabc1ea7b9106ed062fcc784972ef', bytes: 64097 },
+  'cinema-detail': { sha256: 'fc00a9710e120a090a4e56c7681ac1d6dd255c37568e40d026ba4923df5ddfd8', bytes: 52668 },
+  'cinema-hero': { sha256: '45968796345cf2475328d64ce0109e532b620f4fc7a5375e7bb2a7117795043b', bytes: 57775 },
+  'cinema-isolation': { sha256: '2fe428aab14ce66df5042c202106e4a7eaa561116a39541aec421d60c2ececf9', bytes: 57791 },
+  'cinema-tracking': { sha256: '4dd0b69f716c4df55c91304f59202d226e1804f9b16764eb0c3999c17834a2fe', bytes: 58324 },
+  'music-pulse': { sha256: '738b9a7bdb6de6c1fdb15978f3233c48108c9a3bc2cf7252f30a07929f00382c', bytes: 30970 },
+  'music-duet': { sha256: '164674aff4bac9c29c3cdece361515ae6d7c08e1c2a747a0e9d3f4e939405637', bytes: 43273 },
+  'music-chorus': { sha256: 'a9b4ef3bdb6ac28d34275f17d24260abbb621c034a5f3b92ee46a8db418a39e9', bytes: 30423 },
+  'music-orbit': { sha256: '438880c5bd5f1f51992514c0eaf3685fbac0da20abbc18dc5a31c85cbf48200f', bytes: 35753 },
+  'music-parallax': { sha256: 'aa6ccdd254a26b0458f73cbbade341c5d1aa195e915dff194fe94aae61addc89', bytes: 25505 },
+  'music-stage': { sha256: 'ac37b54a7680dbccf85699e59e6d6112c866b2384bf82b01f9ff306ed43ffa85', bytes: 31208 },
+  'music-product': { sha256: '24cd79b96ecaa7d9cf35673eaae3552264943e932b15d0620d5c8c1e30ae09d1', bytes: 21917 },
+  'music-finale': { sha256: 'e9e3b41cd51a071d9d3659b0b3f6ca850f1f63c46e705eebe1b2d49b7f81cf21', bytes: 31186 },
+  'space-cruise': { sha256: '6329c2302c99a6fc3ad5949af2df6d3bea2014bf9d042ce35788ea5a6b3372f2', bytes: 552167 },
+  'space-orbit': { sha256: 'bba6b7406fb07c7572cbefa98f3a562d70c1f3415fd2e92ba72ba686e4fd6c1b', bytes: 557448 },
+  'space-docking': { sha256: 'bcf77a8ead821bc33780cc85af4cfa770aef0b387652acee6acf4330c7f14e45', bytes: 1078461 },
+  'space-chase': { sha256: '4bfcafba72e74e5f20c3ab3f2a9cfebcab7efc75fc21aa36b05c28a4dba8373f', bytes: 1081144 },
+  'space-broadside': { sha256: '4b5c76546c367ce706038749bae117f8ca8f5a841362c82cde6842b499ba3427', bytes: 1088171 },
+  'space-shield': { sha256: '1c4a998891d4db83f7bfc42f2675e3968c475caed0844cc12758519d0a86cd42', bytes: 1091616 },
+  'space-explosion': { sha256: 'e2233f957dc55b43958d921c55f19aa41ffabd741f22eecff58204cda6981a62', bytes: 1089155 },
+  'space-warp': { sha256: '848b383c291fa4cf9f0fee18b45904e2b05caf91835526ac86c3e04466d86512', bytes: 554707 },
+}

@@ -1,10 +1,11 @@
 import { useStore } from '../../stores/useStore'
+import i18n from '../../i18n'
 import type { CommandResult } from '../../lib/commandContract'
 import { rememberedCharacterKitLibrary } from '../characters/session'
 import type { SeriesAssemblyJob } from '../series/assemblyContract'
 import type { SeriesJobStatus } from '../series/types'
 import type { MediaFilter } from '../../types'
-import type { AgentApply3dRhythmAction, AgentApplySeriesPlanAction, AgentApplyStoryProposalAction, AgentApproveStorySectionAction, AgentApproveStoryVisualsAction, AgentAssembleSeriesEpisodeAction, AgentAttachStudioReferencesAction, AgentCommitSeriesCanonAction, AgentConfigureStudioLorasAction, AgentConfigureStorySongAction, AgentCreateComicAction, AgentCreateSeriesEpisodeAction, AgentCreateStoryAction, AgentCreateWorkspaceAction, AgentCreateWorkspaceCollectionAction, AgentDownloadModelAction, AgentGenerateComicAction, AgentGenerateSeriesPlanAction, AgentGenerateStorySectionAction, AgentGenerateStorySongAction, AgentGenerateStoryVisualsAction, AgentPrepare3dAction, AgentPrepareAudioAction, AgentPrepareImageAction, AgentPrepareVideoAction, AgentQueueSfxPackAction, AgentRemoveBackgroundAction, AgentRenderSeriesShotsAction, AgentReviewSeriesAttemptsAction, AgentSelectWorkspaceAction, AgentStartGenerationAction, AgentStageStoryComicAction, AgentStartDirectorProductionAction, AgentStageStoryMusicVideoAction, AgentStageStoryVideoAction, AgentUpdateSeriesEpisodeAction, AgentUpdateStoryAction, AgentUpdateWorkspaceCollectionAction } from './agentActions'
+import type { AgentApply3dRhythmAction, AgentApplySeriesPlanAction, AgentApplyStoryProposalAction, AgentApproveStorySectionAction, AgentApproveStoryVisualsAction, AgentAssembleSeriesEpisodeAction, AgentAttachStudioReferencesAction, AgentCommitSeriesCanonAction, AgentConfigureStudioLorasAction, AgentConfigureStorySongAction, AgentCreateComicAction, AgentCreateSeriesEpisodeAction, AgentCreateStoryAction, AgentCreateWorkspaceAction, AgentCreateWorkspaceCollectionAction, AgentDownloadModelAction, AgentGenerateComicAction, AgentGenerateSeriesPlanAction, AgentGenerateStorySectionAction, AgentGenerateStorySongAction, AgentGenerateStoryVisualsAction, AgentPrepare3dAction, AgentPrepareAudioAction, AgentPrepareImageAction, AgentPrepareVideoAction, AgentQueueSfxPackAction, AgentRemoveBackgroundAction, AgentRenderSeriesShotsAction, AgentReviewSeriesAttemptsAction, AgentStageSeriesComicAction, AgentSelectWorkspaceAction, AgentStartGenerationAction, AgentStageStoryComicAction, AgentStartDirectorProductionAction, AgentStageStoryMusicVideoAction, AgentStageStoryVideoAction, AgentUpdateSeriesEpisodeAction, AgentUpdateStoryAction, AgentUpdateWorkspaceCollectionAction, AgentUpscaleAction } from './agentActions'
 import type {
   AgentAttachVideoclipAlternativeSongAction,
   AgentMountVideoclipAlternativeSongAction,
@@ -43,9 +44,11 @@ import type {
 import type { GenerationSubmissionContext } from '../studio/generationProvenance'
 import { announceWizardNavigation } from '../../lib/navigationCategories'
 import { createToolsAdapter } from './toolsAdapter'
+import { createWorkspaceCollectionAdapter } from './workspaceCollectionAdapter'
 import { downloadModel as requestModelDownload, fetchModelDownloads } from '../../api/generation'
 
 export interface AdapterOutcome {
+  commandResult?: CommandResult
   message: string
   target: AgentExecutionTarget
   projectTarget?: AgentExecutionTarget
@@ -81,6 +84,7 @@ export interface StudioAdapter {
 
 export interface ToolsAdapter {
   removeBackground(action: AgentRemoveBackgroundAction, context?: GenerationSubmissionContext): Promise<AdapterOutcome>
+  upscale(action: AgentUpscaleAction, context?: GenerationSubmissionContext): Promise<AdapterOutcome>
 }
 
 export interface StoryLabAdapter {
@@ -109,6 +113,7 @@ export interface SeriesLabAdapter {
   reviewAttempts(action: AgentReviewSeriesAttemptsAction): Promise<AdapterOutcome>
   commitCanon(action: AgentCommitSeriesCanonAction): Promise<AdapterOutcome>
   assembleEpisode(action: AgentAssembleSeriesEpisodeAction): Promise<AdapterOutcome>
+  stageComic(action: AgentStageSeriesComicAction): Promise<AdapterOutcome>
 }
 export interface ComicAdapter {
   open(): Promise<AdapterOutcome>
@@ -149,8 +154,8 @@ export interface QueueAdapter {
 export interface WorkspaceAdapter {
   select(action: AgentSelectWorkspaceAction): Promise<AdapterOutcome>
   create(action: AgentCreateWorkspaceAction): Promise<AdapterOutcome>
-  createCollection(action: AgentCreateWorkspaceCollectionAction): Promise<AdapterOutcome>
-  updateCollection(action: AgentUpdateWorkspaceCollectionAction): Promise<AdapterOutcome>
+  createCollection(action: AgentCreateWorkspaceCollectionAction, context?: GenerationSubmissionContext): Promise<AdapterOutcome>
+  updateCollection(action: AgentUpdateWorkspaceCollectionAction, context?: GenerationSubmissionContext): Promise<AdapterOutcome>
 }
 export interface VideoclipAdapter {
   attachAlternativeSong(action: AgentAttachVideoclipAlternativeSongAction): Promise<AdapterOutcome>
@@ -159,6 +164,7 @@ export interface VideoclipAdapter {
 
 export interface Video3DAdapter {
   open(animate?: boolean): Promise<AdapterOutcome>
+  prepareProgrammaticVideo(action: import('./programmaticVideo').AgentPrepareProgrammaticVideoAction): Promise<AdapterOutcome>
   applyRhythm(action: AgentApply3dRhythmAction): Promise<AdapterOutcome>
   run(request: AgentSceneWorkflowRequest): Promise<AdapterOutcome>
   control(request: AgentSceneControlRequest): Promise<AdapterOutcome>
@@ -358,7 +364,7 @@ export function createDefaultApplicationAdapters(): WizardApplicationAdapters {
       const result = await startGeneration(context || {
         actor: 'wizard', capability: action.type,
       })
-      const presented = await presentStudioSliceResult(result, 'Studio generation')
+      const presented = await presentAdmittedStudioResult(result)
       const taskId = result.taskIds[0]
       return {
         ...presented,
@@ -367,10 +373,11 @@ export function createDefaultApplicationAdapters(): WizardApplicationAdapters {
           state: 'queued',
           message: presented.message,
           target: presented.target,
+          metadata: presented.metadata,
           taskId,
           recoverable: true,
           executionKey: executionKey({
-            workspace: useStore.getState().activeWorkspace || 'default',
+            workspace: result.entities[0]?.workspaceId || useStore.getState().activeWorkspace || 'default',
             type: action.type,
             params: action,
           }),
@@ -387,9 +394,13 @@ export function createDefaultApplicationAdapters(): WizardApplicationAdapters {
     },
     async queueSfxPack(action, context) {
       const { queueSfx } = await import('../studio/adapters')
-      return presentStudioSliceResult(await queueSfx(action, context || {
-        actor: 'wizard', capability: action.type,
-      }), 'Audio → SFX')
+      const result = await queueSfx(action, context || { actor: 'wizard', capability: action.type })
+      const presented = await presentSfxPackResult(result)
+      return { ...presented, commandResult: result, report: executionReport({
+        state: result.status === 'queued' ? 'queued' : result.status === 'partial' ? 'partial' : 'failed',
+        message: presented.message, target: presented.target, taskId: result.taskIds[0],
+        metadata: { ...presented.metadata, error: result.error }, recoverable: true,
+      }) }
     },
   }
   adapters.tools = createToolsAdapter(navigate)
@@ -550,6 +561,10 @@ export function createDefaultApplicationAdapters(): WizardApplicationAdapters {
       const outcome = await presentSeriesSliceResult(await assembleEpisode(action))
       if (!outcome.taskId) throw new Error('Series Lab no devolvió el job de ensamblado iniciado.')
       return outcome
+    },
+    async stageComic(action) {
+      const { resolveSeriesComicCommand, stageSeriesComic } = await import('../series/adapters')
+      return presentSeriesComicResult(await stageSeriesComic(resolveSeriesComicCommand(action)))
     },
   }
   adapters.comic = {
@@ -805,45 +820,7 @@ export function createDefaultApplicationAdapters(): WizardApplicationAdapters {
       const { createWorkspace } = await import('../workspaces/adapters')
       return presentWorkspaceSliceResult(await createWorkspace({ workspaceName: action.workspaceName }))
     },
-    async createCollection(action) {
-      await navigate('workspaces')
-      const { createWorkspaceCollection } = await import('../../api/workspaceCollections')
-      const created = await createWorkspaceCollection({
-        name: action.name,
-        description: action.description,
-        project_ids: action.projectIds,
-        asset_ids: action.assetIds,
-        production_ids: action.productionIds,
-      })
-      window.dispatchEvent(new CustomEvent('hocuspocus:workspace-collection-open', { detail: { collection: created } }))
-      return {
-        message: `He creado el Workspace “${created.name}” y lo he abierto con sus referencias exactas.`,
-        target: { kind: 'workspace_collection', id: created.id, title: created.name },
-      }
-    },
-    async updateCollection(action) {
-      const { fetchWorkspaceCollections, updateWorkspaceCollection } = await import('../../api/workspaceCollections')
-      const page = await fetchWorkspaceCollections()
-      const current = page.workspaces.find(item => item.id === action.workspaceId)
-      if (!current) throw new Error(`No existe el Workspace con ID “${action.workspaceId}”.`)
-      if (action.expectedRevision !== undefined && current.revision !== action.expectedRevision) {
-        throw new Error(`El Workspace cambió desde la revisión ${action.expectedRevision}; ahora está en la ${current.revision}. Vuelve a consultarlo antes de sobrescribirlo.`)
-      }
-      const changed = await updateWorkspaceCollection({
-        ...current,
-        name: action.name ?? current.name,
-        description: action.description ?? current.description,
-        project_ids: action.projectIds ?? current.project_ids,
-        asset_ids: action.assetIds ?? current.asset_ids,
-        production_ids: action.productionIds ?? current.production_ids,
-      })
-      await navigate('workspaces')
-      window.dispatchEvent(new CustomEvent('hocuspocus:workspace-collection-open', { detail: { collection: changed } }))
-      return {
-        message: `He actualizado el Workspace “${changed.name}” por su ID exacto.`,
-        target: { kind: 'workspace_collection', id: changed.id, title: changed.name },
-      }
-    },
+    ...createWorkspaceCollectionAdapter(navigate),
   }
   adapters.videoclips = {
     async attachAlternativeSong(action) {
@@ -875,6 +852,14 @@ export function createDefaultApplicationAdapters(): WizardApplicationAdapters {
   }
   adapters.video3d = {
     open: animate => navigate(animate ? 'animate_3d' : 'video_3d'),
+    async prepareProgrammaticVideo(action) {
+      const workspace = useStore.getState().activeWorkspace || 'default'
+      const { requestProgrammaticVideoPreparation } = await import('./programmaticVideoHandoff')
+      const navigation = await navigate('video_3d')
+      const prepared = await requestProgrammaticVideoPreparation({ ...action, workspace })
+      if ((useStore.getState().activeWorkspace || 'default') !== workspace) throw new Error('El workspace cambió durante la preparación de Video3D.')
+      return { ...navigation, message: prepared.message, metadata: { generationPolicy: prepared.policy, stage: 'prepared', generated: false } }
+    },
     async applyRhythm(action) {
       const navigation = await navigate('video_3d')
       const message = await requestAgentSceneRhythm(action)
@@ -945,16 +930,11 @@ async function presentStorySliceResult(result: CommandResult): Promise<AdapterOu
     openAgentStorySection,
   } = await import('./agentUiBus')
   const section = result.navigationTarget?.section
-  if (
-    section === 'overview'
-    || section === 'world'
-    || section === 'characters'
-    || section === 'relationships'
-    || section === 'structure'
-    || section === 'assets'
-    || section === 'music'
-  ) {
-    openAgentStorySection(section)
+  if (section) {
+    const { resolveStoryLabNavigation } = await import('../stories/labNavigation')
+    const { useStoryStore } = await import('../stories/store')
+    const resolved = resolveStoryLabNavigation(section, useStoryStore.getState().project.projectType)
+    if (resolved.ok) openAgentStorySection(resolved.tab)
   }
   const meta = result.artifacts[0]?.metadata || {}
   if (meta.notifyDraft === true && result.entities[0]?.id) notifyAgentStoryDraft(result.entities[0].id)
@@ -984,6 +964,20 @@ async function seriesEpisodeOutcome(message: string): Promise<AdapterOutcome> {
   const episode = series?.episodesById[state.activeEpisodeId]
   if (!series?.id || !episode?.id) throw new Error('Series Lab no devolvió el episodio canónico creado o actualizado.')
   return { message, target: { kind: 'series_episode', id: episode.id, title: `${series.title} · ${episode.title}` } }
+}
+
+async function presentSeriesComicResult(result: CommandResult): Promise<AdapterOutcome> {
+  await navigate('comics')
+  const { useComicStore } = await import('../comics/store')
+  const comic = useComicStore.getState().project
+  const meta = result.artifacts[0]?.metadata || {}
+  const summary = typeof meta.summary === 'string' ? meta.summary : 'Cómic de Series Lab preparado.'
+  if (!comic?.id) throw new Error('Series Lab no correlacionó el cómic editable.')
+  return {
+    message: summary,
+    target: { kind: 'comic', id: comic.id, title: comic.title },
+    metadata: meta,
+  }
 }
 
 async function presentSeriesSliceResult(result: CommandResult): Promise<AdapterOutcome> {
@@ -1028,6 +1022,36 @@ async function presentQueueSliceResult(result: CommandResult): Promise<AdapterOu
     message: summary,
     target: { kind: 'activity', id: result.entities[0]?.id || 'activity', title: 'Activity' },
     taskId: result.taskIds[0],
+  }
+}
+
+async function presentAdmittedStudioResult(result: CommandResult): Promise<AdapterOutcome> {
+  const receipt = result.artifacts[0]?.metadata?.receipt
+  if (result.status !== 'queued' || !receipt) return presentStudioSliceResult(result, 'Studio generation')
+  const metadata = { commandId: result.commandId, receipt }
+  try {
+    return { ...await presentStudioSliceResult(result, 'Studio generation'), metadata }
+  } catch {
+    const message = i18n.t('studio:commands.admittedNotVisible', { id: result.taskIds[0] })
+    return {
+      message, taskId: result.taskIds[0],
+      target: { kind: 'generation_task', id: result.taskIds[0], title: 'Studio generation' },
+      metadata: { ...metadata, presentationWarning: message },
+    }
+  }
+}
+
+async function presentSfxPackResult(result: CommandResult): Promise<AdapterOutcome> {
+  const metadata: Record<string, unknown> = { ...result.artifacts[0]?.metadata, taskIds: result.taskIds }
+  try {
+    return { ...await presentStudioSliceResult(result, 'Audio → SFX'), metadata }
+  } catch {
+    const warning = i18n.t('studio:sfxCommands.packPresentationFailed')
+    return {
+      message: `${String(metadata.summary || '')} ${warning}`,
+      target: { kind: 'sfx_pack', id: result.entities[0]?.id || result.commandId, title: 'Audio → SFX' },
+      taskId: result.taskIds[0], metadata: { ...metadata, presentationWarning: warning },
+    }
   }
 }
 

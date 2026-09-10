@@ -3,7 +3,6 @@ import { useUiTranslation } from '../../i18n'
 import { panel } from './storyLabChrome'
 import { StoryMusicProductionGuide } from './StoryMusicProductionGuide'
 import { StoryMusicProductionLaunch } from './StoryMusicProductionLaunch'
-import { StoryMusicProductionLegacyDrawer } from './StoryMusicProductionLegacyDrawer'
 import { StoryMusicProductionModels } from './StoryMusicProductionModels'
 import { StoryMusicProductionSong } from './StoryMusicProductionSong'
 import type { StoryProductionsTabProps } from './storyLabProductions'
@@ -40,7 +39,6 @@ export function StoryProductionsMusicPanel(props: StoryProductionsTabProps) {
           {' '}{t('productions.noSongsHint')}
         </div>
       )}
-      <StoryMusicProductionLegacyDrawer {...props} />
     </div>
   )
 }

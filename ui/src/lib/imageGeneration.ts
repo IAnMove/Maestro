@@ -2,11 +2,13 @@ import * as api from '../api/client'
 import { getModelMode, useStore } from '../stores/useStore'
 import { comicId } from '../features/comics/model'
 import type { ComicAsset } from '../features/comics/types'
+import { generationProvenancePayload, type GenerationSubmissionContext } from '../features/studio/generationProvenance'
 
 export type LocalImageOptions = {
   panelId?: string
   existingJobId?: string
   onJobSubmitted?: (jobId: string) => void
+  onStatus?: (status: api.ApiJobStatus) => void
   onPollRetry?: (attempt: number, error: string) => void
   /** Kept for caller compatibility; provider jobs are not resubmitted automatically. */
   onProviderRetry?: (attempt: number, error: string) => void
@@ -16,6 +18,30 @@ export type LocalImageOptions = {
   /** Freeze an explicit local output canvas instead of inheriting another image model's saved value. */
   resolution?: string
   aspectRatio?: '1:1' | '16:9' | '4:3' | '3:2' | '2:3' | '3:4' | '9:16' | '21:9'
+  /** Ordered references; the first image is the source canvas in edit mode. */
+  references?: string[]
+  /** Resolve canonical local URLs on the server, without duplicating media. */
+  canonicalReferences?: boolean
+  workspace?: string
+  cleanModelDefaults?: boolean
+  comicPanel?: boolean
+  submissionContext?: GenerationSubmissionContext
+  /** Stops observation only. Cancelling server work is an explicit separate action. */
+  signal?: AbortSignal
+}
+
+export function observeImageRequest<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (!signal) return promise
+  return new Promise((resolve, reject) => {
+    const aborted = () => reject(new DOMException('Image observation cancelled', 'AbortError'))
+    promise.then(resolve, reject).finally(() => signal.removeEventListener('abort', aborted))
+    if (signal.aborted) { aborted(); return }
+    signal.addEventListener('abort', aborted, { once: true })
+  })
+}
+
+export function throwIfImageObservationAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) throw new DOMException('Image observation cancelled', 'AbortError')
 }
 
 const wait = (milliseconds: number) =>
@@ -123,23 +149,16 @@ export async function findCompletedLocalImage(
   return null
 }
 
-async function runLocalImage(
-  prompt: string,
-  modelType?: string,
-  reference?: string,
-  negativePrompt = '',
-  options: LocalImageOptions = {},
-): Promise<ComicAsset> {
-  const maestro = useStore.getState()
-  const selected = modelType || maestro.selectedModelPerMode.image || maestro.params.model_type
-  if (!selected) throw new Error('Select an image model in HocusPocus first')
+async function prepareLocalImageReferences(
+  selected: string,
+  maestro: ReturnType<typeof useStore.getState>,
+  imageParams: Record<string, unknown>,
+  references: string[],
+  options: LocalImageOptions,
+): Promise<Record<string, unknown>> {
   const model = maestro.models.find(item => item.model_type === selected)
-  if (model && getModelMode(model.model_type, model.family) !== 'image') {
-    throw new Error(`"${selected}" is a video model. Select a HocusPocus image model or MiniMax`)
-  }
-  const imageParams = maestro.savedParamsPerMode.image || {}
   const referenceParams: Record<string, unknown> = {}
-  if (reference) {
+  if (references.length && !options.existingJobId) {
     const supportsReferences = Boolean(
       model?.supports_ref_images
       || (selected === maestro.params.model_type && maestro.modelOptions?.image_ref_choices),
@@ -153,17 +172,25 @@ async function runLocalImage(
         )
       }
     } else {
-      const response = await fetch(reference)
-      if (!response.ok) throw new Error('The selected identity reference is no longer available')
-      const blob = await response.blob()
-      const uploaded = await api.uploadImage(new File(
-        [blob],
-        fileName(decodeURIComponent(reference)) || 'story-reference.png',
-        { type: blob.type || 'image/png' },
-      ))
+      const paths: string[] = []
+      for (const source of references) {
+        throwIfImageObservationAborted(options.signal)
+        if (options.canonicalReferences) paths.push(source)
+        else {
+          const response = await fetch(source, { signal: options.signal })
+          if (!response.ok) throw new Error('The selected identity reference is no longer available')
+          const blob = await response.blob()
+          const uploaded = await api.uploadImage(new File(
+            [blob], fileName(decodeURIComponent(source)) || 'story-reference.png',
+            { type: blob.type || 'image/png' },
+          ))
+          paths.push(uploaded.path)
+        }
+      }
       const currentType = typeof imageParams.video_prompt_type === 'string'
         ? imageParams.video_prompt_type : ''
-      referenceParams.image_refs = [uploaded.path]
+      referenceParams.image_refs = paths
+      if (options.canonicalReferences) referenceParams.canonical_image_refs = true
       // Qwen's KI contract makes the first conditional image the main
       // subject/landscape. Plain I treats it as a supplemental person/object
       // reference and is exactly the wrong semantic for scene style transfer.
@@ -193,10 +220,36 @@ async function runLocalImage(
       }
     }
   }
+  return referenceParams
+}
+
+async function runLocalImage(
+  prompt: string,
+  modelType?: string,
+  reference?: string,
+  negativePrompt = '',
+  options: LocalImageOptions = {},
+): Promise<ComicAsset> {
+  throwIfImageObservationAborted(options.signal)
+  const maestro = useStore.getState()
+  const workspace = options.workspace ?? maestro.activeWorkspace
+  const selected = modelType || maestro.selectedModelPerMode.image || maestro.params.model_type
+  if (!selected) throw new Error('Select an image model in HocusPocus first')
+  const model = maestro.models.find(item => item.model_type === selected)
+  if (model && getModelMode(model.model_type, model.family) !== 'image') {
+    throw new Error(`"${selected}" is a video model. Select a HocusPocus image model or MiniMax`)
+  }
+  const imageParams = options.cleanModelDefaults
+    ? options.existingJobId ? {} : await observeImageRequest(api.fetchDefaults(selected), options.signal)
+    : maestro.savedParamsPerMode.image || {}
+  const referenceParams = await prepareLocalImageReferences(
+    selected, maestro, imageParams, options.references ?? (reference ? [reference] : []), options,
+  )
   let identity: ImageTaskIdentity = { jobId: options.existingJobId }
   if (!options.existingJobId) {
+    throwIfImageObservationAborted(options.signal)
     const submitted = await api.submitGeneration({
-      ...maestro.params,
+      ...(options.cleanModelDefaults ? {} : maestro.params),
       ...imageParams,
       ...referenceParams,
       ...(options.resolution ? { resolution: options.resolution } : {}),
@@ -205,11 +258,13 @@ async function runLocalImage(
       model_type: selected,
       image_mode: 1,
       generation_mode: 'image',
-      comic_panel: true,
+      comic_panel: options.comicPanel ?? true,
       comic_panel_id: options.panelId,
       provider: 'maestro',
       repeat_generation: 1,
-      workspace: maestro.activeWorkspace,
+      workspace,
+      ...(options.cleanModelDefaults ? { multi_prompts_gen_type: 2, prompt_enhancer: '', video_length: 1 } : {}),
+      ...(options.submissionContext ? { provenance: generationProvenancePayload(options.submissionContext) } : {}),
     })
     identity = {
       jobId: submitted.job_id,
@@ -220,12 +275,14 @@ async function runLocalImage(
   const jobId = validIdentityValue(identity.jobId)
   if (!jobId) throw new Error('HocusPocus did not return an image job ID')
   if (!options.existingJobId) options.onJobSubmitted?.(jobId)
+  throwIfImageObservationAborted(options.signal)
   let consecutivePollFailures = 0
   for (;;) {
-    await wait(consecutivePollFailures ? Math.min(10000, 1500 * consecutivePollFailures) : 1500)
+    await observeImageRequest(wait(consecutivePollFailures ? Math.min(10000, 1500 * consecutivePollFailures) : 1500), options.signal)
     let status: api.ApiJobStatus
     try {
-      status = await api.fetchJobStatus(jobId)
+      status = await observeImageRequest(api.fetchJobStatus(jobId), options.signal)
+      throwIfImageObservationAborted(options.signal)
       consecutivePollFailures = 0
       identity = mergeTaskIdentity(identity, {
         jobId: status.job_id,
@@ -233,6 +290,7 @@ async function runLocalImage(
         rootTaskId: status.root_task_id,
       })
     } catch (error) {
+      throwIfImageObservationAborted(options.signal)
       consecutivePollFailures += 1
       options.onPollRetry?.(consecutivePollFailures, (error as Error).message)
       if (consecutivePollFailures >= 20) {
@@ -240,6 +298,8 @@ async function runLocalImage(
       }
       continue
     }
+    options.onStatus?.(status)
+    throwIfImageObservationAborted(options.signal)
     if (status.status === 'failed' || status.status === 'cancelled') {
       throw new Error(status.error || status.message || 'Local image generation failed')
     }
@@ -248,7 +308,7 @@ async function runLocalImage(
       if (!path) throw new Error('Image job completed without an image')
       const name = fileName(path)
       maestro.loadOutputs()
-      return localAsset(name, prompt, selected, identity, maestro.activeWorkspace)
+      return localAsset(name, prompt, selected, identity, workspace)
     }
   }
 }
@@ -262,6 +322,17 @@ export async function generateImageAsset(
   options?: LocalImageOptions,
 ): Promise<ComicAsset> {
   if (provider === 'minimax') {
+    const requestedWorkspace = useStore.getState().activeWorkspace
+    let subjectReference = reference
+    if (reference?.startsWith('/api/v1/file/')) {
+      const url = new URL(reference, 'http://reference.invalid')
+      const entries = [...url.searchParams.entries()]
+      if (url.hash || entries.some(([key, value]) => key !== 'workspace' || value !== requestedWorkspace) || entries.length > 1) {
+        throw new Error('MiniMax identity reference must belong to the requested workspace')
+      }
+      // Legacy servers resolve the job workspace but do not parse file queries.
+      subjectReference = url.pathname
+    }
     const providerPrompt = compactProviderPrompt(prompt)
     let job: api.MiniMaxImageJob
     if (options?.existingJobId) {
@@ -270,8 +341,8 @@ export async function generateImageAsset(
       job = await api.startMiniMaxImageJob({
         prompt: providerPrompt,
         aspect_ratio: options?.aspectRatio || '1:1',
-        subject_reference: reference,
-        workspace: useStore.getState().activeWorkspace,
+        subject_reference: subjectReference,
+        workspace: requestedWorkspace,
       })
       options?.onJobSubmitted?.(job.jobId)
     }
@@ -302,7 +373,20 @@ export async function generateImageAsset(
       }
     }
     if (job.status === 'completed' && job.result?.asset) {
-      return withTaskIdentity(job.result.asset, identity)
+      const asset = job.result.asset
+      // The job owns its output even after a tab/workspace change or recovery.
+      // Older API responses omit the workspace on their local file URLs.
+      const scopedUrl = (source?: string) => {
+        if (!source?.startsWith('/api/v1/file/')) return source
+        const url = new URL(source, 'http://reference.invalid')
+        url.searchParams.set('workspace', job.workspace || requestedWorkspace)
+        return url.pathname + url.search
+      }
+      return withTaskIdentity({
+        ...asset,
+        source: scopedUrl(asset.source) || asset.source,
+        ...(asset.thumbnail ? { thumbnail: scopedUrl(asset.thumbnail) } : {}),
+      }, identity)
     }
     if (job.status === 'cancelled') throw new Error('MiniMax image generation was cancelled')
     throw new Error(

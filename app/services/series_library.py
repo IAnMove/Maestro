@@ -36,7 +36,7 @@ SHOT_EDITOR_FIELDS = frozenset({
     "primarySpeakerId", "locationId", "locationVariantId",
     "wardrobeByCharacterId", "propIds", "emotionalStateByCharacterId",
     "continuityFromShotId", "renderStrategy", "referencePolicy", "prompt",
-    "negativePrompt", "audioDirection",
+    "negativePrompt", "audioDirection", "sourceDialogueIds", "dialogueOrigin",
 })
 SHOT_SERVER_FIELDS = frozenset({"attempts", "approvedAttemptId", "referenceManifest"})
 SERIES_CANON_INPUT_FIELDS = (
@@ -512,7 +512,8 @@ def _normalize_episode(value: dict, key: str, index: int, season_id: str, canon:
         "createdAt": _text(episode.get("createdAt"), now),
         "updatedAt": _text(episode.get("updatedAt"), now),
     })
-    return episode
+    from .series_shot_dialogue import annotate_episode_shot_dialogue
+    return annotate_episode_shot_dialogue(episode)
 
 
 def _validate_project_graph_ids(project: dict) -> None:
@@ -1204,6 +1205,7 @@ def import_story_project(story: dict, workspace_id: str = "default") -> dict:
             "personality": _text(raw.get("personality")), "desire": _text(raw.get("desire")),
             "need": _text(raw.get("need")), "flaw": _text(raw.get("flaw")),
             "longArc": _text(raw.get("arc")), "voiceAndDialogue": _text(raw.get("voice")),
+            **({"voiceProfile": {"characterKitRef": copy.deepcopy(raw["characterKitRef"])}} if isinstance(raw.get("characterKitRef"), dict) else {}),
             "appearance": _text(raw.get("appearance")),
             "identityLock": _text(raw.get("visualPrompt")),
             "wardrobeVariants": ([{
@@ -1428,6 +1430,13 @@ def update_series_episode(
             merged[key] = copy.deepcopy(patch[key])
     if "shots" in patch:
         merged["shots"] = _merge_episode_shot_patch(current.get("shots"), patch["shots"])
+
+    from .series_shot_dialogue import annotate_episode_shot_dialogue, sync_episode_shot_dialogue
+    if patch.get("syncShotDialogueFromScript") is True:
+        merged = sync_episode_shot_dialogue(
+            merged, include_conflicts=patch.get("syncManualDialogueConflicts") is True,
+        )
+    annotate_episode_shot_dialogue(merged)
 
     synchronize_series_project_durations(updated, merged)
 

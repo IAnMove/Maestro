@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ParseKeys } from 'i18next'
-import { Box, Camera, Loader2, PersonStanding, Plus, Upload, X } from 'lucide-react'
+import { Box, Camera, Loader2, PersonStanding } from 'lucide-react'
 import * as api from '../../api/client'
-import { getFileUrl } from '../../api/client'
+import { getFileUrl, type ApiOutput } from '../../api/client'
+import { AssetInput } from '../asset-picker/AssetInput.tsx'
+import { ensureUploadsPath } from '../../lib/labsImagePick'
 import { useSerializedPoll } from '../../hooks/useSerializedPoll'
 import { useStore } from '../../stores/useStore'
 import { queueFaceRigHandoff } from '../../lib/characterKitHandoff'
@@ -15,6 +17,8 @@ import {
   type CharacterCreatorHistoryEntry,
 } from './characterCreatorHistory'
 import { useUiTranslation } from '../../i18n'
+import { CharacterSpeechWorkshopEntry } from './CharacterSpeechWorkshopEntry'
+import { Character3DLibraryEntry } from './Character3DLibraryEntry'
 import {
   buildCharacterOrbitPrompt,
   CHARACTER_ORBIT_VIEWS,
@@ -40,7 +44,7 @@ const MAX_REFS = 9
 interface UploadedRef {
   id: string
   role: OrbitRefRole
-  file: File
+  file?: File
   preview: string
   path?: string
   filename?: string
@@ -97,7 +101,8 @@ export function CharacterCreatorPanel() {
   const [error, setError] = useState<string | null>(null)
   const [history, setHistory] = useState<CharacterCreatorHistoryEntry[]>([])
   const modelType = useMemo(() => resolveOrbitModel(models), [models])
-  const readyRefs = refs.filter(ref => Boolean(ref.file))
+  const imageItems = useMemo(() => outputFiles.filter(file => file.type === 'image'), [outputFiles])
+  const readyRefs = refs.filter(ref => Boolean(ref.path || ref.file))
   const refsRef = useRef(refs)
   const aPromptRef = useRef(aPrompt)
   const hunyuanGlbRef = useRef(hunyuanGlb)
@@ -113,17 +118,30 @@ export function CharacterCreatorPanel() {
     refsRef.current.forEach(ref => { if (ref.preview) URL.revokeObjectURL(ref.preview) })
   }, [])
 
-  const setRefFile = (id: string | null, file: File, role: OrbitRefRole) => {
-    const preview = URL.createObjectURL(file)
-    setRefs(current => {
-      if (!id) {
-        return [...current, { id: newId(), role, file, preview }]
-      }
-      return current.map(ref => {
-        if (ref.id !== id) return ref
-        if (ref.preview) URL.revokeObjectURL(ref.preview)
-        return { ...ref, file, preview, path: undefined, filename: undefined, url: undefined }
+  const applyRef = (id: string | null, item: ApiOutput | null, role: OrbitRefRole) => {
+    if (!item) {
+      if (id) clearRef(id)
+      return
+    }
+    void ensureUploadsPath(item).then(ensured => {
+      setRefs(current => {
+        const next: UploadedRef = {
+          id: id || newId(),
+          role,
+          preview: item.thumbnail_url || item.url,
+          path: ensured.path,
+          filename: ensured.name,
+          url: ensured.url,
+        }
+        if (!id) return [...current, next]
+        return current.map(ref => {
+          if (ref.id !== id) return ref
+          if (ref.preview.startsWith('blob:')) URL.revokeObjectURL(ref.preview)
+          return { ...ref, ...next, id: ref.id, role: ref.role }
+        })
       })
+    }).catch(reason => {
+      setError(reason instanceof Error ? reason.message : String(reason))
     })
   }
 
@@ -141,6 +159,7 @@ export function CharacterCreatorPanel() {
 
   const uploadRef = async (ref: UploadedRef): Promise<UploadedRef> => {
     if (ref.path) return ref
+    if (!ref.file) throw new Error(t('creator.errors.needViewOrUpload'))
     const uploaded = await api.uploadImage(ref.file)
     return { ...ref, path: uploaded.path, filename: uploaded.filename, url: uploaded.url }
   }
@@ -282,7 +301,7 @@ export function CharacterCreatorPanel() {
       let source = captured?.url || (captured?.filename ? getFileUrl(captured.filename, activeWorkspace) : '')
       if (!source || source.startsWith('blob:') || source.startsWith('data:')) {
         const subject = refs[0]
-        if (!subject?.file) throw new Error(t('creator.errors.needViewOrUpload'))
+        if (!subject?.path && !subject?.file) throw new Error(t('creator.errors.needViewOrUpload'))
         const uploaded = await uploadRef(subject)
         setRefs(current => current.map(ref => ref.id === uploaded.id ? uploaded : ref))
         source = uploaded.url || (uploaded.filename ? getFileUrl(uploaded.filename, activeWorkspace) : '')
@@ -522,6 +541,8 @@ export function CharacterCreatorPanel() {
         )}
       </header>
       <div className="flex-1 overflow-y-auto p-3 md:p-4">
+        <CharacterSpeechWorkshopEntry workspace={activeWorkspace} />
+        <Character3DLibraryEntry workspace={activeWorkspace} />
         <div className="mx-auto grid max-w-5xl gap-4 lg:grid-cols-[22rem_minmax(0,1fr)]">
           <div className="space-y-3">
             <div className="flex gap-1">
@@ -533,11 +554,9 @@ export function CharacterCreatorPanel() {
               label={kind === 'object' ? t('creator.objectImage') : t('creator.subjectImage')}
               hint={t('creator.subjectHint')}
               value={refs[0] || null}
+              items={imageItems}
               roleLocked="subject"
-              onPick={file => {
-                if (refs[0]) setRefFile(refs[0].id, file, 'subject')
-                else setRefFile(null, file, 'subject')
-              }}
+              onChoose={item => applyRef(refs[0]?.id || null, item, 'subject')}
               onClear={() => { if (refs[0]) clearRef(refs[0].id) }}
             />
 
@@ -547,29 +566,22 @@ export function CharacterCreatorPanel() {
                 label={t('creator.extraRef', { index: index + 1 })}
                 hint={t('creator.extraHint')}
                 value={ref}
-                onPick={file => setRefFile(ref.id, file, ref.role)}
+                items={imageItems}
+                onChoose={item => applyRef(ref.id, item, ref.role)}
                 onClear={() => clearRef(ref.id)}
                 onRole={role => setRole(ref.id, role)}
               />
             ))}
 
             {refs.length < MAX_REFS && (
-              <button
-                type="button"
-                className={`${button} w-full`}
-                onClick={() => {
-                  const input = document.createElement('input')
-                  input.type = 'file'
-                  input.accept = 'image/*'
-                  input.onchange = event => {
-                    const file = (event.target as HTMLInputElement).files?.[0]
-                    if (file) setRefFile(null, file, kind === 'object' ? 'extra' : 'outfit')
-                  }
-                  input.click()
-                }}
-              >
-                <Plus size={13} /> {t('creator.addOptionalRef')}
-              </button>
+              <RefPicker
+                label={t('creator.addOptionalRef')}
+                hint={t('creator.extraHint')}
+                value={null}
+                items={imageItems}
+                onChoose={item => applyRef(null, item, kind === 'object' ? 'extra' : 'outfit')}
+                onClear={() => undefined}
+              />
             )}
 
             <div className="space-y-1">
@@ -696,56 +708,51 @@ export function CharacterCreatorPanel() {
 }
 
 function RefPicker({
-  label, hint, value, roleLocked, onPick, onClear, onRole,
+  label, hint, value, items, roleLocked, onChoose, onClear, onRole,
 }: {
   label: string
   hint: string
   value: UploadedRef | null
+  items: ApiOutput[]
   roleLocked?: OrbitRefRole
-  onPick: (file: File) => void
+  onChoose: (item: ApiOutput | null) => void
   onClear: () => void
   onRole?: (role: OrbitRefRole) => void
 }) {
   const { t } = useUiTranslation('characters')
+  const selected = value
+    ? {
+      name: value.filename || value.id,
+      type: 'image' as const,
+      mode: null,
+      size: 0,
+      created_at: 0,
+      url: value.url || value.preview,
+      thumbnail_url: value.preview,
+    }
+    : undefined
   return (
     <div className="rounded-xl border border-border bg-bg-secondary p-3">
-      <div className="text-xs font-medium text-text-primary">{label}</div>
-      <p className="mt-1 text-[10px] text-text-muted">{hint}</p>
+      <p className="mb-2 text-[10px] text-text-muted">{hint}</p>
       {!roleLocked && value && onRole && (
         <select
           value={value.role}
           onChange={event => onRole(event.target.value as OrbitRefRole)}
-          className="mt-2 w-full rounded-md border border-border bg-bg-primary px-2 py-1 text-[11px] text-text-primary"
+          className="mb-2 w-full rounded-md border border-border bg-bg-primary px-2 py-1 text-[11px] text-text-primary"
         >
           {EXTRA_ROLE_IDS.map(id => <option key={id} value={id}>{t(`creator.roles.${id}` as ParseKeys<'characters'>)}</option>)}
         </select>
       )}
-      {value ? (
-        <div className="relative mt-2 overflow-hidden rounded-lg border border-border">
-          <img src={value.preview} alt="" className="h-40 w-full object-cover" />
-          <button type="button" className="absolute right-2 top-2 rounded bg-black/60 p-1 text-white" onClick={onClear} aria-label={t('creator.removeRefAria', { label })}>
-            <X size={12} />
-          </button>
-        </div>
-      ) : (
-        <button
-          type="button"
-          className="mt-2 flex h-28 w-full flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border text-text-muted hover:border-violet-400/50"
-          onClick={() => {
-            const input = document.createElement('input')
-            input.type = 'file'
-            input.accept = 'image/*'
-            input.onchange = event => {
-              const file = (event.target as HTMLInputElement).files?.[0]
-              if (file) onPick(file)
-            }
-            input.click()
-          }}
-        >
-          <Upload size={14} />
-          <span className="text-[10px]">{t('creator.dropOrChoose')}</span>
-        </button>
-      )}
+      <AssetInput
+        label={label}
+        placeholder={t('creator.dropOrChoose')}
+        items={items}
+        value={selected}
+        accept="image/*"
+        optional={Boolean(value)}
+        constraints={{ kinds: ['image'], maxCount: 1, optional: Boolean(value) }}
+        onChoose={item => { if (!item) onClear(); else onChoose(item) }}
+      />
     </div>
   )
 }

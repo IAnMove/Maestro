@@ -6,12 +6,14 @@ import { InfoTooltip } from './InfoTooltip'
 /** Compact, reproducible preset for Maestro's managed H3 Turbo adapter. */
 export function MiniMaxH3TurboToggle() {
   const { t } = useUiTranslation('studio')
-  const option = useStore(s => s.modelOptions?.minimax_h3_turbo)
+  const catalog = useStore(s => s.modelOptions?.minimax_h3_turbo)
+  const presetId = useStore(s => s.params.minimax_h3_turbo_preset)
+  const selected = catalog?.presets?.find(preset => preset.id === presetId)
+  const option = catalog ? { ...catalog, ...selected } : catalog
   const advisory = useStore(s => s.modelOptions?.minimax_h3_runtime_advisory)
   const enabled = useStore(s => s.params.minimax_h3_turbo_mode === true)
   const currentSteps = useStore(s => s.params.num_inference_steps)
   const defaultSteps = useStore(s => s.modelOptions?.default_num_inference_steps)
-  const activatedLoras = useStore(s => s.params.activated_loras)
   const setParam = useStore(s => s.setParam)
   const toggleLora = useStore(s => s.toggleLora)
   const setLoraWeight = useStore(s => s.setLoraWeight)
@@ -23,9 +25,13 @@ export function MiniMaxH3TurboToggle() {
 
   const handleChange = (checked: boolean) => {
     if (!option) return
+    for (const name of useStore.getState().params.activated_loras) {
+      if (catalog?.presets?.some(preset => preset.filename === name) && (!checked || name !== option.filename)) toggleLora(name)
+    }
+    setParam('minimax_h3_turbo_preset', selected?.id ?? catalog?.preset_id ?? '')
     setParam('minimax_h3_turbo_mode', checked)
     if (checked) {
-      if (!activatedLoras.includes(option.filename)) {
+      if (!useStore.getState().params.activated_loras.includes(option.filename)) {
         toggleLora(option.filename)
       }
       // toggleLora updates the Zustand store synchronously, so the managed
@@ -34,7 +40,7 @@ export function MiniMaxH3TurboToggle() {
       setLoraWeight(option.filename, 0, option.weight)
       setParam('num_inference_steps', option.steps)
     } else {
-      if (activatedLoras.includes(option.filename)) {
+      if (useStore.getState().params.activated_loras.includes(option.filename)) {
         toggleLora(option.filename)
       }
       if (currentSteps === option.steps && defaultSteps != null) {
@@ -114,6 +120,24 @@ export function MiniMaxH3TurboToggle() {
             </label>
             <InfoTooltip label={t('h3Turbo.about')} text={option.guide} />
           </div>
+          {catalog?.presets && <select aria-label={t('h3Adoption.turboPreset')}
+            className="mt-2 w-full rounded bg-bg-tertiary p-1 text-xs" value={selected?.id ?? catalog.preset_id}
+            onChange={event => {
+              const preset = catalog.presets?.find(item => item.id === event.target.value)
+              if (!preset) return
+              for (const name of useStore.getState().params.activated_loras) {
+                if (catalog.presets?.some(item => item.filename === name)) toggleLora(name)
+              }
+              setParam('minimax_h3_turbo_preset', preset.id)
+              if (enabled) {
+                toggleLora(preset.filename)
+                setLoraWeight(preset.filename, 0, preset.weight)
+                setParam('num_inference_steps', preset.steps)
+                setParam('minimax_h3_turbo_mode', true)
+              }
+            }}>
+            {catalog.presets.map(preset => <option key={preset.id} value={preset.id}>{preset.label}</option>)}
+          </select>}
           {enabled && (
             <p className="mt-1.5 text-[9px] leading-relaxed text-indicator-warning">
               {t('h3Turbo.speedWarning')}

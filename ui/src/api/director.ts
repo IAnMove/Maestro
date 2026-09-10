@@ -855,6 +855,8 @@ export async function planClipPromptsAndImages(params: {
   video_model?: string
   h3_reference_mode?: 'first_frame' | 'references'
   h3_audio_prompt?: string
+  h3_audio_policy?: 'native' | 'legacy'
+  minimax_h3_audio_policy?: 'native' | 'legacy'
   music_video_treatment?: import('../types').MusicVideoTreatment
 }): Promise<{ clip_plans: import('../types').ClipPlan[] }> {
   const res = await fetch(`${BASE}/api/v1/director/plan-prompts-and-images`, {
@@ -906,6 +908,8 @@ export async function planShortFilmPrompts(params: {
   video_model?: string
   h3_reference_mode?: 'first_frame' | 'references'
   h3_audio_prompt?: string
+  h3_audio_policy?: 'native' | 'legacy'
+  minimax_h3_audio_policy?: 'native' | 'legacy'
 }): Promise<{ clip_plans: import('../types').ClipPlan[] }> {
   const res = await fetch(`${BASE}/api/v1/director/plan-short-film-prompts`, {
     method: 'POST',

@@ -171,6 +171,40 @@ def _summary(
     return record
 
 
+def _created_sort_parts(item: Mapping[str, Any]) -> tuple[bool, float, str]:
+    created = item.get("created_at")
+    missing = not isinstance(created, (int, float)) or float(created) <= 0
+    stamp = 0.0 if missing else float(created)
+    return missing, stamp, str(item.get("id") or "")
+
+
+def _sort_catalog(values: list[dict[str, Any]], sort: str) -> None:
+    mode = str(sort or "").strip().casefold()
+    if mode in {"", "completed_desc"}:
+        values.sort(key=lambda item: (item["completed_at"], str(item.get("id") or "")), reverse=True)
+        return
+    if mode == "created_desc":
+        values.sort(key=lambda item: (
+            _created_sort_parts(item)[0],
+            -_created_sort_parts(item)[1],
+            _created_sort_parts(item)[2],
+        ))
+        return
+    if mode == "created_asc":
+        values.sort(key=_created_sort_parts)
+        return
+    filename = lambda item: str(item.get("filename") or "").casefold()
+    identifier = lambda item: str(item.get("id") or "")
+    if mode == "name_asc":
+        values.sort(key=lambda item: (filename(item), identifier(item)))
+        return
+    if mode == "name_desc":
+        values.sort(key=identifier)
+        values.sort(key=filename, reverse=True)
+        return
+    raise ValueError(f"Unknown catalog sort: {sort}")
+
+
 def scan_asset_catalog(
     roots: Iterable[Mapping[str, Any]],
     *,
@@ -181,6 +215,7 @@ def scan_asset_catalog(
     limit: int = 0,
     offset: int = 0,
     include_manifest: bool = False,
+    sort: str = "",
 ) -> dict[str, Any]:
     """Scan explicit roots and aggregate copies sharing one canonical asset ID."""
     records: dict[str, dict[str, Any]] = {}
@@ -235,9 +270,13 @@ def scan_asset_catalog(
                 })
 
     values = list(records.values())
-    wanted_kind = str(kind or "").strip().casefold()
-    if wanted_kind:
-        values = [item for item in values if item["kind"] == wanted_kind]
+    wanted_kinds = {
+        part.strip().casefold()
+        for part in str(kind or "").split(",")
+        if part.strip()
+    }
+    if wanted_kinds:
+        values = [item for item in values if item["kind"] in wanted_kinds]
     wanted_statuses = {str(item).strip().casefold() for item in metadata_statuses if str(item).strip()}
     if wanted_statuses:
         values = [item for item in values if item["metadata_status"] in wanted_statuses]
@@ -250,7 +289,7 @@ def scan_asset_catalog(
             str(item["model"].get("id") or ""),
             item["prompt_preview"],
         )).casefold()]
-    values.sort(key=lambda item: (item["completed_at"], item["id"]), reverse=True)
+    _sort_catalog(values, sort)
     total = len(values)
     start = max(0, int(offset or 0))
     if limit and int(limit) > 0:

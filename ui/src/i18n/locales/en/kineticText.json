@@ -1,0 +1,6 @@
+{
+  "title": "Animated lettering", "help": "Timed lettering shared by 2D and 3D. Preview, saved scenes and MP4 exports use the same animation.",
+  "text": "Text", "preset": "Animation", "color": "Color", "start": "Start (s)", "end": "End (s)", "x": "Horizontal (%)", "y": "Vertical (%)", "size": "Size (% height)", "rotation": "Tilt (degrees)", "remove": "Remove text", "add": "Add animated text", "defaultText": "YOUR NEXT VERSE",
+  "presets": { "impact": "Impact", "rise": "Fly upward", "typewriter": "Terminal", "wave": "Letter wave" },
+  "font": "Typeface", "fonts": { "sans": "Sans serif", "mono": "Monospace / terminal" }
+}

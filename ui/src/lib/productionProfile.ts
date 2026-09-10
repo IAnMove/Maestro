@@ -31,6 +31,80 @@ export function writingProviderFromText(
   return provider
 }
 
+export function seriesProviderFieldsFromProfile(profile: ProductionProfile) {
+  const portrait = profile.video.settings.aspectRatio === '9:16'
+    || profile.video.settings.aspectRatio === '3:4'
+  return {
+    writingProvider: writingProviderFromText(profile.text.provider),
+    writingModel: profile.text.model,
+    writingBaseUrl: writingBaseUrlFromProfile(profile),
+    imageProvider: (profile.image.provider === 'minimax' ? 'minimax' : 'maestro') as 'minimax' | 'maestro',
+    imageModel: profile.image.model,
+    videoModel: profile.video.model,
+    videoSettings: {
+      resolution: profile.video.settings.resolution,
+      orientation: (portrait ? 'portrait' : 'landscape') as 'landscape' | 'portrait',
+      numInferenceSteps: profile.video.settings.steps,
+      flowShift: profile.video.settings.flowShift,
+      audioShift: profile.video.settings.audioShift,
+      modelProfile: profile.video.settings.profile,
+    },
+  }
+}
+
+export function seriesProviderMatchesGlobal(
+  provider: {
+    writingProvider?: string
+    writingModel?: string
+    writingBaseUrl?: string
+    imageProvider?: string
+    imageModel?: string
+    videoModel?: string
+    videoSettings?: Record<string, unknown>
+  },
+  fields: ReturnType<typeof seriesProviderFieldsFromProfile>,
+): boolean {
+  const settings = provider.videoSettings || {}
+  return provider.writingProvider === fields.writingProvider
+    && provider.writingModel === fields.writingModel
+    && (provider.writingBaseUrl || '') === (fields.writingBaseUrl || '')
+    && provider.imageProvider === fields.imageProvider
+    && provider.imageModel === fields.imageModel
+    && provider.videoModel === fields.videoModel
+    && settings.resolution === fields.videoSettings.resolution
+    && settings.orientation === fields.videoSettings.orientation
+    && settings.numInferenceSteps === fields.videoSettings.numInferenceSteps
+    && settings.flowShift === fields.videoSettings.flowShift
+    && settings.audioShift === fields.videoSettings.audioShift
+    && settings.modelProfile === fields.videoSettings.modelProfile
+}
+
+export function applySeriesGlobalProvider<T extends {
+  useGlobalProfile?: boolean
+  writingProvider?: string
+  writingModel?: string
+  writingBaseUrl?: string
+  imageProvider?: string
+  imageModel?: string
+  videoModel?: string
+  videoSettings?: Record<string, unknown>
+}>(provider: T, fields: ReturnType<typeof seriesProviderFieldsFromProfile>): T {
+  return {
+    ...provider,
+    useGlobalProfile: true,
+    writingProvider: fields.writingProvider,
+    writingModel: fields.writingModel,
+    writingBaseUrl: fields.writingBaseUrl,
+    imageProvider: fields.imageProvider,
+    imageModel: fields.imageModel,
+    videoModel: fields.videoModel,
+    videoSettings: {
+      ...(provider.videoSettings || {}),
+      ...fields.videoSettings,
+    },
+  }
+}
+
 export function writingBaseUrlFromProfile(profile: ProductionProfile): string {
   if (profile.text.base_url) return profile.text.base_url
   if (profile.text.provider === 'minimax') return 'https://api.minimax.io/v1'

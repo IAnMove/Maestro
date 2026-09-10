@@ -1,4 +1,5 @@
 import type { CharacterKit, CharacterKitAsset, CharacterMouthState } from '../../lib/characterKit'
+import { isFacePatchCompatible } from '../../lib/characterFacePatch'
 import type { ParseKeys } from 'i18next'
 import i18n from '../../i18n'
 
@@ -114,7 +115,9 @@ export function characterKitNextStep(kit: CharacterKit | null, poseId = 'base'):
       tab: 'kit',
     }
   }
-  if (!poseMouthWasWiped(kit, poseId) || !poseMouthsAreLocked(kit, poseId)) {
+  const hasCompatiblePatch = Object.values(kit.mouth).some(asset => asset?.facePatch
+    && isFacePatchCompatible(asset, poseId.trim() || 'base', pose.source))
+  if (!hasCompatiblePatch && (!poseMouthWasWiped(kit, poseId) || !poseMouthsAreLocked(kit, poseId))) {
     return {
       id: 'wipe-mouth',
       title: tCharacters('guide.wipeMouth.title'),

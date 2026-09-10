@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { X, Globe, BookMarked, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { useStore } from '../../stores/useStore'
 import { useIsMobile } from '../../lib/useIsMobile'
@@ -24,26 +24,33 @@ import { OutpaintControls } from './OutpaintControls'
 import { RetakeControls } from './RetakeControls'
 import { EditAnythingControls } from './EditAnythingControls'
 import { RecastControls } from './RecastControls'
+import { WangpModelControls } from './WangpModelControls'
 import { BlendControls } from './BlendControls'
 import { AnchorReturnBanner } from './AnchorReturnBanner'
 import { VoiceRefSection } from './VoiceRefSection'
-import { ToolsPanel } from './ToolsPanel'
 import { Hunyuan3DPanel } from './Hunyuan3DPanel'
 import { HardwareStatusBar } from './HardwareStatusBar'
+import { H3PromptControls } from './H3PromptControls'
 import { MiniMaxH3TurboToggle } from './MiniMaxH3TurboToggle'
 import { PanoramaLoopPanel } from './PanoramaLoopPanel'
 import { BrandIdentity } from '../BrandIdentity'
 import { DirectorChat } from './DirectorChat'
 import { useUiTranslation } from '../../i18n'
+import { StudioCommandPanels } from '../../features/studio/StudioCommandPanels'
+
+const ViggleControls = lazy(() => import('./ViggleControls').then(module => ({ default: module.ViggleControls })))
+const ToolsPanel = lazy(() => import('./ToolsPanel').then(module => ({ default: module.ToolsPanel })))
 
 export function Sidebar() {
   const { t } = useUiTranslation('navigation')
+  const { t: tCommon } = useUiTranslation('common')
   const [toolsCollapsed, setToolsCollapsed] = useState(() =>
     window.localStorage.getItem('hocuspocus-tools-sidebar-collapsed') === 'true')
   const generationMode = useStore(s => s.generationMode)
   const imageMode = useStore(s => s.params.image_mode)
   const modelOptions = useStore(s => s.modelOptions)
   const sidebarOpen = useStore(s => s.sidebarOpen)
+  const mediaFilter = useStore(s => s.mediaFilter)
   const appVersion = useStore(s => s.systemConfig?.app_version)
   const setSidebarOpen = useStore(s => s.setSidebarOpen)
   const setSidebarMode = useStore(s => s.setSidebarMode)
@@ -52,10 +59,13 @@ export function Sidebar() {
   const setDashboardOpen = useStore(s => s.setDashboardOpen)
   const editSubMode = useStore(s => s.editSubMode)
   const modelType = useStore(s => s.params.model_type)
+  const workspace = useStore(s => s.activeWorkspace)
+  const studioUnobscured = useStore(s => !s.settingsOpen && !s.dashboardOpen)
   const openLoraBrowser = useStore(s => s.setLoraBrowserOpen)
   const isMobile = useIsMobile()
 
   const isVideo = generationMode === 'video'
+  const isAdvancedH3 = String(modelType).startsWith('h3_advanced')
   const isImage = generationMode === 'image'
   const isAudio = generationMode === 'audio'
   const isModel3d = generationMode === 'model3d'
@@ -88,6 +98,25 @@ export function Sidebar() {
     setToolsCollapsed(collapsed)
     window.localStorage.setItem('hocuspocus-tools-sidebar-collapsed', String(collapsed))
   }
+
+  useEffect(() => {
+    const openImageSubmission = () => {
+      setToolsCollapsed(false)
+      window.localStorage.setItem('hocuspocus-tools-sidebar-collapsed', 'false')
+      setSidebarOpen(true)
+    }
+    const openSpeechSubmission = () => {
+      setToolsCollapsed(false)
+      window.localStorage.setItem('hocuspocus-tools-sidebar-collapsed', 'false')
+      setSidebarOpen(true)
+    }
+    window.addEventListener('hocuspocus:studio-image-open', openImageSubmission)
+    window.addEventListener('hocuspocus:studio-speech-open', openSpeechSubmission)
+    return () => {
+      window.removeEventListener('hocuspocus:studio-image-open', openImageSubmission)
+      window.removeEventListener('hocuspocus:studio-speech-open', openSpeechSubmission)
+    }
+  }, [setSidebarOpen])
 
   useEffect(() => {
     const openStudio = () => {
@@ -158,8 +187,9 @@ export function Sidebar() {
       )}
       {isRecast && (
         <>
-          <RecastControls />
-          <PromptInput />
+          {modelType === 'viggle_animate'
+            ? <Suspense fallback={<div role="status">Viggle-Animate…</div>}><ViggleControls /></Suspense>
+            : <><RecastControls /><PromptInput /></>}
         </>
       )}
     </>
@@ -178,7 +208,9 @@ export function Sidebar() {
       <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-4 min-h-0 [&>*]:shrink-0">
         {/* Tools mode: standalone post-processing (upscale / revoice) on any
             existing clip. Renders in place of the generation controls. */}
-        {isTools ? <ToolsPanel /> : isModel3d ? <Hunyuan3DPanel /> : (
+        {isTools ? <Suspense fallback={<div role="status">{tCommon('status.loading')}</div>}>
+          <ToolsPanel />
+        </Suspense> : isModel3d ? <Hunyuan3DPanel /> : (
         <>
         {/* Edit mode: sub-mode toggle + sub-controls */}
         {isEdit && <EditSubModeToggle />}
@@ -191,10 +223,12 @@ export function Sidebar() {
             start/end ImageUpload don't apply there. */}
         {isVideo && !isBlend && <DurationSlider />}
         {isVideo && <MiniMaxH3TurboToggle />}
+        {isVideo && <H3PromptControls />}
+        <WangpModelControls />
         {/* Frames (image_mode 0) AND Extend (image_mode 3) both use the unified
             InputsPanel. In Extend mode its first tile is the source video to
             continue from; otherwise it's the start frame. */}
-        {isVideo && !isOmniReference && !isMultiClip && !isBlend && (
+        {isVideo && !isAdvancedH3 && !isOmniReference && !isMultiClip && !isBlend && (
           <div>
             {isI2vOnly && !isContinue && (
               <div className="text-[10px] text-indicator-warning bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-1.5 mb-2">
@@ -215,7 +249,7 @@ export function Sidebar() {
             In Frames mode (video, image_mode 0) the unified InputsPanel routes
             audio/control-video via tiles instead, so the dropdown is hidden
             there. Other video sub-modes + image mode keep AudioModeSection. */}
-        {!isEdit && !isAudio && !(isVideo && (imageMode === 0 || imageMode === 3)) && modelOptions?.audio_prompt_type_sources && <AudioModeSection />}
+        {!isAdvancedH3 && !isEdit && !isAudio && !(isVideo && (imageMode === 0 || imageMode === 3)) && modelOptions?.audio_prompt_type_sources && <AudioModeSection />}
 
         {/* Audio mode: sub-mode toggle + mode-specific controls */}
         {isAudio && <AudioSubModeToggle />}
@@ -226,10 +260,13 @@ export function Sidebar() {
 
         {/* Prompt area (non-edit modes, skip for SFX/Mixer/Music which have their own UI) */}
         {!isEdit && !(isAudio && (audioSubMode === 'sfx' || audioSubMode === 'mixer' || audioSubMode === 'music')) && (isMultiClip ? <MultiClipEditor /> : <PromptInput />)}
+        <StudioCommandPanels mode={generationMode} audioSubMode={audioSubMode}
+          workspace={workspace || 'default'} model={String(modelType)}
+          visible={studioUnobscured && (!isMobile || sidebarOpen)} />
 
         {/* Video: reference images below prompt. In Frames mode the InputsPanel
             renders them as ordered tiles instead. */}
-        {isVideo && !isOmniReference && imageMode !== 0 && imageMode !== 3 && modelOptions?.image_ref_choices && <ImageRefSection />}
+        {isVideo && !isAdvancedH3 && !isOmniReference && imageMode !== 0 && imageMode !== 3 && modelOptions?.image_ref_choices && <ImageRefSection />}
 
         {/* Voice Reference (ID-LoRA) — gated by Settings → Services
             toggle (`voice_reference_enabled`). VoiceRefSection internally
@@ -268,14 +305,19 @@ export function Sidebar() {
           <div className="flex-1 min-w-0">
             <ModelSelector />
           </div>
-          <div className="shrink-0">
-            <GenerateButton />
-          </div>
+          {!(isAudio && audioSubMode === 'mixer') && (
+            <div className="shrink-0">
+              <GenerateButton />
+            </div>
+          )}
         </div>
       </div>
       )}
     </>
   )
+
+  // This workspace owns its controls in the central area, including on mobile.
+  if (mediaFilter === 'character-replacement') return null
 
   // Mobile: overlay drawer
   if (isMobile) {

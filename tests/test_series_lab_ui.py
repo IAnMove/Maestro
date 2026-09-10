@@ -38,9 +38,16 @@ def test_setup_has_required_aura_explicit_models_and_canvas_choices():
     assert catalog["setup"]["prepareImages"] == "Prepare canon + up to 4 images"
     assert "t('setup.needImageModel')" in setup
     assert "will not silently select or download a recommended model" in catalog["setup"]["needImageModel"]
-    assert "minimax_h3" in setup and "minimax_h3_full" in setup
-    assert "480p" in setup and "720p" in setup
-    assert "t('providers.landscape')" in setup and "t('providers.portrait')" in setup
+    catalog_ts = (ROOT / "ui" / "src" / "lib" / "h3Catalog.ts").read_text(encoding="utf-8")
+    video_fields = source("SeriesSetupVideoFields.tsx")
+    assert "SERIES_SETUP_VIDEO_MODELS" in video_fields
+    assert "SeriesSetupVideoFields" in setup
+    assert "applySeriesGlobalProvider" in setup
+    assert "minimax_h3_legacy" in catalog_ts
+    assert "minimax_h3_full" in catalog_ts
+    assert "minimax_h3_fused_turbo" in catalog_ts
+    assert "480p" in video_fields and "720p" in video_fields
+    assert "t('providers.landscape')" in video_fields and "t('providers.portrait')" in video_fields
     assert catalog["providers"]["landscape"].startswith("Landscape")
     assert catalog["providers"]["portrait"].startswith("Portrait")
     assert "t('setup.knownTitle')" in setup
@@ -81,19 +88,28 @@ def test_canon_facts_can_be_removed_individually():
 
 def test_review_is_thumbnail_first_and_exposes_ordered_editable_attempt_history():
     review = source("SeriesReviewPanel.tsx")
+    catalog = json.loads(CATALOG_EN.read_text(encoding="utf-8"))["review"]
     assert "getOutputThumbnailUrl" in review
     assert "open ? <video" in review
     assert 'preload="metadata"' in review
-    assert "Saved generation request and result metadata" in review
-    assert "Approve this attempt" in review and "Reject</button>" in review
-    assert "Approve all" in review and "approveSeriesAttemptsBulk" in review
-    assert "Play all" in review and "if (playingAll) advancePlayAll()" in review
+    assert "t('review.savedMetadata')" in review
+    assert catalog["savedMetadata"].startswith("Saved generation")
+    assert "review.useThisTake" in review and "t('review.reject')" in review
+    assert "review.usePendingTakes" in review and "approveSeriesAttemptsBulk" in review
+    assert "bulkApproveSelections" in review
+    assert "t('review.replaceFinals'" in review
+    assert catalog["replaceFinals"].startswith("Replace finals")
+    assert "t('review.playAll')" in review and "if (playingAll) advancePlayAll()" in review
+    assert catalog["playAll"] == "Play all"
     assert "orderedTimelineShots" in review and "safeTimelineAttempt" in review
-    assert "Edit & regenerate" in review and "Save and regenerate in this slot" in review
-    assert "Join clips" in review and "startSeriesEpisodeAssembly" in review
+    assert "t('review.editRegenerate')" in review and "t('review.saveRegenerate')" in review
+    assert catalog["editRegenerate"] == "Edit & regenerate"
+    assert "t('review.joinClips')" in review and "startSeriesEpisodeAssembly" in review
+    assert catalog["joinClips"] == "Join clips"
     assert "t('review.orderedAssembly')" in review and "t('review.historyAttempts')" in review
-    assert "Attempts in this slot" in review
-    assert "Open complete approved sequence in Video Editor" in review
+    assert "t('review.attemptsInSlot')" in review
+    assert "t('review.openEditor')" in review
+    assert catalog["openEditor"].startswith("Open complete approved sequence")
 
 
 def test_story_productions_have_an_in_place_ordered_clip_timeline():
@@ -126,7 +142,7 @@ def test_backend_authority_selection_restore_and_recovery_cards_are_wired():
 
 def test_episode_proposal_uses_readable_cards_and_manual_editing():
     panel = source("SeriesEpisodePanel.tsx")
-    review = source("SeriesEpisodeProposalReview.tsx")
+    review = source("SeriesEpisodeProposalReview.tsx") + "\n" + source("SeriesShotDraftFields.tsx")
     client = api_client_source()
     catalog = json.loads(CATALOG_EN.read_text(encoding="utf-8"))
     assert "SeriesEpisodeProposalReview" in panel

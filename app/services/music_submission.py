@@ -32,9 +32,10 @@ _STORE_LOCK = threading.RLock()
 
 
 class MusicSubmissionError(ValueError):
-    def __init__(self, message: str, status_code: int = 400):
+    def __init__(self, message: str, status_code: int = 400, details: Mapping[str, Any] | None = None):
         super().__init__(message)
         self.status_code = status_code
+        self.details = dict(details or {})
 
 
 class MusicSubmissionConflict(MusicSubmissionError):
@@ -75,31 +76,18 @@ def _stable_dump(value: Any) -> str:
 
 
 def spec_snapshot(request: Mapping[str, Any]) -> dict[str, Any]:
-    provenance = request.get("provenance") if isinstance(request.get("provenance"), Mapping) else {}
-    model = _clean(request.get("model")) or "music-3.0"
+    from .music_model_contract import MusicModelError, freeze_music_spec
+
     try:
-        count = max(1, min(3, int(request.get("count") or 2)))
-    except (TypeError, ValueError, OverflowError) as exc:
-        raise MusicSubmissionError(
-            "MiniMax Music candidate count must be an integer from 1 to 3",
-        ) from exc
-    return {
-        "model": model,
-        "prompt": str(request.get("prompt") or "").strip()[:300],
-        "lyrics": str(request.get("lyrics") or "").strip()[:3500],
-        "instrumental": bool(request.get("instrumental")),
-        "count": count,
-        "project_id": _clean(request.get("project_id") or provenance.get("project_id")),
-        "cue_id": _clean(request.get("cue_id") or provenance.get("cue_id")),
-        "candidate_id": _clean(request.get("candidate_id") or provenance.get("candidate_id")),
-        "output_folder": _portable_folder(
-            request.get("output_folder") or request.get("workspace"),
-        ),
-        "workspace_id": _clean(request.get("workspace_id")),
-        "library_revision": request.get("library_revision", request.get("expectedVersion")),
-        "reference_audio_filename": _clean(request.get("reference_audio_filename")),
-        "intent": _intent(request),
-    }
+        frozen = freeze_music_spec(request)
+    except MusicModelError as exc:
+        raise MusicSubmissionError(str(exc), exc.status_code, exc.details) from exc
+    frozen["output_folder"] = _portable_folder(
+        request.get("output_folder") or request.get("workspace"),
+    )
+    frozen["workspace_id"] = _clean(request.get("workspace_id"))
+    frozen["intent"] = _intent(request)
+    return frozen
 
 
 def spec_hash(spec: Mapping[str, Any]) -> str:
@@ -214,6 +202,53 @@ class MusicSubmissionStore:
                 raise
             return payload
 
+    def _find_by_field(self, field: str, token: str) -> dict[str, Any] | None:
+        value = str(token or "").strip()
+        if not value or not self.root.is_dir():
+            return None
+        for path in sorted(self.root.glob("*.json")):
+            try:
+                record = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            if isinstance(record, dict) and str(record.get(field) or "") == value:
+                return dict(record)
+        return None
+
+    def get_by_generation_id(self, generation_id: str) -> dict[str, Any] | None:
+        return self._find_by_field("generation_id", generation_id)
+
+    def get_by_job_id(self, job_id: str) -> dict[str, Any] | None:
+        return self._find_by_field("job_id", job_id)
+
+    def replace(self, record: Mapping[str, Any]) -> dict[str, Any]:
+        """Overwrite an existing reservation with the same spec hash."""
+        key = str(record["idempotency_key"])
+        path = self._path(key)
+        payload = json.loads(json.dumps(record, ensure_ascii=False))
+        with _STORE_LOCK:
+            existing = self.load(key)
+            if existing is None:
+                raise MusicSubmissionError(f"Unknown music reservation {key}", 404)
+            if existing.get("spec_hash") != payload.get("spec_hash"):
+                raise MusicSubmissionConflict()
+            self.root.mkdir(parents=True, exist_ok=True)
+            temporary = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
+            try:
+                with open(temporary, "w", encoding="utf-8") as handle:
+                    json.dump(payload, handle, ensure_ascii=False, indent=2, sort_keys=True)
+                    handle.write("\n")
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                os.replace(temporary, path)
+            except Exception:
+                try:
+                    temporary.unlink(missing_ok=True)
+                except OSError:
+                    pass
+                raise
+            return payload
+
 
 def _intent(request: Mapping[str, Any]) -> str:
     raw = (_clean(request.get("intent")) or "retransmit").casefold()
@@ -234,7 +269,13 @@ def submit_music_generation(
     after_persist: Callable[[dict[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
     """Reserve durable IDs and return 202-shaped state without running inference."""
+    from .music_model_contract import MusicModelError, assert_enqueue_guard
+
     spec = spec_snapshot(request)
+    try:
+        assert_enqueue_guard(spec)
+    except MusicModelError as exc:
+        raise MusicSubmissionError(str(exc), exc.status_code, exc.details) from exc
     route = _validate_spec(spec)
     intent = spec["intent"]
     digest = spec_hash(spec)

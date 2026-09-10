@@ -1,8 +1,10 @@
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { lazy, Suspense, useState, useCallback, useEffect, useRef } from 'react'
 import { RefreshCw, ShieldAlert, ShieldCheck, Lock, Loader2 } from 'lucide-react'
 import { useUiTranslation } from '../../i18n'
 import { useStore } from '../../stores/useStore'
 import { testLlmConnection } from '../../api/client'
+
+const McpSettingsPanel = lazy(() => import('./McpSettingsPanel').then(module => ({ default: module.McpSettingsPanel })))
 
 function ApiKeyField({ label, maskedValue, isSet, onSave }: {
   label: string
@@ -345,6 +347,7 @@ export function ServicesSettingsPanel() {
 
   return (
     <div className="space-y-5">
+      <Suspense fallback={<p role="status" className="text-xs text-text-muted">{tCommon('status.loading')}</p>}><McpSettingsPanel /></Suspense>
       {/* Beta-features toggle moved to the bottom of this panel. See
           the "BETA FEATURES" section near the end of the return for
           rationale on the demotion + restyle. */}

@@ -14,6 +14,9 @@ import threading
 import uuid
 from typing import Any
 
+from .character_face_patch import normalize_character_face_patch
+from .character_speech_definition import normalize_speech3d, normalize_character_voice
+
 
 CHARACTER_KIT_LIBRARY_FILENAME = ".character-kit-library-v1.json"
 MAX_CHARACTER_KITS = 100
@@ -64,14 +67,24 @@ def _asset(value: Any, label: str) -> dict[str, Any]:
         raise ValueError(f"{label} has an invalid alpha status")
     if review_state not in _REVIEW_STATES:
         raise ValueError(f"{label} has an invalid review state")
+    kind = "overlay" if value.get("kind") == "overlay" else "image"
+    if "facePatch" in value and kind != "overlay":
+        raise ValueError(f"{label} facePatch is only valid for overlay assets")
+    face_patch = (
+        normalize_character_face_patch(value["facePatch"])
+        if "facePatch" in value
+        else None
+    )
     result = {
         "id": _token(value.get("id"), label),
         "name": _text(value.get("name"), f"{label} name", 240, required=True),
         "source": source,
-        "kind": "overlay" if value.get("kind") == "overlay" else "image",
+        "kind": kind,
         "alphaStatus": alpha_status,
         "reviewState": review_state,
     }
+    if face_patch is not None:
+        result["facePatch"] = face_patch
     for key, maximum in (("prompt", 4000), ("model", 240), ("workspace", 120)):
         text = _text(value.get(key), f"{label} {key}", maximum)
         if text:
@@ -152,6 +165,12 @@ def normalize_character_kit(value: Any, fallback_id: str = "") -> dict[str, Any]
     }
     if len(result["provenance"]) > 500 or any(not isinstance(item, dict) for item in result["provenance"]):
         raise ValueError("Character Kit provenance must contain at most 500 objects")
+    if value.get("speech3d") is not None:
+        result["speech3d"] = normalize_speech3d(value["speech3d"])
+    if value.get("voice") is not None:
+        result["voice"] = normalize_character_voice(value["voice"])
+    if value.get("lookNotes"):
+        result["lookNotes"] = _text(value["lookNotes"], "Character look notes", 4000)
     for key in ("identityReference", "base"):
         if value.get(key) is not None:
             result[key] = _asset(value[key], f"Character Kit {key}")
@@ -212,6 +231,12 @@ def write_character_kit_library(workspace_dir: str, value: Any, *, base_revision
         os.makedirs(workspace_dir, exist_ok=True)
         path = character_kit_library_path(workspace_dir)
         temporary = f"{path}.{uuid.uuid4().hex}.tmp"
+        # Keep the previous authored revision; never silently discard calibration.
+        if current["revision"] > 0:
+            history = f"{path}.v{current['revision']}.json"
+            if not os.path.exists(history):
+                with open(history, "x", encoding="utf-8") as handle:
+                    json.dump(current, handle, ensure_ascii=False, allow_nan=False)
         try:
             with open(temporary, "w", encoding="utf-8") as handle:
                 handle.write(encoded)

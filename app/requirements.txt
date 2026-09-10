@@ -120,3 +120,8 @@ pytest==8.3.5
 # huggingface_hub[hf_xet]  # slows down everything
 iopath==0.1.10
 pycocotools==2.0.11
+
+# WanGP H3 Face Refiner tracking; keep its checkpoint loader API reproducible.
+# 8.4.142 requires ultralytics-thop>=2.1.6 (2.0.18 makes uv unsatisfiable).
+ultralytics==8.4.142
+ultralytics-thop==2.1.6

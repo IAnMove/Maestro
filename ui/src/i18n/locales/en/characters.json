@@ -1,7 +1,58 @@
 {
+  "speechWorkshop": {
+    "alternatives": "Methods and limitations",
+    "title": "Prepare 2D speech",
+    "intro": "Prepare a reusable character once: choose a base, position mouth pieces, preview, review and save. You do not need a 3D turnaround.",
+    "methods": {
+      "sprites": {
+        "title": "Mouth overlays",
+        "detail": "Use a ready-made mouth pack in the editor below. Cover the original mouth first; generic lips may not match detailed art. Custom sprites can also be assigned from scene layers."
+      },
+      "patches": {
+        "title": "Raster face patches",
+        "detail": "Import an aligned face variant. Its skin/beard covers the original mouth. Same identity does not guarantee alignment. Do not remove its background."
+      },
+      "software": {
+        "title": "External lip-sync software",
+        "detail": "Rhubarb creates mouth timings, not artwork. MuseTalk changes the face using a model. Neither is connected here yet."
+      }
+    },
+    "manualOnly": "Manual workshop: no image generation, neural background removal or voice generation here. Those buttons are disabled. Prepare variants externally and import them; the existing scene Face Rig retains its assisted tools.",
+    "character": "Saved character",
+    "choose": "Choose a character",
+    "newCharacter": "New character from an image",
+    "name": "New character name",
+    "baseImage": "Base image",
+    "importBase": "Upload base and create draft",
+    "importHint": "PNG, JPEG or WebP, up to 20 MiB. Choosing a file or a HocusPocus image does not upload it. Upload creates a pending base, not an approved character. Files are retained even if you discard the draft.",
+    "pose": "Editing pose",
+    "approvePose": "I have reviewed this base image",
+    "singlePack": "Current limit: one mouth pack per character. Patches are bound to their exact pose and source; do not overwrite a working pack to prepare another view.",
+    "checklist": "Mouth preparation status",
+    "states": {
+      "missing": "missing",
+      "pending": "pending review",
+      "rejected": "rejected",
+      "incompatible": "different pose/source",
+      "approved": "approved"
+    },
+    "previewReady": "A closed and an open mouth are reviewed. You can test the swap; this does not certify visual quality or phonetic lip-sync.",
+    "previewNotReady": "Review the base and at least a closed and an open mouth before judging animation. Existing text previews are heuristic, not phonetic lip-sync.",
+    "save": "Save speech character",
+    "discardReload": "Discard draft and reload library",
+    "reload": "Reload library",
+    "unsaved": "Unsaved changes. This tab keeps a recovery draft per workspace when you navigate away. Save to keep it on the server; recovery is best-effort if browser storage is unavailable. Discard and reload explicitly removes the draft.",
+    "busy": "Loading or saving character…",
+    "errorHint": "No automatic retry or overwrite. Your draft is retained on save failure; if another editor saved first, resolve it before discarding and reloading.",
+    "invalidImport": "Enter a name and choose a non-empty PNG, JPEG or WebP of at most 20 MiB.",
+    "invalidUpload": "The upload did not return a persistent image URL.",
+    "invalidSave": "The server did not return the saved character.",
+    "imported": "Base uploaded. Review it in the preview, then save the character explicitly.",
+    "saved": "Character saved to this workspace. Visual and audio validation remain separate."
+  },
   "library": {
     "title": "Cutout characters",
-    "subtitle": "A character is a body + mouths placed on top. This is not Character Creator (that is the 3D turnaround).",
+    "subtitle": "A character is a body + mouths placed on top. You can also prepare it in Character Creator → Prepare 2D speech.",
     "savedCount_zero": "empty",
     "savedCount_one": "{{count}} saved",
     "savedCount_other": "{{count}} saved",
@@ -239,9 +290,42 @@
       "mouthTooLow": "Mouths on a full-body cutout usually sit above the chest. Nudge Down/Up until the overlay covers the lips, then lock all mouths."
     }
   },
+  "facePatch": {
+    "title": "Raster mouth replacement patch",
+    "experimental": "Experimental replacement patch: import a full-image mouth variant generated from the same character reference. The variant must stay aligned to this pose and keep the exact same pixel dimensions. No automatic generator is included.",
+    "alignment": "Preparation runs privately on this device. Nothing is uploaded until you choose Save pending patch. Saving the patch does not save the kit; use the normal Character Kit Save too.",
+    "promptLabel": "Readonly reference prompt for this mouth state",
+    "variantLabel": "Aligned full-image variant (PNG, JPEG or WebP)",
+    "variantHint": "Use the same reference, pose, framing and dimensions. This image replaces a region of the approved base; it is not a transparent mouth sprite.",
+    "poseAlt": "{{name}} approved base pose",
+    "previewAlt": "Prepared {{state}} mouth patch preview",
+    "savePending": "Save pending patch",
+    "keepTexture": "Do not remove this patch’s background: its skin or beard covers the original mouth.",
+    "stalePose": "This patch belongs to a different pose or an earlier image. Prepare it again.",
+    "wipedPending": "A new mouth-cleaned image is ready. Review and approve the pose before mounting it.",
+    "disabled": {
+      "external": "Face patch editing is disabled.",
+      "eyes": "Raster replacement patches apply only to closed, small, wide, or round mouth states. Eyes are handled separately.",
+      "pose": "Approve this base pose before preparing a facial patch.",
+      "rotation": "Rotate the mouth box back to 0° before preparing a facial patch."
+    },
+    "status": {
+      "preparing": "Preparing patch locally…",
+      "saving": "Uploading patch…",
+      "prepared": "Patch prepared locally. Review the preview before saving.",
+      "savedPending": "Patch saved as pending. Review it, then save the Character Kit separately.",
+      "cancelled": "Cancelled stale patch operation. The newer pose or draft was kept."
+    },
+    "errors": {
+      "fileType": "Choose a PNG, JPEG or WebP full-image variant.",
+      "prepare": "Could not prepare this facial patch.",
+      "noPrepared": "Prepare a variant before saving the pending patch.",
+      "upload": "Could not upload or register this facial patch."
+    }
+  },
   "creator": {
     "title": "Character Creator",
-    "subtitle": "3D turnaround: upload a photo. MiniMax or the internal LLM describe the subject if you leave the A Prompt empty. You get a 360 video and, if you want, a Hunyuan mesh. This is not the 2D Face Rig puppet.",
+    "subtitle": "3D turnaround: upload a photo. MiniMax or the internal LLM describe the subject if you leave the A Prompt empty. You get a 360 video and, if you want, a Hunyuan mesh. For a 2D puppet, open Prepare 2D speech below; it does not need a 360 video.",
     "openFaceRig": "Create / open CharacterKit Face Rig",
     "history": "History in this Workspace",
     "kind": {

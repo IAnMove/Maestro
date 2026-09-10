@@ -1,3 +1,4 @@
+import type { CommandResult } from '../../lib/commandContract'
 import type {
   AgentAction,
   AgentApply3dRhythmAction,
@@ -23,6 +24,7 @@ import type {
   AgentGenerateStoryVisualsAction,
   AgentRenderSeriesShotsAction,
   AgentReviewSeriesAttemptsAction,
+  AgentStageSeriesComicAction,
   AgentStageStoryComicAction,
   AgentStartDirectorProductionAction,
   AgentStageStoryVideoAction,
@@ -41,9 +43,12 @@ import type { AgentCreateVideoEditorProjectAction, AgentOpenVideoEditorProjectAc
 import type { AgentAttachVideoclipAlternativeSongAction, AgentMountVideoclipAlternativeSongAction } from './alternativeSongActions'
 import type { AgentApplyCharacterKitPresetAction, AgentAttachCharacterKitReferencesAction, AgentBuildCharacterKitAction, AgentCreateCharacterKitAction, AgentOpenCharacterKitAction, AgentOpenCharacterKitRigAction, AgentTrackCharacterKitJobAction } from './characterKitActions'
 import { registerStudioCapabilities } from './studioCapabilities'
+export { restoreAuthoredMusicFields, authoredSfxPackInput } from './audioActionParser'
 import { registerNavigationQueueCapabilities } from './navigationQueueCapabilities'
 import { registerEditorAuxCapabilities } from './editorAuxCapabilities'
 import { registerToolCapabilities } from './toolCapabilities'
+import { registerProgrammaticVideoCapability } from './programmaticVideo'
+export { reconcileProgrammaticVideoRequest, type AgentPrepareProgrammaticVideoAction } from './programmaticVideo'
 import type { GenerationSubmissionContext } from '../studio/generationProvenance'
 import {
   LANGUAGE_INTENT_SCHEMA,
@@ -84,6 +89,7 @@ export interface CapabilityPresentation {
 }
 
 export interface CapabilityExecutionOutcome {
+  commandResult?: CommandResult
   message: string
   report?: AgentExecutionReport
   metadata?: Record<string, unknown>
@@ -124,7 +130,7 @@ export interface CapabilityDefinition<TAction extends AgentAction = AgentAction>
   ): Promise<CapabilityExecutionOutcome>
   report: {
     targetKind: string
-    successState: 'prepared' | 'completed'
+    successState: 'prepared' | 'queued' | 'completed'
   }
   summarize(action: TAction, outcome: CapabilityExecutionOutcome): string
   presentation: CapabilityPresentation
@@ -136,7 +142,7 @@ const LANGUAGE_AWARE_CAPABILITIES = new Set<AgentAction['type']>([
   'prepare_video', 'prepare_image', 'prepare_audio', 'queue_sfx_pack', 'prepare_3d',
   'create_story', 'update_story', 'generate_story_section', 'stage_story_comic',
   'stage_story_video', 'configure_story_song', 'stage_story_music_video',
-  'create_series_episode', 'update_series_episode', 'generate_series_plan',
+  'create_series_episode', 'update_series_episode', 'generate_series_plan', 'stage_series_comic',
   'create_rhythmic_3d_video', 'create_comic',
 ])
 
@@ -188,7 +194,7 @@ const storyVisualScopes = new Set(['world', 'locations', 'characters', 'all'])
 const storyVisualTargetKinds = new Set(['world', 'location', 'character'])
 const seriesPlanScopes = new Set(['outline', 'script', 'shots', 'complete'])
 const seriesRenderModes = new Set(['selected', 'missing', 'failed', 'all'])
-const seriesReviewScopes = new Set(['selected_latest', 'all_latest'])
+const seriesReviewScopes = new Set(['selected_latest', 'all_latest', 'replace_latest'])
 const seriesReviewDecisions = new Set(['approve', 'reject'])
 const seriesCanonDecisions = new Set(['accept_all', 'reject_all', 'accept_selected', 'reject_selected'])
 
@@ -783,13 +789,15 @@ defineCapability<AgentRenderSeriesShotsAction>({
 defineCapability<AgentReviewSeriesAttemptsAction>({
   name: 'review_series_attempts', title: 'Review exact Series Lab attempts', description: 'Approve or reject only reproducible attempts belonging to the exact canonical episode.',
   useWhen: 'The user explicitly asks to approve or reject rendered Series Lab shots.', parameters: ['series_title', 'target_episode_title', 'review_decision', 'review_scope', 'shot_numbers', 'attempt_id', 'confirm'],
-  inputSchema: { type: 'object', additionalProperties: false, properties: { type: { const: 'review_series_attempts' }, review_decision: { type: 'string', enum: ['approve', 'reject'] }, review_scope: { type: 'string', enum: ['selected_latest', 'all_latest'] }, confirm: { const: true } }, required: ['type', 'review_decision', 'review_scope', 'confirm'] }, risk: 'edit', confirmation: 'required', progress: 'Revisando intentos reproducibles de Series Lab…',
+  inputSchema: { type: 'object', additionalProperties: false, properties: { type: { const: 'review_series_attempts' }, review_decision: { type: 'string', enum: ['approve', 'reject'] }, review_scope: { type: 'string', enum: ['selected_latest', 'all_latest', 'replace_latest'] }, confirm: { const: true } }, required: ['type', 'review_decision', 'review_scope', 'confirm'] }, risk: 'edit', confirmation: 'required', progress: 'Revisando intentos reproducibles de Series Lab…',
   resolve(raw) {
     if (raw.confirm !== true) return null
     const decision = text(raw.review_decision, 30); const scope = text(raw.review_scope, 30)
     const shotNumbers = [...new Set(Array.isArray(raw.shot_numbers) ? raw.shot_numbers.slice(0, 200).flatMap(value => typeof value === 'number' && Number.isInteger(value) && value > 0 ? [value] : []) : [])]
-    if (!seriesReviewDecisions.has(decision) || !seriesReviewScopes.has(scope) || (scope === 'selected_latest' && !shotNumbers.length) || (scope === 'all_latest' && decision !== 'approve')) return null
-    return { type: 'review_series_attempts', seriesTitle: text(raw.series_title, 300), targetEpisodeTitle: text(raw.target_episode_title, 300), decision: decision as AgentReviewSeriesAttemptsAction['decision'], scope: scope as AgentReviewSeriesAttemptsAction['scope'], shotNumbers, attemptId: text(raw.attempt_id, 160), confirm: true }
+    const attemptId = text(raw.attempt_id, 160)
+    if (!seriesReviewDecisions.has(decision) || !seriesReviewScopes.has(scope) || (scope === 'selected_latest' && !shotNumbers.length) || ((scope === 'all_latest' || scope === 'replace_latest') && decision !== 'approve')) return null
+    if (attemptId && (scope !== 'selected_latest' || shotNumbers.length !== 1)) return null
+    return { type: 'review_series_attempts', seriesTitle: text(raw.series_title, 300), targetEpisodeTitle: text(raw.target_episode_title, 300), decision: decision as AgentReviewSeriesAttemptsAction['decision'], scope: scope as AgentReviewSeriesAttemptsAction['scope'], shotNumbers, attemptId, confirm: true }
   },
   validate(action) { return action.confirm === true ? [] : ['confirmation is required'] }, async prepare(action) { return action }, async execute(action, context) { return context.adapters.seriesLab.reviewAttempts(action) }, correlate(_action, outcome) { return outcome.target }, async track(_action, outcome) { return outcome }, report: { targetKind: 'series_episode', successState: 'completed' }, summarize(_action, outcome) { return outcome.message }, presentation: { destination: 'series_lab', anchors: ['review'], replay: 'atomic' },
 })
@@ -814,6 +822,56 @@ defineCapability<AgentAssembleSeriesEpisodeAction>({
   inputSchema: { type: 'object', additionalProperties: false, properties: { type: { const: 'assemble_series_episode' }, confirm: { const: true } }, required: ['type', 'confirm'] }, risk: 'compute', confirmation: 'required', progress: 'Ensamblando el episodio de Series Lab…',
   resolve(raw) { return raw.confirm === true ? { type: 'assemble_series_episode', seriesTitle: text(raw.series_title, 300), targetEpisodeTitle: text(raw.target_episode_title, 300), confirm: true } : null },
   validate(action) { return action.confirm === true ? [] : ['confirmation is required'] }, async prepare(action) { return action }, async execute(action, context) { return context.adapters.seriesLab.assembleEpisode(action) }, correlate(_action, outcome) { return outcome.target }, async track(_action, outcome) { return outcome }, report: { targetKind: 'series_episode', successState: 'completed' }, summarize(_action, outcome) { return outcome.message }, presentation: { destination: 'series_lab', anchors: ['review', 'assembly'], replay: 'atomic' },
+})
+
+defineCapability<AgentStageSeriesComicAction>({
+  name: 'stage_series_comic',
+  title: 'Stage a Series Lab episode as an editable comic',
+  description: 'Create a new editable Comic Director project from one exact Series episode, then verify its comic ID. It does not draw panels.',
+  useWhen: 'The user explicitly asks to turn the active or exactly named Series episode into a filled comic without rendering artwork.',
+  parameters: ['series_title', 'target_episode_title', 'series_id', 'episode_id', 'title', 'page_count', 'panels_per_page', 'confirm'],
+  inputSchema: {
+    type: 'object', additionalProperties: false,
+    properties: {
+      type: { const: 'stage_series_comic' },
+      series_title: { type: 'string', maxLength: 300 },
+      target_episode_title: { type: 'string', maxLength: 300 },
+      series_id: { type: 'string', maxLength: 160 },
+      episode_id: { type: 'string', maxLength: 160 },
+      title: { type: 'string', maxLength: 300 },
+      page_count: { type: 'integer', minimum: 1, maximum: 100 },
+      panels_per_page: { type: 'integer', minimum: 1, maximum: 12 },
+      confirm: { const: true },
+    },
+    required: ['type', 'confirm'],
+  },
+  risk: 'edit', confirmation: 'required', progress: 'Convirtiendo el episodio en un cómic editable…',
+  resolve(raw) {
+    if (raw.confirm !== true) return null
+    return {
+      type: 'stage_series_comic',
+      seriesTitle: text(raw.series_title, 300),
+      targetEpisodeTitle: text(raw.target_episode_title, 300),
+      seriesId: text(raw.series_id, 160),
+      episodeId: text(raw.episode_id, 160),
+      title: text(raw.title, 300),
+      pageCount: Math.round(boundedNumber(raw.page_count, 1, 100, 4)),
+      panelsPerPage: Math.round(boundedNumber(raw.panels_per_page, 1, 12, 4)),
+      confirm: true,
+    }
+  },
+  validate(action) {
+    return action.confirm === true && action.pageCount >= 1 && action.panelsPerPage >= 1
+      ? []
+      : ['confirmed page and panel counts are required']
+  },
+  async prepare(action) { return action },
+  async execute(action, context) { return context.adapters.seriesLab.stageComic(action) },
+  correlate(_action, outcome) { return outcome.target },
+  async track(_action, outcome) { return outcome },
+  report: { targetKind: 'comic', successState: 'completed' },
+  summarize(_action, outcome) { return outcome.message },
+  presentation: { destination: 'comics', anchors: ['project', 'pages', 'panels'], replay: 'atomic' },
 })
 
 defineCapability<AgentCreateComicAction>({
@@ -1111,6 +1169,7 @@ registerStudioCapabilities(defineCapability)
 registerNavigationQueueCapabilities(defineCapability)
 registerEditorAuxCapabilities(defineCapability)
 registerToolCapabilities(defineCapability)
+registerProgrammaticVideoCapability(defineCapability)
 
 export function getCapability(name: string): CapabilityDefinition | undefined {
   return definitions.get(name)

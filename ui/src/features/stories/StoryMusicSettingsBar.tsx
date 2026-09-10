@@ -1,7 +1,7 @@
 import { Loader2, Palette, RefreshCcw } from 'lucide-react'
 import { useUiTranslation } from '../../i18n'
 import { button, input, panel } from './storyLabChrome'
-import { ACE_STEP_MUSIC_MODEL, MINIMAX_MUSIC3_LOCAL_MODEL, isLocalMusicModel, normalizeStoryMusicModel } from './musicModel'
+import { ACE_STEP_MUSIC_MODEL, MINIMAX_MUSIC3_LOCAL_MODEL, normalizeStoryMusicModel, storyMusicGenerationReady, storyMusicReadyMessageKey } from './musicModel'
 import type { StoryMusicTabProps } from './StoryMusicTab'
 import { useStore } from '../../stores/useStore'
 import { modelRequirementsText } from '../../lib/minimaxMusicCatalog'
@@ -30,10 +30,8 @@ export function StoryMusicSettingsBar(props: StoryMusicTabProps) {
           {resourceHint && <span className="mt-1 block text-[9px] text-text-muted" title={resourceHint}>{resourceHint}</span>}
         </label>
         <div className="text-[10px] text-text-muted">{t('music.oneResultHint')}</div>
-        <div className={`rounded-md border px-3 py-2 text-[10px] ${minimaxConfigured || isLocalMusicModel(project.music.model) ? 'border-emerald-500/30 text-emerald-300' : 'border-amber-500/40 text-amber-300'}`}>
-          {isLocalMusicModel(project.music.model)
-            ? t('music.minimaxLocalReady')
-            : minimaxConfigured ? t('music.minimaxReady') : t('music.minimaxMissing')}
+        <div className={`rounded-md border px-3 py-2 text-[10px] ${storyMusicGenerationReady(project.music.model, minimaxConfigured) ? 'border-emerald-500/30 text-emerald-300' : 'border-amber-500/40 text-amber-300'}`}>
+          {t(storyMusicReadyMessageKey(project.music.model, minimaxConfigured))}
         </div>
       </div>
 

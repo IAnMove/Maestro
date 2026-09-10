@@ -1,3 +1,4 @@
+import { DirectorModelPicker } from '../../components/Sidebar/DirectorModelPicker'
 import { ChevronRight, Film, Loader2, Sparkles } from 'lucide-react'
 import { MINIMAX_IMAGE_API_LABEL, MINIMAX_IMAGE_API_MODEL } from '../../lib/externalModels'
 import { useUiTranslation } from '../../i18n'
@@ -12,8 +13,8 @@ export function StoryFilmProductionCard(props: StoryProductionsTabProps) {
     project, patch, workspace, productionBusy, filmDirection, setFilmDirection, filmDuration, setFilmDuration,
     filmPreserveVisualStyle, setFilmPreserveVisualStyle, stageFilm, directVideo, directReferenceVideo,
     approvedVisualReferenceCount, directReferenceVideoReady, directReferenceVideoSupported, filmGenerationImageReady,
-    filmImageReady, filmImageModel, filmVideoModel, selectableImageModels, selectableVideoModels,
-    selectedFilmImageModel, selectedFilmVideoModel, selectDirectorImageModel, selectStoryVideoModel, storyVideoOptionsReady,
+    filmImageReady, filmImageModel, filmVideoModel, selectableImageModels,
+    selectedFilmImageModel, selectDirectorImageModel, selectStoryVideoModel, storyVideoOptionsReady,
     storyVideoConfigurationReady, storyVideoResolution, storyVideoAspectRatio, storyVideoOptions, storyVideoAdjusted,
     setStoryVideoFormat, productionIssues,
   } = props
@@ -30,17 +31,20 @@ export function StoryFilmProductionCard(props: StoryProductionsTabProps) {
       <div className="rounded-md border border-violet-500/25 bg-violet-500/5 p-2.5 space-y-2">
         <p className="text-[10px] font-medium text-violet-100">{t('productions.visualGuidance')}</p>
         <div className="grid grid-cols-2 gap-1.5">
-          <button type="button" className={`${button} flex-col ${!directReferenceVideo ? 'border-purple-400/60 text-purple-200' : ''}`}
+          <button type="button" aria-pressed={project.musicVideoGenerationMode === 'image_guided'}
+            className={`${button} flex-col ${project.musicVideoGenerationMode === 'image_guided' ? 'border-purple-400/60 text-purple-200' : ''}`}
             onClick={() => patch({ musicVideoGenerationMode: 'image_guided' })}>
             <span>{t('productions.generateStartImages')}</span>
             <span className="text-[9px] text-text-muted">{t('productions.imageGuidedHint')}</span>
           </button>
-          <button type="button" className={`${button} flex-col ${directReferenceVideo ? 'border-violet-400/70 bg-violet-500/10 text-violet-200' : ''}`}
+          <button type="button" aria-pressed={directReferenceVideo}
+            className={`${button} flex-col ${directReferenceVideo ? 'border-violet-400/70 bg-violet-500/10 text-violet-200' : ''}`}
             onClick={() => patch({ musicVideoGenerationMode: 'direct_references' })}>
             <span>{t('productions.directApproved')}</span>
             <span className="text-[9px] text-text-muted">{t('productions.h3NoStart')}</span>
           </button>
-          <button type="button" className={`${button} flex-col ${directVideo ? 'border-fuchsia-400/70 bg-fuchsia-500/10 text-fuchsia-200' : ''}`}
+          <button type="button" aria-pressed={directVideo}
+            className={`${button} flex-col ${directVideo ? 'border-fuchsia-400/70 bg-fuchsia-500/10 text-fuchsia-200' : ''}`}
             onClick={() => patch({ musicVideoGenerationMode: 'direct_video', protagonistConsistency: false })}>
             <span>{t('productions.directVideo')}</span>
             <span className="text-[9px] text-text-muted">{t('productions.t2vNoRefs')}</span>
@@ -86,18 +90,7 @@ export function StoryFilmProductionCard(props: StoryProductionsTabProps) {
         </span>
       </label>
       <label className="block text-[10px] text-text-muted">{t('productions.videoModel')}
-        <select className={`${input} mt-1`} value={filmVideoModel}
-          disabled={project.provider.useGlobalProfile || !storyVideoOptionsReady}
-          onChange={event => selectStoryVideoModel(event.target.value)}>
-          {!selectableVideoModels.some(model => model.model_type === filmVideoModel) && (
-            <option value={filmVideoModel}>{selectedFilmVideoModel?.name || filmVideoModel}</option>
-          )}
-          {selectableVideoModels.map(model => (
-            <option key={model.model_type} value={model.model_type}>
-              {model.name}{model.is_downloaded === false ? t('productions.downloadsOnFirstUse') : ''}
-            </option>
-          ))}
-        </select>
+        <DirectorModelPicker mode="video" value={filmVideoModel} onChange={selectStoryVideoModel} pipeline="short_film_story" allowSeamless={false} preserveSelection showModeLabel={false} />
         <span className="mt-1 block text-[9px] leading-relaxed text-text-muted">
           {!storyVideoOptionsReady
             ? t('productions.checkingFormats')

@@ -1,10 +1,11 @@
-import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
-import { Upload, X } from 'lucide-react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
+import { X } from 'lucide-react'
 import { useStore } from '../../stores/useStore'
 import { useUiTranslation } from '../../i18n'
 import { VideoTimelineSelector } from '../shared/VideoTimelineSelector'
 import { OutpaintCanvas } from './OutpaintCanvas'
-import * as api from '../../api/client'
+import { StudioSourceField } from '../../lib/StudioSourceField.tsx'
+import { applyChosenStudioMedia, useWorkspaceOutputs } from '../../lib/studioAssetPick.ts'
 
 /**
  * Outpaint mode controls.
@@ -69,7 +70,12 @@ export function OutpaintControls() {
 
   const [error, setError] = useState<string | null>(null)
   const [showAdvanced, setShowAdvanced] = useState(false)
-  const fileRef = useRef<HTMLInputElement>(null)
+  const activeWorkspace = useStore(s => s.activeWorkspace)
+  const library = useWorkspaceOutputs(activeWorkspace)
+  const mediaItems = useMemo(
+    () => library.filter(item => item.type === 'image' || item.type === 'video'),
+    [library],
+  )
 
   // Source pixel dimensions parsed from editVideoResolution (e.g. "1280x720").
   // OutpaintCanvas needs these to:
@@ -84,42 +90,16 @@ export function OutpaintControls() {
     return { srcW: parseInt(m[1], 10), srcH: parseInt(m[2], 10) }
   }, [editVideoResolution])
 
-  const handleUpload = useCallback(async (file: File) => {
+  const handleChoose = useCallback((item: import('../../api/outputs').ApiOutput) => {
     setError(null)
-    try {
-      const result = await api.uploadImage(file)
-      const url = URL.createObjectURL(file)
-      const isVideo = file.type.startsWith('video/')
-      if (isVideo) {
-        const video = document.createElement('video')
-        video.src = url
-        video.onloadedmetadata = () => {
-          const duration = video.duration && isFinite(video.duration) ? video.duration : 0
-          const resolution = `${video.videoWidth}x${video.videoHeight}`
-          setEditVideo(file, result.path, url, duration, resolution)
-          // Reset trim window to the full clip so the timeline starts
-          // wide-open. User can narrow with the markers if they want a
-          // partial-window outpaint.
-          setTrimStart(0)
-          setTrimEnd(duration)
-        }
-      } else {
-        const img = new window.Image()
-        img.src = url
-        img.onload = () => {
-          setEditVideo(file, result.path, url, 0, `${img.naturalWidth}x${img.naturalHeight}`)
-        }
+    applyChosenStudioMedia(item, next => {
+      setEditVideo(next.file, next.path, next.url, next.duration, `${next.width}x${next.height}`)
+      if (item.type === 'video') {
+        setTrimStart(0)
+        setTrimEnd(next.duration)
       }
-    } catch {
-      setError('Failed to upload')
-    }
+    })
   }, [setEditVideo, setTrimStart, setTrimEnd])
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    const file = e.dataTransfer.files[0]
-    if (file && (file.type.startsWith('video/') || file.type.startsWith('image/'))) handleUpload(file)
-  }, [handleUpload])
 
   const isVideoFile = editVideoFile?.type.startsWith('video/')
   const selectedDuration = trimEnd > trimStart
@@ -145,23 +125,14 @@ export function OutpaintControls() {
       {/* Upload zone — shown only when no clip loaded. Same dashed-border
           + drop-target treatment as the other Edit-mode flows. */}
       {!editVideoFile ? (
-        <div
-          onDragOver={e => e.preventDefault()}
-          onDrop={handleDrop}
-          onClick={() => fileRef.current?.click()}
-          className="border-2 border-dashed border-border rounded-lg p-6 text-center cursor-pointer hover:border-accent-blue transition-colors"
-        >
-          <Upload size={24} className="mx-auto mb-2 text-text-muted" />
-          <p className="text-xs text-text-secondary">{t('outpaint.drop')}</p>
-          <p className="text-[10px] text-text-muted mt-1">{t('chrome.orBrowse')}</p>
-          <input
-            ref={fileRef}
-            type="file"
-            accept="video/*,image/*"
-            className="hidden"
-            onChange={e => { const f = e.target.files?.[0]; if (f) handleUpload(f) }}
-          />
-        </div>
+        <StudioSourceField
+          label={t('outpaint.drop')}
+          items={mediaItems}
+          accept="video/*,image/*"
+          kinds={['image', 'video']}
+          workspaceId={activeWorkspace}
+          onChoose={handleChoose}
+        />
       ) : (
         <>
           {/* Header: filename + remove button. The X mirrors the inpaint

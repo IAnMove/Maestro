@@ -1,4 +1,14 @@
 {
+  "modelPicker": {
+    "image": "Image",
+    "video": "Video",
+    "externalApi": "External API",
+    "empty": "No compatible models enabled",
+    "about": "About {{name}}",
+    "imageHint": "Only models that can create an establishing image and edit reference-based start frames are shown.",
+    "storyHint": "Only models that can render Director-planned shots with synchronized native audio are shown.",
+    "soundtrackHint": "Only models that can follow the uploaded soundtrack or dialogue timeline are shown."
+  },
   "queueRecovery": {
     "titleBusy": "Older leftovers besides the current generation",
     "titleIdle": "A generation queue can be recovered",
@@ -9,9 +19,9 @@
     "unknownModel": "Unknown model",
     "interrupted": "Interrupted",
     "waiting": "Waiting",
-    "duplicateWarning": "Do not press Resume if Activity already shows an H3 in sampling/decode: that duplicates the GPU. Discard leftovers and let the live job finish.",
+    "duplicateWarning": "Discarding these jobs does not affect the active generation or delete completed videos.",
     "rerunWarning": "The clip that was running will start again from the beginning; waiting clips keep their order.",
-    "discardClean": "Discard and start clean",
+    "discardClean": "Discard interrupted jobs only",
     "resumeAnyway": "Resume old leftovers anyway",
     "resumeQueue": "Resume queue"
   },

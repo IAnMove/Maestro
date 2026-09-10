@@ -1,4 +1,4 @@
-import type { RefObject } from 'react'
+import type { ApiOutput } from '../../api/outputs'
 import { Music } from 'lucide-react'
 import { useUiTranslation } from '../../i18n'
 import { panel, type StoryMusicQueue } from './storyLabChrome'
@@ -39,11 +39,10 @@ export type StoryMusicTabProps = {
   translateMusicCueLyrics: (cueId: string) => void
   generateMusicCueAudio: (cueId: string) => void
   openMusicalTrailer: (candidateId?: string) => void
-  onImportCustomMp3: (cueId: string) => void
-  onImportLyria: (cueId: string) => void
+  onImportCustomMp3: (cueId: string, item: ApiOutput) => void
+  onImportLyria: (cueId: string, item: ApiOutput) => void
   onCopied: (text: string) => void
-  musicCoverRef: RefObject<HTMLInputElement | null>
-  uploadCoverReference: (file?: File) => void
+  uploadCoverReference: (item: ApiOutput) => void
   writeStorySong: () => void
   adaptStoryLyrics: () => void
   translateManualSongLyrics: () => void

@@ -74,8 +74,8 @@ export interface StudioConfigurationSlice {
   singlePromptMode: boolean
   studioFocusedClipIndex: number
   setClipPrompt: (index: number, prompt: string) => void
-  setClipStartImage: (index: number, file: File | null) => void
-  addClipKeyframe: (index: number, file: File) => void
+  setClipStartImage: (index: number, file: File | null, path?: string | null) => void
+  addClipKeyframe: (index: number, file: File | null, path?: string | null) => void
   removeClipKeyframe: (index: number, keyframeIndex: number) => void
   setSinglePromptMode: (enabled: boolean) => void
   setStudioFocusedClipIndex: (index: number) => void
@@ -133,7 +133,18 @@ export function createStudioConfigurationSlice(
     setDurationSeconds: requestedSeconds => {
       const options = get().modelOptions
       const fps = options?.fps ?? 16
-      const minimum = Math.max(1, (options?.frames_minimum || fps) / fps)
+      // DramaBox (and similar TTS models) declare duration_slider.min=0 so
+      // that 0 means "auto-derive from the prompt". The video floor of 1s
+      // must not rewrite that sentinel — Wizard prepare and the Advanced
+      // slider both call this setter with 0.
+      const autoDurationAllowed = Boolean(
+        options?.audio_only
+        && options.duration_slider
+        && options.duration_slider.min === 0,
+      )
+      const minimum = autoDurationAllowed
+        ? 0
+        : Math.max(1, (options?.frames_minimum || fps) / fps)
       const nativeMaximum = options?.frames_maximum ? options.frames_maximum / fps : null
       const maximum = options?.sliding_window || nativeMaximum == null
         ? Number.POSITIVE_INFINITY
@@ -371,18 +382,18 @@ export function createStudioConfigurationSlice(
       clips[index] = { ...clips[index], prompt }
       set({ clips })
     },
-    setClipStartImage: (index, file) => {
+    setClipStartImage: (index, file, path = null) => {
       const clips = [...get().clips]
       if (!clips[index]) return
-      clips[index] = { ...clips[index], startImage: file, startImagePath: null }
+      clips[index] = { ...clips[index], startImage: file, startImagePath: path }
       set({ clips })
     },
-    addClipKeyframe: (index, file) => {
+    addClipKeyframe: (index, file, path = null) => {
       const clips = [...get().clips]
       if (!clips[index]) return
       clips[index] = {
         ...clips[index],
-        keyframes: [...(clips[index].keyframes || []), { file, path: null }],
+        keyframes: [...(clips[index].keyframes || []), { file, path }],
       }
       set({ clips })
     },

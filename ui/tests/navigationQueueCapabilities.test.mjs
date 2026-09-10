@@ -9,7 +9,14 @@ Object.assign(globalThis, {
   localStorage: dom.window.localStorage,
   Event: dom.window.Event,
   CustomEvent: dom.window.CustomEvent,
+  HTMLElement: dom.window.HTMLElement,
+  HTMLInputElement: dom.window.HTMLInputElement,
+  HTMLTextAreaElement: dom.window.HTMLTextAreaElement,
+  HTMLSelectElement: dom.window.HTMLSelectElement,
+  HTMLButtonElement: dom.window.HTMLButtonElement,
 })
+window.matchMedia = () => ({ matches: false })
+window.HTMLElement.prototype.scrollIntoView = () => undefined
 
 test('navigation and queue registration is complete and idempotent', async () => {
   const { registerNavigationQueueCapabilities } = await import('../src/features/agent/navigationQueueCapabilities.ts')
@@ -59,6 +66,9 @@ test('registered resolvers preserve section, queue, confirmation and workspace c
   assert.deepEqual(story.resolve({ story_section: 'music' }), {
     type: 'open_story_section', section: 'music',
   })
+  assert.deepEqual(story.resolve({ story_section: 'song' }), {
+    type: 'open_story_section', section: 'music',
+  })
   assert.equal(story.resolve({ story_section: 'unknown' }), null)
   assert.equal(story.validate({ type: 'open_story_section', section: 'assembly' }).length, 0)
 
@@ -94,7 +104,7 @@ test('registered resolvers preserve section, queue, confirmation and workspace c
 
   const createCollection = definitions.get('create_workspace_collection')
   assert.deepEqual(createCollection.resolve({
-    name: '  Campaña  ', project_ids: ['project-1', 'project-1'], asset_ids: ['asset-1'],
+    name: '  Campaña  ', project_ids: ['project-1'], asset_ids: ['asset-1'],
   }), {
     type: 'create_workspace_collection', name: 'Campaña', description: '',
     projectIds: ['project-1'], assetIds: ['asset-1'], productionIds: [],
@@ -109,6 +119,14 @@ test('registered resolvers preserve section, queue, confirmation and workspace c
   })
   assert.equal(updateCollection.resolve({ workspace_id: 'workspace-1' }), null)
   assert.equal(updateCollection.resolve({ workspace_id: 'workspace-1', expected_revision: 'old', name: 'Bad' }), null)
+  for (const references of [['asset-real', 42, null], ['asset-real', 'asset-real'], [' asset-real'], ['x'.repeat(241)], null, 'asset-real']) {
+    assert.equal(createCollection.resolve({ name: 'Do not partially create', asset_ids: references }), null)
+    assert.equal(updateCollection.resolve({ workspace_id: 'workspace-1', asset_ids: references }), null)
+  }
+  assert.equal(createCollection.resolve({ name: 'Bad description', description: 42 }), null)
+  assert.equal(updateCollection.resolve({ workspace_id: 'workspace-1', description: null }), null)
+  const exactId = 'asset-' + 'x'.repeat(220)
+  assert.deepEqual(createCollection.resolve({ name: 'Exact ID', asset_ids: [exactId] }).assetIds, [exactId])
 })
 
 test('section capabilities retain the visible lab navigation effect', async () => {

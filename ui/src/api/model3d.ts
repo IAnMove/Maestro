@@ -5,15 +5,20 @@ import { BASE } from './http'
 export interface Hunyuan3DModel {
   id: string
   label: string
-  engine: 'v2' | 'v21'
+  engine: 'v2' | 'v21' | 'trellis2' | 'pixal3d'
   repo: string
   subfolder: string
   parameters: string
   multiview: boolean
   turbo: boolean
   supports_text: boolean
-  recommended_vram_gb: number
+  recommended_vram_gb: number | null
   description: string
+  runtime?: { installed: boolean; install_hint: string | null; validation?: string }
+  resolutions?: number[]
+  supports_low_vram?: boolean
+  supports_camera_fov?: boolean
+  multiview_reason?: 'single_image' | 'camera_contract'
 }
 
 export interface Hunyuan3DPreset {
@@ -87,6 +92,9 @@ export async function startHunyuan3DJob(params: {
   target_face_num?: number
   mc_algo?: string
   provenance?: Record<string, unknown>
+  resolution?: number
+  low_vram?: boolean
+  camera_fov?: number
 }): Promise<Hunyuan3DJob> {
   const res = await fetch(`${BASE}/api/v1/model3d/generate`, {
     method: 'POST',

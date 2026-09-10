@@ -68,10 +68,16 @@ def h3_window_plan_signature(
     fps: float,
     has_start_image: bool,
     has_end_image: bool,
+    planning_style: str = "faithful",
+    h3_audio_policy: str = "native",
+    reference_context: str = "",
 ) -> str:
     """Fingerprint every input that can change a window plan."""
 
     payload = {
+        "planning_style": planning_style,
+        "audio_policy": h3_audio_policy,
+        "reference_context": reference_context,
         "prompt": str(prompt or "").strip(),
         "model_type": str(model_type or ""),
         "resolution": str(resolution or ""),
@@ -134,7 +140,21 @@ def _dialogue_sentence(item: Any, speaker_ids: dict[str, str]) -> str:
     lead = f"{speaker} ({stable_id}) {delivery}"
     if action:
         lead += f" while {action}"
-    return f"{lead}: <d>[{language}] {text}</d>. Immediately after the line, the speaker closes their mouth."
+    from .h3_prompt_policy import tagged_dialogue
+    return f"{lead}: {tagged_dialogue(language, text)}. Immediately after the line, the speaker closes their mouth."
+
+
+def _window_audio_fields(plan):
+    return (_compact(plan.get("ambient_audio") or "Natural location ambience", 150),
+            _compact(plan.get("music") or "N/A", 100))
+
+
+def _window_soundscape(ambient, effects):
+    return ". ".join(value for value in (ambient, effects) if value and value != "N/A") or "N/A"
+
+
+def _window_has_start_reference(context, position, has_start):
+    return not context and (position > 0 or has_start)
 
 
 def compile_h3_window_prompts(
@@ -143,6 +163,8 @@ def compile_h3_window_prompts(
     *,
     has_start_image: bool = False,
     has_end_image: bool = False,
+    h3_audio_policy: str = "native",
+    reference_context: str = "",
 ) -> list[dict[str, Any]]:
     """Compile a planner JSON object into complete, window-local H3 prompts."""
 
@@ -157,8 +179,7 @@ def compile_h3_window_prompts(
     setting = _compact(plan.get("setting_continuity"), 190)
     visual = _compact(plan.get("visual_continuity"), 150)
     initial_state = _compact(plan.get("initial_state"), 170)
-    ambient = _compact(plan.get("ambient_audio") or "Natural location ambience", 150)
-    music = _compact(plan.get("music") or "N/A", 100)
+    ambient, music = _window_audio_fields(plan)
     shared_visual = ". ".join(item for item in (subjects, setting, visual) if item)
     speaker_ids: dict[str, str] = {}
     compiled: list[dict[str, Any]] = []
@@ -196,11 +217,11 @@ def compile_h3_window_prompts(
         )
 
         picture_instructions: list[str] = []
-        if position > 0 or has_start_image:
+        if _window_has_start_reference(reference_context, position, has_start_image):
             picture_instructions.append(
                 "For the target video, at 0.00 seconds into the target video, <Picture 1> is fully referenced."
             )
-        if has_end_image and position + 1 == len(spans):
+        if not reference_context and has_end_image and position + 1 == len(spans):
             picture_instructions.append(
                 f"At {duration:.2f} seconds, <Picture 2> is the required final-frame destination."
             )
@@ -219,8 +240,8 @@ def compile_h3_window_prompts(
                 f"The window ends with {closing}.",
             ]
         )
-        soundscape = "N/A"
-        music_value = "N/A"
+        soundscape = _window_soundscape(ambient, effects)
+        music_value = music
 
         prompt_parts = picture_instructions + [
             f"integrated_multimodal_description: {' '.join(visual_parts)}",
@@ -231,12 +252,13 @@ def compile_h3_window_prompts(
         # Each sliding-window pass has its own local clock. Rebuild the vocal
         # schedule against that exact pass duration so a short line cannot
         # leak gibberish into the unused part of the window.
-        from .minimax_h3_duration import inject_h3_vocal_timeline
-
-        prompt, _ = inject_h3_vocal_timeline(prompt, duration)
-        from .director.h3_dialogue import apply_h3_no_sound_description
-
-        prompt = apply_h3_no_sound_description(prompt)
+        from .h3_prompt_finalization import finalize_h3_prompt
+        from .h3_story_contract import reference_window_prompt
+        if reference_context:
+            prompt = reference_window_prompt(prompt, reference_context)
+        prompt = finalize_h3_prompt(
+            prompt, policy=h3_audio_policy, duration_seconds=duration,
+        )
         compiled.append(
             {
                 **span,
@@ -533,9 +555,16 @@ def plan_h3_sliding_windows(
     has_end_image: bool = False,
     image_paths: list[str] | None = None,
     nsfw: bool = False,
+    planning_style: str = "faithful",
+    h3_audio_policy: str = "native",
+    reference_context: str = "",
 ) -> dict[str, Any]:
     """Use Maestro's configured LLM to create and compile an H3 window plan."""
 
+    from .h3_prompt_policy import planning_style as normalize_style, audio_policy, sound_contract
+    from .h3_story_contract import ledger_instructions, reconcile_window_dialogue
+    planning_style = normalize_style(planning_style)
+    h3_audio_policy = audio_policy(h3_audio_policy)
     boundaries = compute_h3_window_boundaries(
         total_frames,
         window_frames,
@@ -554,8 +583,11 @@ def plan_h3_sliding_windows(
         fps=fps,
         has_start_image=has_start_image,
         has_end_image=has_end_image,
+        planning_style=planning_style,
+        h3_audio_policy=h3_audio_policy,
+        reference_context=reference_context,
     )
-    if len(boundaries) <= 1:
+    if not boundaries:
         return {
             "source_prompt": str(prompt or ""),
             "signature": signature,
@@ -571,6 +603,9 @@ def plan_h3_sliding_windows(
     from services.guide_loader import load_guide
 
     guide = load_guide("enhance", "minimax_h3_sliding_windows")
+    guide += "\n\n" + ledger_instructions(prompt, planning_style) + "\n" + sound_contract(h3_audio_policy)
+    if reference_context:
+        guide += "\nReferences are canonical identity/voice evidence, not timeline keyframes:\n" + reference_context
     if nsfw:
         # This planner only divides an existing request over time. The general
         # mature-mode enhancer supplement is intentionally not injected here:
@@ -621,7 +656,7 @@ def plan_h3_sliding_windows(
             prompt=user_prompt,
             system_prompt=guide,
             max_new_tokens=max(1400, len(boundaries) * 520 + 500),
-            temperature=0.25,
+            temperature=0.38 if planning_style == "creative" else 0.25,
             top_p=0.85,
             image_paths=image_paths or None,
             enable_thinking=False,
@@ -687,27 +722,37 @@ def plan_h3_sliding_windows(
                 "The local LLM's repaired H3 window plan still violated "
                 "source fidelity: " + "; ".join(violations)
             )
+        ledger = reconcile_window_dialogue(plan, prompt, planning_style, boundaries)
         compiled = compile_h3_window_prompts(
             plan,
             boundaries,
             has_start_image=has_start_image,
             has_end_image=has_end_image,
+            h3_audio_policy=h3_audio_policy,
+            reference_context=reference_context,
         )
     except Exception as error:
         print(f"[MiniMax H3] Window planner fallback: {error}")
         planned_by = "deterministic_fallback"
         plan = _fallback_plan(prompt, len(boundaries))
+        ledger = reconcile_window_dialogue(plan, prompt, planning_style, boundaries)
         compiled = compile_h3_window_prompts(
             plan,
             boundaries,
             has_start_image=has_start_image,
             has_end_image=has_end_image,
+            h3_audio_policy=h3_audio_policy,
+            reference_context=reference_context,
         )
 
     return {
         "source_prompt": str(prompt or ""),
         "signature": signature,
         "planned_by": planned_by,
+        "planning_style": planning_style,
+        "audio_policy": h3_audio_policy,
+        "reference_context": reference_context,
+        "dialogue_ledger": ledger,
         "total_frames": int(total_frames),
         "window_frames": int(window_frames),
         "window_count": len(compiled),

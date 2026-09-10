@@ -3,6 +3,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useStore, getFamiliesForMode, getModelsForFamily } from '../../stores/useStore'
 import { useUiTranslation } from '../../i18n'
 import { InfoTooltip } from './InfoTooltip'
+import { H3ModelName } from './H3ModelInfo'
 import { modelRequirementsText } from '../../lib/minimaxMusicCatalog'
 
 export function ModelSelector() {
@@ -46,22 +47,27 @@ export function ModelSelector() {
   // Build grouped model list, filtered by:
   //   1. enabledModels (Settings → System → Model Visibility),
   //   2. nsfw_only gate (Mature Mode must be on for those to appear).
+  const availableForFamily = (familyId: string) => getModelsForFamily(familyId, models, generationMode, effectiveSubMode)
+    .filter(m => !m.tool_only)
+    .filter(m => effectiveSubMode !== 'recast' || m.model_type !== 'viggle_animate')
+    .filter(m => !m.nsfw_only || nsfwMode)
   const groups = modeFamilies.map(family => ({
     family,
-    models: getModelsForFamily(family.id, models, generationMode)
-      .filter(m => !m.tool_only)
-      .filter(m => enabledModels.has(m.model_type))
-      .filter(m => !m.nsfw_only || nsfwMode),
+    models: availableForFamily(family.id).filter(m => enabledModels.has(m.model_type)),
   })).filter(g => g.models.length > 0)
 
   // How many models are available for this mode but NOT enabled — powers the
   // "+N" hint that nudges users toward Settings → Enabled Models.
   const disabledCount = modeFamilies.reduce((n, family) => {
-    const avail = getModelsForFamily(family.id, models, generationMode)
-      .filter(m => !m.tool_only)
-      .filter(m => !m.nsfw_only || nsfwMode)
+    const avail = availableForFamily(family.id)
     return n + avail.filter(m => !enabledModels.has(m.model_type)).length
   }, 0)
+
+  if (effectiveSubMode === 'recast' && currentModelType === 'viggle_animate') {
+    return <div data-wizard-anchor="model" className="rounded-lg border border-border bg-bg-tertiary px-2.5 py-2 text-xs">
+      {currentModel?.name || 'Viggle-Animate'}
+    </div>
+  }
 
   return (
     <div className="relative flex-1 min-w-0" ref={containerRef} data-wizard-anchor="model">
@@ -72,7 +78,7 @@ export function ModelSelector() {
         className="w-full flex items-center gap-1.5 bg-bg-tertiary border border-border rounded-lg px-2.5 py-2 text-left hover:border-border-light transition-colors"
       >
         <span className="flex-1 min-w-0 truncate text-xs text-text-primary">
-          {currentModel?.name ?? t('model.select')}
+          <H3ModelName modelType={currentModelType} fallback={currentModel?.name ?? t('model.select')} />
         </span>
         <ChevronDown size={14} className={`shrink-0 text-text-muted transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
@@ -120,7 +126,7 @@ export function ModelSelector() {
                         }}
                         className="min-w-0 flex-1 px-3 py-1.5 flex items-center gap-2 text-left"
                       >
-                        <span className="flex-1 min-w-0 text-xs truncate">{model.name}</span>
+                        <span className="flex-1 min-w-0 text-xs truncate"><H3ModelName modelType={model.model_type} fallback={model.name} /></span>
                         {model.resource_requirements?.vram_gb != null && (
                           <span className="shrink-0 text-[9px] text-text-muted tabular-nums">
                             ~{model.resource_requirements.vram_gb} GB VRAM

@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useStore } from '../../stores/useStore'
 import { useUiTranslation } from '../../i18n'
-import { FileUploadZone } from '../shared/FileUploadZone'
-import * as api from '../../api/client'
+import type { ApiOutput } from '../../api/outputs'
+import { AssetInput } from '../../features/asset-picker/AssetInput.tsx'
+import { studioMediaPath, useWorkspaceOutputs } from '../../lib/studioAssetPick.ts'
 
 /**
  * SFX mode controls for MMAudio — sound effects generation.
@@ -14,37 +15,24 @@ export function SfxControls() {
   const setParam = useStore(s => s.setParam)
   const durationSeconds = useStore(s => s.durationSeconds)
   const setDurationSeconds = useStore(s => s.setDurationSeconds)
-  const [videoFilename, setVideoFilename] = useState<string | null>(null)
-  const [uploading, setUploading] = useState(false)
+  const [chosenVideo, setChosenVideo] = useState<ApiOutput | null>(null)
+  const activeWorkspace = useStore(s => s.activeWorkspace)
+  const videoItems = useWorkspaceOutputs(activeWorkspace, 'video')
+  const videoGuide = typeof params.video_guide === 'string' ? params.video_guide : ''
+  const matchesGuide = (item: ApiOutput) => Boolean(videoGuide) && [item.asset_id, item.url, studioMediaPath(item)].includes(videoGuide)
+  const selectedVideo = chosenVideo && matchesGuide(chosenVideo)
+    ? chosenVideo : videoItems.find(matchesGuide)
+  const { t: common } = useUiTranslation('common')
 
   const sfxPrompt = ((params as unknown as Record<string, unknown>).MMAudio_prompt as string) || ''
   const sfxNegPrompt = ((params as unknown as Record<string, unknown>).MMAudio_neg_prompt as string) || ''
   const textWeight = ((params as unknown as Record<string, unknown>).sfx_text_weight as number) ?? 1.0
 
-  const handleVideoUpload = async (file: File) => {
-    setUploading(true)
-    try {
-      const result = await api.uploadImage(file)
-      setParam('video_guide' as keyof typeof params, result.path)
-      setVideoFilename(file.name)
-
-      // Try to get video duration
-      const url = URL.createObjectURL(file)
-      const video = document.createElement('video')
-      video.preload = 'metadata'
-      video.onloadedmetadata = () => {
-        if (Number.isFinite(video.duration) && video.duration > 0) {
-          setDurationSeconds(Math.round(video.duration * 10) / 10)
-        }
-        URL.revokeObjectURL(url)
-      }
-      video.onerror = () => URL.revokeObjectURL(url)
-      video.src = url
-    } catch (e) {
-      console.error('Upload failed:', e)
-    } finally {
-      setUploading(false)
-    }
+  const chooseVideo = (item: ApiOutput | null) => {
+    // Keep the selected source identity, including its original workspace.
+    // The server inspects its duration when preparing the command.
+    setParam('video_guide', item?.url)
+    setChosenVideo(item)
   }
 
   return (
@@ -54,23 +42,33 @@ export function SfxControls() {
         <label className="text-[11px] text-text-muted uppercase tracking-wider mb-1.5 block">
           {t('sfx.videoClip')} <span className="normal-case text-text-muted">({t('chrome.optional')})</span>
         </label>
-        <FileUploadZone
-          label={uploading ? t('chrome.uploading') : t('sfx.dropVideo')}
-          accept=".mp4,.webm,.avi,.mov,.mkv"
-          filename={videoFilename}
-          onFile={handleVideoUpload}
-          onClear={() => {
-            setParam('video_guide' as keyof typeof params, undefined)
-            setVideoFilename(null)
-          }}
+        <AssetInput
+          key={activeWorkspace}
+          value={selectedVideo}
+          label={t('sfx.dropVideo')}
+          placeholder={t('sfx.dropVideo')}
+          items={videoItems}
+          accept=".mp4,.webm,.avi,.mov,.mkv,video/*"
+          workspaceId={activeWorkspace}
+          optional
+          constraints={{ kinds: ['video'], maxCount: 1, optional: true }}
+          onChoose={chooseVideo}
         />
+        {videoGuide && !selectedVideo && (
+          <div className="text-[10px] text-text-secondary break-all">
+            <span>{videoGuide}</span>
+            <button type="button" className="ml-2 underline" onClick={() => chooseVideo(null)}>
+              {common('picker.remove')}
+            </button>
+          </div>
+        )}
         <p className="text-[9px] text-text-muted mt-1">
           {t('sfx.hint')}
         </p>
       </div>
 
       {/* Duration (shown when no video — max 20s, MMAudio single-pass limit) */}
-      {!videoFilename && (
+      {!videoGuide && (
         <div>
           <div className="flex items-center justify-between mb-1.5">
             <label className="text-[11px] text-text-muted uppercase tracking-wider">{t('sfx.duration')}</label>

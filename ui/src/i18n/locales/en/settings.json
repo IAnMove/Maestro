@@ -369,5 +369,23 @@
     "linkedLoraTitle": "Lives in a linked install's loras folder (read-only from here) — no delete. Free the space in that install, or unlink it.",
     "files": "{{count}} files",
     "modelSizeTitle": "{{primary}} deletable here; the rest lives in linked installs or belongs to a base model"
+  },
+  "mcp": {
+    "title": "MCP · External assistants",
+    "info": "How MCP works",
+    "summary": "Connect an external assistant to this installation. Wizard remains available inside the app.",
+    "enable": "Enable MCP access",
+    "endpoint": "Connection URL",
+    "token": "New token — copy before closing Settings",
+    "copyToken": "Copy token",
+    "environment": "The token comes from HOCUS_MCP_TOKEN. Use that value in your client; disabling access takes effect immediately.",
+    "rotate": "Replace token (disconnects existing clients)",
+    "example": "Connection example",
+    "client": "Choose Streamable HTTP and Bearer authentication in your client. Its configuration format may differ from this example.",
+    "help": "MCP lets an external assistant discover tools and call the same application services without an open browser tab. Enable it, copy the URL and token, then add them to your MCP client. Start by listing tools and reading models or assets.",
+    "access": "The token grants the available read, edit and generation operations on this installation. Network reachability follows the app: localhost for this computer, or the app’s LAN URL for another computer. This switch does not open a router port or publish the app to the internet.",
+    "use": "Keep returned job IDs and poll their status. Retry with the same intent ID; use a new ID for a new generation. Scene tools return editable documents; preparing a scene does not export a video. Disable MCP to revoke access immediately.",
+    "failed": "Could not update or read MCP settings. Open the app at its local address and retry.",
+    "copyFailed": "Could not copy the token. Select and copy the field manually."
   }
 }

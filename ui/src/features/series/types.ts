@@ -48,6 +48,7 @@ export interface SeriesVisualVariant {
 }
 
 export interface SeriesVoiceProfile {
+  characterKitRef?: import('../../lib/characterVoice').CharacterKitRef
   provider?: string
   voiceId?: string
   language?: string
@@ -243,6 +244,9 @@ export interface SeriesShot {
   attempts: SeriesRenderAttempt[]
   approvedAttemptId?: string
   audioDirection?: string
+  sourceDialogueIds?: string[]
+  dialogueOrigin?: 'script' | 'manual'
+  scriptDialogueStatus?: 'in_sync' | 'stale' | 'manual_conflict'
 }
 
 export interface SeriesCanonDeltaItem extends CanonFact {

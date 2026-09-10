@@ -2,11 +2,12 @@ import { lazy, Suspense, useRef, useCallback, useState, useEffect, useLayoutEffe
 import { Film, Play, Square, Loader2, X, BookMarked, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react'
 import { TabFilter } from './TabFilter'
 import { ThumbnailGallery } from './ThumbnailGallery'
+import { GalleryViewSwitcher } from './GalleryViewSwitcher'
 import { MediaFeedItem } from './MediaFeedItem'
 import { useStore } from '../../stores/useStore'
 import { jobFitsGalleryFilter } from '../../lib/galleryListQuery'
 import type { GenerationJob } from '../../types'
-import { stageSceneForEditor } from '../../lib/sceneOutput'
+import { openSceneOutput } from '../../lib/sceneOutput'
 import {
   clearVideoEditorReplacementTarget,
   readVideoEditorReplacementTarget,
@@ -21,8 +22,13 @@ import {
   mediaFeedMaxPreviewHeight,
 } from './mediaFeedSizing'
 
+const GalleryLayouts = lazy(() => import('./GalleryLayouts'))
 const SceneAnimatorPanel = lazy(() => import('../Sidebar/SceneAnimatorPanel')
   .then(module => ({ default: module.SceneAnimatorPanel })))
+const Scene3DEditorPanel = lazy(() => import('../../features/scene3d/Scene3DEditorPanel')
+  .then(module => ({ default: module.Scene3DEditorPanel })))
+const CharacterReplacementWorkspace = lazy(() => import('../../features/characterReplacement/CharacterReplacementWorkspace')
+  .then(module => ({ default: module.CharacterReplacementWorkspace })))
 const RigAnimatePanel = lazy(() => import('../Sidebar/RigAnimatePanel')
   .then(module => ({ default: module.RigAnimatePanel })))
 const ComicEditorPanel = lazy(() => import('../../features/comics/ComicEditorPanel')
@@ -39,8 +45,8 @@ const RunsPanel = lazy(() => import('../../features/workspaces/WorkspacesPanel')
   .then(module => ({ default: module.RunsPanel })))
 const CharacterCreatorPanel = lazy(() => import('../../features/characters/CharacterCreatorPanel')
   .then(module => ({ default: module.CharacterCreatorPanel })))
-const AuditDevPanel = lazy(() => import('../../features/auditdev/AuditDevPanel')
-  .then(module => ({ default: module.AuditDevPanel })))
+const DeveloperToolsPanel = lazy(() => import('../../features/auditdev/DeveloperToolsPanel')
+  .then(module => ({ default: module.DeveloperToolsPanel })))
 const AssetsPanel = lazy(() => import('../../features/assets/AssetsPanel')
   .then(module => ({ default: module.AssetsPanel })))
 const ProjectsPanel = lazy(() => import('../../features/projects/ProjectsPanel')
@@ -323,6 +329,11 @@ export function MainContent() {
   const maxMediaHeight = mediaFeedMaxPreviewHeight(containerHeight)
   const estimatedItemHeight = estimatedMediaFeedItemHeight(containerWidth, containerHeight)
 
+  // Gallery layout. Grid and mosaic live in a lazily loaded module so the
+  // one-up feed stays the only layout in the entry chunk.
+  const galleryView = useStore(s => s.galleryView)
+  const activeWorkspace = useStore(s => s.activeWorkspace)
+
   // Measure container on mount and resize; clear stale heights whenever either
   // dimension changes because the viewport cap also makes item height depend
   // on the available vertical space.
@@ -436,8 +447,7 @@ export function MainContent() {
   const handleThumbnailClick = useCallback((index: number) => {
     const file = outputs[index]
     if (file?.type === 'scene') {
-      void stageSceneForEditor(file)
-        .then(() => setMediaFilter('scene3d'))
+      void openSceneOutput(file)
         .catch(error => console.error('Failed to open scene:', error))
       return
     }
@@ -513,7 +523,7 @@ export function MainContent() {
       }
     }
     requestAnimationFrame(align)
-  }, [getItemHeight, outputs, placeholderTotalHeight, setMediaFilter, setSelectedOutput])
+  }, [getItemHeight, outputs, placeholderTotalHeight, setSelectedOutput])
 
   // Infinite scroll: load more when near the bottom
   const loadingMore = useRef(false)
@@ -553,6 +563,7 @@ export function MainContent() {
     el.scrollTop += extra
     setScrollTop(el.scrollTop)
   }, [outputs, getItemHeight])
+
 
   const visibleItems = useMemo(() => {
     const items: JSX.Element[] = []
@@ -603,10 +614,20 @@ export function MainContent() {
           <ProjectsPanel />
         ) : mediaFilter === 'workspaces' ? (
           <WorkspaceCollectionsPanel />
+        ) : mediaFilter === 'character-replacement' ? (
+          <div className="flex-1 min-w-0 overflow-y-auto">
+            <CharacterReplacementWorkspace />
+          </div>
         ) : mediaFilter === 'scene3d' ? (
           <div className="flex-1 overflow-y-auto p-4 md:p-8">
             <div className="max-w-[1600px] mx-auto">
               <SceneAnimatorPanel />
+            </div>
+          </div>
+        ) : mediaFilter === 'world3d' ? (
+          <div className="flex-1 overflow-y-auto p-4 md:p-8">
+            <div className="max-w-[1600px] mx-auto">
+              <Scene3DEditorPanel />
             </div>
           </div>
         ) : mediaFilter === 'animate3d' ? (
@@ -660,11 +681,14 @@ export function MainContent() {
         ) : mediaFilter === 'auditdev' && developerMode ? (
           <div className="flex-1 overflow-hidden p-2 md:p-4">
             <div className="max-w-[1900px] mx-auto h-full">
-              <AuditDevPanel />
+              <DeveloperToolsPanel />
             </div>
           </div>
         ) : <>
         {/* Scrollable media feed */}
+        <div className="pointer-events-none absolute right-3 top-3 z-20 md:right-4 md:top-4">
+          <GalleryViewSwitcher />
+        </div>
         <div
           ref={feedRef}
           className="flex-1 overflow-y-auto p-3 md:p-4"
@@ -720,16 +744,31 @@ export function MainContent() {
           </div>
 
           {/* Position container for virtualized output items */}
-          <div className="relative" style={{ height: totalHeight - placeholderTotalHeight }}>
-            {visibleItems.map(item => {
-              // Adjust top positions to be relative to this container (subtract placeholder height)
-              const adjustedStyle = {
-                ...item.props.style,
-                top: (item.props.style?.top as number) - placeholderTotalHeight,
-              }
-              return { ...item, props: { ...item.props, style: adjustedStyle } }
-            })}
-          </div>
+          {galleryView === 'feed' ? (
+            <div className="relative" style={{ height: totalHeight - placeholderTotalHeight }}>
+              {visibleItems.map(item => {
+                // Adjust top positions to be relative to this container (subtract placeholder height)
+                const adjustedStyle = {
+                  ...item.props.style,
+                  top: (item.props.style?.top as number) - placeholderTotalHeight,
+                }
+                return { ...item, props: { ...item.props, style: adjustedStyle } }
+              })}
+            </div>
+          ) : (
+            <Suspense fallback={<PanelLoadingFallback />}>
+              <GalleryLayouts
+                view={galleryView}
+                outputs={outputs}
+                workspace={activeWorkspace}
+                activeIndex={activeIndex}
+                containerWidth={containerWidth}
+                containerHeight={containerHeight}
+                scrollTop={scrollTop}
+                onOpen={setSelectedOutput}
+              />
+            </Suspense>
+          )}
 
           {/* Loading state */}
           {outputsLoading && outputs.length === 0 && (

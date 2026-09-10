@@ -297,6 +297,7 @@ def create_llm_router(
     default_llm_repo: str,
     ensure_llm_loaded: Callable[[], None],
     comic_writing_llm: Callable[[dict], dict | None],
+    resolve_visual_media: Callable[[str, str | None], str] | None = None,
 ) -> APIRouter:
     """Build the contiguous LLM control/generate/song-writer router."""
 
@@ -374,7 +375,8 @@ def create_llm_router(
         ensure_llm_loaded()
 
         try:
-            result = llm_service.generate(
+            from services.wangp_analysis import generate_with_media
+            arguments = dict(
                 prompt=prompt,
                 system_prompt=body.get("system_prompt", ""),
                 max_new_tokens=body.get("max_new_tokens", 256),
@@ -385,7 +387,12 @@ def create_llm_router(
                 seed=body.get("seed"),
                 json_schema=json_schema,
             )
-            return {"text": result}
+            if body.get("media") and resolve_visual_media is None:
+                raise ValueError("Visual input resolver is unavailable")
+            return await asyncio.to_thread(generate_with_media, llm_service, arguments, body.get("media"),
+                                           lambda value: resolve_visual_media(value, body.get("workspace")))
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
@@ -458,8 +465,8 @@ def _h3_plan_model_def(get_model_def: Callable[[str], Any], model_type: str):
     model_def = get_model_def(model_type) or {}
     if not str(model_def.get("architecture") or "").startswith("minimax_h3"):
         raise HTTPException(status_code=400, detail="H3 window planning requires a MiniMax H3 model.")
-    if model_def.get("omni_reference"):
-        raise HTTPException(status_code=400, detail="MiniMax H3 Omni does not use sliding windows.")
+    if model_def.get("minimax_h3_legacy_sidecar"):
+        raise HTTPException(status_code=400, detail="H3 Legacy does not support sequence planning.")
     return model_def
 
 
@@ -467,6 +474,8 @@ def _h3_planning_inputs(body: dict, model_type: str) -> dict:
     """Collect window-memory inputs using the same field aliases as the Studio UI."""
     return {
         "model_type": model_type,
+        "minimax_h3_reference_sequence": body.get("minimax_h3_reference_sequence", False),
+        "minimax_h3_multi_window": True,
         "resolution": body.get("resolution") or "864x480",
         "video_length": body.get("total_frames") or body.get("video_length") or 124,
         "sliding_window_size": body.get("window_frames") or body.get("sliding_window_size") or 345,
@@ -663,6 +672,8 @@ def _run_llm_enhance(
             tts_voice_count=body.get("tts_voice_count", 2),
             raw_enhancer_mode=raw_enhancer_mode,
             reference_context=body.get("reference_context"),
+            planning_style=body.get("planning_style", "faithful"),
+            h3_audio_policy=body.get("h3_audio_policy", "native"),
         )
         return {"original": prompt, "enhanced": result}
     except Exception as e:
@@ -694,7 +705,16 @@ def create_llm_prompt_router(
         model_type = str(body.get("model_type") or "")
         if not prompt:
             raise HTTPException(status_code=400, detail="prompt is required")
+        from services.h3_prompt_policy import planning_style, audio_policy
+        try:
+            planning_style(body.get("planning_style"))
+            audio_policy(body.get("h3_audio_policy"))
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
         model_def = _h3_plan_model_def(get_model_def, model_type)
+        if body.get("minimax_h3_references"):
+            from services.h3_runtime_policy import reference_context
+            body["reference_context"] = reference_context(body["minimax_h3_references"])
         planning_inputs = _h3_planning_inputs(body, model_type)
         from models.minimax_h3.minimax_h3_handler import apply_h3_window_memory_policy
 
@@ -736,9 +756,14 @@ def create_llm_prompt_router(
                 has_end_image=bool(body.get("has_end_image")),
                 image_paths=image_paths or None,
                 nsfw=bool(nsfw),
+                planning_style=body.get("planning_style", "faithful"),
+                h3_audio_policy=body.get("h3_audio_policy", "native"),
+                reference_context=body.get("reference_context", ""),
             )
             result["effective_window_frames"] = window_frames
             return result
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
         except Exception as error:
             traceback.print_exc()
             raise HTTPException(status_code=500, detail=str(error)) from error

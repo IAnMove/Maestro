@@ -1,0 +1,4 @@
+# Historical documents are opt-in for ordinary ripgrep searches.
+# Use an explicit file path or rg --no-ignore docs/archive when investigating history.
+*
+!README.md

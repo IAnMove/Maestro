@@ -133,7 +133,7 @@ test('common capability runner follows every stage and reports the verified adap
     onStage: current => stages.push(current),
   })
   assert.deepEqual(stages, [
-    'resolve', 'validate', 'prepare', 'confirm', 'execute', 'correlate', 'track', 'report',
+    'resolve', 'validate', 'prepare', 'confirm', 'revalidate', 'execute', 'correlate', 'track', 'report',
   ])
   assert.equal(result.ok, true)
   assert.deepEqual(result.report.target, {

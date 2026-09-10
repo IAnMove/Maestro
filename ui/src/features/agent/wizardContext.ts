@@ -7,6 +7,7 @@ import { sequenceTotalDuration } from '../video-editor/editorTimeline'
 import { useSeriesStore } from '../series/store'
 import { useStoryStore } from '../stories/store'
 import { rememberedCharacterKitLibrary, rememberedVideo3dScene } from './wizardLabSession'
+import { projectWizardContextCapabilities } from './wizardCapabilityAvailability'
 import type { MediaFilter } from '../../types'
 
 /**
@@ -126,9 +127,16 @@ export interface WizardPendingQuestion {
   version: number | null
 }
 
+export interface WizardCapabilityStatusEntry {
+  name: string
+  status: 'executable' | 'needs_data' | 'blocked' | 'requires_navigation'
+  reason: string
+}
+
 export interface WizardContextCapabilities {
   available: string[]
   blocked: Array<{ name: string; reason: string }>
+  statuses: WizardCapabilityStatusEntry[]
 }
 
 export interface WizardContextSnapshot {
@@ -571,6 +579,17 @@ function normalizePipelines(value: unknown, workspaceId: string): WizardPipeline
     })
 }
 
+function normalizeCapabilityStatus(value: unknown): WizardCapabilityStatusEntry | null {
+  const itemRecord = record(value)
+  const name = idValue(itemRecord.name || itemRecord.id)
+  const status = stringValue(itemRecord.status)
+  if (!name) return null
+  if (status !== 'executable' && status !== 'needs_data' && status !== 'blocked' && status !== 'requires_navigation') {
+    return null
+  }
+  return { name, status, reason: stringValue(itemRecord.reason) }
+}
+
 function normalizeCapabilities(value: unknown): WizardContextCapabilities {
   const raw = Array.isArray(value) ? { available: value } : record(value)
   const available = uniqueStrings(raw.available || raw.allowed || raw.capability_ids || raw.capabilities)
@@ -582,7 +601,11 @@ function normalizeCapabilities(value: unknown): WizardContextCapabilities {
     })
     .filter((item): item is { name: string; reason: string } => Boolean(item))
     .filter((item, index, list) => list.findIndex(candidate => candidate.name === item.name) === index)
-  return { available, blocked }
+  const statuses = (Array.isArray(raw.statuses) ? raw.statuses : [])
+    .map(normalizeCapabilityStatus)
+    .filter((item): item is WizardCapabilityStatusEntry => Boolean(item))
+    .filter((item, index, list) => list.findIndex(candidate => candidate.name === item.name) === index)
+  return { available, blocked, statuses }
 }
 
 function normalizeLabSnapshots(value: unknown): WizardLabSnapshots {
@@ -838,6 +861,7 @@ function inferredLocation(state: ReturnType<typeof useStore.getState>): WizardCo
     comics: { area: 'comics', tab: 'comics', section: '' },
     videoeditor: { area: 'video_editor', tab: 'video_editor', section: '' },
     scene3d: { area: 'video_3d', tab: 'video_3d', section: '' },
+    world3d: { area: 'video_3d', tab: 'world_3d', section: 'world' },
     animate3d: { area: 'video_3d', tab: 'animate_3d', section: 'animate' },
     characters: { area: 'character_kit', tab: 'character_kit', section: '' },
     workspaces: { area: 'workspaces', tab: 'workspaces', section: '' },
@@ -1138,21 +1162,16 @@ function pipelineRefsFromStore(
   return refs
 }
 
-function contextCapabilities(location: WizardContextLocation): WizardContextCapabilities {
-  const common = ['open_tab', 'inspect_queue', 'select_workspace']
-  const byTab: Record<string, string[]> = {
-    studio: ['prepare_video', 'prepare_image', 'prepare_audio', 'prepare_3d', 'remove_background', 'start_generation'],
-    story_lab: ['open_story_section', 'create_story', 'update_story', 'generate_story_section', 'apply_story_proposal', 'approve_story_section', 'approve_story_visuals', 'generate_story_visuals', 'configure_story_song', 'generate_story_song', 'stage_story_music_video', 'start_director_production'],
-    series_lab: ['open_series_section', 'create_series_episode', 'update_series_episode', 'generate_series_plan', 'apply_series_plan', 'render_series_shots', 'review_series_attempts', 'assemble_series_episode', 'commit_series_canon'],
-    comics: ['create_comic', 'generate_comic', 'generate_comic_panel'],
-    video_3d: ['open_3d_scene', 'create_3d_scene', 'set_3d_scene_properties', 'add_3d_scene_layer', 'update_3d_scene_layer', 'remove_3d_scene_layer', 'attach_3d_scene_audio', 'analyze_3d_scene_audio', 'apply_3d_choreography', 'save_3d_scene', 'export_3d_scene'],
-    animate_3d: ['open_3d_scene', 'apply_3d_rhythm', 'apply_3d_choreography'],
-    video_editor: ['create_video_editor_project', 'open_video_editor_project', 'add_video_editor_clips', 'order_video_editor_clips', 'trim_video_editor_clip', 'add_video_editor_audio', 'validate_video_editor_timeline', 'export_video_editor'],
-    character_kit: ['create_character_kit', 'open_character_kit', 'update_character_kit', 'attach_character_kit_references', 'build_character_kit', 'open_character_kit_rig', 'apply_character_kit_preset', 'track_character_kit_job'],
-    director: ['start_director_production'],
-    workspaces: ['create_workspace_collection', 'update_workspace_collection'],
-  }
-  return { available: [...new Set([...common, ...(byTab[location.tab] || [])])], blocked: [] }
+function contextCapabilities(
+  location: WizardContextLocation,
+  labs: WizardLabSnapshots,
+  pendingQuestion: unknown,
+): WizardContextCapabilities {
+  return projectWizardContextCapabilities({
+    location,
+    labs,
+    pendingQuestion,
+  })
 }
 
 function draftSnapshots(
@@ -1393,8 +1412,10 @@ export function buildWizardContextSnapshot(options: BuildWizardContextOptions = 
     kit_id: presence?.kit_id || (location.tab === 'character_kit' || location.tab === 'character_creator' ? kit?.id : ''),
     clip_index: presence?.clip_index,
   })
+  const labs = buildWizardLabSnapshots()
   const capabilities = options.capabilities === undefined
-    ? contextCapabilities(location) : normalizeCapabilities(options.capabilities)
+    ? contextCapabilities(location, labs, options.pending_question)
+    : normalizeCapabilities(options.capabilities)
   return normalizeWizardContextSnapshot({
     schema: WIZARD_CONTEXT_SCHEMA,
     version: WIZARD_CONTEXT_VERSION,
@@ -1409,6 +1430,6 @@ export function buildWizardContextSnapshot(options: BuildWizardContextOptions = 
     workflow: options.workflow,
     pending_question: options.pending_question,
     capabilities,
-    labs: buildWizardLabSnapshots(),
+    labs,
   }, workspaceId)
 }

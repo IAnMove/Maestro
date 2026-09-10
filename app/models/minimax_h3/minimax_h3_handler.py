@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import os
 
-import torch
-
 
 _MODEL_TYPE = "minimax_h3"
 _LEGACY_MODEL_TYPE = "minimax_h3_legacy"
@@ -18,6 +16,10 @@ _OFFICIAL_REPO = "MiniMaxAI/MiniMax-H3"
 _OFFICIAL_REVISION = "5d9b308a59ab12e67147f191e184baf704185bd1"
 _DEEPBEEP_REPO = "DeepBeepMeep/MiniMax-H3"
 _DEEPBEEP_REVISION = "fec7846aef352e58a1cfb699455e3d104281e68b"
+_EXPERIMENTAL_VAE_REPO = "Kijai/MiniMax-H3-experimental"
+_EXPERIMENTAL_VAE_REVISION = "a3e7d8da4ae7ba8df0779094cf5ab9d6ee855fe4"
+_FUSED_MODEL_REPO = "MATLOWAI/minimax-h3-fused-turbo-int8-convrot"
+_FUSED_MODEL_REVISION = "3b51096a1bf67608d98131116558202208fcf195"
 _ASSETS_ROOT = "minimax_h3"
 
 _TRANSFORMER = "minimax_h3_fl2va_pruned_fp8_scaled.safetensors"
@@ -28,7 +30,21 @@ _TEXT_ENCODER_INT8 = "Qwen3-VL-32B-Instruct-layer50_quanto_bf16_int8.safetensors
 _TEXT_ENCODER_GGUF_Q2 = "qwen3vl-32B-MiniMax-H3-Q2_K.gguf"
 _TEXT_ENCODER_GGUF_Q4 = "qwen3vl-32B-MiniMax-H3-Q4_K_M.gguf"
 _VIDEO_VAE = "minimax_h3_video_vae_fp16.safetensors"
+_VIDEO_VAE_INT8_CONVROT = "minimax_h3_video_vae_int8_convrot.safetensors"
 _AUDIO_VAE = "minimax_h3_audio_vae_fp32.safetensors"
+_WANGP_TEXT_ENCODER_FOLDER = "Qwen3-VL-32B-Instruct"
+_WANGP_FL2VA_PRUNED_TRANSFORMER = (
+    "MiniMax-H3-FL2VA-pruned_rank8_int8_convrot.safetensors"
+)
+_WANGP_REF2VA_PRUNED_TRANSFORMER = (
+    "MiniMax-H3-Ref2VA-pruned_rank8_int8_convrot.safetensors"
+)
+_WANGP_FL2VA_PRUNED_BF16_TRANSFORMER = (
+    "MiniMax-H3-FL2VA-pruned_rank8_bf16.safetensors"
+)
+_WANGP_REF2VA_PRUNED_BF16_TRANSFORMER = (
+    "MiniMax-H3-Ref2VA-pruned_rank8_bf16.safetensors"
+)
 
 # H3 packs video, audio, and text into one unusually long transformer
 # sequence.  At 480p / 10 seconds the token-wise activations alone need
@@ -41,20 +57,247 @@ _TRANSFORMER_WORKING_VRAM_MB = 10 * 1024
 # H3's video VAE accepts 17*n+5 pixel frames. 345 is the final valid
 # frame count at or below the official 15-second limit (14.375s at 24fps).
 # First/Last may continue beyond that duration, but every individual model
-# pass remains inside this native limit and reuses exactly one boundary frame.
+# pass remains inside this native limit. Continuation uses a 17*n+1 overlap:
+# complete 17-frame chunks carry motion history and the final frame is the
+# ordinary FL2VA boundary anchor.
 _H3_MIN_FRAMES = 124
 _H3_MAX_FRAMES = 345
+_H3_FUSED_RECOMMENDED_FRAMES = 243
+_H3_FUSED_DEFAULT_EVALUATIONS = 4
+_H3_FUSED_MIN_EVALUATIONS = 4
+_H3_FUSED_MAX_EVALUATIONS = 8
+_H3_FRAME_STEP = 17
+_H3_OVERLAP_DEFAULT = 18
+_H3_OVERLAP_MAX = 103
+# Ref2VA appends its ordered reference context to the target sequence. Keep
+# Auto sequence clips one legal H3 frame step below the ordinary FL2VA pass
+# recommendation so reference conditioning has a small activation cushion.
+# Expert users can lock Sequence Window Length to reclaim the native ceiling.
+_H3_OMNI_REFERENCE_MARGIN_STEPS = 1
 _H3_SLIDING_WINDOW_DEFAULTS = {
     "window_min": _H3_MIN_FRAMES,
     "window_max": _H3_MAX_FRAMES,
-    "window_step": 17,
+    "window_step": _H3_FRAME_STEP,
     "window_default": _H3_MAX_FRAMES,
     "overlap_min": 1,
-    "overlap_max": 1,
-    "overlap_step": 0,
-    "overlap_default": 1,
+    "overlap_max": _H3_OVERLAP_MAX,
+    "overlap_step": _H3_FRAME_STEP,
+    "overlap_offset": 1,
+    "overlap_default": _H3_OVERLAP_DEFAULT,
     "discard_last_frames": 0,
 }
+
+# Opt-in diagnostics for investigating very long FL2VA continuations. These
+# live in ``custom_settings`` so they remain out of the ordinary H3 workflow,
+# survive presets/metadata, and can be removed without expanding the shared
+# WanGP generation signature. None of them changes the default pipeline.
+_H3_LONG_SEQUENCE_RUNTIME_SETTINGS = (
+    "h3_long_sequence_clean_tail",
+    "h3_long_sequence_single_frame_after_three",
+    "h3_long_sequence_vary_seed",
+    "h3_long_sequence_periodic_reset",
+    "h3_long_sequence_diagnostics",
+)
+_H3_LONG_SEQUENCE_CLEAN_TAIL_FRAMES = _H3_FRAME_STEP
+_H3_LONG_SEQUENCE_SEED_STRIDE = 1_000_003
+
+
+def _normalize_h3_fused_steps(value) -> int:
+    """Mirror the standalone fused-request boundary without package imports.
+
+    Model handlers are also loaded directly by WanGP's model discovery and
+    asset-sharing tools, where relative imports are unavailable.
+    """
+
+    if value in (None, ""):
+        return _H3_FUSED_DEFAULT_EVALUATIONS
+    if isinstance(value, bool):
+        raise ValueError("H3 Fused Turbo total steps must be a whole number.")
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError) as error:
+        raise ValueError(
+            "H3 Fused Turbo total steps must be a whole number."
+        ) from error
+    if not numeric.is_integer():
+        raise ValueError("H3 Fused Turbo total steps must be a whole number.")
+    steps = int(numeric)
+    if not _H3_FUSED_MIN_EVALUATIONS <= steps <= _H3_FUSED_MAX_EVALUATIONS:
+        raise ValueError(
+            "H3 Fused Turbo supports 4-8 total denoising steps; "
+            f"received {steps}. Four is the published default."
+        )
+    return steps
+
+
+def resolve_h3_long_sequence_discard_frames(
+    custom_settings,
+    *,
+    enabled: bool,
+) -> int:
+    """Return the opt-in clean-tail discard for a rolling FL2VA sequence."""
+
+    settings = custom_settings if isinstance(custom_settings, dict) else {}
+    if enabled and settings.get("h3_long_sequence_clean_tail") is True:
+        return _H3_LONG_SEQUENCE_CLEAN_TAIL_FRAMES
+    return 0
+
+
+def resolve_h3_long_sequence_window_policy(
+    window_no: int,
+    overlap_frames: int,
+    seed,
+    custom_settings,
+):
+    """Resolve one experimental FL2VA continuation handoff.
+
+    The scheduler's output stride remains based on ``overlap_frames``. A
+    one-frame handoff therefore uses the remaining overlap as generated
+    warm-up that the outer assembler trims, preserving the exact requested
+    total duration while removing recursive multi-frame history.
+    """
+
+    settings = custom_settings if isinstance(custom_settings, dict) else {}
+    window = max(1, int(window_no or 1))
+    overlap = max(0, int(overlap_frames or 0))
+    is_continuation = window > 1 and overlap > 0
+    persistent_single_frame = (
+        is_continuation
+        and window >= 4
+        and settings.get(
+            "h3_long_sequence_single_frame_after_three"
+        ) is True
+    )
+    periodic_reset = (
+        is_continuation
+        and (window - 1) % 3 == 0
+        and settings.get("h3_long_sequence_periodic_reset") is True
+    )
+    conditioning_frames = (
+        1
+        if persistent_single_frame or periodic_reset
+        else overlap
+    )
+    effective_seed = seed
+    if (
+        settings.get("h3_long_sequence_vary_seed") is True
+        and window > 1
+        and seed is not None
+    ):
+        effective_seed = (
+            int(seed) + (window - 1) * _H3_LONG_SEQUENCE_SEED_STRIDE
+        ) % 2_147_483_647
+    return {
+        "conditioning_frames": conditioning_frames,
+        "output_trim_frames": overlap,
+        "seed": effective_seed,
+        "persistent_single_frame": persistent_single_frame,
+        "periodic_reset": periodic_reset,
+        "diagnostics": settings.get(
+            "h3_long_sequence_diagnostics"
+        ) is True,
+    }
+
+
+def align_h3_num_frames(num_frames: int) -> int:
+    """Snap a request to the next ``17 * n + 5`` H3 frame count."""
+
+    if num_frames < 1:
+        raise ValueError(f"`num_frames` must be positive, got {num_frames}.")
+    while num_frames % _H3_FRAME_STEP != 5:
+        num_frames += 1
+    return num_frames
+
+
+def normalize_h3_clip_frame_count(
+    value,
+    *,
+    minimum_frames: int = _H3_MIN_FRAMES,
+    maximum_frames: int = _H3_MAX_FRAMES,
+    frame_step: int = _H3_FRAME_STEP,
+) -> int:
+    """Repair one bounded H3 clip onto its native frame lattice.
+
+    Uploaded media and legacy Director metadata commonly describe duration in
+    ordinary seconds. At H3's 24 fps, an exact five-second clip becomes 120
+    frames even though the model's first legal duration is 124 frames. Round
+    upward so source audio/video is never shortened merely to satisfy the
+    lattice, and clamp to the model's published one-pass bounds.
+    """
+
+    minimum = max(1, int(minimum_frames or _H3_MIN_FRAMES))
+    step = max(1, int(frame_step or _H3_FRAME_STEP))
+    maximum = max(minimum, int(maximum_frames or _H3_MAX_FRAMES))
+    # A hardware/profile ceiling may be expressed as an ordinary frame count.
+    # Keep the returned value legal even when that ceiling is not itself one
+    # of H3's ``minimum + n * step`` values.
+    maximum = minimum + ((maximum - minimum) // step) * step
+    try:
+        requested = int(round(float(value)))
+    except (TypeError, ValueError, OverflowError):
+        requested = minimum
+    if requested <= minimum:
+        return minimum
+    lattice_steps = (requested - minimum + step - 1) // step
+    return min(maximum, minimum + lattice_steps * step)
+
+
+def normalize_h3_clip_frame_schedule(
+    values,
+    *,
+    minimum_frames: int = _H3_MIN_FRAMES,
+    maximum_frames: int = _H3_MAX_FRAMES,
+    frame_step: int = _H3_FRAME_STEP,
+) -> list[int]:
+    """Repair an H3 clip schedule while preserving cumulative media timing.
+
+    A single clip rounds upward so it cannot lose source content. For a series
+    of audio/video-derived clips, carry each rounding residual into the next
+    choice instead; this prevents a small lattice adjustment from accumulating
+    into visible A/V drift across a long sequence.
+    """
+
+    minimum = max(1, int(minimum_frames or _H3_MIN_FRAMES))
+    step = max(1, int(frame_step or _H3_FRAME_STEP))
+    maximum = max(minimum, int(maximum_frames or _H3_MAX_FRAMES))
+    maximum = minimum + ((maximum - minimum) // step) * step
+    valid = list(range(minimum, maximum + 1, step))
+    residual = 0.0
+    schedule: list[int] = []
+    for value in (values or []):
+        try:
+            requested = int(round(float(value)))
+        except (TypeError, ValueError, OverflowError):
+            requested = minimum
+        target = max(1.0, float(requested)) + residual
+        chosen = min(valid, key=lambda candidate: (abs(candidate - target), candidate))
+        residual = target - chosen
+        schedule.append(chosen)
+    return schedule
+
+
+def normalize_h3_overlap_frames(value, *, window_frames=None) -> int:
+    """Round and safely cap an FL2VA overlap on the 17*n+1 lattice."""
+
+    try:
+        value = int(value)
+    except (TypeError, ValueError):
+        value = _H3_OVERLAP_DEFAULT
+    if value <= 0:
+        value = 1
+    value = (
+        ((value - 1 + _H3_FRAME_STEP // 2) // _H3_FRAME_STEP)
+        * _H3_FRAME_STEP
+        + 1
+    )
+    maximum = _H3_OVERLAP_MAX
+    if window_frames is not None:
+        available = max(1, int(window_frames) - _H3_FRAME_STEP)
+        maximum = min(
+            maximum,
+            ((available - 1) // _H3_FRAME_STEP) * _H3_FRAME_STEP + 1,
+        )
+    return max(1, min(maximum, value))
 
 # First Block Cache is intentionally opt-in. It compares a compact signature
 # from block one and can reuse the remaining 49-block residual when adjacent
@@ -192,6 +435,7 @@ _H3_RESOLUTION_PRESETS = {
         "label": "480p",
         "values": {
             "auto": "auto_480p",
+            "21:9": "1120x480",
             "16:9": "864x480",
             "9:16": "480x864",
             "1:1": "640x640",
@@ -203,6 +447,7 @@ _H3_RESOLUTION_PRESETS = {
         "label": "540p",
         "values": {
             "auto": "auto_540p",
+            "21:9": "1280x544",
             "16:9": "960x544",
             "9:16": "544x960",
             "1:1": "736x736",
@@ -219,6 +464,7 @@ _H3_RESOLUTION_PRESETS = {
         "hint": "Uses a model-aligned 1280x704 canvas for faster H3 generation.",
         "values": {
             "auto": "auto_720p",
+            "21:9": "1632x704",
             "16:9": "1280x704",
             "9:16": "704x1280",
             "1:1": "704x704",
@@ -226,17 +472,19 @@ _H3_RESOLUTION_PRESETS = {
             "3:4": "704x928",
         },
     },
-    # Preserve the released 768px-short-edge canvas for saved settings and
-    # direct API compatibility. It is intentionally omitted from the visible
-    # preset order now that aligned 720p is the consumer default.
+    # H3's native trained tier uses a 768px short edge. Keep it distinct from
+    # the lighter aligned 720p canvas so users can choose the model's native
+    # resolution without jumping all the way to experimental 1080p.
     "768p": {
-        "label": "768p High",
+        "label": "768p",
         "hint": (
-            "H3's released 1344x768 canvas. It uses 14.5% more pixels than "
-            "720p and may require a shorter window on lower-VRAM GPUs."
+            "MiniMax H3's native trained resolution (1344x768 at 16:9). "
+            "It uses 14.5% more pixels than 720p and may require a shorter "
+            "window on lower-VRAM GPUs."
         ),
         "values": {
             "auto": "auto_768p",
+            "21:9": "1792x768",
             "16:9": "1344x768",
             "9:16": "768x1344",
             "1:1": "768x768",
@@ -259,6 +507,7 @@ _H3_RESOLUTION_PRESETS = {
         ),
         "values": {
             "auto": "auto_1080p",
+            "21:9": "2528x1088",
             "16:9": "1920x1088",
             "9:16": "1088x1920",
             "1:1": "1088x1088",
@@ -267,7 +516,7 @@ _H3_RESOLUTION_PRESETS = {
         },
     },
 }
-_H3_RESOLUTION_PRESET_ORDER = ["480p", "540p", "720p", "1080p"]
+_H3_RESOLUTION_PRESET_ORDER = ["480p", "540p", "720p", "768p", "1080p"]
 _H3_AUTO_RESOLUTION_BUDGETS = {
     "auto": 1280 * 704,
     "auto_480p": 864 * 480,
@@ -288,9 +537,12 @@ _H3_AUTO_RESOLUTION_FALLBACKS = {
 # Shared with the Studio UI through /api/v1/model-options. The backend
 # remains authoritative, while the UI can display and select the same safe
 # pass length before a job is submitted. Full 33B and Pruned 20B do not have
-# the same weight-streaming cost, so keeping one table for both needlessly
-# split Pruned jobs into extra continuation passes. Bands are evaluated
-# top-down; VRAM tiers are evaluated left-to-right.
+# the same peak-memory shape: Full streams more weights, while Pruned uses a
+# fused QKV projection. Keep checkpoint-specific curves, but calibrate them
+# against the current H3 residency cap rather than older pre-cap OOM results.
+# On a 24 GB RTX 4090, both checkpoints now complete a 345-frame 1280x704
+# pass while the cap preserves roughly 16.1 GB for packed-sequence workspace.
+# Bands are evaluated top-down; VRAM tiers are evaluated left-to-right.
 _H3_FULL_WINDOW_MEMORY_POLICY = {
     "checkpoint": "full",
     "manual_override": True,
@@ -426,6 +678,133 @@ _H3_PRUNED_WINDOW_MEMORY_POLICY = {
     ],
 }
 
+
+# The fused checkpoint's published baseline is 243 frames at 1152x640. A
+# 24 GB RTX 4090 subsequently completed full 345-frame 1280x704 and 1344x768
+# passes with the 4-step fused recipe and the H3 workspace-residency cap. The
+# latter also completed a second continuation window. Promote that measured
+# Frames envelope for 24 GB and larger cards, while retaining the published
+# 243-frame baseline on <=23 GB cards, larger canvases, and References runs
+# whose additional conditioning memory was not part of those measurements.
+# The 345-frame native maximum remains available as a manual override.
+_H3_FUSED_VALIDATED_FULL_WINDOW_MAX_PIXELS = 1344 * 768
+_H3_FUSED_VALIDATED_FULL_WINDOW_MIN_VRAM_GB = 24
+
+
+_H3_FUSED_WINDOW_MEMORY_POLICY = {
+    "checkpoint": "fused_4step",
+    "manual_override": True,
+    "auto_resolution_pixels": dict(_H3_AUTO_RESOLUTION_BUDGETS),
+    "resolution_bands": [
+        {
+            "min_pixels": 1_800_000,
+            "vram_tiers": [
+                {
+                    "max_vram_gb": 8,
+                    "frames": None,
+                    "fallback_resolution": "480p",
+                },
+                {
+                    "max_vram_gb": 12,
+                    "frames": None,
+                    "fallback_resolution": "720p or lower",
+                },
+                {"max_vram_gb": 16, "frames": 124},
+                {"max_vram_gb": 24, "frames": 158},
+                {"max_vram_gb": 32, "frames": 243},
+                {"frames": 243},
+            ],
+        },
+        {
+            # Keep larger native/ultrawide canvases outside the measured
+            # 1344x768 activation envelope on the published baseline.
+            "min_pixels": _H3_FUSED_VALIDATED_FULL_WINDOW_MAX_PIXELS + 1,
+            "vram_tiers": [
+                {
+                    "max_vram_gb": 8,
+                    "frames": None,
+                    "fallback_resolution": "480p",
+                },
+                {"max_vram_gb": 12, "frames": 124},
+                {"max_vram_gb": 16, "frames": 124},
+                {"max_vram_gb": 24, "frames": 243},
+                {"frames": 243},
+            ],
+        },
+        {
+            "min_pixels": 1_000_000,
+            "vram_tiers": [
+                {
+                    "max_vram_gb": 8,
+                    "frames": None,
+                    "fallback_resolution": "480p",
+                },
+                {"max_vram_gb": 12, "frames": 124},
+                {"max_vram_gb": 16, "frames": 124},
+                {"max_vram_gb": 23, "frames": 243},
+                {"frames": 345},
+            ],
+        },
+        {
+            "min_pixels": 800_000,
+            "vram_tiers": [
+                {"max_vram_gb": 8, "frames": 124},
+                {"max_vram_gb": 12, "frames": 124},
+                {"max_vram_gb": 23, "frames": 243},
+                {"frames": 345},
+            ],
+        },
+        {
+            "min_pixels": 500_000,
+            "vram_tiers": [
+                {"max_vram_gb": 8, "frames": 124},
+                {"max_vram_gb": 12, "frames": 243},
+                {"max_vram_gb": 23, "frames": 243},
+                {"frames": 345},
+            ],
+        },
+        {
+            "min_pixels": 0,
+            "vram_tiers": [
+                {"max_vram_gb": 8, "frames": 243},
+                {"max_vram_gb": 23, "frames": 243},
+                {"frames": 345},
+            ],
+        },
+    ],
+}
+
+# Ref2VA appends ordered image, video, and audio context to the target
+# sequence. Keep its automatic fused window at the published 243-frame recipe
+# until a reference-conditioned 345-frame pass is measured independently.
+_H3_FUSED_REFERENCE_WINDOW_MEMORY_POLICY = {
+    **_H3_PRUNED_WINDOW_MEMORY_POLICY,
+    "checkpoint": "fused_4step_references",
+    "resolution_bands": [
+        {
+            **band,
+            "vram_tiers": [
+                {
+                    **tier,
+                    "frames": (
+                        None
+                        if tier.get("frames") is None
+                        else min(
+                            _H3_FUSED_RECOMMENDED_FRAMES,
+                            int(tier["frames"]),
+                        )
+                    ),
+                }
+                for tier in band.get("vram_tiers", [])
+            ],
+        }
+        for band in _H3_PRUNED_WINDOW_MEMORY_POLICY.get(
+            "resolution_bands",
+            [],
+        )
+    ],
+}
+
 # Full H3's transformer, text/vision encoders, video/audio VAEs, and managed
 # Turbo adapter total roughly 54 GB before normal OS/application headroom.
 # This is a preflight recommendation, not a hard gate: MMGP can still stream
@@ -434,16 +813,19 @@ _H3_FULL_ESTIMATED_PIPELINE_RAM_GB = 54.0
 _H3_FULL_MINIMUM_SYSTEM_RAM_GB = 64.0
 
 _RESOLUTIONS = [
+    ("2528x1088 (21:9 experimental)", "2528x1088"),
     ("1920x1088 (16:9 experimental)", "1920x1088"),
     ("1088x1920 (9:16 experimental)", "1088x1920"),
     ("1440x1088 (4:3 experimental)", "1440x1088"),
     ("1088x1440 (3:4 experimental)", "1088x1440"),
     ("1088x1088 (1:1 experimental)", "1088x1088"),
+    ("1792x768 (21:9 native)", "1792x768"),
     ("1344x768 (16:9 high)", "1344x768"),
     ("768x1344 (9:16 high)", "768x1344"),
     ("1024x768 (4:3 high)", "1024x768"),
     ("768x1024 (3:4 high)", "768x1024"),
     ("768x768 (1:1 high)", "768x768"),
+    ("1632x704 (21:9 720p)", "1632x704"),
     ("1280x704 (16:9 720p)", "1280x704"),
     ("704x1280 (9:16 720p)", "704x1280"),
     ("928x704 (4:3 720p)", "928x704"),
@@ -451,11 +833,13 @@ _RESOLUTIONS = [
     ("704x704 (1:1 720p)", "704x704"),
     ("1152x640 (16:9)", "1152x640"),
     ("640x1152 (9:16)", "640x1152"),
+    ("1280x544 (21:9)", "1280x544"),
     ("960x544 (16:9)", "960x544"),
     ("544x960 (9:16)", "544x960"),
     ("736x544 (4:3)", "736x544"),
     ("544x736 (3:4)", "544x736"),
     ("736x736 (1:1)", "736x736"),
+    ("1120x480 (21:9 low VRAM)", "1120x480"),
     ("864x480 (16:9 low VRAM)", "864x480"),
     ("480x864 (9:16 low VRAM)", "480x864"),
     ("640x480 (4:3 low VRAM)", "640x480"),
@@ -552,12 +936,33 @@ def recommended_h3_window_profile(
 
     model_def = model_def or {}
     full_checkpoint = bool(model_def.get("minimax_h3_full_checkpoint", False))
-    policy = (
-        _H3_FULL_WINDOW_MEMORY_POLICY
-        if full_checkpoint
-        else _H3_PRUNED_WINDOW_MEMORY_POLICY
+    fused_turbo = bool(model_def.get("minimax_h3_fused_turbo", False))
+    omni_reference = bool(
+        model_def.get("omni_reference", False)
+        or model_def.get("architecture") == "minimax_h3_ref2va"
     )
-    checkpoint = "full" if full_checkpoint else "pruned"
+    policy = (
+        (
+            _H3_FUSED_REFERENCE_WINDOW_MEMORY_POLICY
+            if omni_reference
+            else _H3_FUSED_WINDOW_MEMORY_POLICY
+        )
+        if fused_turbo
+        else (
+            _H3_FULL_WINDOW_MEMORY_POLICY
+            if full_checkpoint
+            else _H3_PRUNED_WINDOW_MEMORY_POLICY
+        )
+    )
+    checkpoint = (
+        (
+            "fused_4step_references"
+            if omni_reference
+            else "fused_4step"
+        )
+        if fused_turbo
+        else ("full" if full_checkpoint else "pruned")
+    )
 
     try:
         total_vram_gb = float(total_vram_gb)
@@ -572,7 +977,11 @@ def recommended_h3_window_profile(
     if total_vram_gb <= 0:
         return {
             "supported": True,
-            "frames": _H3_MAX_FRAMES,
+            "frames": (
+                _H3_FUSED_RECOMMENDED_FRAMES
+                if fused_turbo
+                else _H3_MAX_FRAMES
+            ),
             "fallback_resolution": None,
             "gpu_vram_gb": total_vram_gb,
             "resolution": effective_resolution,
@@ -600,7 +1009,11 @@ def recommended_h3_window_profile(
         break
     return {
         "supported": True,
-        "frames": _H3_MAX_FRAMES,
+        "frames": (
+            _H3_FUSED_RECOMMENDED_FRAMES
+            if fused_turbo
+            else _H3_MAX_FRAMES
+        ),
         "fallback_resolution": None,
         "gpu_vram_gb": total_vram_gb,
         "resolution": effective_resolution,
@@ -622,6 +1035,258 @@ def recommended_h3_window_frames(
         model_def,
     )
     return int(profile.get("frames") or 0)
+
+
+def recommended_h3_omni_sequence_profile(
+    total_vram_gb,
+    resolution,
+    model_def: dict | None = None,
+) -> dict:
+    """Return the safe native Ref2VA pass size for an Omni sequence.
+
+    Ref2VA packs canonical reference media beside every target pass. Auto
+    therefore reserves one legal frame step as lightweight reference-context
+    headroom while preserving H3's minimum; native continuation only changes
+    how completed passes exchange their motion and audio tails.
+    """
+
+    model_def = model_def or {}
+    profile = dict(
+        recommended_h3_window_profile(
+            total_vram_gb,
+            resolution,
+            model_def,
+        )
+    )
+    profile["base_frames"] = profile.get("frames")
+    profile["reference_margin_frames"] = 0
+    if not profile.get("supported") or not profile.get("frames"):
+        return profile
+
+    minimum = max(1, int(model_def.get("frames_minimum") or _H3_MIN_FRAMES))
+    maximum = max(minimum, int(model_def.get("frames_maximum") or _H3_MAX_FRAMES))
+    step = max(1, int(model_def.get("frames_steps") or _H3_FRAME_STEP))
+    policy = model_def.get("omni_sequence_memory_policy") or {}
+    try:
+        margin_steps = max(
+            0,
+            int(
+                policy.get(
+                    "reference_margin_steps",
+                    _H3_OMNI_REFERENCE_MARGIN_STEPS,
+                )
+            ),
+        )
+    except (TypeError, ValueError):
+        margin_steps = _H3_OMNI_REFERENCE_MARGIN_STEPS
+
+    base_frames = min(maximum, max(minimum, int(profile["frames"])))
+    safe_frames = max(minimum, base_frames - margin_steps * step)
+    safe_frames = minimum + ((safe_frames - minimum) // step) * step
+    safe_frames = min(maximum, max(minimum, safe_frames))
+    profile["frames"] = safe_frames
+    profile["reference_margin_frames"] = base_frames - safe_frames
+    profile["reference_margin_steps"] = margin_steps
+    return profile
+
+
+def apply_h3_omni_sequence_memory_policy(
+    inputs: dict,
+    model_def: dict,
+    hardware: dict | None,
+) -> dict | None:
+    """Resolve one native Omni Sequence pass without changing total duration.
+
+    Auto uses the GPU/canvas/checkpoint recommendation plus Ref2VA headroom.
+    A locked manual value remains available for experimentation and is only
+    normalized to the model's legal frame lattice.
+    """
+
+    if not isinstance(inputs, dict) or not (model_def or {}).get(
+        "omni_reference"
+    ):
+        return None
+    hardware = hardware or {}
+    minimum = max(1, int(model_def.get("frames_minimum") or _H3_MIN_FRAMES))
+    maximum = max(minimum, int(model_def.get("frames_maximum") or _H3_MAX_FRAMES))
+    step = max(1, int(model_def.get("frames_steps") or _H3_FRAME_STEP))
+    try:
+        total_vram_gb = float(hardware.get("gpu_vram_gb") or 0)
+        total_frames = int(inputs.get("video_length") or minimum)
+        requested_clip = int(
+            inputs.get("minimax_h3_sequence_clip_frames") or maximum
+        )
+    except (TypeError, ValueError):
+        return None
+
+    requested_clip = min(maximum, max(minimum, requested_clip))
+    requested_clip = minimum + ((requested_clip - minimum) // step) * step
+    manual_override = inputs.get(
+        "minimax_h3_sequence_memory_override", False
+    ) is True
+    resolution = _normalize_h3_resolution(
+        inputs.get("resolution", "864x480")
+    )
+    profile = recommended_h3_omni_sequence_profile(
+        total_vram_gb,
+        resolution,
+        model_def,
+    )
+    if not manual_override and not profile.get("supported"):
+        fallback = profile.get("fallback_resolution") or "a lower resolution"
+        return {
+            "unsupported": True,
+            "message": (
+                "MiniMax H3 Omni Auto does not recommend "
+                f"{profile['resolution']} on a {total_vram_gb:.0f} GB GPU: "
+                "H3 cannot use a native clip shorter than its 124-frame "
+                "(5.2-second) minimum. "
+                f"Choose {fallback}, or manually lock Sequence Window Length "
+                "in Advanced to try this combination experimentally."
+            ),
+            "gpu_vram_gb": total_vram_gb,
+            "resolution": profile["resolution"],
+            "requested_clip_frames": requested_clip,
+            "effective_clip_frames": None,
+            "output_frames": total_frames,
+            "fallback_resolution": fallback,
+            "checkpoint": profile["checkpoint"],
+            "manual_override": False,
+        }
+
+    safe_clip = int(profile.get("frames") or maximum)
+    effective_clip = requested_clip if manual_override else safe_clip
+    inputs["minimax_h3_sequence_clip_frames"] = effective_clip
+    return {
+        "gpu_vram_gb": total_vram_gb,
+        "resolution": resolution,
+        "requested_clip_frames": requested_clip,
+        "effective_clip_frames": effective_clip,
+        "recommended_clip_frames": safe_clip,
+        "output_frames": total_frames,
+        "checkpoint": profile["checkpoint"],
+        "manual_override": manual_override,
+        "reference_margin_frames": int(
+            profile.get("reference_margin_frames") or 0
+        ),
+    }
+
+
+def apply_h3_native_omni_memory_policy(
+    inputs: dict,
+    model_def: dict,
+    hardware: dict | None,
+) -> dict | None:
+    """Keep an automatic one-shot Ref2VA clip within its safe native pass.
+
+    Unlike Omni Reference Sequence, a one-shot Ref2VA request cannot divide
+    the requested duration into continuation windows. Auto therefore reduces
+    the output duration only when the request still carries Auto's shorter
+    Window Length. A matching native window is an intentional user override
+    and must be honored, including requests from cached v1.7.x frontends that
+    predate the explicit memory-override flag. Sequence mode is handled
+    separately and keeps its full requested timeline.
+    """
+
+    if (
+        not isinstance(inputs, dict)
+        or not (model_def or {}).get("omni_reference")
+        or inputs.get("minimax_h3_reference_sequence") is True
+    ):
+        return None
+    if (
+        inputs.get("sliding_window_memory_override") is True
+        or inputs.get("minimax_h3_sequence_memory_override") is True
+    ):
+        return None
+    hardware = hardware or {}
+    try:
+        total_vram_gb = float(hardware.get("gpu_vram_gb") or 0)
+        requested_frames = int(inputs.get("video_length") or _H3_MIN_FRAMES)
+        requested_window_frames = int(
+            inputs.get("sliding_window_size") or _H3_MIN_FRAMES
+        )
+    except (TypeError, ValueError):
+        return None
+    if total_vram_gb <= 0:
+        return None
+
+    minimum_frames = max(
+        1,
+        int((model_def or {}).get("frames_minimum") or _H3_MIN_FRAMES),
+    )
+    maximum_frames = max(
+        minimum_frames,
+        int((model_def or {}).get("frames_maximum") or _H3_MAX_FRAMES),
+    )
+    requested_native_frames = normalize_h3_clip_frame_count(
+        requested_frames,
+        minimum_frames=minimum_frames,
+        maximum_frames=maximum_frames,
+        frame_step=int(
+            (model_def or {}).get("frames_steps") or _H3_FRAME_STEP
+        ),
+    )
+    requested_native_window_frames = normalize_h3_clip_frame_count(
+        requested_window_frames,
+        minimum_frames=minimum_frames,
+        maximum_frames=maximum_frames,
+        frame_step=int(
+            (model_def or {}).get("frames_steps") or _H3_FRAME_STEP
+        ),
+    )
+    if (
+        requested_frames > minimum_frames
+        and requested_native_window_frames >= requested_native_frames
+    ):
+        # v1.7.0-v1.7.2 could lose the explicit boolean during model-option
+        # or restored-sidecar state changes even though Duration and Window
+        # Length still visibly matched. Treat that unambiguous request shape
+        # as the same manual override instead of silently returning 5.2s.
+        inputs["sliding_window_memory_override"] = True
+        return None
+
+    resolution = _normalize_h3_resolution(
+        inputs.get("resolution", "864x480")
+    )
+    profile = recommended_h3_window_profile(
+        total_vram_gb,
+        resolution,
+        model_def,
+    )
+    if not profile["supported"]:
+        fallback = profile.get("fallback_resolution") or "a lower resolution"
+        return {
+            "unsupported": True,
+            "message": (
+                "MiniMax H3 Omni Auto does not recommend "
+                f"{profile['resolution']} on a {total_vram_gb:.0f} GB GPU: "
+                "H3 cannot use a native clip shorter than its 124-frame "
+                "(5.2-second) minimum. "
+                f"Choose {fallback}, or enable Multi-window sequence to divide "
+                "a longer timeline into VRAM-aware native windows."
+            ),
+            "gpu_vram_gb": total_vram_gb,
+            "resolution": profile["resolution"],
+            "requested_frames": requested_frames,
+            "effective_frames": None,
+            "fallback_resolution": fallback,
+            "checkpoint": profile["checkpoint"],
+        }
+
+    safe_frames = int(profile["frames"])
+    if requested_frames <= safe_frames:
+        return None
+
+    inputs["video_length"] = safe_frames
+    inputs["sliding_window_size"] = safe_frames
+    return {
+        "gpu_vram_gb": total_vram_gb,
+        "resolution": resolution,
+        "requested_frames": requested_frames,
+        "effective_frames": safe_frames,
+        "checkpoint": profile["checkpoint"],
+    }
 
 
 def h3_runtime_preflight(
@@ -741,7 +1406,7 @@ def apply_h3_window_memory_policy(
             f"{profile['resolution']} on a {total_vram_gb:.0f} GB GPU: "
             "H3 cannot use a window shorter than its 124-frame "
             "(5.2-second) minimum. "
-            f"Choose {fallback}, or manually lock Window Size in Advanced "
+            f"Choose {fallback}, or manually lock Window Length in Advanced "
             "to try this combination experimentally."
         )
         return {
@@ -883,16 +1548,19 @@ def pace_h3_sliding_window_prompt(
         if allowed_dialogue_indices:
             dialogue_instruction = (
                 "Only the <d> dialogue tags still present below may be spoken "
-                "in this segment, once each and in order."
+                "in this segment, once each and in order. Reserved dialogue "
+                "markers are silent and must not produce speech or gibberish."
             )
         else:
             dialogue_instruction = (
-                "This segment contains no <d> dialogue tags. Continue the "
-                "visible action from the plan."
+                "This segment has no assigned scripted dialogue. Everyone "
+                "remains silent with mouths closed; do not add speech, muttering, "
+                "or gibberish. Reserved dialogue markers are not spoken."
             )
     else:
         dialogue_instruction = (
-            "Continue the visible action from this segment of the full-shot plan."
+            "Do not invent or repeat dialogue beyond what this segment of the "
+            "full-shot plan explicitly requires."
         )
 
     return (
@@ -903,6 +1571,37 @@ def pace_h3_sliding_window_prompt(
         "describes the complete timeline, not a command to perform everything "
         f"inside this shorter segment. {phase_instruction} "
         f"{dialogue_instruction}\n\nFULL-SHOT PLAN:\n{prompt}"
+    )
+
+
+def enforce_h3_source_continuation_prompt(prompt):
+    """Keep Studio Extend from treating the source tail as a new-shot ref.
+
+    H3 receives native motion history plus the final boundary frame, but the
+    model may still interpret a normal action prompt as permission to begin a
+    fresh camera setup at the first generated frame.  Extend promises a
+    temporal continuation, so make the boundary behavior explicit while
+    leaving the user free to request cuts later in the generated portion.
+    """
+
+    prompt = str(prompt or "").strip()
+    if not prompt:
+        return prompt
+    marker = "SOURCE-VIDEO CONTINUATION CONTRACT"
+    if marker in prompt:
+        return prompt
+    return (
+        f"{marker} (highest priority): At 0.00 seconds, continue directly "
+        "from the supplied source video's final moment as the same "
+        "uninterrupted take. The opening generated frames preserve the exact "
+        "camera position, lens, framing, environment, lighting, subject "
+        "identities, poses, screen positions, and current motion trajectories. "
+        "Do not cut, reset the action, change angle, or begin a new establishing "
+        "shot at the extension boundary. Continue the existing motion naturally "
+        "before introducing the requested action. If a later camera cut is "
+        "requested, perform it only after the continuation is visibly "
+        "established.\n\nEXTENSION PLAN:\n"
+        f"{prompt}"
     )
 
 
@@ -964,23 +1663,61 @@ class family_handler:
             _FULL_MODEL_TYPE,
             _REF2VA_FULL_MODEL_TYPE,
         }
+        fused_turbo = bool(
+            (model_def or {}).get("minimax_h3_fused_turbo", False)
+        )
+        window_memory_policy = (
+            (
+                _H3_FUSED_REFERENCE_WINDOW_MEMORY_POLICY
+                if omni_reference
+                else _H3_FUSED_WINDOW_MEMORY_POLICY
+            )
+            if fused_turbo
+            else (
+                _H3_FULL_WINDOW_MEMORY_POLICY
+                if full_checkpoint
+                else _H3_PRUNED_WINDOW_MEMORY_POLICY
+            )
+        )
+        sliding_window_defaults = dict(_H3_SLIDING_WINDOW_DEFAULTS)
+        if fused_turbo:
+            sliding_window_defaults["window_default"] = (
+                _H3_FUSED_RECOMMENDED_FRAMES
+            )
         text_encoder_variants = _text_encoder_variants()
         workflow_help = (
             "OMNI REFERENCES\n"
             "Use ordered image, video, and audio references to guide identity, "
             "appearance, motion, scenes, voices, or sound. The references guide "
             "a newly generated result rather than becoming fixed first/last frames. "
-            "H3 also generates synchronized stereo audio. Omni uses one native "
-            "model pass and is limited to 14.4 seconds."
+            "H3 also generates synchronized stereo audio. Multi-window sequence can "
+            "continue beyond one native pass while carrying recent motion and "
+            "matching audio alongside the same canonical references."
             if omni_reference
             else
             "FIRST / LAST\n"
             "Generate from text alone, a first frame, a last frame, or both. H3 "
-            "generates synchronized stereo audio, but this workflow does not accept "
-            "reference audio. Longer videos continue through native 14.4-second "
-            "windows using the prior window's last frame."
+            "can also pass through multiple additional Frames at exact points "
+            "on the timeline. It can follow an uploaded soundtrack or a Control "
+            "Video's audio, and it can preserve a Control Video's pictures while "
+            "creating a new soundtrack. Native video-to-video editing can reimagine "
+            "the whole Control Video, only a white masked area, or everything outside "
+            "that mask. These are source-media workflows, not voice-reference "
+            "cloning. Longer videos continue through native 14.4-second "
+            "windows while carrying recent motion and matching stereo audio into "
+            "the next window."
         )
         checkpoint_help = (
+            "FUSED TURBO PREVIEW\n"
+            "This community checkpoint already contains the Ref2VA delta, "
+            "LightX2V Turbo, Mystic, and INT8 ConvRot conversion. Maestro "
+            "uses its four-evaluation res_multistep recipe by default; "
+            "Advanced can experimentally raise Total Steps through eight. "
+            "Maestro "
+            "does not stack ordinary H3 LoRAs, Turbo, Sol, or First Block "
+            "Cache on top of it. SLA is its supported attention accelerator."
+            if fused_turbo
+            else
             "FULL 33B\n"
             "The larger original checkpoint uses more disk, RAM, and weight "
             "streaming. Choose it when you specifically want the Full model; "
@@ -1007,17 +1744,24 @@ class family_handler:
             "frame_alignment_modulus": 17,
             "frame_alignment_remainder": 5,
             "frame_alignment_mode": "ceil",
-            "sliding_window": not omni_reference,
-            "video_continuation": not omni_reference,
+            "single_block_prompt": True,
+            "sliding_window": True,
+            "video_continuation": True,
             # The overall joined timeline need not itself lie on H3's
             # per-pass 17*n+5 grid. Keep the requested total exact, align
             # each pass independently, then trim only the final joined tail.
-            "sliding_window_exact_total_frames": not omni_reference,
-            "sliding_window_trim_to_requested": not omni_reference,
+            "sliding_window_exact_total_frames": True,
+            "sliding_window_trim_to_requested": True,
             "sliding_window_end_image_at_final": not omni_reference,
             "sliding_window_auto_prompt_pacing": not omni_reference,
-            # Director renders H3 as independent native-duration shots rather
-            # than pretending it supports the rolling-window contract.
+            # The rolling FL2VA contract consumes the exact generated audio
+            # tail alongside its multi-frame visual history.  The generic
+            # scheduler supplies that tail through ``input_waveform``.
+            "audio_guide_window_slicing": True,
+            "sliding_window_audio_history": True,
+            # Standard Director renders independent native-duration shots;
+            # its Seamless option may opt FL2VA into the same native rolling
+            # continuation contract used by Studio.
             "director_video_strategy": (
                 "omni_reference" if omni_reference else "bounded_start_end"
             ),
@@ -1037,21 +1781,47 @@ class family_handler:
             "director_trim_end_frames": False,
             "t2v_class": True,
             "i2v_class": not omni_reference,
-            "image_prompt_types_allowed": "" if omni_reference else "TSE",
+            # FL2VA supports native continuation from a source video's
+            # audiovisual tail.  ``V`` is not merely a Classic-UI label: the
+            # shared task normalizer uses this capability string as an
+            # allowlist.  Omitting it caused Studio Extend to retain the path
+            # in metadata while silently stripping the source before H3 ran.
+            "image_prompt_types_allowed": "" if omni_reference else "TSEV",
             "end_frames_always_enabled": not omni_reference,
+            # FL2VA can pin additional pictures to exact target positions.
+            # Maestro exposes this through the unified Frame strip instead of
+            # adding WanGP's separate frames-injection selector.
+            "custom_frames_injection": not omni_reference,
             "returns_audio": True,
-            # Ref2VA accepts audio through its ordered Omni manifest, not
-            # through Wan's generic audio-guide input. Keep that capability
-            # explicit so the UI can distinguish Audio In from Audio Out.
+            "control_video_trim_disabled": True,
+            # Studio Ref2VA audio is normally an ordered Omni reference.
+            # Director can additionally use a hidden exact-target soundtrack
+            # route for music/dialogue timing; keep the public capability
+            # explicit so the UI still distinguishes Audio In from Audio Out.
             "supports_reference_audio": omni_reference,
             "no_negative_prompt": True,
             "guidance_max_phases": 0,
             "visible_phases": 0,
             "compile": False,
-            "first_block_cache": True,
+            # H3's packed BF16 head-dimension-128 attention can use the
+            # bundled Sol Engine from a compatible SM89+ / Triton 3.6 runtime.
+            "sol_attention": not fused_turbo,
+            "sla_attention": fused_turbo,
+            "sla_attention_default": fused_turbo,
+            "sla_attention_config": {
+                "sparsity_ratio": 0.90,
+                "block_size": 64,
+                "min_seq_len": 8192,
+                "dense_last_steps": 0,
+                "protect_audio": True,
+            },
+            "first_block_cache": not fused_turbo,
             "first_block_cache_thresholds": _FIRST_BLOCK_CACHE_THRESHOLDS,
             "skip_steps_multiplier_choices": _FIRST_BLOCK_CACHE_STRENGTHS,
             "skip_steps_multiplier_label": "First Block Cache Threshold",
+            "runtime_custom_settings": list(
+                _H3_LONG_SEQUENCE_RUNTIME_SETTINGS
+            ),
             "resolutions": _RESOLUTIONS,
             "resolution_presets": _H3_RESOLUTION_PRESETS,
             "resolution_preset_order": _H3_RESOLUTION_PRESET_ORDER,
@@ -1065,7 +1835,102 @@ class family_handler:
             "text_encoder_URLs": text_encoder_variants["nvfp4_awq"]["URLs"],
             "minimax_h3_text_encoder_default": "nvfp4_awq",
             "minimax_h3_text_encoder_variants": text_encoder_variants,
+            # New installs follow WanGP's BF16/INT8 pruned exports while
+            # existing Maestro installs may still hold Comfy's scaled-FP8
+            # checkpoint. They are not byte duplicates, but this runtime
+            # supports both tensor formats. Keep the INT8 and legacy FP8
+            # names as bidirectional migration aliases so the default switch
+            # to INT8 does not download a second ~20B transformer.
+            "compatible_model_paths": (
+                {}
+                if full_checkpoint or fused_turbo
+                else {
+                    (
+                        _REF2VA_TRANSFORMER
+                        if omni_reference
+                        else _TRANSFORMER
+                    ): [
+                        (
+                            _WANGP_REF2VA_PRUNED_TRANSFORMER
+                            if omni_reference
+                            else _WANGP_FL2VA_PRUNED_TRANSFORMER
+                        )
+                    ],
+                    (
+                        _WANGP_REF2VA_PRUNED_TRANSFORMER
+                        if omni_reference
+                        else _WANGP_FL2VA_PRUNED_TRANSFORMER
+                    ): [
+                        (
+                            _REF2VA_TRANSFORMER
+                            if omni_reference
+                            else _TRANSFORMER
+                        )
+                    ],
+                }
+            ),
+            "compatible_model_qkv_layouts": (
+                {}
+                if full_checkpoint or fused_turbo
+                else {
+                    (
+                        _WANGP_REF2VA_PRUNED_TRANSFORMER
+                        if omni_reference
+                        else _WANGP_FL2VA_PRUNED_TRANSFORMER
+                    ): "interleaved",
+                    (
+                        _WANGP_REF2VA_PRUNED_BF16_TRANSFORMER
+                        if omni_reference
+                        else _WANGP_FL2VA_PRUNED_BF16_TRANSFORMER
+                    ): "interleaved",
+                }
+            ),
+            # WanGP stores every Qwen variant in its upstream folder while
+            # Maestro keeps the weight beside its other H3 assets. These are
+            # the same published files (the Comfy NVFP4 artifact is also
+            # byte-identical), so support both relative layouts.
+            "compatible_text_encoder_paths": {
+                filename: [os.path.join(_WANGP_TEXT_ENCODER_FOLDER, filename)]
+                for filename in (
+                    _TEXT_ENCODER,
+                    _TEXT_ENCODER_BF16,
+                    _TEXT_ENCODER_INT8,
+                    _TEXT_ENCODER_GGUF_Q2,
+                    _TEXT_ENCODER_GGUF_Q4,
+                )
+            },
             "minimax_h3_full_checkpoint": full_checkpoint,
+            "minimax_h3_semantic_bridge": False,  # Enable after the separate adapter validation.
+            "minimax_h3_fused_turbo": fused_turbo,
+            "lock_inference_steps": False if fused_turbo else bool(
+                (model_def or {}).get("lock_inference_steps", False)
+            ),
+            "inference_steps_min": (
+                _H3_FUSED_MIN_EVALUATIONS if fused_turbo else 1
+            ),
+            "inference_steps_max": (
+                _H3_FUSED_MAX_EVALUATIONS if fused_turbo else 50
+            ),
+            "inference_steps_label": (
+                "Total Steps" if fused_turbo else "Inference Steps"
+            ),
+            "inference_steps_help": (
+                "4 is the published speed preset. Try 5-6 for a little more refinement; 8 is the checkpoint's slower high end. Extra steps may sharpen detail but are not guaranteed to improve every take."
+                if fused_turbo
+                else ""
+            ),
+            "minimax_h3_qkv_layout": (
+                "grouped"
+                if fused_turbo
+                else ("interleaved" if full_checkpoint else "contiguous")
+            ),
+            "minimax_h3_sampler": (
+                "res_multistep" if fused_turbo else "euler"
+            ),
+            "minimax_h3_video_vae_filename": (
+                _VIDEO_VAE_INT8_CONVROT if fused_turbo else _VIDEO_VAE
+            ),
+            "loras_disabled": fused_turbo,
             "minimax_h3_transformer_working_vram_gb": (
                 _TRANSFORMER_WORKING_VRAM_MB / 1024
             ),
@@ -1073,12 +1938,13 @@ class family_handler:
             # duration. Publish it for both First / Last and Omni; only the
             # former exposes Studio's sliding-window controls.
             "director_memory_policy": (
-                _H3_FULL_WINDOW_MEMORY_POLICY
-                if full_checkpoint
-                else _H3_PRUNED_WINDOW_MEMORY_POLICY
+                window_memory_policy
             ),
             "selector_help": f"{workflow_help}\n\n{checkpoint_help}",
             "lora_compatibility_note": (
+                "Turbo and Mystic are baked into this checkpoint; additional LoRAs are disabled."
+                if fused_turbo
+                else
                 "H3 LoRAs are supported; Maestro converts Pruned adapters when needed."
                 if full_checkpoint
                 else
@@ -1122,6 +1988,7 @@ class family_handler:
                 }
             )
         elif omni_reference:
+            sequence_memory_policy = window_memory_policy
             result.update(
                 {
                     "omni_reference": True,
@@ -1132,20 +1999,76 @@ class family_handler:
                         "total": 12,
                     },
                     "omni_reference_detail_choices": [
-                        ("Match output (recommended)", "match"),
-                        ("Maximum reference detail", "max"),
+                        ("Match output (faster)", "match"),
+                        ("High detail (official PDD recipe)", "max"),
                     ],
                     "omni_reference_detail_default": "match",
+                    # Native Ref2VA continuation has the same target-pass
+                    # memory curve plus canonical-reference activation cost.
+                    # Publish it under an Omni-specific name so Studio can
+                    # auto-size each sequence window independently.
+                    "omni_sequence_memory_policy": {
+                        **sequence_memory_policy,
+                        "reference_margin_steps": (
+                            0
+                            if fused_turbo
+                            else _H3_OMNI_REFERENCE_MARGIN_STEPS
+                        ),
+                    },
+                    "sliding_window_defaults": sliding_window_defaults,
                 }
             )
         else:
-            result["sliding_window_defaults"] = dict(
-                _H3_SLIDING_WINDOW_DEFAULTS
-            )
-            result["sliding_window_memory_policy"] = (
-                _H3_FULL_WINDOW_MEMORY_POLICY
-                if full_checkpoint
-                else _H3_PRUNED_WINDOW_MEMORY_POLICY
+            result["sliding_window_defaults"] = sliding_window_defaults
+            result["sliding_window_memory_policy"] = window_memory_policy
+            result.update(
+                {
+                    "guide_custom_choices": {
+                        "choices": [
+                            ("No Control Video", ""),
+                            ("Use Control Video", "GV"),
+                            ("Inject Frames", "KFI"),
+                        ],
+                        "letters_filter": "GVKFI",
+                        "default": "",
+                        "label": "Control Video / Frames",
+                    },
+                    "video_guide_label": "Control Video",
+                    "video_to_video_inpaint": True,
+                    "mask_preprocessing": {
+                        "selection": ["", "A", "NA"],
+                        "labels": {
+                            "": "Whole Frame",
+                            "A": "Inside White Mask",
+                            "NA": "Outside White Mask",
+                        },
+                        "default": "",
+                        "label": "Area to Edit",
+                    },
+                    "any_audio_prompt": True,
+                    "audio_prompt_choices": True,
+                    "audio_guide_label": "Source Audio / Soundtrack",
+                    "audio_prompt_type_sources": {
+                        "selection": ["", "A", "K", "2"],
+                        "labels": {
+                            "": "Generate Video and Audio from Text",
+                            "A": "Generate Video from Soundtrack + Text",
+                            "K": "Generate Video from Control-Video Audio + Text",
+                            "2": "Keep Control Video and Generate New Audio",
+                        },
+                        "letters_filter": "AK2",
+                        "label": "Media Source",
+                        "show_label": True,
+                        "default": "",
+                    },
+                    # A visible standalone soundtrack is unambiguously the
+                    # FL2VA Audio-to-Video source. Repair older sidecars and
+                    # model-switch state if their hidden A selector was lost.
+                    "infer_audio_prompt_from_guide": True,
+                    "video_length_not_limited_by_audio": True,
+                    "output_audio_is_input_audio": True,
+                    "minimax_h3_media_sources": True,
+                }
             )
         return result
 
@@ -1180,14 +2103,53 @@ class family_handler:
             "video_preprocessor_config.json",
             "vocab.json",
         ]
-        return [
-            {
-                "repoId": _COMFY_REPO,
-                "revision": _COMFY_REVISION,
-                "sourceFolderList": ["vae"],
-                "targetFolderList": [_ASSETS_ROOT],
-                "fileList": [[_VIDEO_VAE, _AUDIO_VAE]],
-            },
+        fused_turbo = bool(
+            (model_def or {}).get("minimax_h3_fused_turbo", False)
+        )
+        vae_downloads = (
+            [
+                {
+                    "repoId": _EXPERIMENTAL_VAE_REPO,
+                    "revision": _EXPERIMENTAL_VAE_REVISION,
+                    "sourceFolderList": [""],
+                    "targetFolderList": [os.path.join(_ASSETS_ROOT, "vae")],
+                    "fileList": [[_VIDEO_VAE_INT8_CONVROT]],
+                },
+                {
+                    "repoId": _COMFY_REPO,
+                    "revision": _COMFY_REVISION,
+                    "sourceFolderList": ["vae"],
+                    "targetFolderList": [_ASSETS_ROOT],
+                    "fileList": [[_AUDIO_VAE]],
+                },
+            ]
+            if fused_turbo
+            else [
+                {
+                    "repoId": _COMFY_REPO,
+                    "revision": _COMFY_REVISION,
+                    "sourceFolderList": ["vae"],
+                    "targetFolderList": [_ASSETS_ROOT],
+                    "fileList": [[_VIDEO_VAE, _AUDIO_VAE]],
+                }
+            ]
+        )
+        attribution_downloads = (
+            [
+                {
+                    "repoId": _FUSED_MODEL_REPO,
+                    "revision": _FUSED_MODEL_REVISION,
+                    "sourceFolderList": [""],
+                    "targetFolderList": [
+                        os.path.join(_ASSETS_ROOT, "fused_turbo")
+                    ],
+                    "fileList": [["LICENSE", "NOTICE"]],
+                }
+            ]
+            if fused_turbo
+            else []
+        )
+        return vae_downloads + attribution_downloads + [
             {
                 "repoId": _OFFICIAL_REPO,
                 "revision": _OFFICIAL_REVISION,
@@ -1203,10 +2165,14 @@ class family_handler:
         model_type=None,
         base_model_type=None,
         model_def=None,
-        dtype=torch.bfloat16,
+        dtype=None,
         text_encoder_filename=None,
         **kwargs,
     ):
+        if dtype is None:
+            import torch
+
+            dtype = torch.bfloat16
         if base_model_type == _LEGACY_MODEL_TYPE or (model_def or {}).get(
             "minimax_h3_legacy_sidecar"
         ):
@@ -1250,23 +2216,37 @@ class family_handler:
             _REF2VA_MODEL_TYPE,
             _REF2VA_FULL_MODEL_TYPE,
         }
+        fused_turbo = bool(
+            (model_def or {}).get("minimax_h3_fused_turbo", False)
+        )
         ui_defaults.update(
             {
-                "num_inference_steps": 20,
-                "video_length": _H3_MIN_FRAMES,
-                "resolution": "864x480",
+                "num_inference_steps": (
+                    _H3_FUSED_DEFAULT_EVALUATIONS if fused_turbo else 20
+                ),
+                "video_length": (
+                    _H3_FUSED_RECOMMENDED_FRAMES
+                    if fused_turbo
+                    else _H3_MIN_FRAMES
+                ),
+                "resolution": "1152x640" if fused_turbo else "864x480",
                 "guidance_scale": 1.0,
                 "image_prompt_type": "",
+                "video_prompt_type": "",
+                "audio_prompt_type": "",
                 "sliding_window_size": (
-                    _H3_MIN_FRAMES
-                    if omni_reference
+                    _H3_FUSED_RECOMMENDED_FRAMES
+                    if fused_turbo
                     else _H3_MAX_FRAMES
                 ),
-                "sliding_window_overlap": 0 if omni_reference else 1,
+                "sliding_window_overlap": _H3_OVERLAP_DEFAULT,
                 "sliding_window_discard_last_frames": 0,
                 "skip_steps_cache_type": "",
                 "skip_steps_multiplier": 0.08,
                 "skip_steps_start_step_perc": 25,
+                "denoising_strength": 1.0,
+                "masking_strength": 1.0,
+                "override_attention": "sla" if fused_turbo else "",
             }
         )
 
@@ -1285,14 +2265,20 @@ class family_handler:
             _REF2VA_FULL_MODEL_TYPE,
         }
         aligned_frames = align_num_frames(max(1, requested_frames))
-        if omni_reference or requested_frames <= _H3_MAX_FRAMES + 1:
+        omni_sequence = (
+            omni_reference
+            and ui_defaults.get("minimax_h3_reference_sequence") is True
+        )
+        if requested_frames <= _H3_MAX_FRAMES + 1:
             ui_defaults["video_length"] = min(
                 _H3_MAX_FRAMES,
                 max(_H3_MIN_FRAMES, aligned_frames),
             )
+        elif omni_reference and not omni_sequence:
+            ui_defaults["video_length"] = _H3_MAX_FRAMES
         else:
-            # A long First/Last setting is the joined output duration, not
-            # one H3 pass, so preserve it for the sliding-window scheduler.
+            # A long First/Last or enabled Omni Reference Sequence setting is
+            # the joined output duration, not one H3 pass.
             ui_defaults["video_length"] = max(
                 _H3_MIN_FRAMES,
                 requested_frames,
@@ -1305,20 +2291,56 @@ class family_handler:
         except (TypeError, ValueError):
             requested_window = _H3_MAX_FRAMES
         aligned_window = align_num_frames(max(1, requested_window))
-        ui_defaults["sliding_window_size"] = (
-            ui_defaults["video_length"]
-            if omni_reference
-            else min(
-                _H3_MAX_FRAMES,
-                max(_H3_MIN_FRAMES, aligned_window),
-            )
+        ui_defaults["sliding_window_size"] = min(
+            _H3_MAX_FRAMES,
+            max(_H3_MIN_FRAMES, aligned_window),
         )
-        ui_defaults["sliding_window_overlap"] = 0 if omni_reference else 1
+        if (
+            not omni_reference
+            and ui_defaults.get("minimax_h3_multi_window") is False
+        ):
+            ui_defaults["video_length"] = min(
+                ui_defaults["video_length"],
+                ui_defaults["sliding_window_size"],
+            )
+        raw_overlap = ui_defaults.get(
+            "sliding_window_overlap",
+            _H3_OVERLAP_DEFAULT,
+        )
+        # Existing Maestro H3 presets used a zero/one-frame anchor. Upgrade
+        # that legacy default once for both FL2VA and Ref2VA.
+        if settings_version < 2.58 and raw_overlap in (None, 0, 1, "1"):
+            raw_overlap = _H3_OVERLAP_DEFAULT
+        ui_defaults["sliding_window_overlap"] = normalize_h3_overlap_frames(
+            raw_overlap,
+            window_frames=ui_defaults["sliding_window_size"],
+        )
         ui_defaults["sliding_window_discard_last_frames"] = 0
         ui_defaults["resolution"] = _normalize_h3_resolution(
             ui_defaults.get("resolution", "864x480")
         )
         ui_defaults["guidance_scale"] = 1.0
+        if (model_def or {}).get("minimax_h3_fused_turbo", False):
+            try:
+                ui_defaults["num_inference_steps"] = (
+                    _normalize_h3_fused_steps(
+                        ui_defaults.get("num_inference_steps")
+                    )
+                )
+            except ValueError:
+                # Older previews always forced four steps, so an unrelated
+                # stale value should migrate to that prior behavior.
+                ui_defaults["num_inference_steps"] = (
+                    _H3_FUSED_DEFAULT_EVALUATIONS
+                )
+            ui_defaults["minimax_h3_turbo_mode"] = False
+            ui_defaults["minimax_h3_turbo_preset"] = ""
+            ui_defaults["skip_steps_cache_type"] = ""
+            ui_defaults["override_attention"] = (
+                "" if ui_defaults.get("override_attention") == "sdpa" else "sla"
+            )
+        ui_defaults.setdefault("denoising_strength", 1.0)
+        ui_defaults.setdefault("masking_strength", 1.0)
         cache_value = float(ui_defaults.get("skip_steps_multiplier", 0.08))
         ui_defaults["skip_steps_multiplier"] = (
             _LEGACY_FIRST_BLOCK_CACHE_THRESHOLDS.get(cache_value, cache_value)
@@ -1339,6 +2361,18 @@ class family_handler:
         **kwargs,
     ):
         """Pace one full H3 shot prompt across automatic continuations."""
+
+        is_source_extension = (
+            int(window_no or 1) == 1
+            and kwargs.get("video_source") is not None
+            and "V" in str(kwargs.get("image_prompt_type") or "")
+        )
+        if is_source_extension:
+            prompt = enforce_h3_source_continuation_prompt(prompt)
+            print(
+                "[MiniMax H3 Extend] Enforcing uninterrupted same-shot "
+                "continuity at the source boundary."
+            )
 
         if (model_def or {}).get("omni_reference", False):
             return prompt
@@ -1368,31 +2402,182 @@ class family_handler:
     def validate_generative_settings(base_model_type, model_def, inputs):
         """Enforce H3's single-pass and continuation geometry server-side."""
 
-        from .packing import align_num_frames
+        if (model_def or {}).get("minimax_h3_fused_turbo", False):
+            try:
+                inputs["num_inference_steps"] = _normalize_h3_fused_steps(
+                    inputs.get("num_inference_steps")
+                )
+            except ValueError as error:
+                return str(error)
+            inputs["guidance_scale"] = 1.0
+            inputs["flow_shift"] = 12.0
+            inputs["audio_flow_shift"] = 3.0
+            inputs["minimax_h3_turbo_mode"] = False
+            inputs["minimax_h3_turbo_preset"] = ""
+            inputs["skip_steps_cache_type"] = ""
+            attention = str(inputs.get("override_attention") or "").strip().lower()
+            inputs["override_attention"] = "sdpa" if attention == "sdpa" else "sla"
+            selected_loras = [
+                str(item).strip()
+                for item in (inputs.get("activated_loras") or [])
+                if str(item).strip()
+            ]
+            if selected_loras:
+                return (
+                    "H3 Fused 4-Step already contains its Turbo and Mystic "
+                    "adapters. Additional LoRAs cannot be stacked on this "
+                    "experimental checkpoint."
+                )
+            inputs["activated_loras"] = []
+            inputs["loras_multipliers"] = ""
 
         omni_reference = base_model_type in {
             _REF2VA_MODEL_TYPE,
             _REF2VA_FULL_MODEL_TYPE,
         }
+        video_prompt_type = str(inputs.get("video_prompt_type") or "")
+        audio_prompt_type = str(inputs.get("audio_prompt_type") or "")
+        if not omni_reference:
+            frozen_video_mode = "2" in audio_prompt_type
+            control_video = (
+                "G" in video_prompt_type
+                and "V" in video_prompt_type
+                and inputs.get("video_guide") is not None
+            )
+            try:
+                denoising_strength = float(
+                    inputs.get("denoising_strength", 1.0)
+                )
+                masking_strength = float(
+                    inputs.get("masking_strength", 1.0)
+                )
+            except (TypeError, ValueError):
+                return "MiniMax H3 video editing strengths must be numbers from 0 to 1."
+            if not 0.0 <= denoising_strength <= 1.0:
+                return "MiniMax H3 denoising strength must be between 0 and 1."
+            if not 0.0 <= masking_strength <= 1.0:
+                return "MiniMax H3 masking strength must be between 0 and 1."
+            inputs["denoising_strength"] = denoising_strength
+            inputs["masking_strength"] = masking_strength
+            # Video-to-audio freezes the source pictures. A remembered edit
+            # mask/mode is intentionally inert so switching the Audio behavior
+            # dropdown cannot make this workflow demand a mask it will not use.
+            if frozen_video_mode:
+                inputs["video_mask"] = None
+                inputs["denoising_strength"] = 1.0
+                inputs["masking_strength"] = 1.0
+            elif "A" in video_prompt_type:
+                if not control_video:
+                    return (
+                        "MiniMax H3 masked video editing requires a Control "
+                        "Video and Use Control Video."
+                    )
+                if inputs.get("video_mask") is None:
+                    return (
+                        "MiniMax H3 masked video editing requires a mask video "
+                        "(white is the selected area)."
+                    )
+            elif "N" in video_prompt_type:
+                return (
+                    "MiniMax H3 Outside Mask editing requires a mask video."
+                )
+            else:
+                inputs["video_mask"] = None
+            if not control_video:
+                inputs["denoising_strength"] = 1.0
+                inputs["masking_strength"] = 1.0
+            if frozen_video_mode:
+                if "A" in audio_prompt_type or "K" in audio_prompt_type:
+                    return (
+                        "MiniMax H3 video-to-audio cannot also use a source "
+                        "soundtrack."
+                    )
+                if (
+                    "G" not in video_prompt_type
+                    or "V" not in video_prompt_type
+                    or inputs.get("video_guide") is None
+                ):
+                    return (
+                        "MiniMax H3 video-to-audio requires a Control Video "
+                        "and Use Control Video."
+                    )
+                # A previously loaded soundtrack is not part of this mode.
+                # Clear it before WGP's generic audio mux path can mistake it
+                # for the requested output soundtrack.
+                inputs["audio_guide"] = None
+                inputs["audio_guide2"] = None
+            if "K" in audio_prompt_type:
+                if (
+                    "G" not in video_prompt_type
+                    or "V" not in video_prompt_type
+                    or inputs.get("video_guide") is None
+                ):
+                    return (
+                        "MiniMax H3 Control-Video Audio mode requires a "
+                        "Control Video and Use Control Video."
+                    )
+                from shared.utils.audio_video import extract_audio_tracks
+
+                try:
+                    if extract_audio_tracks(
+                        inputs["video_guide"],
+                        query_only=True,
+                    ) == 0:
+                        return "The selected MiniMax H3 Control Video has no audio track."
+                except Exception as error:
+                    return (
+                        "Unable to inspect the MiniMax H3 Control Video's "
+                        f"audio track: {error}"
+                    )
+            if "A" in audio_prompt_type and inputs.get("audio_guide") is None:
+                return "MiniMax H3 Soundtrack mode requires an uploaded Soundtrack."
+            if not any(flag in audio_prompt_type for flag in "AK"):
+                inputs["audio_guide"] = None
+                inputs["audio_guide2"] = None
+        if "F" in str(inputs.get("video_prompt_type") or ""):
+            if omni_reference:
+                return (
+                    "Timed frame injection is available with MiniMax H3 "
+                    "First / Last, not H3 Omni references."
+                )
+            image_refs = list(inputs.get("image_refs") or ())
+            frame_positions = [
+                item
+                for item in str(inputs.get("frames_positions") or "")
+                .replace(",", " ")
+                .split()
+                if item
+            ]
+            if not image_refs:
+                return "Add at least one Frame before enabling H3 frame injection."
+            if len(image_refs) != len(frame_positions):
+                return (
+                    "MiniMax H3 needs one position per injected Frame; "
+                    f"received {len(image_refs)} images and "
+                    f"{len(frame_positions)} positions."
+                )
         try:
             requested_frames = int(inputs.get("video_length", _H3_MIN_FRAMES))
         except (TypeError, ValueError):
             requested_frames = _H3_MIN_FRAMES
 
-        if omni_reference:
+        omni_sequence = (
+            omni_reference
+            and inputs.get("minimax_h3_reference_sequence") is True
+        )
+        if omni_reference and not omni_sequence:
             inputs["video_length"] = min(
                 _H3_MAX_FRAMES,
-                max(_H3_MIN_FRAMES, align_num_frames(max(1, requested_frames))),
+                max(_H3_MIN_FRAMES, align_h3_num_frames(max(1, requested_frames))),
             )
             inputs["sliding_window_size"] = inputs["video_length"]
-            inputs["sliding_window_overlap"] = 0
         else:
             if requested_frames <= _H3_MAX_FRAMES + 1:
                 requested_frames = min(
                     _H3_MAX_FRAMES,
                     max(
                         _H3_MIN_FRAMES,
-                        align_num_frames(max(1, requested_frames)),
+                        align_h3_num_frames(max(1, requested_frames)),
                     ),
                 )
             else:
@@ -1409,15 +2594,50 @@ class family_handler:
                 _H3_MAX_FRAMES,
                 max(
                     _H3_MIN_FRAMES,
-                    align_num_frames(max(1, requested_window)),
+                    align_h3_num_frames(max(1, requested_window)),
                 ),
             )
-            inputs["sliding_window_overlap"] = 1
+            if (
+                not omni_reference
+                and inputs.get("minimax_h3_multi_window") is False
+            ):
+                inputs["video_length"] = min(
+                    inputs["video_length"],
+                    inputs["sliding_window_size"],
+                )
+            inputs["sliding_window_overlap"] = normalize_h3_overlap_frames(
+                inputs.get(
+                    "sliding_window_overlap",
+                    _H3_OVERLAP_DEFAULT,
+                ),
+                window_frames=inputs["sliding_window_size"],
+            )
 
-        inputs["sliding_window_discard_last_frames"] = 0
+        if omni_reference and not omni_sequence:
+            inputs["sliding_window_overlap"] = normalize_h3_overlap_frames(
+                inputs.get(
+                    "sliding_window_overlap",
+                    _H3_OVERLAP_DEFAULT,
+                ),
+                window_frames=inputs["sliding_window_size"],
+            )
+
+        inputs["sliding_window_discard_last_frames"] = (
+            resolve_h3_long_sequence_discard_frames(
+                inputs.get("custom_settings"),
+                enabled=(
+                    not omni_reference
+                    and inputs.get("minimax_h3_multi_window") is True
+                    and int(inputs.get("video_length") or 0)
+                    > int(inputs.get("sliding_window_size") or 0)
+                ),
+            )
+        )
         inputs["sliding_window_overlap_noise"] = 0
         inputs["sliding_window_color_correction_strength"] = 0
         try:
+            import torch
+
             detected_vram_gb = (
                 torch.cuda.get_device_properties(0).total_memory / (1024 ** 3)
                 if torch.cuda.is_available()
@@ -1441,4 +2661,22 @@ class family_handler:
                 f"{adjustment['effective_window_frames']} frames. "
                 "Requested output duration is unchanged."
             )
+        if (
+            not omni_reference
+            and inputs.get("minimax_h3_multi_window") is False
+        ):
+            inputs["video_length"] = min(
+                inputs["video_length"],
+                inputs["sliding_window_size"],
+            )
+        # The memory policy may shorten the pass after the first overlap
+        # validation. Re-cap it so history always leaves at least one legal
+        # 17*n+5 target chunk for either FL2VA or Ref2VA to generate.
+        inputs["sliding_window_overlap"] = normalize_h3_overlap_frames(
+            inputs.get(
+                "sliding_window_overlap",
+                _H3_OVERLAP_DEFAULT,
+            ),
+            window_frames=inputs["sliding_window_size"],
+        )
         return None

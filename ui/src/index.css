@@ -91,6 +91,34 @@ model-viewer.scene-animator-model {
    * area dark). */
   --color-media-canvas: #1a1a25;
 
+
+  /* Ask to the Wizard. Its warm light used to be 62 literal ambers in the
+   * block below plus a ramp of amber-50/100/200 utilities in its two
+   * components, which is why the wizard stayed the same colour in every
+   * theme — and it is the whole left column, so it dragged the whole app
+   * towards looking themeless. The ramp is five stops of one hue, and every
+   * palette here has a yellow of its own to point it at. The defaults are
+   * the original ambers, so any theme that says nothing keeps exactly the
+   * look it had. Triplets, because the block composites them at a dozen
+   * different alphas. */
+  --hp-wizard-lit: 255, 251, 235;
+  --hp-wizard-pale: 254, 243, 199;
+  --hp-wizard-soft: 253, 230, 138;
+  --hp-wizard-core: 251, 191, 36;
+  --hp-wizard-deep: 245, 158, 11;
+  /* The panel's ground is the theme's own surface, so the wizard belongs to
+   * whatever palette is on rather than being a black box parked inside it.
+   * The light variants are the exception below: this ramp is warm light on
+   * dark, and on paper it would be invisible. */
+  --hp-wizard-ground: var(--color-bg-secondary);
+  /* Same five stops as Tailwind colours, so the components can drop their
+   * hardcoded amber utilities for `text-wizard-pale` and friends. */
+  --color-wizard-lit: rgb(var(--hp-wizard-lit));
+  --color-wizard-pale: rgb(var(--hp-wizard-pale));
+  --color-wizard-soft: rgb(var(--hp-wizard-soft));
+  --color-wizard-core: rgb(var(--hp-wizard-core));
+  --color-wizard-ground: var(--hp-wizard-ground);
+
   /* Warm accent (selection rings, "TAKES" label, active highlights).
      In default theme this is amber too — the cool palette uses
      accent-blue for those affordances, so warm is mostly unused. */
@@ -535,6 +563,1105 @@ model-viewer.scene-animator-model {
   --shadow-active-ring: 0 0 4px rgba(255, 255, 255, 0.12);
 }
 
+/* ═══ Community palettes ═════════════════════════════════════════════════
+ * Seven more families, each with a dark and a light variant, taken from
+ * the palettes people already run on their desktops. Nothing here is code:
+ * a theme is a set of token overrides, exactly as documented at the top of
+ * this file.
+ *
+ * How each palette is mapped, so the next one is mechanical:
+ *   bg-primary..bg-active   the palette's own surface ladder, darkest first
+ *   border / border-light   the two lowest contrast steps above the surface
+ *   text-*                  fg, then its muted steps — never below the
+ *                           WCAG floor the base tokens already fixed
+ *   accent-blue             whatever the palette uses for links and focus
+ *   accent-warm             its secondary accent (aqua, cyan or orange)
+ *   accent-cool-*           its violet pair, for AI badges
+ *   gradient-cta            the primary-action pair
+ *   media-canvas            the dark themes alias bg-tertiary; the light
+ *                           ones stay dark, so footage never sits in a
+ *                           bright letterbox
+ *
+ * This app is mostly a wall of thumbnails, which is a constraint a
+ * terminal palette never has: a saturated chrome steals colour from the
+ * content. Everforest and Gruvbox are the calmest of the seven for a full
+ * gallery; Kanagawa and Rosé Pine are the prettiest empty and the loudest
+ * full. */
+
+/* The paper treatment is identical for every light variant below, so it is
+ * declared once. Chip and indicator hues stay stable across themes — a user
+ * who learned "green dot = recommended" must read it the same everywhere —
+ * and only drop to their darker stops, which is what makes them legible on
+ * paper. Individual palettes follow and set only their own surfaces. */
+[data-theme="tokyo-day"],
+[data-theme="latte"],
+[data-theme="gruvbox-day"],
+[data-theme="everforest-day"],
+[data-theme="rose-pine-dawn"],
+[data-theme="lotus"],
+[data-theme="nord-day"],
+[data-theme="solarized-day"],
+[data-theme="alucard"],
+[data-theme="ayu-day"],
+[data-theme="one-day"],
+[data-theme="workbench"],
+[data-theme="phosphor-day"],
+[data-theme="studio-day"] {
+  color-scheme: light;
+  --color-indicator-success: #15803d;
+  --color-indicator-warning: #b45309;
+  --color-chip-yellow: #a16207;
+  --color-chip-green: #15803d;
+  --color-chip-cyan: #0e7490;
+  --color-chip-blue: #1d4ed8;
+  --color-chip-purple: #7e22ce;
+  --color-chip-pink: #be185d;
+  --color-chip-teal: #0f766e;
+  --color-chip-orange: #c2410c;
+  --color-chip-gray: #4b5563;
+  --color-chip-red: #b91c1c;
+  /* Bright letterbox bars glare and wash out perceived contrast. */
+  --color-media-canvas: #111827;
+}
+
+/* ─── Tokyo Night ─────────────────────────────────────────────────────── */
+[data-theme="tokyo-night"] {
+  /* La luz del mago toma el amarillo de esta paleta. */
+  --hp-wizard-lit: 250, 243, 232;
+  --hp-wizard-pale: 246, 231, 210;
+  --hp-wizard-soft: 237, 209, 167;
+  --hp-wizard-core: 224, 175, 104;
+  --hp-wizard-deep: 179, 140, 83;
+
+  --color-bg-primary: #16161e;
+  --color-bg-secondary: #1a1b26;
+  --color-bg-tertiary: #24283b;
+  --color-bg-hover: #292e42;
+  --color-bg-active: #3b4261;
+  --color-border: #292e42;
+  --color-border-light: #3b4261;
+  --color-text-primary: #c0caf5;
+  --color-text-secondary: #a9b1d6;
+  --color-text-muted: #8b93b8;
+  --color-accent-blue: #7aa2f7;
+  --color-accent-blue-hover: #9eb8ff;
+  --color-accent-green: #9ece6a;
+  --color-accent-green-hover: #b3dd85;
+  --color-accent-warm: #7dcfff;
+  --color-accent-warm-hover: #a3dcff;
+  --color-accent-cool-from: #bb9af7;
+  --color-accent-cool-to: #7aa2f7;
+  --color-gradient-cta-from: #3d59a1;
+  --color-gradient-cta-to: #6d4aa8;
+  --color-gradient-toggle-from: #7aa2f7;
+  --color-gradient-toggle-to: #7dcfff;
+  --color-gradient-active-frame-from: #7aa2f7;
+  --color-gradient-active-frame-to: #7dcfff;
+  --color-media-canvas: #24283b;
+  --shadow-accent-glow: 0 0 18px rgba(122, 162, 247, 0.35);
+  --shadow-active-ring: 0 0 6px rgba(125, 207, 255, 0.2);
+}
+[data-theme="tokyo-day"] {
+  /* La luz del mago toma el amarillo de esta paleta. */
+  --hp-wizard-lit: 250, 243, 232;
+  --hp-wizard-pale: 246, 231, 210;
+  --hp-wizard-soft: 237, 209, 167;
+  --hp-wizard-core: 224, 175, 104;
+  --hp-wizard-deep: 179, 140, 83;
+
+  --color-bg-primary: #e1e2e7;
+  --color-bg-secondary: #e9e9ec;
+  --color-bg-tertiary: #f2f2f5;
+  --color-bg-hover: #d5d6dc;
+  --color-bg-active: #c4c8da;
+  --color-border: #c4c8da;
+  --color-border-light: #a1a6c5;
+  --color-text-primary: #2b4d9e;
+  --color-text-secondary: #414c85;
+  --color-text-muted: #4d5a8f;
+  --color-accent-blue: #1f63c4;
+  --color-accent-blue-hover: #17509f;
+  --color-accent-green: #587539;
+  --color-accent-green-hover: #46602c;
+  --color-accent-warm: #007197;
+  --color-accent-warm-hover: #005a79;
+  --color-accent-cool-from: #9854f1;
+  --color-accent-cool-to: #2e7de9;
+  --color-gradient-cta-from: #1f63c4;
+  --color-gradient-cta-to: #7c3fd0;
+  --color-gradient-toggle-from: #2e7de9;
+  --color-gradient-toggle-to: #007197;
+  --color-gradient-active-frame-from: #2e7de9;
+  --color-gradient-active-frame-to: #007197;
+  --shadow-accent-glow: 0 2px 12px rgba(46, 125, 233, 0.24);
+  --shadow-active-ring: 0 0 0 2px rgba(46, 125, 233, 0.32);
+}
+
+/* ─── Catppuccin ──────────────────────────────────────────────────────── */
+[data-theme="catppuccin"] {
+  /* La luz del mago toma el amarillo de esta paleta. */
+  --hp-wizard-lit: 254, 251, 243;
+  --hp-wizard-pale: 253, 246, 231;
+  --hp-wizard-soft: 252, 238, 209;
+  --hp-wizard-core: 249, 226, 175;
+  --hp-wizard-deep: 199, 181, 140;
+
+  --color-bg-primary: #11111b;
+  --color-bg-secondary: #181825;
+  --color-bg-tertiary: #1e1e2e;
+  --color-bg-hover: #313244;
+  --color-bg-active: #45475a;
+  --color-border: #313244;
+  --color-border-light: #45475a;
+  --color-text-primary: #cdd6f4;
+  --color-text-secondary: #bac2de;
+  --color-text-muted: #9399b2;
+  --color-accent-blue: #cba6f7;
+  --color-accent-blue-hover: #dcc0ff;
+  --color-accent-green: #a6e3a1;
+  --color-accent-green-hover: #bdeab9;
+  --color-accent-warm: #94e2d5;
+  --color-accent-warm-hover: #b0ebe1;
+  --color-accent-cool-from: #cba6f7;
+  --color-accent-cool-to: #b4befe;
+  --color-gradient-cta-from: #1e66f5;
+  --color-gradient-cta-to: #8839ef;
+  --color-gradient-toggle-from: #89b4fa;
+  --color-gradient-toggle-to: #74c7ec;
+  --color-gradient-active-frame-from: #cba6f7;
+  --color-gradient-active-frame-to: #89dceb;
+  --color-media-canvas: #1e1e2e;
+  --shadow-accent-glow: 0 0 18px rgba(203, 166, 247, 0.34);
+  --shadow-active-ring: 0 0 6px rgba(137, 180, 250, 0.2);
+}
+[data-theme="latte"] {
+  /* La luz del mago toma el amarillo de esta paleta. */
+  --hp-wizard-lit: 254, 251, 243;
+  --hp-wizard-pale: 253, 246, 231;
+  --hp-wizard-soft: 252, 238, 209;
+  --hp-wizard-core: 249, 226, 175;
+  --hp-wizard-deep: 199, 181, 140;
+
+  --color-bg-primary: #eff1f5;
+  --color-bg-secondary: #e6e9ef;
+  --color-bg-tertiary: #ffffff;
+  --color-bg-hover: #dce0e8;
+  --color-bg-active: #ccd0da;
+  --color-border: #ccd0da;
+  --color-border-light: #acb0be;
+  --color-text-primary: #4c4f69;
+  --color-text-secondary: #5c5f77;
+  --color-text-muted: #5f6278;
+  --color-accent-blue: #8839ef;
+  --color-accent-blue-hover: #7028cc;
+  --color-accent-green: #40a02b;
+  --color-accent-green-hover: #348122;
+  --color-accent-warm: #179299;
+  --color-accent-warm-hover: #12757b;
+  --color-accent-cool-from: #8839ef;
+  --color-accent-cool-to: #7287fd;
+  --color-gradient-cta-from: #1e66f5;
+  --color-gradient-cta-to: #8839ef;
+  --color-gradient-toggle-from: #1e66f5;
+  --color-gradient-toggle-to: #209fb5;
+  --color-gradient-active-frame-from: #8839ef;
+  --color-gradient-active-frame-to: #04a5e5;
+  --shadow-accent-glow: 0 2px 12px rgba(136, 57, 239, 0.22);
+  --shadow-active-ring: 0 0 0 2px rgba(30, 102, 245, 0.32);
+}
+
+/* ─── Gruvbox ─────────────────────────────────────────────────────────── */
+[data-theme="gruvbox"] {
+  /* La luz del mago toma el amarillo de esta paleta. */
+  --hp-wizard-lit: 254, 245, 224;
+  --hp-wizard-pale: 254, 235, 193;
+  --hp-wizard-soft: 252, 217, 134;
+  --hp-wizard-core: 250, 189, 47;
+  --hp-wizard-deep: 200, 151, 38;
+
+  --color-bg-primary: #282828;
+  --color-bg-secondary: #32302f;
+  --color-bg-tertiary: #3c3836;
+  --color-bg-hover: #504945;
+  --color-bg-active: #665c54;
+  --color-border: #504945;
+  --color-border-light: #665c54;
+  --color-text-primary: #ebdbb2;
+  --color-text-secondary: #d5c4a1;
+  --color-text-muted: #bdae93;
+  --color-accent-blue: #fe8019;
+  --color-accent-blue-hover: #ff9a45;
+  --color-accent-green: #b8bb26;
+  --color-accent-green-hover: #cdd047;
+  --color-accent-warm: #83a598;
+  --color-accent-warm-hover: #9fbcb1;
+  --color-accent-cool-from: #d3869b;
+  --color-accent-cool-to: #83a598;
+  --color-gradient-cta-from: #79740e;
+  --color-gradient-cta-to: #427b58;
+  --color-gradient-toggle-from: #458588;
+  --color-gradient-toggle-to: #83a598;
+  --color-gradient-active-frame-from: #fabd2f;
+  --color-gradient-active-frame-to: #fe8019;
+  --color-media-canvas: #3c3836;
+  --shadow-accent-glow: 0 0 18px rgba(250, 189, 47, 0.3);
+  --shadow-active-ring: 0 0 6px rgba(254, 128, 25, 0.18);
+}
+[data-theme="gruvbox-day"] {
+  /* La luz del mago toma el amarillo de esta paleta. */
+  --hp-wizard-lit: 254, 245, 224;
+  --hp-wizard-pale: 254, 235, 193;
+  --hp-wizard-soft: 252, 217, 134;
+  --hp-wizard-core: 250, 189, 47;
+  --hp-wizard-deep: 200, 151, 38;
+
+  --color-bg-primary: #f2e5bc;
+  --color-bg-secondary: #fbf1c7;
+  --color-bg-tertiary: #f9f5d7;
+  --color-bg-hover: #ebdbb2;
+  --color-bg-active: #d5c4a1;
+  --color-border: #d5c4a1;
+  --color-border-light: #bdae93;
+  --color-text-primary: #3c3836;
+  --color-text-secondary: #504945;
+  --color-text-muted: #665c54;
+  --color-accent-blue: #af3a03;
+  --color-accent-blue-hover: #8c2e02;
+  --color-accent-green: #79740e;
+  --color-accent-green-hover: #5f5b0b;
+  --color-accent-warm: #076678;
+  --color-accent-warm-hover: #054e5c;
+  --color-accent-cool-from: #8f3f71;
+  --color-accent-cool-to: #076678;
+  --color-gradient-cta-from: #79740e;
+  --color-gradient-cta-to: #427b58;
+  --color-gradient-toggle-from: #076678;
+  --color-gradient-toggle-to: #427b58;
+  --color-gradient-active-frame-from: #b57614;
+  --color-gradient-active-frame-to: #af3a03;
+  --shadow-accent-glow: 0 2px 12px rgba(181, 118, 20, 0.26);
+  --shadow-active-ring: 0 0 0 2px rgba(7, 102, 120, 0.3);
+}
+
+/* ─── Everforest ──────────────────────────────────────────────────────── */
+[data-theme="everforest"] {
+  /* La luz del mago toma el amarillo de esta paleta. */
+  --hp-wizard-lit: 250, 245, 236;
+  --hp-wizard-pale: 244, 235, 217;
+  --hp-wizard-soft: 234, 216, 181;
+  --hp-wizard-core: 219, 188, 127;
+  --hp-wizard-deep: 175, 150, 102;
+
+  --color-bg-primary: #272e33;
+  --color-bg-secondary: #2d353b;
+  --color-bg-tertiary: #343f44;
+  --color-bg-hover: #3d484d;
+  --color-bg-active: #475258;
+  --color-border: #3d484d;
+  --color-border-light: #4f585e;
+  --color-text-primary: #d3c6aa;
+  --color-text-secondary: #9da9a0;
+  --color-text-muted: #a4b19f;
+  --color-accent-blue: #a7c080;
+  --color-accent-blue-hover: #bcd09b;
+  --color-accent-green: #a7c080;
+  --color-accent-green-hover: #bcd09b;
+  --color-accent-warm: #e69875;
+  --color-accent-warm-hover: #edb094;
+  --color-accent-cool-from: #d699b6;
+  --color-accent-cool-to: #7fbbb3;
+  --color-gradient-cta-from: #4e6b2f;
+  --color-gradient-cta-to: #2f6b52;
+  --color-gradient-toggle-from: #7fbbb3;
+  --color-gradient-toggle-to: #83c092;
+  --color-gradient-active-frame-from: #dbbc7f;
+  --color-gradient-active-frame-to: #a7c080;
+  --color-media-canvas: #343f44;
+  --shadow-accent-glow: 0 0 18px rgba(167, 192, 128, 0.28);
+  --shadow-active-ring: 0 0 6px rgba(127, 187, 179, 0.18);
+}
+[data-theme="everforest-day"] {
+  /* La luz del mago toma el amarillo de esta paleta. */
+  --hp-wizard-lit: 250, 245, 236;
+  --hp-wizard-pale: 244, 235, 217;
+  --hp-wizard-soft: 234, 216, 181;
+  --hp-wizard-core: 219, 188, 127;
+  --hp-wizard-deep: 175, 150, 102;
+
+  --color-bg-primary: #f4f0d9;
+  --color-bg-secondary: #fdf6e3;
+  --color-bg-tertiary: #fffbef;
+  --color-bg-hover: #efebd4;
+  --color-bg-active: #e0dcc7;
+  --color-border: #e6e2cc;
+  --color-border-light: #cbd3c7;
+  --color-text-primary: #414d54;
+  --color-text-secondary: #55636a;
+  --color-text-muted: #5e6c62;
+  --color-accent-blue: #6c7a00;
+  --color-accent-blue-hover: #566100;
+  --color-accent-green: #8da101;
+  --color-accent-green-hover: #6f7f01;
+  --color-accent-warm: #c25f14;
+  --color-accent-warm-hover: #9e4d10;
+  --color-accent-cool-from: #df69ba;
+  --color-accent-cool-to: #3a94c5;
+  --color-gradient-cta-from: #5f7000;
+  --color-gradient-cta-to: #256f55;
+  --color-gradient-toggle-from: #3a94c5;
+  --color-gradient-toggle-to: #35a77c;
+  --color-gradient-active-frame-from: #dfa000;
+  --color-gradient-active-frame-to: #8da101;
+  --shadow-accent-glow: 0 2px 12px rgba(141, 161, 1, 0.24);
+  --shadow-active-ring: 0 0 0 2px rgba(58, 148, 197, 0.3);
+}
+
+/* ─── Rosé Pine ───────────────────────────────────────────────────────── */
+[data-theme="rose-pine"] {
+  /* La luz del mago toma el amarillo de esta paleta. */
+  --hp-wizard-lit: 254, 246, 235;
+  --hp-wizard-pale: 252, 236, 214;
+  --hp-wizard-soft: 250, 219, 176;
+  --hp-wizard-core: 246, 193, 119;
+  --hp-wizard-deep: 197, 154, 95;
+
+  --color-bg-primary: #191724;
+  --color-bg-secondary: #1f1d2e;
+  --color-bg-tertiary: #26233a;
+  --color-bg-hover: #403d52;
+  --color-bg-active: #524f67;
+  --color-border: #403d52;
+  --color-border-light: #524f67;
+  --color-text-primary: #e0def4;
+  --color-text-secondary: #c3bfd6;
+  --color-text-muted: #9d99b4;
+  --color-accent-blue: #eb6f92;
+  --color-accent-blue-hover: #f08fab;
+  --color-accent-green: #31748f;
+  --color-accent-green-hover: #3e8dab;
+  --color-accent-warm: #9ccfd8;
+  --color-accent-warm-hover: #b6dde4;
+  --color-accent-cool-from: #c4a7e7;
+  --color-accent-cool-to: #9ccfd8;
+  --color-gradient-cta-from: #8f4d61;
+  --color-gradient-cta-to: #6b5a86;
+  --color-gradient-toggle-from: #31748f;
+  --color-gradient-toggle-to: #9ccfd8;
+  --color-gradient-active-frame-from: #c4a7e7;
+  --color-gradient-active-frame-to: #ebbcba;
+  --color-media-canvas: #26233a;
+  --shadow-accent-glow: 0 0 18px rgba(196, 167, 231, 0.34);
+  --shadow-active-ring: 0 0 6px rgba(235, 111, 146, 0.2);
+}
+[data-theme="rose-pine-dawn"] {
+  /* La luz del mago toma el amarillo de esta paleta. */
+  --hp-wizard-lit: 254, 246, 235;
+  --hp-wizard-pale: 252, 236, 214;
+  --hp-wizard-soft: 250, 219, 176;
+  --hp-wizard-core: 246, 193, 119;
+  --hp-wizard-deep: 197, 154, 95;
+
+  --color-bg-primary: #faf4ed;
+  --color-bg-secondary: #fffaf3;
+  --color-bg-tertiary: #ffffff;
+  --color-bg-hover: #f2e9e1;
+  --color-bg-active: #dfdad9;
+  --color-border: #dfdad9;
+  --color-border-light: #cecacd;
+  --color-text-primary: #575279;
+  --color-text-secondary: #5d5682;
+  --color-text-muted: #66627f;
+  --color-accent-blue: #9e4d63;
+  --color-accent-blue-hover: #843d51;
+  --color-accent-green: #56949f;
+  --color-accent-green-hover: #457881;
+  --color-accent-warm: #286983;
+  --color-accent-warm-hover: #1f5468;
+  --color-accent-cool-from: #907aa9;
+  --color-accent-cool-to: #286983;
+  --color-gradient-cta-from: #91506a;
+  --color-gradient-cta-to: #6f5c86;
+  --color-gradient-toggle-from: #286983;
+  --color-gradient-toggle-to: #56949f;
+  --color-gradient-active-frame-from: #907aa9;
+  --color-gradient-active-frame-to: #d7827e;
+  --shadow-accent-glow: 0 2px 12px rgba(144, 122, 169, 0.26);
+  --shadow-active-ring: 0 0 0 2px rgba(40, 105, 131, 0.3);
+}
+
+/* ─── Kanagawa ────────────────────────────────────────────────────────── */
+[data-theme="kanagawa"] {
+  /* La luz del mago toma el amarillo de esta paleta. */
+  --hp-wizard-lit: 251, 246, 237;
+  --hp-wizard-pale: 248, 237, 218;
+  --hp-wizard-soft: 240, 220, 184;
+  --hp-wizard-core: 230, 195, 132;
+  --hp-wizard-deep: 184, 156, 106;
+
+  --color-bg-primary: #16161d;
+  --color-bg-secondary: #1f1f28;
+  --color-bg-tertiary: #2a2a37;
+  --color-bg-hover: #363646;
+  --color-bg-active: #54546d;
+  --color-border: #363646;
+  --color-border-light: #54546d;
+  --color-text-primary: #dcd7ba;
+  --color-text-secondary: #c8c093;
+  --color-text-muted: #a6a288;
+  --color-accent-blue: #e6c384;
+  --color-accent-blue-hover: #f0d3a0;
+  --color-accent-green: #98bb6c;
+  --color-accent-green-hover: #aecb8b;
+  --color-accent-warm: #7e9cd8;
+  --color-accent-warm-hover: #9cb4e4;
+  --color-accent-cool-from: #957fb8;
+  --color-accent-cool-to: #7e9cd8;
+  --color-gradient-cta-from: #4a5f8f;
+  --color-gradient-cta-to: #5b4b7a;
+  --color-gradient-toggle-from: #7e9cd8;
+  --color-gradient-toggle-to: #7fb4ca;
+  --color-gradient-active-frame-from: #e6c384;
+  --color-gradient-active-frame-to: #d27e99;
+  --color-media-canvas: #2a2a37;
+  --shadow-accent-glow: 0 0 18px rgba(230, 195, 132, 0.28);
+  --shadow-active-ring: 0 0 6px rgba(126, 156, 216, 0.2);
+}
+[data-theme="lotus"] {
+  /* La luz del mago toma el amarillo de esta paleta. */
+  --hp-wizard-lit: 251, 246, 237;
+  --hp-wizard-pale: 248, 237, 218;
+  --hp-wizard-soft: 240, 220, 184;
+  --hp-wizard-core: 230, 195, 132;
+  --hp-wizard-deep: 184, 156, 106;
+
+  --color-bg-primary: #f2ecbc;
+  --color-bg-secondary: #faf6d8;
+  --color-bg-tertiary: #fffcea;
+  --color-bg-hover: #e7dba0;
+  --color-bg-active: #ded8ae;
+  --color-border: #ded8ae;
+  --color-border-light: #bdb68e;
+  --color-text-primary: #545464;
+  --color-text-secondary: #43436c;
+  --color-text-muted: #5c5a4e;
+  --color-accent-blue: #8f4a00;
+  --color-accent-blue-hover: #733b00;
+  --color-accent-green: #6f894e;
+  --color-accent-green-hover: #596e3e;
+  --color-accent-warm: #4d699b;
+  --color-accent-warm-hover: #3d547c;
+  --color-accent-cool-from: #624c83;
+  --color-accent-cool-to: #4d699b;
+  --color-gradient-cta-from: #56693c;
+  --color-gradient-cta-to: #47635e;
+  --color-gradient-toggle-from: #4d699b;
+  --color-gradient-toggle-to: #4e8ca2;
+  --color-gradient-active-frame-from: #77713f;
+  --color-gradient-active-frame-to: #cc6d00;
+  --shadow-accent-glow: 0 2px 12px rgba(119, 113, 63, 0.26);
+  --shadow-active-ring: 0 0 0 2px rgba(77, 105, 155, 0.32);
+}
+
+/* ─── Nord ────────────────────────────────────────────────────────────── */
+[data-theme="nord"] {
+  /* La luz del mago toma el amarillo de esta paleta. */
+  --hp-wizard-lit: 252, 247, 238;
+  --hp-wizard-pale: 249, 239, 220;
+  --hp-wizard-soft: 243, 225, 188;
+  --hp-wizard-core: 235, 203, 139;
+  --hp-wizard-deep: 188, 162, 111;
+
+  --color-bg-primary: #242933;
+  --color-bg-secondary: #2e3440;
+  --color-bg-tertiary: #3b4252;
+  --color-bg-hover: #434c5e;
+  --color-bg-active: #4c566a;
+  --color-border: #434c5e;
+  --color-border-light: #4c566a;
+  --color-text-primary: #eceff4;
+  --color-text-secondary: #d8dee9;
+  --color-text-muted: #a8b1c2;
+  --color-accent-blue: #88c0d0;
+  --color-accent-blue-hover: #a3cfdb;
+  --color-accent-green: #a3be8c;
+  --color-accent-green-hover: #b8cea6;
+  --color-accent-warm: #8fbcbb;
+  --color-accent-warm-hover: #a8cbca;
+  --color-accent-cool-from: #b48ead;
+  --color-accent-cool-to: #81a1c1;
+  --color-gradient-cta-from: #4c6b91;
+  --color-gradient-cta-to: #35706e;
+  --color-gradient-toggle-from: #5e81ac;
+  --color-gradient-toggle-to: #81a1c1;
+  --color-gradient-active-frame-from: #88c0d0;
+  --color-gradient-active-frame-to: #8fbcbb;
+  --color-media-canvas: #3b4252;
+  --shadow-accent-glow: 0 0 18px rgba(136, 192, 208, 0.32);
+  --shadow-active-ring: 0 0 6px rgba(129, 161, 193, 0.2);
+}
+[data-theme="nord-day"] {
+  /* La luz del mago toma el amarillo de esta paleta. */
+  --hp-wizard-lit: 252, 247, 238;
+  --hp-wizard-pale: 249, 239, 220;
+  --hp-wizard-soft: 243, 225, 188;
+  --hp-wizard-core: 235, 203, 139;
+  --hp-wizard-deep: 188, 162, 111;
+
+  --color-bg-primary: #e5e9f0;
+  --color-bg-secondary: #eceff4;
+  --color-bg-tertiary: #ffffff;
+  --color-bg-hover: #dbe1ea;
+  --color-bg-active: #c9d1de;
+  --color-border: #d8dee9;
+  --color-border-light: #b3bccd;
+  --color-text-primary: #2e3440;
+  --color-text-secondary: #3b4252;
+  --color-text-muted: #59637a;
+  --color-accent-blue: #5e81ac;
+  --color-accent-blue-hover: #4c6b91;
+  --color-accent-green: #4f7a3c;
+  --color-accent-green-hover: #3f6230;
+  --color-accent-warm: #35706e;
+  --color-accent-warm-hover: #2a5a58;
+  --color-accent-cool-from: #8a5f83;
+  --color-accent-cool-to: #5e81ac;
+  --color-gradient-cta-from: #4c6b91;
+  --color-gradient-cta-to: #35706e;
+  --color-gradient-toggle-from: #5e81ac;
+  --color-gradient-toggle-to: #4c6b91;
+  --color-gradient-active-frame-from: #5e81ac;
+  --color-gradient-active-frame-to: #35706e;
+  --shadow-accent-glow: 0 2px 12px rgba(94, 129, 172, 0.26);
+  --shadow-active-ring: 0 0 0 2px rgba(94, 129, 172, 0.32);
+}
+
+/* ─── Solarized ───────────────────────────────────────────────────────────
+ * The one palette here built from a measured relationship rather than a
+ * mood: a teal-black ground, which is why it is the only dark theme that
+ * does not read as grey. */
+[data-theme="solarized"] {
+  /* La luz del mago toma el amarillo de esta paleta. */
+  --hp-wizard-lit: 244, 237, 217;
+  --hp-wizard-pale: 233, 220, 178;
+  --hp-wizard-soft: 212, 187, 107;
+  --hp-wizard-core: 181, 137, 0;
+  --hp-wizard-deep: 145, 110, 0;
+
+  --color-bg-primary: #002b36;
+  --color-bg-secondary: #02323e;
+  --color-bg-tertiary: #073642;
+  --color-bg-hover: #0d4552;
+  --color-bg-active: #14535f;
+  --color-border: #0e4653;
+  --color-border-light: #175a68;
+  --color-text-primary: #93a1a1;
+  --color-text-secondary: #869698;
+  --color-text-muted: #8ba0a6;
+  --color-accent-blue: #268bd2;
+  --color-accent-blue-hover: #4aa3e0;
+  --color-accent-green: #859900;
+  --color-accent-green-hover: #9aad0a;
+  --color-accent-warm: #cb4b16;
+  --color-accent-warm-hover: #e4611f;
+  --color-accent-cool-from: #6c71c4;
+  --color-accent-cool-to: #268bd2;
+  --color-gradient-cta-from: #1c6a9c;
+  --color-gradient-cta-to: #1f7a70;
+  --color-gradient-toggle-from: #268bd2;
+  --color-gradient-toggle-to: #2aa198;
+  --color-gradient-active-frame-from: #b58900;
+  --color-gradient-active-frame-to: #cb4b16;
+  --color-media-canvas: #073642;
+  --shadow-accent-glow: 0 0 18px rgba(38, 139, 210, 0.32);
+  --shadow-active-ring: 0 0 6px rgba(203, 75, 22, 0.2);
+}
+[data-theme="solarized-day"] {
+  /* La luz del mago toma el amarillo de esta paleta. */
+  --hp-wizard-lit: 244, 237, 217;
+  --hp-wizard-pale: 233, 220, 178;
+  --hp-wizard-soft: 212, 187, 107;
+  --hp-wizard-core: 181, 137, 0;
+  --hp-wizard-deep: 145, 110, 0;
+
+  --color-bg-primary: #fdf6e3;
+  --color-bg-secondary: #f7f0dd;
+  --color-bg-tertiary: #fffdf5;
+  --color-bg-hover: #eee8d5;
+  --color-bg-active: #ddd6c1;
+  --color-border: #e4ddc8;
+  --color-border-light: #c3bca8;
+  --color-text-primary: #073642;
+  --color-text-secondary: #4e6a72;
+  --color-text-muted: #5b7278;
+  --color-accent-blue: #14567f;
+  --color-accent-blue-hover: #0e4262;
+  --color-accent-green: #6b7c00;
+  --color-accent-green-hover: #556300;
+  --color-accent-warm: #b3400f;
+  --color-accent-warm-hover: #8f330c;
+  --color-accent-cool-from: #5a5fae;
+  --color-accent-cool-to: #14567f;
+  --color-gradient-cta-from: #14567f;
+  --color-gradient-cta-to: #1a6f66;
+  --color-gradient-toggle-from: #14567f;
+  --color-gradient-toggle-to: #1a7d75;
+  --color-gradient-active-frame-from: #92700a;
+  --color-gradient-active-frame-to: #b3400f;
+  --shadow-accent-glow: 0 2px 12px rgba(20, 86, 127, 0.24);
+  --shadow-active-ring: 0 0 0 2px rgba(179, 64, 15, 0.32);
+}
+
+/* ─── Dracula ─────────────────────────────────────────────────────────── */
+[data-theme="dracula"] {
+  /* La luz del mago toma el amarillo de esta paleta. */
+  --hp-wizard-lit: 253, 254, 238;
+  --hp-wizard-pale: 251, 254, 220;
+  --hp-wizard-soft: 247, 252, 188;
+  --hp-wizard-core: 241, 250, 140;
+  --hp-wizard-deep: 193, 200, 112;
+
+  --color-bg-primary: #21222c;
+  --color-bg-secondary: #282a36;
+  --color-bg-tertiary: #343746;
+  --color-bg-hover: #44475a;
+  --color-bg-active: #565a71;
+  --color-border: #44475a;
+  --color-border-light: #565a71;
+  --color-text-primary: #f8f8f2;
+  --color-text-secondary: #dcdce4;
+  --color-text-muted: #a9adc4;
+  --color-accent-blue: #bd93f9;
+  --color-accent-blue-hover: #d3b2ff;
+  --color-accent-green: #50fa7b;
+  --color-accent-green-hover: #74ffa0;
+  --color-accent-warm: #ff79c6;
+  --color-accent-warm-hover: #ff9dd6;
+  --color-accent-cool-from: #ff79c6;
+  --color-accent-cool-to: #bd93f9;
+  --color-gradient-cta-from: #7440c8;
+  --color-gradient-cta-to: #b03a76;
+  --color-gradient-toggle-from: #bd93f9;
+  --color-gradient-toggle-to: #8be9fd;
+  --color-gradient-active-frame-from: #ff79c6;
+  --color-gradient-active-frame-to: #8be9fd;
+  --color-media-canvas: #343746;
+  --shadow-accent-glow: 0 0 18px rgba(189, 147, 249, 0.36);
+  --shadow-active-ring: 0 0 6px rgba(255, 121, 198, 0.2);
+}
+/* Alucard is Dracula's own light counterpart — warm paper, not an inversion. */
+[data-theme="alucard"] {
+  /* La luz del mago toma el amarillo de esta paleta. */
+  --hp-wizard-lit: 253, 254, 238;
+  --hp-wizard-pale: 251, 254, 220;
+  --hp-wizard-soft: 247, 252, 188;
+  --hp-wizard-core: 241, 250, 140;
+  --hp-wizard-deep: 193, 200, 112;
+
+  --color-bg-primary: #fffbeb;
+  --color-bg-secondary: #fff8e0;
+  --color-bg-tertiary: #ffffff;
+  --color-bg-hover: #f5efd8;
+  --color-bg-active: #e8e0c4;
+  --color-border: #eee6cc;
+  --color-border-light: #cdc4a6;
+  --color-text-primary: #1f1f1f;
+  --color-text-secondary: #3d3a2c;
+  --color-text-muted: #605a42;
+  --color-accent-blue: #644ac9;
+  --color-accent-blue-hover: #5138a8;
+  --color-accent-green: #14710a;
+  --color-accent-green-hover: #0f5a08;
+  --color-accent-warm: #a3144d;
+  --color-accent-warm-hover: #85103f;
+  --color-accent-cool-from: #644ac9;
+  --color-accent-cool-to: #036a96;
+  --color-gradient-cta-from: #5138a8;
+  --color-gradient-cta-to: #8c1144;
+  --color-gradient-toggle-from: #644ac9;
+  --color-gradient-toggle-to: #036a96;
+  --color-gradient-active-frame-from: #846e15;
+  --color-gradient-active-frame-to: #a34d14;
+  --shadow-accent-glow: 0 2px 12px rgba(100, 74, 201, 0.24);
+  --shadow-active-ring: 0 0 0 2px rgba(163, 20, 77, 0.3);
+}
+
+/* ─── Ayu ─────────────────────────────────────────────────────────────── */
+[data-theme="ayu"] {
+  /* La luz del mago toma el amarillo de esta paleta. */
+  --hp-wizard-lit: 251, 244, 229;
+  --hp-wizard-pale: 248, 232, 202;
+  --hp-wizard-soft: 240, 212, 154;
+  --hp-wizard-core: 230, 180, 80;
+  --hp-wizard-deep: 184, 144, 64;
+
+  --color-bg-primary: #0b0e14;
+  --color-bg-secondary: #0d1017;
+  --color-bg-tertiary: #131721;
+  --color-bg-hover: #1b1f2a;
+  --color-bg-active: #262b36;
+  --color-border: #1b1f2a;
+  --color-border-light: #2d323d;
+  --color-text-primary: #bfbdb6;
+  --color-text-secondary: #a5a29a;
+  --color-text-muted: #8f8d85;
+  --color-accent-blue: #e6b450;
+  --color-accent-blue-hover: #f5c76a;
+  --color-accent-green: #aad94c;
+  --color-accent-green-hover: #bde36e;
+  --color-accent-warm: #39bae6;
+  --color-accent-warm-hover: #5ecbf0;
+  --color-accent-cool-from: #d2a6ff;
+  --color-accent-cool-to: #39bae6;
+  --color-gradient-cta-from: #8a6110;
+  --color-gradient-cta-to: #1a6f94;
+  --color-gradient-toggle-from: #e6b450;
+  --color-gradient-toggle-to: #ffb454;
+  --color-gradient-active-frame-from: #e6b450;
+  --color-gradient-active-frame-to: #f26d78;
+  --color-media-canvas: #131721;
+  --shadow-accent-glow: 0 0 18px rgba(230, 180, 80, 0.32);
+  --shadow-active-ring: 0 0 6px rgba(57, 186, 230, 0.2);
+}
+[data-theme="ayu-day"] {
+  /* La luz del mago toma el amarillo de esta paleta. */
+  --hp-wizard-lit: 251, 244, 229;
+  --hp-wizard-pale: 248, 232, 202;
+  --hp-wizard-soft: 240, 212, 154;
+  --hp-wizard-core: 230, 180, 80;
+  --hp-wizard-deep: 184, 144, 64;
+
+  --color-bg-primary: #f4f4f4;
+  --color-bg-secondary: #fcfcfc;
+  --color-bg-tertiary: #ffffff;
+  --color-bg-hover: #eaeaea;
+  --color-bg-active: #dcdcdc;
+  --color-border: #e2e2e2;
+  --color-border-light: #c2c2c2;
+  --color-text-primary: #3d4147;
+  --color-text-secondary: #5c6166;
+  --color-text-muted: #61676e;
+  --color-accent-blue: #a35200;
+  --color-accent-blue-hover: #854300;
+  --color-accent-green: #5f7f00;
+  --color-accent-green-hover: #4b6500;
+  --color-accent-warm: #2c7f9c;
+  --color-accent-warm-hover: #22657d;
+  --color-accent-cool-from: #7d4fb0;
+  --color-accent-cool-to: #2c7f9c;
+  --color-gradient-cta-from: #854300;
+  --color-gradient-cta-to: #22657d;
+  --color-gradient-toggle-from: #a35200;
+  --color-gradient-toggle-to: #b35a00;
+  --color-gradient-active-frame-from: #a35200;
+  --color-gradient-active-frame-to: #c22020;
+  --shadow-accent-glow: 0 2px 12px rgba(163, 82, 0, 0.24);
+  --shadow-active-ring: 0 0 0 2px rgba(44, 127, 156, 0.3);
+}
+
+/* ─── One ─────────────────────────────────────────────────────────────── */
+[data-theme="one"] {
+  /* La luz del mago toma el amarillo de esta paleta. */
+  --hp-wizard-lit: 251, 246, 235;
+  --hp-wizard-pale: 247, 236, 215;
+  --hp-wizard-soft: 240, 218, 178;
+  --hp-wizard-core: 229, 192, 123;
+  --hp-wizard-deep: 183, 154, 98;
+
+  --color-bg-primary: #21252b;
+  --color-bg-secondary: #282c34;
+  --color-bg-tertiary: #2f343d;
+  --color-bg-hover: #3a3f4b;
+  --color-bg-active: #4b5263;
+  --color-border: #3a3f4b;
+  --color-border-light: #4b5263;
+  --color-text-primary: #abb2bf;
+  --color-text-secondary: #9199a6;
+  --color-text-muted: #99a1ae;
+  --color-accent-blue: #61afef;
+  --color-accent-blue-hover: #82c2f5;
+  --color-accent-green: #98c379;
+  --color-accent-green-hover: #aed195;
+  --color-accent-warm: #d19a66;
+  --color-accent-warm-hover: #dfb287;
+  --color-accent-cool-from: #c678dd;
+  --color-accent-cool-to: #61afef;
+  --color-gradient-cta-from: #2f6fa8;
+  --color-gradient-cta-to: #7a3f96;
+  --color-gradient-toggle-from: #61afef;
+  --color-gradient-toggle-to: #56b6c2;
+  --color-gradient-active-frame-from: #e5c07b;
+  --color-gradient-active-frame-to: #c678dd;
+  --color-media-canvas: #2f343d;
+  --shadow-accent-glow: 0 0 18px rgba(97, 175, 239, 0.32);
+  --shadow-active-ring: 0 0 6px rgba(198, 120, 221, 0.2);
+}
+[data-theme="one-day"] {
+  /* La luz del mago toma el amarillo de esta paleta. */
+  --hp-wizard-lit: 251, 246, 235;
+  --hp-wizard-pale: 247, 236, 215;
+  --hp-wizard-soft: 240, 218, 178;
+  --hp-wizard-core: 229, 192, 123;
+  --hp-wizard-deep: 183, 154, 98;
+
+  --color-bg-primary: #f0f0f0;
+  --color-bg-secondary: #fafafa;
+  --color-bg-tertiary: #ffffff;
+  --color-bg-hover: #e5e5e6;
+  --color-bg-active: #d3d3d4;
+  --color-border: #e0e0e1;
+  --color-border-light: #c0c0c1;
+  --color-text-primary: #383a42;
+  --color-text-secondary: #4f525d;
+  --color-text-muted: #616570;
+  --color-accent-blue: #2f60cc;
+  --color-accent-blue-hover: #244ba3;
+  --color-accent-green: #3f8b3e;
+  --color-accent-green-hover: #327131;
+  --color-accent-warm: #986600;
+  --color-accent-warm-hover: #7a5200;
+  --color-accent-cool-from: #a626a4;
+  --color-accent-cool-to: #2f60cc;
+  --color-gradient-cta-from: #2f60cc;
+  --color-gradient-cta-to: #8a1f88;
+  --color-gradient-toggle-from: #2f60cc;
+  --color-gradient-toggle-to: #016b99;
+  --color-gradient-active-frame-from: #986600;
+  --color-gradient-active-frame-to: #a626a4;
+  --shadow-accent-glow: 0 2px 12px rgba(47, 96, 204, 0.24);
+  --shadow-active-ring: 0 0 0 2px rgba(166, 38, 164, 0.28);
+}
+
+/* ─── Amiga Workbench ─────────────────────────────────────────────────────
+ * Workbench 1.3 blue with its orange gadgets, and the 2.0 grey desktop as
+ * the daylight side. The grey is a genuine mid-tone rather than paper, which
+ * is a lightness this set had nowhere else. */
+[data-theme="amiga"] {
+  --hp-wizard-lit: 255, 237, 214; --hp-wizard-pale: 255, 222, 191;
+  --hp-wizard-soft: 255, 190, 128; --hp-wizard-core: 255, 136, 0;
+  --hp-wizard-deep: 204, 109, 0;
+  --color-bg-primary: #003c72;
+  --color-bg-secondary: #00468a;
+  --color-bg-tertiary: #0055aa;
+  --color-bg-hover: #0a66c4;
+  --color-bg-active: #1a7ad6;
+  --color-border: #0b4d8f;
+  --color-border-light: #2a86d8;
+  --color-text-primary: #ffffff;
+  --color-text-secondary: #d6e8fb;
+  --color-text-muted: #b3d0ec;
+  --color-accent-blue: #ff8800;
+  --color-accent-blue-hover: #ffa033;
+  --color-accent-green: #3ad17a;
+  --color-accent-green-hover: #5fdd95;
+  --color-accent-warm: #ffffff;
+  --color-accent-warm-hover: #e6f0ff;
+  --color-accent-cool-from: #ff8800;
+  --color-accent-cool-to: #ffffff;
+  --color-gradient-cta-from: #a85a00;
+  --color-gradient-cta-to: #00417a;
+  --color-gradient-toggle-from: #ff8800;
+  --color-gradient-toggle-to: #0055aa;
+  --color-gradient-active-frame-from: #ff8800;
+  --color-gradient-active-frame-to: #ffffff;
+  --color-media-canvas: #001a33;
+  --shadow-accent-glow: 0 0 18px rgba(255, 136, 0, 0.4);
+  --shadow-active-ring: 0 0 6px rgba(255, 255, 255, 0.28);
+}
+[data-theme="workbench"] {
+  --hp-wizard-lit: 255, 237, 214; --hp-wizard-pale: 255, 222, 191;
+  --hp-wizard-soft: 255, 190, 128; --hp-wizard-core: 255, 136, 0;
+  --hp-wizard-deep: 204, 109, 0;
+  --color-bg-primary: #a0a0a0;
+  --color-bg-secondary: #b4b4b4;
+  --color-bg-tertiary: #c8c8c8;
+  --color-bg-hover: #8e8e8e;
+  --color-bg-active: #7a7a7a;
+  --color-border: #6f6f6f;
+  --color-border-light: #ffffff;
+  --color-text-primary: #000000;
+  --color-text-secondary: #1f1f1f;
+  --color-text-muted: #2e2e2e;
+  --color-accent-blue: #0a3d91;
+  --color-accent-blue-hover: #072d6b;
+  --color-accent-green: #0a6b33;
+  --color-accent-green-hover: #075224;
+  --color-accent-warm: #a34700;
+  --color-accent-warm-hover: #7d3600;
+  --color-accent-cool-from: #0a3d91;
+  --color-accent-cool-to: #a34700;
+  --color-gradient-cta-from: #0a3d91;
+  --color-gradient-cta-to: #a34700;
+  --color-gradient-toggle-from: #0a3d91;
+  --color-gradient-toggle-to: #072d6b;
+  --color-gradient-active-frame-from: #0a3d91;
+  --color-gradient-active-frame-to: #ffffff;
+  --shadow-accent-glow: 0 2px 12px rgba(10, 61, 145, 0.3);
+  --shadow-active-ring: 0 0 0 2px rgba(0, 0, 0, 0.45);
+}
+
+/* ─── Phosphor ────────────────────────────────────────────────────────────
+ * Amber CRT. The glow token earns its keep here: on a real tube the light
+ * bled past the character cell, so the active ring blooms rather than
+ * outlines. The daylight side is the printout, not the screen. */
+[data-theme="phosphor"] {
+  --hp-wizard-lit: 255, 236, 191; --hp-wizard-pale: 255, 226, 166;
+  --hp-wizard-soft: 255, 205, 107; --hp-wizard-core: 255, 176, 0;
+  --hp-wizard-deep: 204, 141, 0;
+  --color-bg-primary: #0a0800;
+  --color-bg-secondary: #120e00;
+  --color-bg-tertiary: #1a1400;
+  --color-bg-hover: #241c00;
+  --color-bg-active: #2e2400;
+  --color-border: #3d2f00;
+  --color-border-light: #574400;
+  --color-text-primary: #ffb000;
+  --color-text-secondary: #d99600;
+  --color-text-muted: #b37d00;
+  --color-accent-blue: #ffb000;
+  --color-accent-blue-hover: #ffc740;
+  --color-accent-green: #33ff33;
+  --color-accent-green-hover: #66ff66;
+  --color-accent-warm: #ff7b00;
+  --color-accent-warm-hover: #ff9633;
+  --color-accent-cool-from: #ffb000;
+  --color-accent-cool-to: #33ff33;
+  --color-gradient-cta-from: #8a5f00;
+  --color-gradient-cta-to: #1f6b1f;
+  --color-gradient-toggle-from: #ffb000;
+  --color-gradient-toggle-to: #ff7b00;
+  --color-gradient-active-frame-from: #ffb000;
+  --color-gradient-active-frame-to: #33ff33;
+  --color-media-canvas: #0a0800;
+  --shadow-accent-glow: 0 0 22px rgba(255, 176, 0, 0.45);
+  --shadow-active-ring: 0 0 10px rgba(255, 176, 0, 0.35);
+}
+[data-theme="phosphor-day"] {
+  --hp-wizard-lit: 255, 236, 191; --hp-wizard-pale: 255, 226, 166;
+  --hp-wizard-soft: 255, 205, 107; --hp-wizard-core: 255, 176, 0;
+  --hp-wizard-deep: 204, 141, 0;
+  --color-bg-primary: #efe6cf;
+  --color-bg-secondary: #f6efdd;
+  --color-bg-tertiary: #fdf8ea;
+  --color-bg-hover: #e4d9be;
+  --color-bg-active: #d3c6a6;
+  --color-border: #d9cdb2;
+  --color-border-light: #b3a483;
+  --color-text-primary: #2b2200;
+  --color-text-secondary: #4a3c00;
+  --color-text-muted: #5c4c10;
+  --color-accent-blue: #8a5f00;
+  --color-accent-blue-hover: #6d4b00;
+  --color-accent-green: #2f6b1f;
+  --color-accent-green-hover: #235217;
+  --color-accent-warm: #a33b00;
+  --color-accent-warm-hover: #822f00;
+  --color-accent-cool-from: #8a5f00;
+  --color-accent-cool-to: #2f6b1f;
+  --color-gradient-cta-from: #8a5f00;
+  --color-gradient-cta-to: #a33b00;
+  --color-gradient-toggle-from: #8a5f00;
+  --color-gradient-toggle-to: #6d4b00;
+  --color-gradient-active-frame-from: #8a5f00;
+  --color-gradient-active-frame-to: #a33b00;
+  --shadow-accent-glow: 0 2px 12px rgba(138, 95, 0, 0.28);
+  --shadow-active-ring: 0 0 0 2px rgba(138, 95, 0, 0.35);
+}
+
+/* ─── Studio ──────────────────────────────────────────────────────────────
+ * A grading suite: neutral greys with no tint at all, around an 18% grey
+ * surround, which is the surface a colourist judges an image against. It is
+ * the one theme here chosen for what it does to the CONTENT rather than for
+ * how the chrome looks — nothing in it pulls the thumbnails warm or cool.
+ * The accents are the teal-and-orange of the trade, and they appear only on
+ * controls, never on a surface. */
+[data-theme="studio"] {
+  --hp-wizard-lit: 250, 236, 214; --hp-wizard-pale: 246, 225, 193;
+  --hp-wizard-soft: 240, 203, 151; --hp-wizard-core: 232, 163, 61;
+  --hp-wizard-deep: 186, 130, 49;
+  --color-bg-primary: #1c1c1c;
+  --color-bg-secondary: #232323;
+  --color-bg-tertiary: #2b2b2b;
+  --color-bg-hover: #343434;
+  --color-bg-active: #3f3f3f;
+  --color-border: #333333;
+  --color-border-light: #4a4a4a;
+  --color-text-primary: #e6e6e6;
+  --color-text-secondary: #b3b3b3;
+  --color-text-muted: #999999;
+  --color-accent-blue: #35b0c9;
+  --color-accent-blue-hover: #5cc4d9;
+  --color-accent-green: #66c06b;
+  --color-accent-green-hover: #85cf89;
+  --color-accent-warm: #ff8c42;
+  --color-accent-warm-hover: #ffa76b;
+  --color-accent-cool-from: #ff8c42;
+  --color-accent-cool-to: #35b0c9;
+  --color-gradient-cta-from: #1f7f92;
+  --color-gradient-cta-to: #a8511f;
+  --color-gradient-toggle-from: #35b0c9;
+  --color-gradient-toggle-to: #2a8ca1;
+  --color-gradient-active-frame-from: #ff8c42;
+  --color-gradient-active-frame-to: #35b0c9;
+  --color-media-canvas: #1c1c1c;
+  --shadow-accent-glow: 0 0 18px rgba(53, 176, 201, 0.28);
+  --shadow-active-ring: 0 0 6px rgba(255, 140, 66, 0.24);
+}
+[data-theme="studio-day"] {
+  --hp-wizard-lit: 250, 236, 214; --hp-wizard-pale: 246, 225, 193;
+  --hp-wizard-soft: 240, 203, 151; --hp-wizard-core: 232, 163, 61;
+  --hp-wizard-deep: 186, 130, 49;
+  --color-bg-primary: #d6d6d6;
+  --color-bg-secondary: #e3e3e3;
+  --color-bg-tertiary: #f0f0f0;
+  --color-bg-hover: #c7c7c7;
+  --color-bg-active: #b5b5b5;
+  --color-border: #bdbdbd;
+  --color-border-light: #949494;
+  --color-text-primary: #1a1a1a;
+  --color-text-secondary: #333333;
+  --color-text-muted: #474747;
+  --color-accent-blue: #10697c;
+  --color-accent-blue-hover: #0b5163;
+  --color-accent-green: #2f7a34;
+  --color-accent-green-hover: #235f27;
+  --color-accent-warm: #a8511f;
+  --color-accent-warm-hover: #853f18;
+  --color-accent-cool-from: #a8511f;
+  --color-accent-cool-to: #10697c;
+  --color-gradient-cta-from: #10697c;
+  --color-gradient-cta-to: #a8511f;
+  --color-gradient-toggle-from: #10697c;
+  --color-gradient-toggle-to: #0b5163;
+  --color-gradient-active-frame-from: #a8511f;
+  --color-gradient-active-frame-to: #10697c;
+  --shadow-accent-glow: 0 2px 12px rgba(16, 105, 124, 0.26);
+  --shadow-active-ring: 0 0 0 2px rgba(168, 81, 31, 0.32);
+}
+
+
+/* Warm light on dark is the whole of the wizard's ramp, so on paper it has
+   nowhere to land. Every light variant keeps a dark alcove, tinted just
+   enough to read as the same room. */
+[data-theme="ivory"],
+[data-theme="daylight"],
+[data-theme="pearl"],
+[data-theme="tokyo-day"],
+[data-theme="latte"],
+[data-theme="gruvbox-day"],
+[data-theme="everforest-day"],
+[data-theme="rose-pine-dawn"],
+[data-theme="lotus"],
+[data-theme="nord-day"],
+[data-theme="solarized-day"],
+[data-theme="alucard"],
+[data-theme="ayu-day"],
+[data-theme="one-day"],
+[data-theme="workbench"],
+[data-theme="phosphor-day"],
+[data-theme="studio-day"] {
+  --hp-wizard-ground: #14120c;
+}
+
 /* Custom utility classes that use the theme tokens. These let
  * components opt into theme-aware gradient and glow effects. */
 @layer utilities {
@@ -764,8 +1891,15 @@ input[type="range"]::-webkit-slider-thumb {
   position: absolute;
   left: 0;
   bottom: 0;
-  width: min(100dvh, 66vw);
+  /* Una sola medida gobierna la escena: el tamaño del arte. Las motas se
+     dimensionan y viajan contra ella, así la coreografía es la misma en un
+     móvil y en un 4K en vez de moverse un número fijo de píxeles.
+     `svh` y no `dvh` porque la barra de direcciones del móvil cambia `dvh`
+     a media animación y la caja daba un salto. */
+  --hp-intro-art: min(100svh, 66vw);
+  width: var(--hp-intro-art);
   aspect-ratio: 1 / 1;
+  isolation: isolate;
 }
 .hp-intro-art-frame,
 .hp-intro-art {
@@ -773,6 +1907,9 @@ input[type="range"]::-webkit-slider-thumb {
   inset: 0;
   width: 100%;
   height: 100%;
+}
+.hp-intro-art-frame {
+  z-index: 1;
 }
 .hp-intro-art {
   object-fit: contain;
@@ -794,19 +1931,23 @@ input[type="range"]::-webkit-slider-thumb {
   position: absolute;
   left: 76%;
   top: 40%;
-  width: 110%;
+  /* Tight on the quill, in front of the art. A plate-sized wash sat
+     behind the PNG so the painted halo never got the extra light, and
+     `filter: blur` on that wash re-rastered every breathe frame. */
+  z-index: 2;
+  width: 44%;
   aspect-ratio: 1 / 1;
   transform: translate(-50%, -50%);
+  pointer-events: none;
   background: radial-gradient(
     circle,
-    rgba(255, 186, 92, 0.3) 0%,
-    rgba(226, 132, 46, 0.15) 26%,
-    rgba(92, 58, 138, 0.13) 50%,
+    rgba(255, 224, 150, 0.72) 0%,
+    rgba(255, 186, 92, 0.38) 16%,
+    rgba(226, 132, 46, 0.16) 38%,
+    rgba(92, 58, 138, 0.06) 58%,
     transparent 72%
   );
-  /* No blur here on purpose: a 12px blur over a gradient this soft is
-     invisible, and it turned the breathing scale below into a
-     re-rendered filter on a viewport-sized element every frame. */
+  mix-blend-mode: screen;
   will-change: transform, opacity;
 }
 
@@ -816,15 +1957,17 @@ input[type="range"]::-webkit-slider-thumb {
 .hp-intro-scrim {
   position: absolute;
   inset: 0;
+  /* Copy-side only. Previous stops reached ~58% and crushed the quill
+     halo that sits on the inner edge of the art. */
   background:
     linear-gradient(
       260deg,
-      #07060b 12%,
-      rgba(7, 6, 11, 0.88) 33%,
-      rgba(7, 6, 11, 0.14) 58%,
-      rgba(7, 6, 11, 0) 74%
+      #07060b 8%,
+      rgba(7, 6, 11, 0.88) 22%,
+      rgba(7, 6, 11, 0.28) 34%,
+      rgba(7, 6, 11, 0) 46%
     ),
-    radial-gradient(125% 95% at 48% 46%, transparent 52%, rgba(4, 3, 8, 0.74) 100%);
+    radial-gradient(125% 95% at 48% 46%, transparent 62%, rgba(4, 3, 8, 0.55) 100%);
 }
 
 /* Grain. Half a point of texture over the whole composite, which also
@@ -851,19 +1994,20 @@ input[type="range"]::-webkit-slider-thumb {
   .hp-intro-artbox {
     left: 50%;
     bottom: -4%;
-    width: min(112vw, 78dvh);
+    --hp-intro-art: min(112vw, 78svh);
+    width: var(--hp-intro-art);
     transform: translateX(-50%);
   }
   .hp-intro-scrim {
     background:
       linear-gradient(
         to bottom,
-        #07060b 10%,
-        rgba(7, 6, 11, 0.84) 32%,
-        rgba(7, 6, 11, 0.16) 62%,
-        rgba(7, 6, 11, 0) 78%
+        #07060b 6%,
+        rgba(7, 6, 11, 0.78) 22%,
+        rgba(7, 6, 11, 0.18) 42%,
+        rgba(7, 6, 11, 0) 58%
       ),
-      radial-gradient(125% 95% at 50% 42%, transparent 52%, rgba(4, 3, 8, 0.74) 100%);
+      radial-gradient(125% 95% at 50% 42%, transparent 64%, rgba(4, 3, 8, 0.5) 100%);
   }
 }
 
@@ -874,8 +2018,11 @@ input[type="range"]::-webkit-slider-thumb {
    loading spinner. */
 .hp-intro-mote {
   position: absolute;
-  width: 3px;
-  height: 3px;
+  z-index: 3;
+  /* Proporcionales al arte, con un suelo para que no desaparezcan. El factor
+     sale de los 3px originales medidos sobre un arte de 1080px. */
+  width: max(2px, calc(var(--hp-intro-art) * 0.0028));
+  height: max(2px, calc(var(--hp-intro-art) * 0.0028));
   border-radius: 999px;
   background: rgba(255, 214, 150, 0.9);
   box-shadow: 0 0 7px rgba(255, 186, 92, 0.7);
@@ -929,12 +2076,16 @@ input[type="range"]::-webkit-slider-thumb {
   to { transform: scale(1); }
 }
 @keyframes hp-intro-bloom-in {
-  from { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
+  from { opacity: 0.7; transform: translate(-50%, -50%) scale(0.92); }
   to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 }
+/* Solo opacidad. El bloom se compone con mix-blend-mode: screen, y escalar
+   un elemento mezclado obliga al compositor a re-rasterizar el degradado y
+   rehacer la mezcla en cada fotograma. A 3,5% de escala la diferencia no se
+   ve; el coste sí se notaba en pantallas grandes. */
 @keyframes hp-intro-breathe {
-  0%, 100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-  50% { opacity: 0.82; transform: translate(-50%, -50%) scale(1.035); }
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.78; }
 }
 /* The wordmark resolves out of the glow: each glyph starts out at its
    wide-tracked position and low, then slides home. Offsets come from the
@@ -948,7 +2099,10 @@ input[type="range"]::-webkit-slider-thumb {
   0% { opacity: 0; transform: translate3d(0, 0, 0) scale(0.55); }
   16% { opacity: 0.8; }
   72% { opacity: 0.42; }
-  100% { opacity: 0; transform: translate3d(var(--mote-drift), -190px, 0) scale(1); }
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--mote-drift), calc(var(--hp-intro-art) * -0.176), 0) scale(1);
+  }
 }
 @keyframes hp-intro-draw {
   from { opacity: 0; transform: scaleX(0); }
@@ -988,16 +2142,36 @@ input[type="range"]::-webkit-slider-thumb {
   animation: hp-intro-progress linear both;
 }
 
+/* `reduce` asks for no vestibular motion — travel, parallax, zoom — not for
+   no change at all, and a cross-fade is the accepted stand-in. So the plate
+   still resolves instead of appearing as a dead still: every entrance keeps
+   its own duration and delay (the wordmark's stagger is inline, so it still
+   writes itself letter by letter) and only the displacement is dropped.
+   Base rules are already the settled state, so swapping the keyframe for an
+   opacity-only one is the whole edit. What stays off is what exists purely
+   as travel, and the one loop that never ends. */
 @media (prefers-reduced-motion: reduce) {
   .hp-intro-root[data-run='true'] :is(
-    .hp-intro-art-frame,
-    .hp-intro-art,
-    .hp-intro-bloom,
     .hp-intro-beat,
     .hp-intro-glyph,
     .hp-intro-rule
   ) {
+    animation-name: hp-intro-fade;
+    animation-timing-function: ease-out;
+  }
+  /* Camera push-in: it is only the travel, so there is nothing to fade to. */
+  .hp-intro-root[data-run='true'] .hp-intro-art {
     animation: none;
+  }
+  /* The halo over the writing hand keeps breathing. It is the one loop that
+     survives here, and deliberately: it changes luminance and nothing else —
+     no travel, no scale, nothing that could read as movement — and it is
+     what keeps the light alive rather than printed. Only the scale is taken
+     off its entrance. */
+  .hp-intro-root[data-run='true'] .hp-intro-bloom {
+    animation:
+      hp-intro-fade 1400ms ease-out both,
+      hp-intro-breathe 4600ms 1400ms ease-in-out infinite;
   }
   /* The embers only exist as motion, so they leave rather than freeze
      mid-air (their base state is opacity: 0). */
@@ -1036,7 +2210,7 @@ input[type="range"]::-webkit-slider-thumb {
   width: 82%;
   height: 82%;
   object-fit: contain;
-  filter: drop-shadow(0 0 8px rgba(251, 191, 36, 0.32));
+  filter: drop-shadow(0 0 8px rgba(var(--hp-wizard-core), 0.32));
   animation: hp-agent-float 4.8s ease-in-out infinite;
 }
 .hp-agent-halo {
@@ -1044,7 +2218,7 @@ input[type="range"]::-webkit-slider-thumb {
   inset: 7%;
   z-index: 0;
   border-radius: 999px;
-  background: radial-gradient(circle, rgba(251, 191, 36, 0.24), rgba(124, 58, 237, 0.08) 52%, transparent 72%);
+  background: radial-gradient(circle, rgba(var(--hp-wizard-core), 0.24), rgba(124, 58, 237, 0.08) 52%, transparent 72%);
   animation: hp-agent-halo 3.8s ease-in-out infinite;
 }
 .hp-agent-mote {
@@ -1053,8 +2227,8 @@ input[type="range"]::-webkit-slider-thumb {
   width: 2px;
   height: 2px;
   border-radius: 999px;
-  background: rgba(254, 215, 170, 0.95);
-  box-shadow: 0 0 5px rgba(251, 191, 36, 0.8);
+  background: rgba(var(--hp-wizard-soft), 0.95);
+  box-shadow: 0 0 5px rgba(var(--hp-wizard-core), 0.8);
   opacity: 0;
 }
 .hp-agent-mote-a { left: 9%; top: 58%; animation: hp-agent-spark 3.4s 0s ease-out infinite; }
@@ -1066,9 +2240,9 @@ input[type="range"]::-webkit-slider-thumb {
 .hp-agent-avatar[data-state='acting'] .hp-agent-halo { animation: hp-agent-cast-halo 0.82s ease-out infinite; }
 .hp-agent-avatar[data-state='acting'] .hp-agent-mote { animation-duration: 0.9s; }
 .hp-agent-avatar[data-state='listening'] img { transform: rotate(-4deg) translateY(-1px); }
-.hp-agent-avatar[data-state='success'] .hp-agent-halo { background: radial-gradient(circle, rgba(110, 231, 183, 0.38), rgba(251, 191, 36, 0.12) 55%, transparent 74%); }
+.hp-agent-avatar[data-state='success'] .hp-agent-halo { background: radial-gradient(circle, rgba(110, 231, 183, 0.38), rgba(var(--hp-wizard-core), 0.12) 55%, transparent 74%); }
 .hp-agent-avatar[data-state='error'] .hp-agent-halo { background: radial-gradient(circle, rgba(248, 113, 113, 0.34), rgba(124, 58, 237, 0.08) 55%, transparent 74%); }
-.hp-agent-trigger:hover .hp-agent-avatar img { filter: drop-shadow(0 0 10px rgba(253, 230, 138, 0.55)); }
+.hp-agent-trigger:hover .hp-agent-avatar img { filter: drop-shadow(0 0 10px rgba(var(--hp-wizard-soft), 0.55)); }
 .hp-agent-panel { transform-origin: bottom left; animation: hp-agent-panel-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both; }
 .hp-agent-panel--expanded { transform-origin: center; }
 .hp-agent-panel--expanded .hp-agent-markdown { font-size: 0.95rem; line-height: 1.55; }
@@ -1078,7 +2252,7 @@ input[type="range"]::-webkit-slider-thumb {
   position: absolute;
   inset: -80% -20% auto -25%;
   height: 180px;
-  background: radial-gradient(ellipse, rgba(245, 158, 11, 0.18), rgba(124, 58, 237, 0.08) 45%, transparent 70%);
+  background: radial-gradient(ellipse, rgba(var(--hp-wizard-deep), 0.18), rgba(124, 58, 237, 0.08) 45%, transparent 70%);
   pointer-events: none;
 }
 .hp-agent-markdown > * + * { margin-top: 0.55rem; }
@@ -1086,7 +2260,7 @@ input[type="range"]::-webkit-slider-thumb {
 .hp-agent-markdown blockquote { white-space: pre-wrap; }
 .hp-agent-markdown h2,
 .hp-agent-markdown h3,
-.hp-agent-markdown h4 { color: rgba(255, 251, 235, 0.96); font-weight: 650; line-height: 1.25; }
+.hp-agent-markdown h4 { color: rgba(var(--hp-wizard-lit), 0.96); font-weight: 650; line-height: 1.25; }
 .hp-agent-markdown h2 { font-size: 0.9rem; }
 .hp-agent-markdown h3 { font-size: 0.82rem; }
 .hp-agent-markdown h4 { font-size: 0.76rem; }
@@ -1095,12 +2269,12 @@ input[type="range"]::-webkit-slider-thumb {
 .hp-agent-markdown ul { list-style: disc; }
 .hp-agent-markdown ol { list-style: decimal; }
 .hp-agent-markdown li + li { margin-top: 0.28rem; }
-.hp-agent-markdown strong { color: rgba(255, 251, 235, 0.98); font-weight: 650; }
-.hp-agent-markdown em { color: rgba(254, 243, 199, 0.8); }
-.hp-agent-markdown code { border: 1px solid rgba(253, 230, 138, 0.14); border-radius: 0.3rem; background: rgba(0, 0, 0, 0.28); padding: 0.08rem 0.28rem; color: rgba(254, 243, 199, 0.92); font-size: 0.92em; }
-.hp-agent-markdown pre { max-width: 100%; overflow-x: auto; border: 1px solid rgba(253, 230, 138, 0.14); border-radius: 0.55rem; background: rgba(0, 0, 0, 0.35); padding: 0.55rem; white-space: pre; }
+.hp-agent-markdown strong { color: rgba(var(--hp-wizard-lit), 0.98); font-weight: 650; }
+.hp-agent-markdown em { color: rgba(var(--hp-wizard-pale), 0.8); }
+.hp-agent-markdown code { border: 1px solid rgba(var(--hp-wizard-soft), 0.14); border-radius: 0.3rem; background: rgba(0, 0, 0, 0.28); padding: 0.08rem 0.28rem; color: rgba(var(--hp-wizard-pale), 0.92); font-size: 0.92em; }
+.hp-agent-markdown pre { max-width: 100%; overflow-x: auto; border: 1px solid rgba(var(--hp-wizard-soft), 0.14); border-radius: 0.55rem; background: rgba(0, 0, 0, 0.35); padding: 0.55rem; white-space: pre; }
 .hp-agent-markdown pre code { border: 0; background: transparent; padding: 0; }
-.hp-agent-markdown blockquote { border-left: 2px solid rgba(253, 230, 138, 0.35); padding-left: 0.65rem; color: rgba(254, 243, 199, 0.72); }
+.hp-agent-markdown blockquote { border-left: 2px solid rgba(var(--hp-wizard-soft), 0.35); padding-left: 0.65rem; color: rgba(var(--hp-wizard-pale), 0.72); }
 .hp-agent-markdown a { color: rgb(147, 197, 253); text-decoration: underline; text-underline-offset: 2px; }
 .hp-agent-markdown a:hover { color: rgb(191, 219, 254); }
 
@@ -1111,20 +2285,149 @@ input[type="range"]::-webkit-slider-thumb {
 [data-navigation-category='studios'] { --hp-navigation-rgb: 88, 143, 121; }
 [data-navigation-category='production'] { --hp-navigation-rgb: 160, 96, 103; }
 [data-navigation-category='media'] { --hp-navigation-rgb: 166, 139, 82; }
+/* Trailing-edge fade for a row that always overflows its column. The row
+   scrolls, but a hard cut at the edge reads as a clipped layout rather than
+   as "there is more this way". Mask only — no extra element, no measuring,
+   and it leaves the scrollbar and hit areas untouched. */
+.hp-edge-fade {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 26px), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 26px), transparent);
+}
+
+/* Two-level navigation. The expanded parent and its panel are the SAME
+ * layer: one flat shared fill, no borders, so there is no seam to disguise
+ * with an outline. Depth comes from the surroundings — the track is the
+ * part that sinks — and a single material describes all three states:
+ *
+ *   raised → can be pressed   (collapsed parents and every child)
+ *   flush  → is the surface   (the expanded parent and its panel)
+ *   sunken → is the current one (the selected child)
+ *
+ * The fills are translucent so the same rule holds over the track and over
+ * the plateau. No color-mix(): a solid background plus a tint layer gives
+ * the same result without leaving pre-2023 browsers with no fill at all,
+ * which is exactly when the seam became visible. */
+.hp-navigation-row {
+  /* Neutral hue for the buttons that are not a section — Workspaces and
+     Activity. A section sets its own on itself, and a declaration on the
+     element always beats an inherited one, so the row separates into two
+     groups without a divider being drawn. */
+  --hp-navigation-rgb: 150, 162, 186;
+  border-radius: 0.6rem 0.6rem 0 0;
+  background-color: rgba(0, 0, 0, 0.34);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.55), inset 0 -1px 0 rgba(255, 255, 255, 0.035);
+}
+/* The parents keep the moulded pill: they are the top level, they carry the
+   most weight, and an outline around each one turns the row into a strip of
+   boxes. All they take from the section is the hue of their own fill, which
+   is enough to tell the four apart at rest. */
+.hp-navigation-primary {
+  background-color: rgba(var(--hp-navigation-rgb), 0.1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+/* The children are drawn rather than moulded. A drop shadow under a pill is
+   the stock button of every framework, and at this size, repeated six times
+   in a row, it is all you see. A hairline ring and a single-pixel top light
+   say "pressable" just as clearly and leave the feedback to the press.
+
+   Second level: these are places to go, not objects to pick up, and six
+   capsules under six capsules is what made the whole bar read as a form. So
+   the children have no body at all and the panel goes back to being the
+   surface. A two-pixel rule says which one you are on without drawing
+   another box, and it shows itself at a third on hover so the target still
+   announces where it ends — which is the one thing bodyless items lose. */
+.hp-navigation-child {
+  position: relative;
+  border-radius: 0.3rem 0.3rem 0 0;
+  background-color: transparent;
+  box-shadow: none;
+}
+.hp-navigation-child::after {
+  content: '';
+  position: absolute;
+  right: 0.4rem;
+  bottom: 0;
+  left: 0.4rem;
+  height: 2px;
+  border-radius: 2px;
+  background-color: rgb(var(--hp-navigation-rgb));
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+/* Tailwind's ring and tint utilities on the featured child lose to these
+   rules — index.css is imported after the framework — so its blue is
+   restated here rather than left to disappear. */
+.hp-navigation-child[data-navigation-featured='true'] {
+  color: var(--color-accent-blue);
+}
+.hp-navigation-child[data-navigation-featured='true']::after {
+  background-color: var(--color-accent-blue);
+  opacity: 0.5;
+}
+/* The icon is the colour sample: dimmed while the section is closed, full
+   once it is open or current. */
+.hp-navigation-primary svg {
+  color: rgb(var(--hp-navigation-rgb));
+  opacity: 0.62;
+  transition: opacity 150ms ease;
+}
+.hp-navigation-primary:hover svg { opacity: 0.9; }
+.hp-navigation-primary[data-navigation-active='true'] svg,
+.hp-navigation-primary[data-navigation-expanded='true'] svg { opacity: 1; }
+.hp-navigation-primary:hover {
+  background-color: rgba(var(--hp-navigation-rgb), 0.19);
+}
+.hp-navigation-child:hover { background-color: rgba(255, 255, 255, 0.05); }
+.hp-navigation-child:hover::after { opacity: 0.32; }
+/* A parent with no panel — Workspaces, Activity — has no selected child to
+   stand for it, so it takes the sunken state itself. Current means sunken at
+   either level, which is the whole point of having one material. The label is
+   left to the component's own active colour: the hue reads well pooled in a
+   recess, less so as text. */
+.hp-navigation-primary[data-navigation-active='true']:not([data-navigation-expanded='true']) {
+  background-color: rgba(0, 0, 0, 0.24);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.55),
+              inset 0 0 13px rgba(var(--hp-navigation-rgb), 0.17),
+              inset 0 -1px 0 rgba(255, 255, 255, 0.05);
+}
+/* All of the button-ness lives here, and only while the finger is down. The
+   current-state selectors are repeated so that pressing something already
+   selected still answers — otherwise the sunken rule above, and the selected
+   child below, would outrank the press and swallow it. */
+.hp-navigation-primary:active,
+.hp-navigation-primary[data-navigation-active='true']:active {
+  background-color: rgba(0, 0, 0, 0.34);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.6);
+  transform: translateY(0.5px);
+}
+/* A child has no body to sink, and a box appearing under the finger would
+   contradict the level: the press is a quick darkening and half a pixel. */
+.hp-navigation-child:active,
+.hp-navigation-child[aria-selected='true']:active {
+  background-color: rgba(0, 0, 0, 0.3);
+  transform: translateY(0.5px);
+}
 .hp-navigation-primary[data-navigation-expanded='true'] {
   z-index: 3;
-  border: 1px solid rgba(var(--hp-navigation-rgb), 0.34);
-  border-bottom: 0;
+  border: 0;
   border-radius: 0.55rem 0.55rem 0 0;
-  background: color-mix(in srgb, rgb(var(--hp-navigation-rgb)) 9%, rgb(8, 10, 16));
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.28), 0 0 13px rgba(var(--hp-navigation-rgb), 0.12);
+  background-color: #141824;
+  /* the top edge catches the category light */
+  box-shadow: inset 0 1px 0 rgba(var(--hp-navigation-rgb), 0.5);
   transform: translateY(1px);
 }
 .hp-navigation-children {
-  border-color: rgba(var(--hp-navigation-rgb), 0.3);
-  background: color-mix(in srgb, rgb(var(--hp-navigation-rgb)) 9%, rgb(8, 10, 16));
-  box-shadow: inset 0 1px 0 rgba(var(--hp-navigation-rgb), 0.14);
+  border: 0;
+  /* same base as the parent; the light rides on a separate layer so the
+     shared fill stays continuous */
+  background-color: #141824;
+  background-image: linear-gradient(rgba(var(--hp-navigation-rgb), 0.14), rgba(var(--hp-navigation-rgb), 0) 46%);
+  box-shadow: 0 10px 24px -14px rgba(0, 0, 0, 0.9),
+              0 0 34px -14px rgba(var(--hp-navigation-rgb), 0.45);
 }
+/* Seals the millimetre left between the parent and the panel. With no
+   borders it no longer covers a line; it just continues the fill. Its width
+   is kept current by the ResizeObserver in TabFilter. */
 .hp-navigation-children::before {
   content: '';
   position: absolute;
@@ -1132,23 +2435,25 @@ input[type="range"]::-webkit-slider-thumb {
   top: 0;
   left: var(--hp-navigation-notch-left, 0);
   width: var(--hp-navigation-notch-width, 0);
-  height: 2px;
+  height: 3px;
   pointer-events: none;
-  background: color-mix(in srgb, rgb(var(--hp-navigation-rgb)) 9%, rgb(8, 10, 16));
+  background-color: #141824;
 }
-.hp-navigation-child:hover { background: rgba(var(--hp-navigation-rgb), 0.13); }
+/* Current child: the rule at full strength and the section's colour on the
+   label. No fill — that is the point of the level. */
 .hp-navigation-child[aria-selected='true'] {
+  outline: 0;
   color: rgb(var(--hp-navigation-rgb));
-  outline: 1px solid rgba(var(--hp-navigation-rgb), 0.48);
-  background: rgba(var(--hp-navigation-rgb), 0.15);
-  box-shadow: 0 0 14px rgba(var(--hp-navigation-rgb), 0.2);
+  background-color: transparent;
+  box-shadow: none;
 }
+.hp-navigation-child[aria-selected='true']::after { opacity: 1; }
 [data-wizard-anchor][data-wizard-magic] {
   z-index: 2;
-  outline: 1px solid rgba(253, 230, 138, 0.72);
+  outline: 1px solid rgba(var(--hp-wizard-soft), 0.72);
   outline-offset: 3px;
   border-radius: 0.65rem;
-  box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.16), 0 0 24px rgba(245, 158, 11, 0.28);
+  box-shadow: 0 0 0 1px rgba(var(--hp-wizard-deep), 0.16), 0 0 24px rgba(var(--hp-wizard-deep), 0.28);
 }
 [data-wizard-anchor][data-wizard-magic]::after {
   content: '';
@@ -1158,10 +2463,10 @@ input[type="range"]::-webkit-slider-thumb {
   border-radius: inherit;
   pointer-events: none;
   background:
-    radial-gradient(circle at 14% 72%, rgba(255, 251, 235, 0.98) 0 1px, transparent 2px),
-    radial-gradient(circle at 78% 18%, rgba(253, 230, 138, 0.95) 0 1.5px, transparent 2.5px),
+    radial-gradient(circle at 14% 72%, rgba(var(--hp-wizard-lit), 0.98) 0 1px, transparent 2px),
+    radial-gradient(circle at 78% 18%, rgba(var(--hp-wizard-soft), 0.95) 0 1.5px, transparent 2.5px),
     radial-gradient(circle at 91% 68%, rgba(196, 181, 253, 0.9) 0 1px, transparent 2px),
-    linear-gradient(100deg, transparent 12%, rgba(253, 230, 138, 0.2) 48%, transparent 76%);
+    linear-gradient(100deg, transparent 12%, rgba(var(--hp-wizard-soft), 0.2) 48%, transparent 76%);
   background-size: 100% 100%, 100% 100%, 100% 100%, 220% 100%;
   animation: hp-wizard-anchor-cast 720ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }

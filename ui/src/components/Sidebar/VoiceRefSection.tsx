@@ -1,6 +1,9 @@
 import { Mic } from 'lucide-react'
 import { useStore } from '../../stores/useStore'
 import { useUiTranslation } from '../../i18n'
+import type { ApiOutput } from '../../api/outputs'
+import { AssetInput } from '../../features/asset-picker/AssetInput.tsx'
+import { placeholderMediaFile, studioMediaPath, useWorkspaceOutputs } from '../../lib/studioAssetPick.ts'
 
 const AUDIO_ACCEPT = '.wav,.mp3,.flac,.ogg,.m4a'
 
@@ -30,6 +33,17 @@ export function VoiceRefSection() {
   const setVoiceRef = useStore(s => s.setDirectorVoiceRef)
   const identityScale = useStore(s => s.directorIdentityGuidanceScale)
   const setIdentityScale = useStore(s => s.setDirectorIdentityGuidanceScale)
+  const activeWorkspace = useStore(s => s.activeWorkspace)
+  const audioItems = useWorkspaceOutputs(activeWorkspace, 'audio')
+
+  const chooseVoice = (item: ApiOutput | null) => {
+    if (!item) {
+      setVoiceRef(null)
+      return
+    }
+    setVoiceRef(placeholderMediaFile(item))
+    useStore.setState({ directorVoiceRefPath: studioMediaPath(item) })
+  }
 
   if (!enabled) return null
 
@@ -40,30 +54,26 @@ export function VoiceRefSection() {
           <Mic size={10} />
           {t('voiceRef.title')}
         </span>
-        {!voiceRef ? (
-          <label className="cursor-pointer text-[10px] text-accent-blue hover:underline">
-            {t('voiceRef.addAudio')}
-            <input
-              type="file"
-              accept={AUDIO_ACCEPT}
-              className="hidden"
-              onChange={e => {
-                const f = e.target.files?.[0]
-                if (f) setVoiceRef(f)
-                e.target.value = ''
-              }}
-            />
-          </label>
-        ) : (
+        {voiceRef ? (
           <button
             onClick={() => setVoiceRef(null)}
             className="text-[10px] text-red-400 hover:text-red-300 transition-colors"
           >
             {tCommon('actions.remove')}
           </button>
-        )}
+        ) : null}
       </div>
-      {voiceRef ? (
+      {!voiceRef ? (
+        <AssetInput
+          label={t('voiceRef.addAudio')}
+          placeholder={t('voiceRef.addAudio')}
+          items={audioItems}
+          accept={AUDIO_ACCEPT}
+          workspaceId={activeWorkspace}
+          constraints={{ kinds: ['audio'], maxCount: 1, optional: true }}
+          onChoose={chooseVoice}
+        />
+      ) : (
         <div className="space-y-2">
           <div className="flex items-center gap-1.5 bg-bg-secondary rounded px-2 py-1">
             <Mic size={10} className="text-accent-blue shrink-0" />
@@ -83,7 +93,8 @@ export function VoiceRefSection() {
             <span className="text-[10px] text-text-muted w-6 text-right">{identityScale}</span>
           </div>
         </div>
-      ) : (
+      )}
+      {!voiceRef && (
         <p className="text-[10px] text-text-muted italic">
           {t('voiceRef.hint')}
         </p>

@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import { CheckSquare, Info, RefreshCw, Square, Upload } from 'lucide-react'
+import { SpeechProductionEntry } from '../scene3d/speech/SpeechProductionEntry'
+import { CheckSquare, Info, RefreshCw, Square } from 'lucide-react'
 import * as api from '../../api/client'
+import type { ApiOutput } from '../../api/client'
+import { AssetInput } from '../asset-picker/AssetInput.tsx'
+import { ensureUploadsPath, useWorkspaceImageOutputs } from '../../lib/labsImagePick'
 import { Pill, SectionCard, seriesStatusLabel } from './components'
 import { SeriesShotDurationControl } from './SeriesShotDurationControl'
 import { primaryButton, secondaryButton, selectClass, textareaClass } from './styles'
@@ -20,6 +24,7 @@ export function SeriesShotsPanel({
   onRender: (mode: 'selected' | 'missing' | 'failed' | 'all', shotIds?: string[]) => void
 }) {
   const { t } = useUiTranslation('seriesLab')
+  const imageItems = useWorkspaceImageOutputs(workspace)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [routing, setRouting] = useState(false)
   const [acknowledgingLipSync, setAcknowledgingLipSync] = useState(false)
@@ -66,14 +71,14 @@ export function SeriesShotsPanel({
     finally { setRouting(false) }
   }
   const uploadComposedFrame = async (
-    shot: SeriesShot, file: File, referenceRole: 'composed_start_frame' | 'composed_end_frame',
+    shot: SeriesShot, item: ApiOutput, referenceRole: 'composed_start_frame' | 'composed_end_frame',
   ) => {
     setRouting(true); setError(null)
     try {
       await saveNow()
-      const upload = await api.uploadImage(file)
+      const ensured = await ensureUploadsPath(item)
       const result = await api.importSeriesAsset(workspace, series.id, {
-        uploadPath: upload.path, name: file.name, ownerType: 'shot', ownerId: shot.id,
+        uploadPath: ensured.path, name: item.name, ownerType: 'shot', ownerId: shot.id,
         kind: 'image', referenceRole,
       })
       replaceSeries(result.series)
@@ -128,13 +133,21 @@ export function SeriesShotsPanel({
             {shot.primarySpeakerId && <Pill tone="violet">{t('shots.speaker', { name: characters[shot.primarySpeakerId] || shot.primarySpeakerId })}</Pill>}
             {shot.locationId && <Pill>{locations[shot.locationId] || shot.locationId}</Pill>}
             {approved && <Pill tone="green">{t('shots.approvedModel', { model: approved.model })}</Pill>}
+            {!approved && <Pill>{t('shots.pendingTake')}</Pill>}
             <button className={`ml-auto ${secondaryButton}`} disabled={routing} onClick={() => void routeOne(shot.id)}><RefreshCw size={12} />{t('shots.reroute')}</button>
           </div>
-          <div className="mt-3 grid gap-2 lg:grid-cols-[120px_120px_1fr]">
+          <p className="mt-2 text-xs text-text-primary">{shot.action || shot.framing || t('shots.shotFallback')}</p>
+          <p className="mt-1 text-[11px] text-text-secondary">{shot.dialogueBeats.map(beat => beat.text).filter(Boolean).join(' / ') || t('shots.noDialogue')}</p>
+          <div className="mt-3 max-w-xs">
             <SeriesShotDurationControl workspace={workspace} series={series} shot={shot} onChange={planned => patchShot(shot.id, () => planned)} />
+          </div>
+          <details className="mt-3 rounded-lg border border-border bg-bg-secondary/40 p-2">
+            <summary className="cursor-pointer text-[10px] font-semibold uppercase tracking-wide text-text-muted">{t('shots.advancedDetails')}</summary>
+          <div className="mt-3 grid gap-2 lg:grid-cols-[120px_1fr]">
             <select aria-label={t('shots.strategyAria', { order: shot.order })} className={selectClass} value={shot.renderStrategy} onChange={event => patchShot(shot.id, current => ({ ...current, renderStrategy: event.target.value as SeriesShot['renderStrategy'], referenceManifest: undefined }))}><option value="auto">{t('shots.auto')}</option><option value="direct">{t('shots.direct')}</option><option value="references">{t('shots.references')}</option><option value="first_frame">{t('shots.firstFrame')}</option><option value="first_last">{t('shots.firstLast')}</option></select>
             <textarea aria-label={t('shots.promptAria', { order: shot.order })} className={textareaClass} value={shot.prompt} onChange={event => patchShot(shot.id, current => ({ ...current, prompt: event.target.value }))} />
           </div>
+          <p className="mt-2 truncate text-[10px] text-text-muted" title={shot.id}>{shot.id}</p>
           <div className="mt-2 flex flex-wrap gap-1">{shot.visibleCharacterIds.map(id => <Pill key={id} tone={shot.speakingCharacterIds.includes(id) ? 'violet' : 'neutral'}>{characters[id] || id}{shot.speakingCharacterIds.includes(id) ? t('shots.speaking') : t('shots.visible')}</Pill>)}</div>
           <div className="mt-1 flex flex-wrap gap-1">{Object.entries(shot.wardrobeByCharacterId).map(([characterId, variantId]) => <Pill key={`${characterId}-${variantId}`} tone="blue">{t('shots.wardrobe', { name: characters[characterId] || characterId, variant: variantId })}</Pill>)}</div>
           <div className="mt-3 grid gap-3 lg:grid-cols-2">
@@ -145,9 +158,15 @@ export function SeriesShotsPanel({
             <div className="rounded-lg border border-border p-2">
               <span className="text-[10px] font-semibold uppercase text-text-muted">{t('shots.policyTitle')}</span>
               <div className="mt-2 grid max-h-40 gap-1 overflow-y-auto">{Object.values(series.assets).filter(asset => ['image', 'character', 'location', 'prop'].includes(asset.kind)).map(asset => <div key={asset.id} className="grid grid-cols-[1fr_auto_auto] items-center gap-2 text-[10px] text-text-secondary"><span className="truncate" title={asset.id}>{asset.id}</span><label className="flex items-center gap-1"><input type="checkbox" aria-label={t('shots.includeAria', { id: asset.id, order: shot.order })} checked={shot.referencePolicy.manualIncludeAssetIds.includes(asset.id)} onChange={event => patchShot(shot.id, current => ({ ...current, referencePolicy: { ...current.referencePolicy, mode: 'manual', manualIncludeAssetIds: event.target.checked ? [...current.referencePolicy.manualIncludeAssetIds.filter(id => id !== asset.id), asset.id] : current.referencePolicy.manualIncludeAssetIds.filter(id => id !== asset.id), manualExcludeAssetIds: event.target.checked ? current.referencePolicy.manualExcludeAssetIds.filter(id => id !== asset.id) : current.referencePolicy.manualExcludeAssetIds }, referenceManifest: undefined }))} />{t('shots.include')}</label><label className="flex items-center gap-1"><input type="checkbox" aria-label={t('shots.excludeAria', { id: asset.id, order: shot.order })} checked={shot.referencePolicy.manualExcludeAssetIds.includes(asset.id)} onChange={event => patchShot(shot.id, current => ({ ...current, referencePolicy: { ...current.referencePolicy, mode: 'manual', manualExcludeAssetIds: event.target.checked ? [...current.referencePolicy.manualExcludeAssetIds.filter(id => id !== asset.id), asset.id] : current.referencePolicy.manualExcludeAssetIds.filter(id => id !== asset.id), manualIncludeAssetIds: event.target.checked ? current.referencePolicy.manualIncludeAssetIds.filter(id => id !== asset.id) : current.referencePolicy.manualIncludeAssetIds }, referenceManifest: undefined }))} />{t('shots.exclude')}</label></div>)}</div>
-              <div className="mt-2 flex flex-wrap gap-2"><label className={secondaryButton}><Upload size={12} />{t('shots.composedStart')}<input type="file" accept="image/*" className="hidden" onChange={event => { const file = event.target.files?.[0]; if (file) void uploadComposedFrame(shot, file, 'composed_start_frame') }} /></label><label className={secondaryButton}><Upload size={12} />{t('shots.composedEnd')}<input type="file" accept="image/*" className="hidden" onChange={event => { const file = event.target.files?.[0]; if (file) void uploadComposedFrame(shot, file, 'composed_end_frame') }} /></label></div>
+              <div className="mt-2 grid gap-2"><AssetInput label={t('shots.composedStart')} placeholder={t('shots.composedStart')} items={imageItems} accept="image/*" disabled={routing} constraints={{ kinds: ['image'], maxCount: 1, optional: false }} onChoose={item => { if (item) void uploadComposedFrame(shot, item, 'composed_start_frame') }} /><AssetInput label={t('shots.composedEnd')} placeholder={t('shots.composedEnd')} items={imageItems} accept="image/*" disabled={routing} constraints={{ kinds: ['image'], maxCount: 1, optional: false }} onChoose={item => { if (item) void uploadComposedFrame(shot, item, 'composed_end_frame') }} /></div>
             </div>
           </div>
+          </details>
+          {shot.dialogueBeats.length > 0 && <SpeechProductionEntry key={workspace + '/' + shot.id} kind="episode" workspace={workspace}
+            title={episode.title + ' · ' + shot.order} sourceId={series.id + '/' + episode.id + '/' + shot.id}
+              cast={[...new Set(shot.dialogueBeats.map(beat => beat.characterId))].map(id => ({ id, name: characters[id] || id,
+                characterKitRef: series.characters.find(character => character.id === id)?.voiceProfile?.characterKitRef }))}
+            lines={shot.dialogueBeats.map(beat => ({ id: beat.id, characterId: beat.characterId, text: beat.text }))} />}
           {shot.attempts.length > 0 && <div className="mt-3 flex flex-wrap gap-2">{shot.attempts.map(attempt => <Pill key={attempt.id} tone={attempt.status === 'completed' ? 'green' : attempt.status === 'failed' ? 'red' : attempt.status === 'running' ? 'violet' : 'neutral'}>{t('shots.attempt', { status: seriesStatusLabel(t, attempt.status), seed: attempt.seed ?? t('shots.seedRandom'), elapsed: (attempt.elapsedMs / 1000).toFixed(1), model: attempt.model })}</Pill>)}</div>}
         </article>
       })}</div>

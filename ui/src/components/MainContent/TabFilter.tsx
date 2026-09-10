@@ -14,6 +14,7 @@ import { OutputFolderSelector } from './OutputFolderSelector'
 interface MenuItem {
   value?: MediaFilter
   selected?: boolean
+  featured?: boolean
   section?: string
   label: string
   description: string
@@ -78,7 +79,8 @@ function NavigationBar({ category, title, items, activeValue, barRef }: { catego
             aria-label={item.label}
             aria-selected={item.selected ?? item.value === activeValue}
             onClick={item.action}
-            className="hp-navigation-child flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[10px] font-medium text-text-secondary transition hover:text-text-primary"
+            data-navigation-featured={item.featured ? 'true' : undefined}
+            className={`hp-navigation-child flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[10px] font-medium text-text-secondary transition hover:text-text-primary ${item.featured ? 'ring-1 ring-inset ring-accent-blue/40 bg-accent-blue/10' : ''}`}
           >
             <span>{item.icon}</span><span>{item.label}</span>
           </button>
@@ -162,9 +164,20 @@ export function TabFilter() {
     const row = topRowRef.current
     row?.addEventListener('scroll', alignJoin, { passive: true })
     window.addEventListener('resize', alignJoin)
+    // `resize` only covers the window. The button's width also changes when
+    // the sidebar opens and when the web font swaps in, and the seal used to
+    // stay where it was: that is where the visible seam came from.
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(alignJoin)
+    const expandedButton = expandedCategory ? categoryRefs.current[expandedCategory] : null
+    if (observer) {
+      if (row) observer.observe(row)
+      if (expandedButton) observer.observe(expandedButton)
+      if (childBarRef.current) observer.observe(childBarRef.current)
+    }
     return () => {
       row?.removeEventListener('scroll', alignJoin)
       window.removeEventListener('resize', alignJoin)
+      observer?.disconnect()
     }
   }, [expandedCategory])
 
@@ -201,6 +214,7 @@ export function TabFilter() {
     const state = useStore.getState()
     state.setSettingsOpen(false)
     state.setDashboardOpen(false)
+    if (filter === 'character-replacement') state.setSidebarOpen(false)
     state.setMediaFilter(filter)
     setActiveCategory(category)
     setExpandedCategory(category)
@@ -232,6 +246,8 @@ export function TabFilter() {
     { value: 'comics', label: t('tabs.comics'), description: t('descriptions.comics'), icon: <BookOpen size={15} />, action: () => openFilter('comics') },
     { value: 'characters', label: t('tabs.characters'), description: t('descriptions.characters'), icon: <WandSparkles size={15} />, action: () => openFilter('characters') },
     { value: 'scene3d', label: t('tabs.scene3d'), description: t('descriptions.video3d'), icon: <MonitorPlay size={15} />, action: () => openFilter('scene3d') },
+    { value: 'world3d', label: t('tabs.world3d'), description: t('descriptions.world3d'), icon: <Boxes size={15} />, action: () => openFilter('world3d') },
+    { value: 'character-replacement', featured: true, label: t('tabs.characterReplacement'), description: t('descriptions.characterReplacement'), icon: <WandSparkles size={15} />, action: () => openFilter('character-replacement') },
     { value: 'animate3d', label: t('tabs.animate3d'), description: t('descriptions.animate3d'), icon: <MonitorPlay size={15} />, action: () => openFilter('animate3d') },
   ]
   const productionItems: MenuItem[] = [
@@ -302,8 +318,8 @@ export function TabFilter() {
 
   return (
     <nav aria-label={t('aria.sections')} className="flex min-w-0 flex-1 flex-col rounded-xl border border-border bg-bg-tertiary/70 p-1">
-      <div className="flex min-w-0 items-center gap-1">
-        <div ref={topRowRef} className="flex min-w-0 flex-1 flex-nowrap items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="flex min-w-0 flex-col gap-1 md:flex-row md:items-center">
+        <div ref={topRowRef} className="hp-navigation-row flex min-w-0 w-full flex-nowrap items-center gap-1 overflow-x-auto md:w-auto md:flex-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <PrimaryButton active={activeCategory === 'direct-generation'} expanded={expandedCategory === 'direct-generation'} category="direct-generation" buttonRef={element => { categoryRefs.current['direct-generation'] = element }} icon={<Sparkles size={14} />} label={t('primary.directGeneration')} onClick={() => selectCategory('direct-generation')} />
           <PrimaryButton active={activeCategory === 'studios'} expanded={expandedCategory === 'studios'} category="studios" buttonRef={element => { categoryRefs.current.studios = element }} icon={<BookOpen size={14} />} label={t('primary.studios')} onClick={() => selectCategory('studios')} />
           <PrimaryButton active={activeCategory === 'production'} expanded={expandedCategory === 'production'} category="production" buttonRef={element => { categoryRefs.current.production = element }} icon={<Clapperboard size={14} />} label={t('primary.production')} onClick={() => selectCategory('production')} />
@@ -312,7 +328,7 @@ export function TabFilter() {
           <PrimaryButton active={mediaFilter === PRIMARY_DESTINATIONS.activity.value} icon={<Activity size={14} />} label={t('primary.activity')} ariaLabel={`${t('tabs.runs')} · ${t('primary.activity')}`} onClick={() => openFilter(PRIMARY_DESTINATIONS.activity.value)} />
         </div>
 
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-1 md:shrink-0 md:flex-nowrap">
           <OutputFolderSelector />
           {searchOpen ? (
             <div className="flex items-center gap-1 rounded-lg border border-border bg-bg-secondary px-2 py-0.5">

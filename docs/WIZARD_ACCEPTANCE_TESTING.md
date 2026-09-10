@@ -88,21 +88,46 @@ port, so `--base-url` is required unless
 `HOCUSPOCUS_BASE_URL` already contains the exact URL shown by Pinokio.
 
 Available scenarios are `smoke`, `full`, `studio`, `language`, `music-video`,
-`music-video-new`, `comic`, `series`, `failure`, `cancel` and `workspace`. `language`
+`music-video-new`, `comic`, `series`, `failure`, `cancel`, `workspace`,
+`wizard-media`, `app-tour`, `app-generate` and `app`. `language`
 verifies a live mixed-language turn (conversation, content, speech, exact quote and
 technical provider prompt). `music-video-new` is the one-turn regression for a newly
 authored song and videoclip: it proves that the Wizard creates a fresh Story project,
 fills and generates its vocal ACE-Step song, carries the exact cue identity into
 Director and never falls back to an unrelated selected song.
-`full` runs the principal successful flows serially.
+`full` runs the principal Wizard flows serially. `app-tour` captures every
+primary destination, direct-generation submode, tool panel, Settings, Activity
+and mobile navigation. `app-generate` uses visible native controls to generate
+an image and instrumental music and to upscale the generated image; it checks
+canonical completion, downloaded media and metadata. `app` combines these
+native UI cases with the tour. `app-generate` and `app` require `real`; the
+image case needs an enabled Flux 2 Klein 9B, and the music case needs the
+configured ACE-Step model installed. Music waits for model defaults before
+setting 30 seconds and checks the decoded duration. Upscale uses Lanczos ×2
+and checks the decoded dimensions. These are family-level cases, not certification
+of every model and parameter combination. `wizard-media` is the current live
+Wizard acceptance pass for two independent native generations: a Flux 2 Klein 9B
+image followed by a 20-second ACE-Step instrumental track. Both submissions start
+in the visible Ask to the Wizard panel, resolve through the canonical queue, and
+retain the literal prompts, Wizard command trace, task IDs, output bytes and browser
+decode evidence. It requires the corresponding local models to be installed and
+enabled and must be run with `--profile real --confirm-real`.
 Use `--headed` to watch the Wizard navigate and fill the application. Use
-`--resume` to ask Playwright to run only failures from its previous run.
+`--resume --output-dir <previous-root>` to ask Playwright to rerun failures
+from that root's previous completed attempt. It creates a new evidence folder;
+it does not resume a backend generation or overwrite the earlier report.
+Resume rejects a corrupt, empty or successful `.last-run.json` before launching
+Playwright: without a valid list of failed IDs, `--last-failed` could otherwise
+select the complete scenario again.
 
 Real GPU acceptance is intentionally hard to trigger:
 
 ```bash
 python3 scripts/run_wizard_acceptance.py \
-  --profile real --scenario studio --confirm-real
+  --base-url http://127.0.0.1:<port> \
+  --profile real --scenario app --confirm-real \
+  --output-dir outputs/acceptance-my-run \
+  --workspace-prefix e2e_my_run
 ```
 
 The runner refuses a mismatch between the requested profile and the backend's
@@ -128,9 +153,47 @@ to validate the complete orchestration cheaply while still consulting the real L
 
 ## Evidence and assertions
 
-The HTML report is written to `ui/playwright-report/wizard-live`; raw results,
-traces, screenshots and retained failure videos go to
-`ui/test-results/wizard-live`. Both paths are ignored by Git.
+The runner defaults to a unique `outputs/acceptance-<UTC timestamp>` root.
+`--output-dir` selects a reusable root. Each attempt gets its own
+`attempt-<UTC timestamp>/report`, `raw` and `results.json`. `run.json` records
+the invocation and exit status, and `index.html` links the evidence. An abrupt
+OS kill can leave an attempt marked `running`; inspect its process and backend
+task before starting another inference. Never treat that file alone as proof
+of liveness or completion. Run one invocation per evidence root at a time.
+
+Use `--browser-executable /path/to/chromium` when the normal Playwright browser
+is unavailable. This selects an owned test browser, not the user's browser.
+Direct Playwright calls still accept `HOCUSPOCUS_E2E_ARTIFACT_DIR` and require
+the actual `HOCUSPOCUS_BASE_URL`. They do not get the runner's manifest.
+
+To create one index over several scenario roots:
+
+```bash
+python3 scripts/acceptance_report.py outputs/my-audit
+```
+
+Real-mode cases create fresh `e2e_` folders. The browser harness virtualizes
+active-folder selection and shared model/profile preferences so it does not
+switch the user's global folder or overwrite their preferences. It restricts
+the recovery listing to the current test folder and forbids global recovery
+resume/discard. The interrupted queue and test outputs are preserved. This
+means **server persistence of those global preferences and recovery actions
+is not tested**. Generation, LLM calls, project saves, tasks and media remain
+live, except legacy Comics save/history routes: those resolve the server's
+global active folder even when a browser has another selected folder. The
+harness blocks those writes. The comic case validates all 12 panel images
+and browser JSON/PDF downloads; it does **not** certify server save/history.
+Story and Series library writes remain live within the selected test folder.
+Task controls, including legacy cancel/stop routes, must resolve to canonical
+tasks in that folder. JSON and query destinations are checked independently;
+native submissions require an explicit JSON workspace. Deletion is excluded.
+Do not remove the isolation guard to get a failing case to pass.
+
+See [APP_USER_GUIDE.md](APP_USER_GUIDE.md) for usage and the Wizard capability
+matrix. The tour's `features.json` records screenshot coverage separately from
+registry support. The native media cases also retain sampled RAM/VRAM data;
+the preflight refuses to submit while host RAM usage is already at 80%.
+This is a preflight check, not a prediction or prevention of model peak memory.
 
 Every live scenario records:
 
@@ -152,14 +215,23 @@ canonical task.
 
 1. Run the ordinary Python/UI checks without models.
 2. Boot `plan` and run `smoke` to catch LLM/schema/form regressions cheaply.
-3. Boot `simulate` and run `full` for chained workflows.
+3. Run `app-tour` to capture the visible destinations, then boot `simulate`
+   and run `full` for chained workflows.
 4. Boot `simulate` with one injected failure and run `failure`.
 5. Boot `simulate` with `HOCUSPOCUS_SIMULATION_STEP_DELAY=1` and run `cancel`
    to exercise the visible Activity cancellation path.
-6. Run `workspace` to prove that the Wizard refreshes its exact UI/server
-   context after a switch (the temporary secondary workspace is deleted).
-7. Only for release candidates, boot `real` and run a small explicitly chosen
-   GPU scenario.
+6. Run `workspace` to prove that the Wizard refreshes its folder context after
+   a browser-local switch. Both test folders are preserved for review.
+7. For real acceptance, boot `real` and run `app-generate --confirm-real`.
+   Keep local inference serial. Add `comic`, `series` or `music-video-new`
+   explicitly according to the available models and provider configuration.
+
+For a single real audit index, use separate output roots under one parent
+(`outputs/my-audit/tour`, `outputs/my-audit/native`, etc.), then run
+`python3 scripts/acceptance_report.py outputs/my-audit`. This preserves every
+scenario's resume state. Copy `docs/APP_USER_GUIDE.md` into that parent if you
+want the offline index to link the manual. Only read requests retry brief
+socket interruptions; a POST is never automatically replayed by the harness.
 
 The simulated artifacts are intentionally tiny, deterministic and structurally
 valid so audio analysis, FFmpeg assembly, gallery discovery and Director

@@ -28,6 +28,39 @@ from shared.tools.background_removal_request import (
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def test_runtime_upscale_service_survives_registration_of_same_named_route(monkeypatch):
+    """Exercise the production facades after the endpoint has been defined.
+
+    Loading the complete bootstrap would initialize model services. Compiling
+    these definitions together retains Python's real global name binding,
+    which previously replaced the service module with the endpoint function.
+    """
+    from services import tools_upscale as service
+
+    tree = ast.parse((ROOT / "app" / "_launch_runtime.py").read_text(encoding="utf-8"))
+    imports = [node for node in tree.body if isinstance(node, ast.ImportFrom)
+               and node.module == "services" and any(alias.name == "tools_upscale" for alias in node.names)]
+    definitions = [node for node in tree.body if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+                   and node.name in {"_upscale_tool_image", "_run_tool_upscale", "tools_upscale"}]
+    for node in definitions:
+        node.decorator_list = []
+    namespace = {"Request": object, "wgp": object(), "_jobs": {}, "_active_gen_states": {}}
+    for key in ("_coordinated_generation_slot", "try_start", "register_abort_state", "unregister_abort_state",
+                "is_cancel_requested", "update_job", "finish_job", "acknowledge_cancel", "record_job_outputs",
+                "_chunked_flashvsr_upscale", "_resolve_tool_clip_path", "_write_tool_sidecar"):
+        namespace[key] = object()
+    calls = []
+    monkeypatch.setattr(service, "upscale_image", lambda *args, **kwargs: calls.append((args, kwargs)) or (24, 16))
+    monkeypatch.setattr(service, "run_tool_upscale", lambda *args, **kwargs: calls.append((args, kwargs)) or "delegated")
+    exec(compile(ast.Module(body=imports + definitions, type_ignores=[]), "runtime-upscale-boundary", "exec"), namespace)
+    assert callable(namespace["tools_upscale"])
+    assert namespace["_upscale_tool_image"]("input.png", "output.png", "lanczos2") == (24, 16)
+    assert namespace["_run_tool_upscale"]("test-job") == "delegated"
+    assert calls[0][0] == ("input.png", "output.png", "lanczos2")
+    assert calls[1][0] == ("test-job",)
+    assert calls[1][1]["runtime"]["jobs"] is namespace["_jobs"]
+
+
 def _workspace_functions(workspace: Path, uploads: Path):
     return {
         "workspace_dir": lambda _workspace: str(workspace),

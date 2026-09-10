@@ -944,10 +944,11 @@ export async function approveStorySection(action: ApproveStorySectionCommand): P
   if (action.section === 'world' && (!target.world.summary.trim() || !target.world.visualLanguage.trim())) {
     throw new Error('World necesita un resumen y un lenguaje visual antes de aprobarse.')
   }
-  const directVideo = target.musicVideoGenerationMode === 'direct_video'
+  const { storyRecipeRequiresVisualIdentities, storyVisualGuidanceMode } = await import('./storyVisualGuidance')
+  const requiresVisualIdentities = storyRecipeRequiresVisualIdentities(storyVisualGuidanceMode(target))
   if (action.section === 'characters') {
     if (!target.characters.length) throw new Error('Añade al menos un personaje antes de aprobar el reparto.')
-    if (!directVideo) {
+    if (requiresVisualIdentities) {
       const incomplete = target.characters.flatMap(character => {
         const reasons = [
           character.approval !== 'approved' ? 'sigue en borrador' : '',
@@ -987,7 +988,7 @@ export async function approveStorySection(action: ApproveStorySectionCommand): P
     )
   }
   const candidate = structuredClone(target)
-  if (action.section === 'characters' && directVideo) {
+  if (action.section === 'characters' && !requiresVisualIdentities) {
     candidate.characters = candidate.characters.map(character => ({ ...character, approval: 'approved' as const }))
   }
   const normalized = normalizeStoryProject(candidate)
@@ -1299,7 +1300,14 @@ export async function stageStoryVideo(action: StageStoryVideoCommand): Promise<C
     : storedTarget
   if (current.activeProjectOperations[target.id]) throw new Error(`La historia “${target.title}” tiene una operación activa.`)
   if (!target.synopsis.trim() || !target.characters.length) throw new Error('La producción necesita una sinopsis y al menos un personaje.')
-  const duration = boundedDuration(action.durationSeconds, target.creativeBrief.durationSeconds || (action.kind === 'trailer' ? 60 : 90))
+  const { assertStoryVisualRecipeReady } = await import('./storyVisualGuidance')
+  assertStoryVisualRecipeReady(target)
+  const duration = boundedDuration(
+    action.durationSeconds,
+    action.kind === 'trailer'
+      ? target.productionRecipe.trailerDurationSeconds || target.creativeBrief.durationSeconds || 60
+      : target.productionRecipe.filmDurationSeconds || target.creativeBrief.durationSeconds || 90,
+  )
   const direction = action.direction || (action.kind === 'trailer' ? adaptations.DEFAULT_TRAILER_DIRECTION : adaptations.DEFAULT_SHORT_FILM_DIRECTION)
   const adaptation = action.kind === 'trailer'
     ? adaptations.buildTrailerAdaptation(target, direction, duration, {

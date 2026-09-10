@@ -18,12 +18,19 @@ import {
   type EntityRef,
 } from './commandContract'
 import { replayWizardPresentation } from './wizardPresentation'
+import { buildWizardContextSnapshot } from './wizardContext'
+import {
+  revalidateWizardCapability,
+  wizardCapabilityExecutionError,
+  type WizardAvailabilityContext,
+} from './wizardCapabilityAvailability'
 
 export type CapabilityRunnerStage =
   | 'resolve'
   | 'validate'
   | 'prepare'
   | 'confirm'
+  | 'revalidate'
   | 'execute'
   | 'correlate'
   | 'track'
@@ -32,6 +39,7 @@ export type CapabilityRunnerStage =
 export interface CapabilityRunnerOptions extends CapabilityExecutionContext {
   workspace: string
   onStage?: (stage: CapabilityRunnerStage, actionType: string) => void
+  availability?: WizardAvailabilityContext
 }
 
 function stage(
@@ -52,6 +60,15 @@ function requireConfirmation(action: AgentAction, required: boolean): void {
 function commandId(): string {
   return globalThis.crypto?.randomUUID?.()
     || `command-${Date.now()}-${Math.random().toString(36).slice(2)}`
+}
+
+function liveAvailabilityContext(): WizardAvailabilityContext {
+  const snapshot = buildWizardContextSnapshot()
+  return {
+    location: snapshot.active.location,
+    labs: snapshot.labs,
+    pendingQuestion: snapshot.pending_question,
+  }
 }
 
 function resultStatus(report: AgentExecutionReport): CommandResultStatus {
@@ -86,6 +103,12 @@ export async function runRegisteredCapability(
 
   stage(options, 'confirm', action.type)
   requireConfirmation(prepared, definition.confirmation === 'required')
+
+  stage(options, 'revalidate', action.type)
+  const availabilityError = wizardCapabilityExecutionError(
+    revalidateWizardCapability(prepared.type, options.availability || liveAvailabilityContext()),
+  )
+  if (availabilityError) throw new Error(availabilityError)
 
   const executionCommandId = commandId()
   const executionContext: CapabilityRunnerOptions = {
@@ -149,7 +172,9 @@ export async function runRegisteredCapability(
     }),
   })
   const outputNames = [...new Set([...(report.outputNames || []), ...(report.assetIds || [])].filter(Boolean))]
-  const commandResult = normalizeCommandResult({
+  const commandResult = normalizeCommandResult(tracked.commandResult ? {
+    ...tracked.commandResult, commandId: envelope.commandId,
+  } : {
     commandId: envelope.commandId,
     status: resultStatus(report),
     entities: entity ? [entity] : [],

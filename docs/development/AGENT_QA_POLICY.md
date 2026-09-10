@@ -1,7 +1,9 @@
 # Agent QA policy (minimum)
 
-Status: documentary P0. Remote GitHub protection is **not** applied by this
-PR. That needs a separate admin authorization.
+Status: P0 policy plus P2 `CI required`, P6 evidence validator, and P7
+merge-eligibility **simulation**. Remote GitHub protection is **prepared**,
+not fully active. See [GITHUB_PROTECTION.md](GITHUB_PROTECTION.md). Applying
+or widening rulesets needs a separate admin authorization.
 
 ## Who reviews what
 
@@ -16,34 +18,54 @@ PR. That needs a separate admin authorization.
   approval.
 
 Do not enable auto-merge during this transition.
+`python scripts/evaluate_merge_eligibility.py --snapshot …` only reports
+whether a PR **would** be eligible. It never merges. See
+[MERGE_ELIGIBILITY.md](MERGE_ELIGIBILITY.md).
 
 ## Required checks (names as of this tree)
 
-Until `ci-required` exists (P2) and a verified QA check exists (P6), the
-normal integration path should require exactly these GitHub check names:
+The workflow already emits these names. They were not removed.
 
 1. `Clean-repo guard + Python checks`
 2. `UI tests + lint + type-check + build`
 3. `UI E2E boot (Chromium + simulated API)`
+4. `CI required`
 
-Do not require human approval reviews that will not be performed.
-Do not treat Analyze pull request as a required technical review.
+`CI required` is the aggregator from P2: cancelled, skipped or failed
+dependencies are not success. The **GitHub required context** to enforce is
+the job name `CI required`, not the workflow title `CI`. A job that exists
+in YAML is not a branch rule until a ruleset lists it.
 
-## Remote configuration (prepared, not executed)
+Do not require human approval reviews that will not be performed. Do not
+treat Analyze pull request as a required technical review.
 
-Ask an admin to apply, then verify in read-only:
+Independent review uses
+`python scripts/verify_qa_evidence.py` (format/policy) plus
+`python scripts/verify_qa_provenance.py` (origin). The publisher
+`scripts/publish_qa_check.py` posts the `Independent QA` check from the
+PR base. That check is **not** required and must not be added to
+`CI required` in this PR. See [QA_ACCEPTANCE.md](QA_ACCEPTANCE.md).
 
-- PRs required to update `main`
-- the three checks above required
-- no force-push / no deleting `main`
-- bypass limited to repository owners; record that owners can still bypass
-- credentials for applying rulesets stay off the implementer agent
+## Remote configuration (inspected 2026-09-05)
 
-After P2 lands and `ci-required` is observed on a real PR, add that check
-without dropping coverage. After P6, require the verified QA check only when
-its publisher identity is proven.
+Verified in read-only against `IAnMove/hocuspocus`:
 
-A follow-up PR of this initiative must not apply the ruleset itself.
+- Ruleset `Protect main` (`22330118`) is **active** on default branch `main`:
+  PR required, no deletion, no force-push, 0 approving reviews, empty
+  bypass list. **No required status checks.**
+- `development` is **not** protected. Write access can push, force-push or
+  delete it without a PR or CI.
+- `CI required` runs on every PR to `main`/`development`/`dev` (no path
+  filters) but GitHub does not require it to merge.
+- Auto-merge is off. The remaining owner bypass is editing or deleting the
+  ruleset (`IAnMove` is the only admin collaborator).
+
+Exact payloads to add required `CI required` on `main` and to protect
+`development` are in [GITHUB_PROTECTION.md](GITHUB_PROTECTION.md). Ask an
+admin to apply them, then re-read. Until that verification, say prepared,
+not active.
+
+Do not apply rulesets from this file or from an implementer session.
 
 ## Evidence states (keep them separate)
 

@@ -7,11 +7,37 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 
-from services.workspace_registry import WorkspaceRegistry
+from services.workspace_registry import WorkspaceRegistry, WorkspaceIntentConflict, WorkspaceRevisionConflict
+from services.workspace_commands import catalog, resolve_catalog_reference
 
 
-def create_workspace_collections_router(*, registry: Callable[[], WorkspaceRegistry]) -> APIRouter:
+def create_workspace_collections_router(*, registry: Callable[[], WorkspaceRegistry], resolve_reference=None) -> APIRouter:
     router = APIRouter()
+
+    @router.get("/api/v1/commands")
+    def command_catalog():
+        return catalog()
+
+    @router.post("/api/v1/commands")
+    async def execute_shared_command(request: Request):
+        def failure(status, code, message, retryable=False):
+            return HTTPException(status, {"code": code, "message": message, "retryable": retryable})
+        try:
+            body = await request.json()
+            resolver = resolve_reference or (lambda kind, identity: resolve_catalog_reference(request.app, kind, identity))
+            return registry().execute_command(body, resolve_reference=resolver)
+        except KeyError as exc:
+            raise failure(404, "not_found", "Collection or command receipt not found") from exc
+        except WorkspaceIntentConflict as exc:
+            raise failure(409, "intent_conflict", str(exc)) from exc
+        except WorkspaceRevisionConflict as exc:
+            raise failure(409, "revision_conflict", str(exc)) from exc
+        except HTTPException as exc:
+            raise failure(exc.status_code, "reference_error", str(exc.detail), exc.status_code >= 500) from exc
+        except (TypeError, ValueError) as exc:
+            raise failure(400, "invalid_command", str(exc)) from exc
+        except OSError as exc:
+            raise failure(503, "uncertain_response", "Storage response uncertain; recover or retry the same intent_id", True) from exc
 
     @router.get("/api/v1/workspace-collections")
     def list_workspace_collections():

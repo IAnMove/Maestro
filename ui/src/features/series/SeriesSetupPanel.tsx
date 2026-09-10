@@ -9,6 +9,11 @@ import type { SeriesJobStatus, SeriesProject } from './types'
 import { useUiTranslation } from '../../i18n'
 import { SpokenLanguageOptions } from '../../i18n/SpokenLanguageOptions'
 import { seriesContentLanguagePatch, seriesSpokenLanguagePatch } from './languageIntent'
+import {
+  applySeriesGlobalProvider,
+  seriesProviderFieldsFromProfile,
+} from '../../lib/productionProfile'
+import { SeriesSetupVideoFields } from './SeriesSetupVideoFields'
 
 export function SeriesSetupPanel({
   workspace, series, update, saveNow, replaceSeries, job, setJob,
@@ -43,32 +48,9 @@ export function SeriesSetupPanel({
   }))
   const complete = Boolean(series.title.trim() && series.premise.trim() && series.visualStyle.trim())
   const jobBusy = Boolean(job && ['queued', 'running', 'cancelling'].includes(job.status))
-  const useGlobalProfile = () => patchProvider({
-    useGlobalProfile: true,
-    writingProvider: productionProfile.text.provider === 'local' || productionProfile.text.provider === 'anthropic'
-      ? 'maestro'
-      : productionProfile.text.provider === 'remote' ? 'openai-compatible' : productionProfile.text.provider as SeriesProject['provider']['writingProvider'],
-    writingModel: productionProfile.text.model,
-    writingBaseUrl: productionProfile.text.base_url || (
-      productionProfile.text.provider === 'minimax' ? 'https://api.minimax.io/v1'
-        : productionProfile.text.provider === 'grok' ? 'https://api.x.ai/v1'
-          : productionProfile.text.provider === 'ollama' ? 'http://127.0.0.1:11434'
-            : ''
-    ),
-    imageProvider: productionProfile.image.provider === 'minimax' ? 'minimax' : 'maestro',
-    imageModel: productionProfile.image.model,
-    videoModel: productionProfile.video.model,
-    videoSettings: {
-      ...series.provider.videoSettings,
-      resolution: productionProfile.video.settings.resolution,
-      orientation: productionProfile.video.settings.aspectRatio === '9:16' || productionProfile.video.settings.aspectRatio === '3:4'
-        ? 'portrait' : 'landscape',
-      numInferenceSteps: productionProfile.video.settings.steps,
-      flowShift: productionProfile.video.settings.flowShift,
-      audioShift: productionProfile.video.settings.audioShift,
-      modelProfile: productionProfile.video.settings.profile,
-    },
-  })
+  const useGlobalProfile = () => patchProvider(
+    applySeriesGlobalProvider(series.provider, seriesProviderFieldsFromProfile(productionProfile)),
+  )
   useEffect(() => {
     if (job?.jobType === 'canon') setImageMode(job.generateImages === true)
     if (!job || job.jobType !== 'canon' || !['queued', 'running', 'cancelling'].includes(job.status)) return
@@ -307,16 +289,7 @@ export function SeriesSetupPanel({
           <SeriesField label={t('providers.writingModel')}><input className={inputClass} value={series.provider.writingModel} onChange={event => patchProvider({ writingModel: event.target.value })} placeholder={t('providers.writingModelPlaceholder')} /></SeriesField>
           <SeriesField label={t('providers.imageProvider')}><select className={selectClass} value={series.provider.imageProvider} onChange={event => patchProvider({ imageProvider: event.target.value })}><option value="maestro">{t('providers.imageLocal')}</option><option value="minimax">{t('providers.imageMinimax')}</option></select></SeriesField>
           <SeriesField label={t('providers.imageModel')}><input className={inputClass} value={series.provider.imageModel} disabled={series.provider.imageProvider === 'minimax'} onChange={event => patchProvider({ imageModel: event.target.value })} placeholder={series.provider.imageProvider === 'minimax' ? t('providers.imageModelMinimax') : t('providers.imageModelLocal')} /></SeriesField>
-          <SeriesField label={t('providers.videoModel')}><select className={selectClass} value={series.provider.videoModel} onChange={event => patchProvider({ videoModel: event.target.value })}>
-            <option value="minimax_h3_legacy">{t('providers.h3Legacy')}</option><option value="minimax_h3">{t('providers.h3Pruned')}</option><option value="minimax_h3_full">{t('providers.h3Full')}</option>
-          </select></SeriesField>
-          <SeriesField label={t('providers.resolution')}><select className={selectClass} value={String(series.provider.videoSettings.resolution || '480p')} onChange={event => patchVideo({ resolution: event.target.value })}>
-            <option value="480p">{t('providers.res480')}</option><option value="540p">{t('providers.res540')}</option><option value="720p">{t('providers.res720')}</option><option value="768p">{t('providers.res768')}</option>
-          </select></SeriesField>
-          <SeriesField label={t('providers.orientation')}><select className={selectClass} value={String(series.provider.videoSettings.orientation || 'landscape')} onChange={event => patchVideo({ orientation: event.target.value as 'landscape' | 'portrait' })}>
-            <option value="landscape">{t('providers.landscape')}</option><option value="portrait">{t('providers.portrait')}</option>
-          </select></SeriesField>
-          <SeriesField label={t('providers.steps')}><input className={inputClass} type="number" min={1} max={50} value={Number(series.provider.videoSettings.numInferenceSteps || 20)} onChange={event => patchVideo({ numInferenceSteps: Number(event.target.value) })} /></SeriesField>
+          <SeriesSetupVideoFields series={series} t={t} patchProvider={patchProvider} patchVideo={patchVideo} />
         </div>
         </fieldset>
       </SectionCard>

@@ -44,7 +44,7 @@ from shared.utils.audio_video import save_image_metadata, read_image_metadata, e
 from shared.utils.audio_metadata import save_audio_metadata, read_audio_metadata, extract_creation_datetime_from_metadata, resolve_audio_creation_datetime
 from shared.utils.video_metadata import save_video_metadata
 from shared.match_archi import match_nvidia_architecture
-from shared.attention import get_attention_modes, get_supported_attention_modes
+from shared.attention import get_override_attention_modes as get_attention_modes, get_supported_override_attention_modes as get_supported_attention_modes
 from shared.utils.utils import truncate_for_filesystem, sanitize_file_name, process_images_multithread, get_default_workers
 from shared.utils.process_locks import acquire_GPU_ressources, release_GPU_ressources, any_GPU_process_running, gen_lock
 from shared.loras_migration import migrate_loras_layout
@@ -785,7 +785,7 @@ def validate_settings(state, model_type, single_prompt, inputs):
     if inputs.get("cfg_star_switch", 0) != 0 and inputs.get("apg_switch", 0) != 0:
         gr.Info("Adaptive Progressive Guidance and Classifier Free Guidance Star can not be set at the same time")
         return ret()
-    prompt = inputs["prompt"]
+    prompt = model_def.get("fixed_prompt_label") or inputs["prompt"]
     prompt, errors = prompt_parser.process_template(prompt, keep_empty_lines=model_def.get("preserve_empty_prompt_lines", False))
     if len(errors) > 0:
         gr.Info("Error processing prompt template: " + errors)
@@ -2117,7 +2117,7 @@ def update_generation_status(html_content):
     if(html_content):
         return gr.update(value=html_content)
 
-family_handlers = ["models.wan.wan_handler", "models.wan.ovi_handler", "models.wan.df_handler", "models.hyvideo.hunyuan_handler", "models.ltx_video.ltxv_handler", "models.ltx2.ltx2_handler", "models.ltx2.scenema_audio_handler", "models.ltx2.ltx_audio_tts_handler", "models.minimax_h3.minimax_h3_handler", "models.longcat.longcat_handler", "models.flux.flux_handler", "models.qwen.qwen_handler", "models.kandinsky5.kandinsky_handler",  "models.z_image.z_image_handler", "models.krea2.krea2_handler", "models.hidream.hidream_handler", "models.TTS.ace_step_handler", "models.TTS.chatterbox_handler", "models.TTS.qwen3_handler", "models.TTS.yue_handler", "models.TTS.heartmula_handler", "models.TTS.kugelaudio_handler", "models.TTS.minimax_music3_handler", "models.TTS.index_tts2_handler"]
+family_handlers = ["models.h3_advanced.handler", "models.sensenova_u1.handler", "models.wan.wan_handler", "models.wan.ovi_handler", "models.wan.df_handler", "models.hyvideo.hunyuan_handler", "models.ltx_video.ltxv_handler", "models.ltx2.ltx2_handler", "models.ltx2.scenema_audio_handler", "models.ltx2.ltx_audio_tts_handler", "models.minimax_h3.minimax_h3_handler", "models.longcat.longcat_handler", "models.flux.flux_handler", "models.qwen.qwen_handler", "models.kandinsky5.kandinsky_handler",  "models.z_image.z_image_handler", "models.krea2.krea2_handler", "models.hidream.hidream_handler", "models.TTS.ace_step_handler", "models.TTS.chatterbox_handler", "models.TTS.qwen3_handler", "models.TTS.yue_handler", "models.TTS.heartmula_handler", "models.TTS.kugelaudio_handler", "models.TTS.minimax_music3_handler", "models.TTS.index_tts2_handler"]
 DEFAULT_LORA_ROOT = "loras"
 
 def register_family_lora_args(parser, lora_root):
@@ -2971,6 +2971,8 @@ def normalize_model_total_frame_count(frame_count, model_def):
     """Normalize an output timeline without treating a window cap as total."""
 
     frame_count = int(frame_count)
+    if model_def.get("wangp_1272") and model_def.get("sliding_window_exact_total_frames"):
+        return max(1, frame_count)
     maximum = model_def.get("frames_maximum", None)
     if (
         model_def.get("sliding_window_exact_total_frames", False)
@@ -3491,6 +3493,8 @@ if int(server_config.get("flashvsr_mode", 0) or 0) == 0:
     server_config["flashvsr_mode"] = FlashVSRBridge.MODE_TINY
 flashvsr.normalize_config()
 edit_mode_handlers = [flashvsr]
+from shared.wangp1272 import processors as wangp_processors
+wangp_processors.register(server_config, fl)
 
 def find_edit_spatial_upsampler(spatial_upsampling):
     return next((handler for handler in edit_mode_handlers if handler.is_upsampling(spatial_upsampling)), None)
@@ -3900,7 +3904,7 @@ def download_models(model_filename = None, model_type= None, file_type = 0, subm
 
 
         enhancer_enabled = int(server_config.get("enhancer_enabled", 0) or 0)
-        if enhancer_enabled > 0:
+        if enhancer_enabled > 0 and not (get_model_def(model_type) or {}).get("fixed_prompt_label"):
             from shared.prompt_enhancer import ensure_prompt_enhancer_assets
 
             ensure_prompt_enhancer_assets(
@@ -3945,6 +3949,12 @@ def download_models(model_filename = None, model_type= None, file_type = 0, subm
             if isinstance(preload_URLs, str): preload_URLs = [preload_URLs]
 
         for url in preload_URLs:
+            if model_def.get("wangp_1272") and "/loras/" in url:
+                update_loras_url_cache(get_lora_dir(model_type), [url])
+                error = check_loras_exist(model_type, [url], True)
+                if error:
+                    raise ValueError(error)
+                continue
             filename = get_local_model_filename(url)
             if filename is None: 
                 filename = fl.get_download_location(os.path.basename(url))
@@ -4226,7 +4236,7 @@ def setup_prompt_enhancer(pipe, kwargs):
 
 
 
-def load_models(model_type, override_profile = -1, output_type="video", **model_kwargs):
+def load_models(model_type, override_profile = -1, output_type="video", track_as_main=True, **model_kwargs):
     global transformer_type, loaded_profile
     base_model_type = get_base_model_type(model_type)
     model_def = get_model_def(model_type)
@@ -4265,7 +4275,12 @@ def load_models(model_type, override_profile = -1, output_type="video", **model_
         source_type_list += [0]
         model_submodel_no_list += [2]
     for module_type in modules:
-        if isinstance(module_type,dict):
+        if isinstance(module_type, list) and model_def.get("wangp_1272"):
+            model_file_list.append(get_model_filename(model_type, transformer_quantization, transformer_dtype, URLs=module_type))
+            model_type_list.append(model_type)
+            source_type_list.append(1)
+            model_submodel_no_list.append(0)
+        elif isinstance(module_type,dict):
             URLs1 = module_type.get("URLs", None)
             if URLs1 is None: raise Exception(f"No URLs defined for Module {module_type}")
             model_file_list.append(get_model_filename(model_type, transformer_quantization, transformer_dtype, URLs = URLs1))
@@ -4292,7 +4307,8 @@ def load_models(model_type, override_profile = -1, output_type="video", **model_
 
     VAE_dtype = torch.float16 if server_config.get("vae_precision","16") == "16" else torch.float
     mixed_precision_transformer =  server_config.get("mixed_precision","0") == "1"
-    transformer_type = None
+    if track_as_main:
+        transformer_type = None
 
     for source_type, filename in zip(source_type_list, local_model_file_list):
         if source_type==0:  
@@ -4361,7 +4377,7 @@ def load_models(model_type, override_profile = -1, output_type="video", **model_
         pipe = kwargs.pop("pipe")
     if "coTenantsMap" not in kwargs: kwargs["coTenantsMap"] = {}
     mmgp_profile = init_pipe(pipe, kwargs, profile)
-    if server_config.get("enhancer_mode", 1) == 0:
+    if track_as_main and not model_def.get("fixed_prompt_label") and server_config.get("enhancer_mode", 1) == 0:
         setup_prompt_enhancer(pipe, kwargs)
     loras_transformer = kwargs.pop("loras", [])
     if "transformer" in pipe:
@@ -4404,8 +4420,9 @@ def load_models(model_type, override_profile = -1, output_type="video", **model_
         pass
     if len(args.gpu) > 0:
         torch.set_default_device(args.gpu)
-    transformer_type = model_type
-    loaded_profile = profile
+    if track_as_main:
+        transformer_type = model_type
+        loaded_profile = profile
     return wan_model, offloadobj 
 
 if not "P" in preload_model_policy:
@@ -5582,7 +5599,7 @@ def extract_faces_from_video_with_mask(input_video_path, input_mask_path, max_fr
     return face_tensor
 
 
-def preprocess_video_with_mask(pre_video_guide, input_video_path, input_mask_path, height, width,  max_frames, start_frame=0, fit_canvas = None, fit_crop = False, target_fps = 16, block_size= 16, expand_scale = 2, process_type = "inpaint", process_type2 = None, to_bbox = False, RGB_Mask = False, negate_mask = False, process_outside_mask = None, inpaint_color = 127, outpainting_dims = None, outpainting_ratio = "", proc_no = 1):
+def preprocess_video_with_mask(pre_video_guide, input_video_path, input_mask_path, height, width,  max_frames, start_frame=0, fit_canvas = None, fit_crop = False, target_fps = 16, block_size= 16, expand_scale = 2, process_type = "inpaint", process_type2 = None, to_bbox = False, RGB_Mask = False, negate_mask = False, process_outside_mask = None, inpaint_color = 127, outpainting_dims = None, outpainting_ratio = "", proc_no = 1, outpainting_quantize_margins=0):
 
     def mask_to_xyxy_box(mask):
         rows, cols = np.where(mask == 255)
@@ -5650,7 +5667,11 @@ def preprocess_video_with_mask(pre_video_guide, input_video_path, input_mask_pat
 
     if outpainting_dims != None:
         final_height, final_width = height, width
-        height, width, margin_top, margin_left =  get_outpainting_frame_location(final_height, final_width,  outpainting_dims, 1)        
+        if outpainting_quantize_margins:
+            from shared.wangp1272.compat import get_outpainting_frame_location as h3_frame_location
+            height, width, margin_top, margin_left = h3_frame_location(final_height, final_width, outpainting_dims, 1, quantize_margins=outpainting_quantize_margins)
+        else:
+            height, width, margin_top, margin_left = get_outpainting_frame_location(final_height, final_width, outpainting_dims, 1)
 
     if any_mask:
         num_frames = min(len(video), len(mask_video))
@@ -5888,38 +5909,44 @@ def parse_keep_frames_video_guide(keep_frames, video_length):
     return  frames, error
 
 
-def perform_temporal_upsampling(sample, previous_last_frame, temporal_upsampling, fps):
+def perform_temporal_upsampling(sample, previous_last_frame, temporal_upsampling, fps, abort_callback=None, progress_callback=None):
+    if str(temporal_upsampling).startswith("dlssg"):
+        return wangp_processors.temporal(sample, previous_last_frame, temporal_upsampling, fps,
+                                          main_offloadobj=offloadobj, abort_callback=abort_callback,
+                                          progress_callback=progress_callback)
     exp = 0
     if temporal_upsampling == "rife2":
         exp = 1
     elif temporal_upsampling == "rife4":
         exp = 2
+    multiplier = 3 if temporal_upsampling == "rife3" else 2**exp
     output_fps = fps
-    if exp == 0:
+    if multiplier == 1:
         return sample, previous_last_frame, output_fps
     rife_version = server_config.get("rife_version", "v4")
-    rife_model_path = None
-    if rife_version == "v4":
-        rife_model_path = fl.locate_file(RIFE_V4_FILENAME)
-    else:
-        rife_model_path = fl.locate_file(RIFE_V3_FILENAME)
+    rife_filename = RIFE_V4_FILENAME if rife_version == "v4" else RIFE_V3_FILENAME
+    if multiplier == 3 and rife_version != "v4":
+        raise ValueError("RIFE x3 requires version 4.26")
+    if fl.locate_file(rife_filename, error_if_none=False) is None:
+        process_files_def(repoId="DeepBeepMeep/Wan2.1", revision="850ed9ffca04b4d1ba6b95b5cd6167abedd3fc65", sourceFolderList=[""], fileList=[[rife_filename]])
+    rife_model_path = fl.locate_file(rife_filename)
     if previous_last_frame is not None and previous_last_frame.dtype != sample.dtype:
         if sample.dtype == torch.uint8:
             previous_last_frame = _video_tensor_to_uint8_chunk_inplace(previous_last_frame)
         else:
             previous_last_frame = previous_last_frame.float().div_(127.5).sub_(1.0)
-    if exp > 0: 
+    if multiplier > 1:
         from postprocessing.rife.inference import temporal_interpolation
         if previous_last_frame != None:
             sample = torch.cat([previous_last_frame, sample], dim=1)
             previous_last_frame = sample[:, -1:].clone()
-            sample = temporal_interpolation(rife_model_path, sample, exp, device=processing_device, rife_version=rife_version)
+            sample = temporal_interpolation(rife_model_path, sample, exp, device=processing_device, rife_version=rife_version, multiplier=multiplier)
             sample = sample[:, 1:]
         else:
-            sample = temporal_interpolation(rife_model_path, sample, exp, device=processing_device, rife_version=rife_version)
+            sample = temporal_interpolation(rife_model_path, sample, exp, device=processing_device, rife_version=rife_version, multiplier=multiplier)
             previous_last_frame = sample[:, -1:].clone()
 
-        output_fps = output_fps * 2**exp
+        output_fps = output_fps * multiplier
     return sample, previous_last_frame, output_fps 
 
 
@@ -5930,8 +5957,22 @@ def perform_spatial_upsampling(
     abort_callback=None,
     progress_callback=None,
     still_image=False,
+    fps=24.0,
+    source_audio_path=None,
+    processor_settings=None,
+    audio_context=None,
 ):
     from shared.utils.utils import resize_lanczos
+    if wangp_processors.is_spatial(spatial_upsampling):
+        return wangp_processors.spatial(
+            sample, spatial_upsampling, main_offloadobj=offloadobj,
+            process_files=process_files_def,
+            profile=loaded_profile if loaded_profile >= 0 else get_default_profile("video"),
+            fps=fps, seed=seed,
+            still_image=still_image, abort_callback=abort_callback,
+            progress_callback=progress_callback, **wangp_processors.validated_settings(spatial_upsampling, processor_settings),
+            **(audio_context or {"source_audio_path": source_audio_path}),
+        )
     if spatial_upsampling == "vae2":
         return sample
     # FlashVSR (DiT super-resolution) dispatch — ported from upstream Wan2GP.
@@ -5967,11 +6008,12 @@ def perform_spatial_upsampling(
         scale = 2
     h, w = sample.shape[-2:]
     h *= scale
-    h = round(h/16) * 16
     w *= scale
-    w = round(w/16) * 16
-    h = int(h)
-    w = int(w)
+    if not (still_image and spatial_upsampling in {"lanczos1.5", "lanczos2"}):
+        h = round(h / 16) * 16
+        w = round(w / 16) * 16
+    h = int(round(h))
+    w = int(round(w))
     frames_to_upsample = [sample[:, i] for i in range( sample.shape[1]) ] 
     if sample.dtype == torch.uint8:
         resample = Image.Resampling.LANCZOS if method is None else method
@@ -6094,6 +6136,7 @@ def edit_video(
                 spatial_upsampling,
                 seed=seed,
                 abort_callback=lambda: gen.get("abort", False),
+                still_image=has_image_file_extension(video_source),
             )
             if sample is None or gen.get("abort", False):
                 return
@@ -7161,6 +7204,20 @@ def _resolve_image_ref_fit(model_def, auto_aspect):
         return 1
     return ref_fit
 
+from shared.wangp1272.timeline import native_generation_kwargs, native_injection_frames, first_window_length
+from services.wangp_submission import finalize_viggle_audio
+
+
+def _resolve_native_extra_loras(model_type, model_def, loras, send_cmd):
+    if not model_def.get('wangp_1272') or not loras:
+        return loras
+    update_loras_url_cache(get_lora_dir(model_type), loras)
+    errors = check_loras_exist(model_type, loras, True, send_cmd)
+    if errors:
+        raise gr.Error(errors)
+    return [resolve_lora_path(model_type, item) for item in loras]
+
+
 def generate_video(
     task,
     send_cmd,
@@ -7349,6 +7406,18 @@ def generate_video(
     # planner. Kept as a real list so semantic newlines inside each prompt are
     # never mistaken for prompt boundaries.
     h3_window_prompts=None,
+    minimax_h3_planning_style="faithful",
+    minimax_h3_audio_policy="native",
+    minimax_h3_turbo_preset="",
+    minimax_h3_reference_sequence=False,
+    minimax_h3_semantic_bridge_alpha=0.0,
+    minimax_h3_semantic_bridge_magnitude="per_token",
+    minimax_h3_multi_window=True,
+    h3_reference_context="",
+    wangp_processor_settings=None,
+    attention_sparsity=1.3,
+    viggle_audio_mode="generated",
+    viggle_source_video=None,
 ):
 
 
@@ -7524,6 +7593,8 @@ def generate_video(
     overridden_attention = override_attention if len(override_attention) else get_overridden_attention(model_type)
     # if overridden_attention is not None and overridden_attention !=  attention_mode: print(f"Attention mode has been overriden to {overridden_attention} for model type '{model_type}'")
     attn = overridden_attention if overridden_attention is not None else attention_mode
+    from services.h3_runtime_policy import resolve_model_attention, release_special_loras, conditioning_kwargs
+    attn = resolve_model_attention(attn, model_def, attention_modes_supported)
     if attn == "auto":
         attn = get_auto_attention()
     elif not attn in attention_modes_supported:
@@ -7761,6 +7832,7 @@ def generate_video(
         extra_loras_transformers, extra_loras_multipliers = wan_model.get_loras_transformer(get_model_recursive_prop, **locals())
         loras_list_mult_choices_nums, loras_slists, errors =  parse_loras_multipliers(extra_loras_multipliers, len(extra_loras_transformers), num_inference_steps, nb_phases = model_def_nb_phases, merge_slist= loras_slists, model_switch_phase= model_switch_phase )
         if len(errors) > 0: raise Exception(f"Error parsing Extra Transformer Loras: {errors}")
+        extra_loras_transformers = _resolve_native_extra_loras(model_type, model_def, extra_loras_transformers, send_cmd)
         loras_selected += extra_loras_transformers
 
     if len(activated_loras) > 0:
@@ -7775,6 +7847,8 @@ def generate_video(
 
     if hasattr(wan_model, "validate_loras"):
         wan_model.validate_loras(loras_selected)
+    if hasattr(wan_model, "configure_special_loras"):
+        wan_model.configure_special_loras(loras_selected, loras_list_mult_choices_nums)
 
     if hasattr(wan_model, "get_trans_lora"):
         trans_lora, trans2_lora = wan_model.get_trans_lora()
@@ -8100,6 +8174,7 @@ def generate_video(
         """Release preparation/runtime state on success, failure, or abort."""
         clear_status(state)
         trans.cache = None
+        release_special_loras(wan_model)
         offload.unload_loras_from_model(trans_lora)
         if trans2_lora is not None:
             offload.unload_loras_from_model(trans2_lora)
@@ -8151,6 +8226,7 @@ def generate_video(
         current_video_length = sliding_window_size
     else:
         initial_total_windows = 1
+        current_video_length = first_window_length(current_video_length, model_def, align_model_frame_count)
 
     first_window_video_length = current_video_length
     original_prompts = prompts.copy()
@@ -8170,6 +8246,7 @@ def generate_video(
         source_video_frames_count = 0  # number of frames to use in source video (processing starts source_video_overlap_frames_count frames before )
         frames_already_processed = []
         frames_already_processed_count = 0
+        native_frames_processed_count = 0
         overlapped_latents = None
         context_scale = None
         window_no = 0
@@ -8403,6 +8480,8 @@ def generate_video(
             aligned_guide_start_frame = guide_start_frame - alignment_shift
             aligned_guide_end_frame = guide_end_frame - alignment_shift
             aligned_window_start_frame = window_start_frame - alignment_shift  
+            if model_def.get("audio_guide_window_slicing", False) and pre_audio_guide is not None:
+                input_waveform, input_waveform_sample_rate = pre_audio_guide, pre_audio_guide_sample_rate
             if audio_guide is not None and model_def.get("audio_guide_window_slicing", False):
                 audio_start_frame = aligned_window_start_frame
                 if reset_control_aligment:
@@ -8590,7 +8669,7 @@ def generate_video(
                         else:
                             ref_pose_tensor = pre_video_guide
 
-                        video_guide_processed, video_mask_processed = preprocess_video_with_mask(ref_pose_tensor, video_guide if sparse_video_image is None else sparse_video_image, video_mask, height=image_size[0], width = image_size[1], max_frames= guide_frames_extract_count, start_frame = guide_frames_extract_start, fit_canvas = sample_fit_canvas, fit_crop = fit_crop, target_fps = fps,  process_type = preprocess_type, expand_scale = mask_expand, RGB_Mask = True, negate_mask = "N" in video_prompt_type, process_outside_mask = process_outside_mask, outpainting_dims = outpainting_dims, outpainting_ratio = video_guide_outpainting_ratio, proc_no =1, inpaint_color =inpaint_color, block_size = block_size, to_bbox = "H" in video_prompt_type )
+                        video_guide_processed, video_mask_processed = preprocess_video_with_mask(ref_pose_tensor, video_guide if sparse_video_image is None else sparse_video_image, video_mask, height=image_size[0], width = image_size[1], max_frames= guide_frames_extract_count, start_frame = guide_frames_extract_start, fit_canvas = sample_fit_canvas, fit_crop = fit_crop, target_fps = fps,  process_type = preprocess_type, expand_scale = mask_expand, RGB_Mask = True, negate_mask = "N" in video_prompt_type, process_outside_mask = process_outside_mask, outpainting_dims = outpainting_dims, outpainting_ratio = video_guide_outpainting_ratio, proc_no =1, inpaint_color =inpaint_color, block_size = block_size, to_bbox = "H" in video_prompt_type, outpainting_quantize_margins=model_def.get("outpainting_quantize_margins", 0) )
                         if preprocess_type2 != None:
                             video_guide_processed2, video_mask_processed2 = preprocess_video_with_mask(ref_pose_tensor, video_guide, video_mask, height=image_size[0], width = image_size[1], max_frames= guide_frames_extract_count, start_frame = guide_frames_extract_start, fit_canvas = sample_fit_canvas, fit_crop = fit_crop, target_fps = fps,  process_type = preprocess_type2, expand_scale = mask_expand, RGB_Mask = True, negate_mask = "N" in video_prompt_type, process_outside_mask = process_outside_mask, outpainting_dims = outpainting_dims, outpainting_ratio = video_guide_outpainting_ratio, proc_no =2, block_size = block_size, to_bbox = "H" in video_prompt_type )
 
@@ -8671,13 +8750,14 @@ def generate_video(
                     send_cmd, model_def, custom_settings, image_start_tensor=image_start_tensor, pre_video_frame=pre_video_frame
                 )
 
+            custom_frames_injection = model_def.get("custom_frames_injection", False)
             frames_to_inject_parsed = frames_to_inject[ window_start_frame if extract_guide_from_window_start else guide_start_frame: guide_end_frame]
             # A model that treats the guide as a *reference* decodes it from source itself, so preparing it
             # as a control video is pure waste: it decodes and resizes the clip onto the output canvas, then
             # trims it to the latent grid ("N frames will be lost"), and hands over a tensor the model does
             # not read -- while holding a full-length copy of it in memory that the generation then needs.
             reference_video_only = model_def.get("reference_video_source_path", False) and len(frames_to_inject_parsed) == 0
-            if not reference_video_only and (video_guide is not None or len(frames_to_inject_parsed) > 0 or model_def.get("forced_guide_mask_inputs", False)):
+            if not reference_video_only and (video_guide is not None or (len(frames_to_inject_parsed) > 0 and not custom_frames_injection) or model_def.get("forced_guide_mask_inputs", False)):
                 any_mask = video_mask is not None or model_def.get("forced_guide_mask_inputs", False)
                 any_guide_padding = model_def.get("pad_guide_video", False)
                 dont_cat_preguide = extract_guide_from_window_start or model_def.get("dont_cat_preguide", False) or sparse_video_image is not None 
@@ -8687,7 +8767,9 @@ def generate_video(
                                                                         None if dont_cat_preguide or fake_start_image and window_no==1 else pre_video_guide,
                                                                         image_size, current_video_length, latent_size,
                                                                         any_mask, any_guide_padding, guide_inpaint_color, 
-                                                                        keep_frames_parsed, frames_to_inject_parsed , outpainting_dims)
+                                                                        keep_frames_parsed, [] if custom_frames_injection else frames_to_inject_parsed, outpainting_dims,
+                                                                        frame_offset=model_def.get("frames_offset", 1),
+                                                                        pad_last_frame=bool(model_def.get("fixed_prompt_label")))
                 video_guide_processed = video_guide_processed2 = video_mask_processed = video_mask_processed2 = None
                 if len(src_videos) == 1:
                     src_video, src_video2, src_mask, src_mask2 = src_videos[0], None, src_masks[0], None 
@@ -8729,7 +8811,11 @@ def generate_video(
 
             if src_ref_images is not None or nb_frames_positions:
                 if len(frames_to_inject_parsed):
-                    new_image_refs = [convert_tensor_to_image(src_video, frame_no + (0 if extract_guide_from_window_start else (aligned_guide_start_frame - aligned_window_start_frame)) ) for frame_no, inject in enumerate(frames_to_inject_parsed) if inject]
+                    if custom_frames_injection:
+                        frames_relative_positions_list, frames_to_inject_parsed = native_injection_frames(frames_to_inject_parsed, extract_guide_from_window_start, aligned_guide_start_frame, aligned_window_start_frame)
+                        new_image_refs = list(frames_to_inject_parsed)
+                    else:
+                        new_image_refs = [convert_tensor_to_image(src_video, frame_no + (0 if extract_guide_from_window_start else (aligned_guide_start_frame - aligned_window_start_frame)) ) for frame_no, inject in enumerate(frames_to_inject_parsed) if inject]
                 else:
                     new_image_refs = []
                 if src_ref_images is not None:
@@ -8943,6 +9029,11 @@ def generate_video(
                         "ltx2_prefetch_prompts": ltx2_prefetch_prompts,
                         "ltx2_prefetch_window": ltx2_prefetch_window,
                     } if str(base_model_type).startswith("ltx2_") else {}),
+                    **native_generation_kwargs(get_model_family(model_type), attention_sparsity=attention_sparsity,
+                        frames_to_inject=frames_to_inject_parsed, has_end=image_end_tensor is not None,
+                        window_length=current_video_length, requested=requested_frames_to_generate,
+                        produced=native_frames_processed_count, reuse=reuse_frames, window_no=window_no),
+                    **conditioning_kwargs(model_def, minimax_h3_semantic_bridge_alpha, minimax_h3_semantic_bridge_magnitude),
                     **({} if not model_def.get("omni_reference", False) else {
                         "minimax_h3_references": minimax_h3_references,
                         "minimax_h3_reference_detail": minimax_h3_reference_detail,
@@ -8977,6 +9068,7 @@ def generate_video(
                 trans.cache = None 
                 if trans2 is not None: 
                     trans2.cache = None 
+                release_special_loras(wan_model)
                 offload.unload_loras_from_model(trans_lora)
                 if trans2_lora is not None: 
                     offload.unload_loras_from_model(trans2_lora)
@@ -9115,37 +9207,14 @@ def generate_video(
                     if generated_audio is not None:
                         generated_audio = truncate_audio( generated_audio, reuse_frames, 0, fps, output_audio_sampling_rate,)
 
-                if (
-                    sliding_window
-                    and model_def.get("sliding_window_trim_to_requested", False)
-                ):
-                    # H3's individual passes must lie on a 17*n+5 grid, but
-                    # the joined Studio duration can be any frame count. The
-                    # final pass may therefore decode a few extra frames (or
-                    # a minimum-size continuation for a very short tail).
-                    # Trim that tail only after removing the shared boundary
-                    # frame so video and native audio keep the exact requested
-                    # joined duration.
-                    remaining_output_frames = max(
-                        0,
-                        requested_frames_to_generate
-                        - frames_already_processed_count,
-                    )
-                    excess_output_frames = max(
-                        0,
-                        int(sample.shape[1]) - remaining_output_frames,
-                    )
-                    if excess_output_frames > 0:
-                        sample = sample[:, :-excess_output_frames]
-                        guide_start_frame -= excess_output_frames
-                        if generated_audio is not None:
-                            generated_audio = truncate_audio(
-                                generated_audio,
-                                0,
-                                excess_output_frames,
-                                fps,
-                                output_audio_sampling_rate,
-                            )
+                from shared.wangp1272.timeline import trim_timeline
+                sample, generated_audio, guide_start_frame = trim_timeline(
+                    sample, generated_audio, guide_start_frame,
+                    requested=requested_frames_to_generate, produced=native_frames_processed_count,
+                    fps=fps, sample_rate=output_audio_sampling_rate,
+                    enabled=(sliding_window or model_def.get("wangp_1272")) and model_def.get("sliding_window_trim_to_requested", False),
+                    truncate_audio=truncate_audio,
+                )
 
                 num_frames_generated = guide_start_frame - (source_video_frames_count - source_video_overlap_frames_count)
                 if generated_audio is not None:
@@ -9171,9 +9240,12 @@ def generate_video(
                 if len(temporal_upsampling) > 0 or len(spatial_upsampling) > 0 and not "vae2" in spatial_upsampling:                
                     send_cmd("progress", [0, get_latest_status(state,"Upsampling")])
                 
+                postprocess_audio_offset = native_frames_processed_count
+                if not (audio_only or is_image):
+                    native_frames_processed_count += sample.shape[1]
                 output_fps  = fps
                 if len(temporal_upsampling) > 0:
-                    sample, previous_last_frame, output_fps = perform_temporal_upsampling(sample, previous_last_frame if sliding_window and window_no > 1 else None, temporal_upsampling, fps)
+                    sample, previous_last_frame, output_fps = perform_temporal_upsampling(sample, previous_last_frame if sliding_window and window_no > 1 else None, temporal_upsampling, fps, abort_callback=lambda: gen.get("abort", False))
 
                 if len(spatial_upsampling) > 0:
                     # Forward FlashVSR's per-step progress to the job tile. FlashVSR
@@ -9196,6 +9268,14 @@ def generate_video(
                         seed=seed,
                         abort_callback=lambda: gen.get("abort", False),
                         progress_callback=_spatial_progress,
+                        fps=output_fps,
+                        still_image=is_image,
+                        processor_settings=wangp_processor_settings,
+                        audio_context=wangp_processors.generation_audio_context(
+                            prompt=prompt, generated_audio=generated_audio, sample_rate=output_audio_sampling_rate,
+                            source_path=output_new_audio_filepath, native_offset=postprocess_audio_offset,
+                            fps=fps, output_fps=output_fps, model_type=base_model_type,
+                            viggle_audio_mode=viggle_audio_mode, viggle_source_video=viggle_source_video or video_guide),
                     )
                     if sample is None or gen.get("abort", False):
                         abort = True
@@ -9349,6 +9429,8 @@ def generate_video(
 
                 else:
                     save_video( tensor=output_video_frames, save_file=video_path, fps=output_fps, nrow=1, normalize=True, value_range=(-1, 1),  codec_type= server_config.get("video_output_codec", None), container= container)
+
+                finalize_viggle_audio(video_path, base_model_type, viggle_audio_mode, viggle_source_video, video_guide)
 
                 # Register primary media immediately after its successful
                 # write. Gallery registration happens later, after metadata
@@ -13208,8 +13290,9 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                                 choices=[
                                     ("Disabled", ""),
                                     ("Rife x2 frames/s", "rife2"), 
+                                    ("Rife x3 frames/s (v4.26)", "rife3"),
                                     ("Rife x4 frames/s", "rife4"), 
-                                ],
+                                ] + wangp_processors.classic_choices('temporal'),
                                 value=temporal_upsampling,
                                 visible=not image_outputs,
                                 scale = 1,
@@ -13223,7 +13306,7 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                                     ("Disabled", ""),
                                     ("Lanczos x1.5", "lanczos1.5"), 
                                     ("Lanczos x2.0", "lanczos2"), 
-                                ] + ([("VAE x1.0 (refined)", "vae1"),("VAE x2.0", "vae2")] if any_vae_upsampling else []) ,
+                                ] + wangp_processors.classic_choices('spatial') + ([("VAE x1.0 (refined)", "vae1"),("VAE x2.0", "vae2")] if any_vae_upsampling else []) ,
                                 value=spatial_upsampling,
                                 visible=True,
                                 scale = 1,

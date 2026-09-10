@@ -1,3 +1,4 @@
+import { DirectorModelPicker } from '../../components/Sidebar/DirectorModelPicker'
 import { ChevronRight, Loader2, Sparkles } from 'lucide-react'
 import { MINIMAX_IMAGE_API_LABEL, MINIMAX_IMAGE_API_MODEL } from '../../lib/externalModels'
 import { useUiTranslation } from '../../i18n'
@@ -10,8 +11,8 @@ export function StoryTrailerClipProduction(props: StoryTrailerTabProps) {
   const {
     project, patch, trailerTitleCards, trailerPreserveVisualStyle, setTrailerPreserveVisualStyle, markTrailerTouched,
     directVideo, directReferenceVideo, approvedVisualReferenceCount, directReferenceVideoReady, directReferenceVideoSupported,
-    directVideoMasterReady, filmImageModel, filmVideoModel, selectableImageModels, selectableVideoModels,
-    selectedFilmImageModel, selectedFilmVideoModel, selectDirectorImageModel, selectStoryVideoModel, storyVideoOptionsReady,
+    directVideoMasterReady, filmImageModel, filmVideoModel, selectableImageModels,
+    selectedFilmImageModel, selectDirectorImageModel, selectStoryVideoModel, storyVideoOptionsReady,
     storyVideoConfigurationReady, storyVideoResolution, storyVideoAspectRatio, storyVideoOptions, storyVideoAdjusted,
     setStoryVideoFormat, trailerProductionIssues, productionBusy, filmGenerationImageReady, stageTrailer,
   } = props
@@ -23,9 +24,9 @@ export function StoryTrailerClipProduction(props: StoryTrailerTabProps) {
           <p className="text-[10px] font-medium text-text-primary">{t('trailer.visualGuide')}</p>
           <p className="text-[9px] leading-relaxed text-text-muted">{t('trailer.visualGuideHint')}</p>
           <div className="grid gap-1.5 md:grid-cols-3">
-            <button type="button" className={`${button} flex-col ${!directVideo && !directReferenceVideo ? 'border-purple-400/60 text-purple-200' : ''}`} onClick={() => patch({ musicVideoGenerationMode: 'image_guided' })}><span>{t('trailer.startImages')}</span><span className="text-[9px] text-text-muted">{t('trailer.startImagesHint')}</span></button>
-            <button type="button" className={`${button} flex-col ${directReferenceVideo ? 'border-violet-400/70 bg-violet-500/10 text-violet-200' : ''}`} onClick={() => patch({ musicVideoGenerationMode: 'direct_references' })}><span>{t('trailer.directReferences')}</span><span className="text-[9px] text-text-muted">{t('trailer.directReferencesHint')}</span></button>
-            <button type="button" className={`${button} flex-col ${directVideo ? 'border-fuchsia-400/70 bg-fuchsia-500/10 text-fuchsia-200' : ''}`} onClick={() => patch({ musicVideoGenerationMode: 'direct_video', protagonistConsistency: false })}><span>{t('trailer.directVideo')}</span><span className="text-[9px] text-text-muted">{t('trailer.directVideoHint')}</span></button>
+            <button type="button" aria-pressed={project.musicVideoGenerationMode === 'image_guided'} className={`${button} flex-col ${project.musicVideoGenerationMode === 'image_guided' ? 'border-purple-400/60 text-purple-200' : ''}`} onClick={() => patch({ musicVideoGenerationMode: 'image_guided' })}><span>{t('trailer.startImages')}</span><span className="text-[9px] text-text-muted">{t('trailer.startImagesHint')}</span></button>
+            <button type="button" aria-pressed={directReferenceVideo} className={`${button} flex-col ${directReferenceVideo ? 'border-violet-400/70 bg-violet-500/10 text-violet-200' : ''}`} onClick={() => patch({ musicVideoGenerationMode: 'direct_references' })}><span>{t('trailer.directReferences')}</span><span className="text-[9px] text-text-muted">{t('trailer.directReferencesHint')}</span></button>
+            <button type="button" aria-pressed={directVideo} className={`${button} flex-col ${directVideo ? 'border-fuchsia-400/70 bg-fuchsia-500/10 text-fuchsia-200' : ''}`} onClick={() => patch({ musicVideoGenerationMode: 'direct_video', protagonistConsistency: false })}><span>{t('trailer.directVideo')}</span><span className="text-[9px] text-text-muted">{t('trailer.directVideoHint')}</span></button>
           </div>
           {project.protagonistConsistency && <p className="text-[9px] text-amber-300">{t('trailer.t2vDisablesConsistency')}</p>}
           {directReferenceVideo && <div className={`rounded-md border p-2 text-[9px] leading-relaxed ${directReferenceVideoReady ? 'border-emerald-500/35 bg-emerald-500/5 text-emerald-100' : 'border-amber-500/40 bg-amber-500/5 text-amber-200'}`}>
@@ -58,10 +59,7 @@ export function StoryTrailerClipProduction(props: StoryTrailerTabProps) {
             </select>
           </label>
           <label className="block text-[10px] text-text-muted">{t('trailer.videoModel')}
-            <select className={`${input} mt-1`} value={filmVideoModel} disabled={project.provider.useGlobalProfile || !storyVideoOptionsReady} onChange={event => selectStoryVideoModel(event.target.value)}>
-              {!selectableVideoModels.some(model => model.model_type === filmVideoModel) && <option value={filmVideoModel}>{selectedFilmVideoModel?.name || filmVideoModel}</option>}
-              {selectableVideoModels.map(model => <option key={model.model_type} value={model.model_type}>{model.name}{model.is_downloaded === false ? t('trailer.downloadsOnFirstUse') : ''}</option>)}
-            </select>
+            <DirectorModelPicker mode="video" value={filmVideoModel} onChange={selectStoryVideoModel} pipeline="short_film_story" allowSeamless={false} preserveSelection showModeLabel={false} />
           </label>
         </div>
       </div>

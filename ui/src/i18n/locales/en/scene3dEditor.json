@@ -1,0 +1,576 @@
+{
+  "speech": {
+    "resting": "silent",
+    "speaking": "speaking",
+    "characterDefinition": "Reusable character · 3D model, face and voice",
+    "definitionHint": "The character stores its model and face. Each scene keeps an independent snapshot; dialogue and audio belong to the scene, not the character.",
+    "savedCharacter": "Library character",
+    "newCharacter": "Create new character",
+    "useCharacter": "Use character in this shot",
+    "definitionName": "Character name",
+    "saveCharacter": "Save character with face and voice",
+    "characterSaved": "Character saved. Model, mouth, eyes and voice are available in other shots.",
+    "characterApplied": "Character applied. Shot interventions are preserved.",
+    "reloadLibrary": "Reload library",
+    "libraryReloaded": "Library refreshed. Review the character before saving again.",
+    "editCharacterFace": "Adjust mouth and eyes in Video 3D",
+    "libraryVoice": "Preferred voice (optional)",
+    "noPreferredVoice": "No preferred voice · use existing audio",
+    "voiceDirection": "Voice direction (optional)",
+    "voiceHint": "Local Qwen3 CustomVoice. Language is detected from the text. Requires the model installed; no credentials or automatic audio generation.",
+    "generateVoice": "Generate this line's voice",
+    "attachGeneratedVoice": "Apply already generated audio",
+    "existingAudioWins": "This line already has audio: reuse it without generating another voice.",
+    "explicitGeneration": "Only this button generates audio. It uses the literal text, then local Rhubarb calculates lip-sync.",
+    "voiceTooLong": "Audio lasts {{seconds}} s and does not fit this turn. Extend its end, then apply the already generated audio. Preserved file: {{file}}",
+    "noLinkedCharacter": "Not linked · choose a GLB manually",
+    "missingCharacter": "Character unavailable in this library",
+    "otherWorkspace": "Reference stored in {{workspace}}.",
+    "textOnlyProduction": "Without audio, editable interventions will open. Add audio or generate each line with the character voice inside Video 3D.",
+    "sourceCharacter": "Story character",
+    "manualCharacter": "Choose from the library",
+    "previousShot": "Return to the previous shot (keep this draft)",
+    "soundtrack": "Original scene audio",
+    "soundtrackHint": "Played once. Mouths use their own timing; muting this track does not remove lip-sync.",
+    "interventions": "This character's interventions",
+    "intervention": "Intervention",
+    "addIntervention": "Add intervention",
+    "literalText": "Dialogue or lyrics (literal reference)",
+    "end": "Intervention end (s)",
+    "playVoice": "Play this intervention's audio",
+    "playVoiceHint": "Turn off if this voice already belongs to the scene soundtrack. The mouth remains synchronized.",
+    "saveProfile": "Save placement for this model",
+    "loadProfile": "Load saved placement",
+    "profileSaved": "Placement saved for this GLB. Other shots in this workspace can reuse it.",
+    "profileLoaded": "Placement restored. This scene's voices and timings have not changed.",
+    "profileMissing": "This model has no saved placement yet.",
+    "loadBeforeSave": "A saved placement exists. Load it before updating it.",
+    "phoneticHint": "Rhubarb proposes mouth gestures; it does not identify speakers. Songs work better with isolated vocals: use them as a muted mouth guide while keeping the song on the scene soundtrack.",
+    "productionEntry": "Lip-sync with 3D characters",
+    "productionHint": "Choose GLBs and existing audio. Prepare a shot in Video 3D without changing the original production or generating models or voices. Speaker timings without timestamps are editable initial suggestions, not word alignment.",
+    "twoSpeakers": "Use one or two characters per shot. Split interventions for a larger cast.",
+    "openProduction": "Prepare shot in Video 3D",
+    "productionReady": "Audio and characters come from your production. Review mouth placement and timing before export; the original has not been replaced.",
+    "kind": {
+      "song": "Song",
+      "dialogue": "Dialogue",
+      "episode": "Episode",
+      "trailer": "Trailer"
+    },
+    "title": "3D voice and lip-sync",
+    "intro": "Edit only this selected subject: add lips, choose a voice, then press Play.",
+    "option": "Voice and lip-sync",
+    "character": "Character",
+    "selectCharacter": "Select a character",
+    "chooseModel": "First choose a GLB model in this character's card below the viewport.",
+    "advancedImport": "Import existing settings (optional)",
+    "importKit": "Import Taberna kit (.zip)",
+    "enabled": "Enable lips",
+    "profile": "Placement profile",
+    "generic": "Generic humanoid",
+    "calibrate": "Apply reference",
+    "noFace": "Wait for the GLB to load, then retry. Mouth painting needs a mesh with one standard material.",
+    "voice": "Character voice",
+    "pickVoice": "Choose audio (max. 10 min / 32 MB); analyze fragments up to 90 s",
+    "analyze": "Calculate gestures with Rhubarb (local)",
+    "importCues": "Import cues JSON",
+    "fit": "Fit duration to voices",
+    "cues_one": "{{count}} cue",
+    "cues_other": "{{count}} cues",
+    "driver": {
+      "imported": "Imported cues",
+      "rhubarb": "Phonetic cues · Rhubarb",
+      "amplitude": "Volume-driven motion",
+      "rhubarb-vocals": "Rhubarb · isolated vocals"
+    },
+    "amplitudeHint": "Volume only opens/closes the mouth: it does not recognize phonemes. Calculate Rhubarb cues for better results.",
+    "start": "Scene start (s)",
+    "offset": "Trim audio start (s)",
+    "gain": "Volume",
+    "needsPlacement": "Add lips to this subject before previewing its voice on the model.",
+    "busy": "Preparing voice or kit…",
+    "adjust": "Adjust mouth and expressions",
+    "adjustHint": "X: left/right; Y: up/down; Z: depth. Face the model forward (+Z), adjust width/height, then Play. The GLB stays intact.",
+    "mouth": "Mouth",
+    "width": "Width",
+    "height": "Height",
+    "mesh": "Face mesh",
+    "skin": "Skin color",
+    "clean": "Cover original mouth",
+    "strength": "Opening",
+    "style": "Mouth art",
+    "soft": "Soft",
+    "toon": "Cartoon",
+    "pixel": "Pixel",
+    "lip": "Lip color",
+    "eyes": "Animate eyes",
+    "blink": "Automatic blinking",
+    "expressionLabel": "Expression",
+    "expression": {
+      "neutral": "Neutral",
+      "happy": "Happy",
+      "angry": "Angry",
+      "worried": "Worried",
+      "surprised": "Surprised",
+      "sleepy": "Sleepy"
+    },
+    "eyeY": "Eye height",
+    "eyeSpacing": "Eye spacing",
+    "eyeWidth": "Eye width",
+    "eyeHeight": "Eyelid height",
+    "audioBlocked": "Voice playback failed. Check the file, then Pause and Play; export reports audio failures.",
+    "addLips": "Add lips",
+    "editLips": "Edit lips",
+    "reviewPlacement": "Review the mouth position and size on this model.",
+    "manualPlacement": "No head landmark found. Adjust this starting position using Mouth X/Y/Z and Width/Height.",
+    "placementReferences": "Advanced placement references",
+    "referencesHint": "Applies placement to this subject. Review the fit after using another character’s reference.",
+    "characterLibraryAdvanced": "Advanced: reusable characters and preferred voice",
+    "recordVoice": "Record with microphone",
+    "stopRecording": "Stop recording",
+    "cancelRecording": "Cancel recording",
+    "exampleVoice": "Use English example",
+    "recording": "Recording… Stops after 90 seconds.",
+    "microphonePermission": "Waiting for microphone permission…",
+    "microphoneUnavailable": "Microphone recording needs HTTPS or localhost and a supported browser. You can use the example or upload audio here.",
+    "microphoneDenied": "Microphone access was denied. Allow it in your browser and retry.",
+    "recordingFailed": "Recording failed. Check the microphone and try again.",
+    "recordingPreview": "Listen to recording",
+    "useRecording": "Use recording for this subject",
+    "discardRecording": "Discard recording",
+    "voicePreview": "Listen to this subject’s voice",
+    "pickLips": "Place with a click on the face",
+    "pickHint": "Click the mouth on the selected subject. Escape cancels.",
+    "pickMissed": "Click the selected model’s face, not the background.",
+    "cancelPlacement": "Cancel placement",
+    "isolation": {
+      "label": "Isolate vocals before calculating lips",
+      "loading": "Checking the optional local model…",
+      "ready": "Installed BS-RoFormer · CPU. Separates vocals for lip analysis only; original playback stays intact. Up to 90 seconds; processing can take several minutes. No downloads or cloud services.",
+      "missing": "Optional model unavailable. Requires installed audio-separator and the BS-RoFormer checkpoint plus YAML in app/ckpts/roformer. Nothing is downloaded automatically.",
+      "error": "Could not check the optional model.",
+      "retry": "Check again"
+    }
+  },
+  "title": "3D scene studio",
+  "subtitle": "Choose a shot, place your objects and press Play.",
+  "templates": "Shot library",
+  "search": "Search templates",
+  "all": "All",
+  "noResults": "No templates match your search.",
+  "play": "Play",
+  "pause": "Pause",
+  "restart": "Back to start",
+  "timeline": "Scene position",
+  "speed": "Speed",
+  "speedHelp": "Applies to playback and MP4 export.",
+  "outputDuration": "Output: {{seconds}} s",
+  "camera": "Camera",
+  "objects": "Objects",
+  "translate": "Move",
+  "rotate": "Rotate Y",
+  "scale": "Scale",
+  "size": "Size",
+  "smaller": "Smaller",
+  "larger": "Larger",
+  "reset": "Reset transform",
+  "gizmoHelp": "Inside the scene, press G to move, R to rotate around Y, or S to scale. Drag the gizmo; use its centre to scale proportionally.",
+  "viewport": "3D scene",
+  "transformShortcuts": "Inside the scene: R to rotate around Y · S to scale · G to move. Drag the gizmo to adjust the object.",
+  "selectObject": "Select an object",
+  "position": "Position (m)",
+  "yaw": "Rotation Y (°)",
+  "keepAssets": "Keep my objects when changing shots",
+  "cameraHelp": "Camera changes are editable; your objects keep their identity.",
+  "category": {
+    "cinema": "Cinema",
+    "product": "Product",
+    "music": "Music video",
+    "space": "Space",
+    "drive": "Driving"
+  },
+  "template": {
+    "speech-portrait": {
+      "title": "Talking portrait",
+      "description": "Close-up with voice, an integrated mouth and expressions."
+    },
+    "speech-dialogue": {
+      "title": "Lip-sync dialogue",
+      "description": "Two characters, each with their own voice and adjustable start."
+    },
+    "speech-presenter": {
+      "title": "Voiced presenter",
+      "description": "Medium shot for narration, body animation and lip-sync."
+    },
+    "two-shot": {
+      "title": "Two shot",
+      "description": "Balanced framing for two subjects with a slow approach."
+    },
+    "product-orbit": {
+      "title": "Product orbit",
+      "description": "A measured turn around the product with a warm key light."
+    },
+    "hero-push": {
+      "title": "Hero approach",
+      "description": "Low camera and a gentle push toward the subject."
+    },
+    "over-shoulder": {
+      "title": "Over the shoulder",
+      "description": "Staggered subjects frame a conversation in depth."
+    },
+    "tracking": {
+      "title": "Side follow",
+      "description": "Profile composition with room in front of the subject."
+    },
+    "crane-reveal": {
+      "title": "Crane reveal",
+      "description": "Rise from a low viewpoint into a wide composition."
+    },
+    "establishing": {
+      "title": "Establishing orbit",
+      "description": "A broad arc to introduce the environment and a prop."
+    },
+    "run-loop": {
+      "title": "Endless run",
+      "description": "Stable runner framing against a scrolling world; add a run clip."
+    },
+    "neon-run": {
+      "title": "Neon sprint",
+      "description": "Cool light and a fast backdrop for an energetic running clip."
+    },
+    "block-street": {
+      "title": "Street rhythm",
+      "description": "Relaxed profile shot with slower street motion."
+    },
+    "space-float": {
+      "title": "Space float",
+      "description": "Elevated subject framed by rocks and a gentle camera arc."
+    },
+    "walk-void": {
+      "title": "Walk in the void",
+      "description": "Minimal setting and a frontal approach for a walking clip."
+    },
+    "dance-orbit": {
+      "title": "Dance orbit",
+      "description": "A half orbit that keeps the performer legible."
+    },
+    "dance-stage": {
+      "title": "Street stage",
+      "description": "A wide street set with an unhurried musical arc."
+    },
+    "cafe-dance": {
+      "title": "Café performance",
+      "description": "Frontal full-body composition in the textured café set."
+    },
+    "drive-chase": {
+      "title": "Chase camera",
+      "description": "Rear car view with road motion and subtle sway."
+    },
+    "drive-hood": {
+      "title": "On the hood",
+      "description": "Immersive forward view with a restrained road bump."
+    },
+    "drive-wing": {
+      "title": "Coastal profile",
+      "description": "Low side view of the car beside the coastal backdrop."
+    },
+    "drive-orbit": {
+      "title": "Car orbit",
+      "description": "A low sweeping view that reveals the moving road."
+    },
+    "drive-tunnel": {
+      "title": "Tunnel drive",
+      "description": "Forward camera framed by the tunnel environment."
+    },
+    "drive-hero": {
+      "title": "Driver portrait",
+      "description": "Car chase composition with a replaceable character slot."
+    },
+    "portrait-arc": {
+      "title": "Portrait arc",
+      "description": "A short intimate orbit with space above the head."
+    },
+    "duo-diagonal": {
+      "title": "Diagonal dialogue",
+      "description": "Two subjects staged diagonally around a central prop."
+    },
+    "high-angle": {
+      "title": "High-angle reveal",
+      "description": "An elevated viewpoint reveals the subject and surrounding prop."
+    },
+    "wide-tableau": {
+      "title": "Wide tableau",
+      "description": "Two subjects and a foreground prop in a wide composition."
+    },
+    "product-detail": {
+      "title": "Product detail",
+      "description": "Close oblique framing to inspect the object surface."
+    },
+    "product-pair": {
+      "title": "Product comparison",
+      "description": "Two products share a calm, symmetrical frontal composition."
+    },
+    "product-pedestal": {
+      "title": "Pedestal reveal",
+      "description": "Place a product above a supporting prop and reveal it from below."
+    },
+    "duet-stage": {
+      "title": "Stage duet",
+      "description": "Two performers share a wide stage; assign their own animation clips."
+    },
+    "cafe-duet": {
+      "title": "Café duet",
+      "description": "Two performers frame the café entrance from either side."
+    },
+    "stage-crane": {
+      "title": "Stage crane",
+      "description": "Reveal a performer and stage prop with an ascending camera."
+    },
+    "space-encounter": {
+      "title": "Space encounter",
+      "description": "Two suspended subjects face each other between rocky markers."
+    },
+    "space-survey": {
+      "title": "Space survey",
+      "description": "A wide elevated orbit around a subject and a nearby prop."
+    },
+    "drive-coast-reveal": {
+      "title": "Coast reveal",
+      "description": "A crane shot reveals the car against the coastal road."
+    },
+    "drive-city-wide": {
+      "title": "City wide shot",
+      "description": "A broad low orbit situates the car in the city."
+    },
+    "drive-tunnel-wing": {
+      "title": "Tunnel profile",
+      "description": "A low side camera shows the car within the tunnel."
+    },
+    "siege-ring": {
+      "title": "Citadel siege",
+      "description": "A central hero and two flanking enemies in a server citadel."
+    },
+    "spell-duel": {
+      "title": "Spell duel",
+      "description": "A sideways encounter with room for two characters to retreat."
+    },
+    "victory-circle": {
+      "title": "Victory circle",
+      "description": "A celebration orbit around three characters on a server stage."
+    },
+    "coder-room": {
+      "title": "Coder workshop",
+      "description": "A desk, keyboard and animated code screen in an open room."
+    },
+    "clone-chase": {
+      "title": "Street pursuit",
+      "description": "Travelling actors and a fixed street with visible ground markers."
+    },
+    "face-closeup": {
+      "title": "Intimate close-up",
+      "description": "A gentle push toward the animated head."
+    },
+    "face-extreme": {
+      "title": "Extreme gaze",
+      "description": "Tight framing on the eyes and expression."
+    },
+    "face-profile": {
+      "title": "Character profile",
+      "description": "A restrained slide alongside the face."
+    },
+    "face-reaction-arc": {
+      "title": "Reaction arc",
+      "description": "A short arc around the face for a reaction shot."
+    },
+    "face-low-angle": {
+      "title": "Low-angle hero",
+      "description": "A low angle approaching the face from chest level."
+    },
+    "face-high-angle": {
+      "title": "High-angle doubt",
+      "description": "An intimate high angle for doubt or exhaustion."
+    },
+    "face-revelation": {
+      "title": "Revelation push",
+      "description": "A fast push from medium framing to the face."
+    },
+    "face-to-face": {
+      "title": "Face to face",
+      "description": "Two faces sharing a close framing."
+    },
+    "boots-to-face": {
+      "title": "Boots to gaze",
+      "description": "The camera rises from the feet to the face."
+    },
+    "dutch-charge": {
+      "title": "Dutch charge",
+      "description": "Forward motion with a rolling camera angle."
+    },
+    "overhead-formation": {
+      "title": "Overhead formation",
+      "description": "A rotating top view of three characters."
+    },
+    "camera-pass": {
+      "title": "Camera pass",
+      "description": "The character passes a stationary camera that pans to follow."
+    },
+    "vehicle-showcase": {
+      "title": "Vehicle showcase",
+      "description": "A three-quarter orbit around your vehicle GLB."
+    },
+    "vehicle-front-low": {
+      "title": "Low front grille",
+      "description": "A low approach toward the vehicle front."
+    },
+    "vehicle-rear-chase": {
+      "title": "Rear chase",
+      "description": "Rear tracking of a moving vehicle."
+    },
+    "vehicle-side-track": {
+      "title": "Side tracking",
+      "description": "The camera keeps pace alongside the vehicle."
+    },
+    "vehicle-wheel-detail": {
+      "title": "Wheel detail",
+      "description": "A low side detail shot, adjustable to the model."
+    },
+    "vehicle-roof-orbit": {
+      "title": "Roof orbit",
+      "description": "A high orbit revealing the roof and silhouette."
+    },
+    "vehicle-convoy": {
+      "title": "Triple convoy",
+      "description": "Three vehicles advance in a staggered formation."
+    },
+    "vehicle-drift-arc": {
+      "title": "Drift arc",
+      "description": "A curved route with the vehicle facing its direction of travel."
+    },
+    "monitor-reveal": {
+      "title": "Monitor reveal",
+      "description": "A rising camera reveals a monitor beside your mascot."
+    },
+    "desk-presenter": {
+      "title": "Desktop presenter",
+      "description": "Your mascot presents a GLB computer with an image or video surface."
+    },
+    "monitor-detail": {
+      "title": "Screen detail",
+      "description": "A frontal push-in makes the monitor content readable."
+    },
+    "screen-gallery": {
+      "title": "Screen gallery",
+      "description": "Three panels surround the lead in an observatory."
+    },
+    "billboard-plaza": {
+      "title": "Giant-screen plaza",
+      "description": "Monumental architecture, a raised billboard and a lead for scale."
+    },
+    "screen-corridor": {
+      "title": "Screen corridor",
+      "description": "The lead travels through a corridor of facing panels."
+    },
+    "control-room": {
+      "title": "Control room",
+      "description": "Six screens and a mascot overseeing the room."
+    },
+    "product-finale": {
+      "title": "Product finale",
+      "description": "A wide product presentation with the lead and three screens."
+    }
+  },
+  "gallerySearch": "Search the catalog",
+  "galleryPlaceholder": "Portrait, dance, ships…",
+  "galleryCount": "{{count}} templates",
+  "focusEditor": "Expand editor",
+  "exitFocus": "Exit fullscreen",
+  "fullscreenUnavailable": "This browser cannot enter fullscreen.",
+  "animation": "GLB animation",
+  "animationsLoading": "Loading GLB animations…",
+  "animationsEmpty": "This GLB has no animations.",
+  "animationSpeed": "Animation speed",
+  "animationStart": "Animation start (s)",
+  "animationLoop": "Loop animation",
+  "animationFit": "Fit animation to shot",
+  "animationFitHint": "Play the remaining animation once over the current shot duration (0.1–4× speed). Apply again if you change the duration or start time.",
+  "clipNumber": "Clip number",
+  "duration": "Duration (s)",
+  "saveDocument": "Save shot JSON",
+  "loadDocument": "Open shot JSON",
+  "invalidDocument": "Could not open: this is not a valid 3D shot file.",
+  "travel": {
+    "title": "Travel through the scene",
+    "help": "The transform panel sets the starting position. Define the destination here; the path lasts for the shot.",
+    "to": "Destination",
+    "via": "Curve control",
+    "face": "Face the direction of travel",
+    "curve": "Curved path",
+    "ease": "Ease in and out",
+    "distance": "Straight distance: {{distance}} m · {{speed}} m/s",
+    "floor": "Use image as a floor texture",
+    "surface": "Image use",
+    "backdrop": "Backdrop",
+    "wall": "Wall texture",
+    "ground": "Rest model on the ground",
+    "typing": "Keyboard gesture",
+    "typingHelp": "Keyboard gesture for compatible characters. Use it with the programmer room template and keep the character close to the desk.",
+    "screen": "Monitor",
+    "code": "Coding",
+    "error": "Build failed",
+    "success": "Build passed",
+    "repeat": "Texture repetitions"
+  },
+  "framing": {
+    "title": "Subject framing",
+    "help": "Follow a point on the subject. Adjust framing to your GLB; models without a head bone use their height.",
+    "target": "Character or object",
+    "anchor": "Point of interest",
+    "head": "Head",
+    "center": "Center",
+    "feet": "Feet / base",
+    "from": "Camera at start",
+    "to": "Camera at end",
+    "lookFrom": "Look at start",
+    "lookTo": "Look at end",
+    "orbit": "Orbit turns",
+    "rollFrom": "Initial tilt (°)",
+    "rollTo": "Final tilt (°)",
+    "facing": "Follow the subject orientation"
+  },
+  "screens": {
+    "add": "Add screen",
+    "title": "Media screen",
+    "attach": "Use a mesh as a screen",
+    "mesh": "Screen mesh",
+    "chooseMesh": "Choose a mesh",
+    "content": "Screen image or video",
+    "chooseContent": "Choose an image or video",
+    "fit": "Content fit",
+    "contain": "Fit entire image",
+    "cover": "Fill and crop",
+    "style": "Screen style",
+    "monitor": "Desktop monitor",
+    "billboard": "Billboard / giant screen",
+    "frameless": "Frameless panel",
+    "width": "Width / aspect",
+    "height": "Height / aspect",
+    "flipY": "Flip vertically",
+    "start": "Video start (s)",
+    "speed": "Video speed",
+    "loop": "Loop video",
+    "clockHelp": "Video follows the scene clock. Its audio is muted.",
+    "remove": "Remove screen",
+    "failed": "The screen could not load. Check the mesh and media file."
+  },
+  "library": {
+    "name": "Scene name",
+    "save": "Save scene to gallery",
+    "open": "Open scene",
+    "help": "Choose a saved Video3D scene. Choosing replaces the current shot; save it first to keep your edits. JSON import and export remain available.",
+    "saved": "Scene saved to this workspace. Open scene to load it again.",
+    "changed": "The scene changed while loading. Choose it again to replace the current scene.",
+    "previewUnavailable": "Wait for the 3D preview to load before saving.",
+    "saveFailed": "Could not save the scene.",
+    "cancelLoad": "Cancel loading"
+  }
+}

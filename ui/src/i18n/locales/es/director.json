@@ -1,4 +1,14 @@
 {
+  "modelPicker": {
+    "image": "Imagen",
+    "video": "Vídeo",
+    "externalApi": "API externa",
+    "empty": "No hay modelos compatibles habilitados",
+    "about": "Acerca de {{name}}",
+    "imageHint": "Se muestran los modelos que pueden crear una imagen inicial y editar fotogramas a partir de referencias.",
+    "storyHint": "Se muestran los modelos que pueden generar los planos de Director con audio nativo sincronizado.",
+    "soundtrackHint": "Se muestran los modelos que pueden seguir la canción o los diálogos cargados."
+  },
   "queueRecovery": {
     "titleBusy": "Hay restos antiguos además de la generación actual",
     "titleIdle": "Hay una cola de generación por recuperar",
@@ -9,9 +19,9 @@
     "unknownModel": "Modelo desconocido",
     "interrupted": "Interrumpido",
     "waiting": "En espera",
-    "duplicateWarning": "No pulses Retomar si el Activity ya muestra un H3 en sampling/decode: eso duplica GPU. Descarta los restos y deja terminar el trabajo vivo.",
+    "duplicateWarning": "Descartar estos trabajos no afecta a la generación activa ni borra los vídeos terminados.",
     "rerunWarning": "El clip que estaba ejecutándose volverá a empezar desde el principio; los clips que estaban esperando conservarán su orden.",
-    "discardClean": "Descartar y empezar limpio",
+    "discardClean": "Descartar solo los trabajos interrumpidos",
     "resumeAnyway": "Aun así retomar restos antiguos",
     "resumeQueue": "Retomar cola"
   },

@@ -1,7 +1,8 @@
-import { Loader2, Music, RefreshCcw, Sparkles, Trash2, Upload } from 'lucide-react'
+import { Loader2, Music, RefreshCcw, Sparkles, Trash2 } from 'lucide-react'
 import { useUiTranslation } from '../../i18n'
 import { storyMusicGenerationReady } from './musicModel'
 import { button, completeGenerationButton, input } from './storyLabChrome'
+import { StoryAudioPicker } from './StoryAudioPicker'
 import type { StoryMusicTabProps } from './StoryMusicTab'
 
 export function StoryMusicHeader(props: StoryMusicTabProps) {
@@ -39,11 +40,17 @@ export function StoryMusicHeader(props: StoryMusicTabProps) {
               {newSongAction === 'audio' ? <Loader2 size={13} className="animate-spin" /> : <Music size={13} />}
               {t('music.newSongAudio')}
             </button>
-            <button className={button} disabled={musicBusy} onClick={() => {
-              onImportCustomMp3(project.music.cues.find(cue => cue.kind === 'story')?.id || '')
-            }}>
-              <Upload size={13} /> {t('music.importCustomMp3')}
-            </button>
+            <StoryAudioPicker
+              workspace={props.workspace}
+              projectId={project.id}
+              label={t('music.importCustomMp3')}
+              accept=".mp3,audio/mpeg"
+              disabled={musicBusy}
+              onChoose={item => {
+                const cueId = project.music.cues.find(cue => cue.kind === 'story')?.id || ''
+                if (item && cueId) onImportCustomMp3(cueId, item)
+              }}
+            />
           </> : <>
             <button className={button} disabled={Boolean(busy || musicQueue)} onClick={() => generate('music')}>
               {busy === 'music' ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />} {t('music.generateLlm')}

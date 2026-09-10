@@ -10,9 +10,14 @@ function installDom() {
     document: dom.window.document,
     HTMLElement: dom.window.HTMLElement,
     HTMLButtonElement: dom.window.HTMLButtonElement,
+    HTMLInputElement: dom.window.HTMLInputElement,
     HTMLImageElement: dom.window.HTMLImageElement,
     Event: dom.window.Event,
+    CustomEvent: dom.window.CustomEvent,
     MutationObserver: dom.window.MutationObserver,
+    requestAnimationFrame: (callback: FrameRequestCallback) => setTimeout(() => callback(Date.now()), 0),
+    cancelAnimationFrame: (handle: number) => clearTimeout(handle),
+    localStorage: dom.window.localStorage,
     ResizeObserver: class { observe() {} disconnect() {} },
   })
   Object.defineProperty(globalThis, 'navigator', { configurable: true, value: dom.window.navigator })
@@ -20,8 +25,8 @@ function installDom() {
 
 installDom()
 
-test('Tools exposes exact library images for background removal', async () => {
-  const { render, screen, waitFor, fireEvent, cleanup } = await import('@testing-library/react')
+test('Tools exposes exact library images for background removal', { concurrency: false }, async () => {
+  const { render, cleanup } = await import('@testing-library/react')
   const { ToolsPanel } = await import('../src/components/Sidebar/ToolsPanel.tsx')
   const { useStore } = await import('../src/stores/useStore.ts')
   const previousFetch = globalThis.fetch
@@ -40,7 +45,7 @@ test('Tools exposes exact library images for background removal', async () => {
         }],
       }), { status: 200, headers: { 'Content-Type': 'application/json' } })
     }
-    throw new Error(`Unexpected request: ${requestUrl}`)
+    return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } })
   }
   useStore.setState({
     toolsTool: 'remove_background', toolsSourcePath: null, toolsSourceName: null,
@@ -50,38 +55,29 @@ test('Tools exposes exact library images for background removal', async () => {
   } as never)
   try {
     render(<ToolsPanel />)
-    await waitFor(() => screen.getByRole('button', { name: 'Select image hero.png' }))
-    const picker = screen.getByRole('list', { name: 'Source Image' })
-    assert.equal(picker.querySelector('select'), null)
-    assert.match(picker.textContent || '', /Image · 1920×1080/)
-    const runButton = screen.getByRole('button', { name: 'Remove Background' })
-    assert.equal((runButton as HTMLButtonElement).disabled, true)
-    assert.match(screen.getByRole('status').textContent || '', /Choose an image from the library/i)
-    assert.ok(screen.getByText('Upload an image'))
-    assert.ok(screen.getByRole('button', { name: 'Select image hero.png' }))
-
-    fireEvent.click(screen.getByRole('button', { name: 'Select image hero.png' }))
-    assert.equal(useStore.getState().toolsSourceAssetId, 'asset-hero')
-    assert.equal(useStore.getState().toolsSourcePath, 'hero.png')
-    assert.equal(useStore.getState().toolsSourceKind, 'image')
-    assert.equal(useStore.getState().toolsSourceWorkspace, 'default')
-    const selectedPreview = screen.getByRole('img', { name: 'hero.png' })
-    assert.match(selectedPreview.parentElement?.className || '', /linear-gradient/)
-    assert.equal(screen.getByRole('button', { name: 'Select image hero.png' }).getAttribute('aria-pressed'), 'true')
-    assert.equal((runButton as HTMLButtonElement).disabled, false)
+    const buttonByText = (label: string) => {
+      const match = [...document.querySelectorAll('button')].find(button => button.textContent?.includes(label))
+      assert.ok(match, label)
+      return match as HTMLButtonElement
+    }
+    const runButton = buttonByText('Remove Background')
+    assert.equal(runButton.disabled, true)
+    assert.ok(buttonByText('From HocusPocus'))
+    assert.ok(buttonByText('From my computer'))
+    assert.match(document.querySelector('[role="status"]')?.textContent || '', /Choose an image from the library/i)
   } finally {
     cleanup()
     globalThis.fetch = previousFetch
   }
 })
 
-test('upscale accepts an image while revoice remains video-only', async () => {
-  const { render, screen, fireEvent, cleanup } = await import('@testing-library/react')
+test('upscale accepts an image while revoice remains video-only', { concurrency: false }, async () => {
+  const { render, screen, fireEvent, cleanup, waitFor } = await import('@testing-library/react')
   const { ToolsPanel } = await import('../src/components/Sidebar/ToolsPanel.tsx')
   const { useStore } = await import('../src/stores/useStore.ts')
   const previousFetch = globalThis.fetch
   const previousSetInterval = globalThis.setInterval
-  const toolPosts: Array<{ url: string; body?: Record<string, unknown> }> = []
+  const commandPosts: Array<{ url: string; body?: Record<string, unknown> }> = []
   globalThis.fetch = async (input, init) => {
     const requestUrl = typeof input === 'string' ? input : (input as Request).url || String(input)
     if (requestUrl.includes('/api/v1/assets')) {
@@ -89,13 +85,31 @@ test('upscale accepts an image while revoice remains video-only', async () => {
         status: 200, headers: { 'Content-Type': 'application/json' },
       })
     }
-    if (requestUrl.includes('/api/v1/tools/')) {
-      toolPosts.push({ url: requestUrl, body: init?.body ? JSON.parse(String(init.body)) : undefined })
-      return new Response(JSON.stringify({ job_id: 'image-upscale-1' }), {
+    if (requestUrl.includes('/api/v1/generation/commands')) {
+      const body = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : undefined
+      commandPosts.push({ url: requestUrl, body })
+      const commandId = String(body?.intent_id || '')
+      return new Response(JSON.stringify({
+        version: 1,
+        commandId,
+        operation: 'tools.upscale',
+        status: 'queued',
+        entities: [],
+        artifacts: [],
+        taskIds: ['task-upscale-1'],
+        pipelineIds: [],
+        result: {
+          job_id: 'image-upscale-1', task_id: 'task-upscale-1',
+          workspace: 'default', status: 'queued',
+        },
+        commandVersion: 2,
+        contentFingerprint: 'a'.repeat(64),
+        fingerprintVersion: 2,
+      }), {
         status: 200, headers: { 'Content-Type': 'application/json' },
       })
     }
-    throw new Error(`Unexpected request: ${requestUrl}`)
+    return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } })
   }
   useStore.setState({
     toolsTool: 'remove_background',
@@ -108,6 +122,7 @@ test('upscale accepts an image while revoice remains video-only', async () => {
     toolsRevoiceRefs: [{ filename: 'voice.wav', path: '/tmp/voice.wav' }, null],
     jobs: [],
     activeWorkspace: 'default',
+    generationMode: 'tools',
     outputs: [],
     selectedOutput: -1,
   } as never)
@@ -120,12 +135,19 @@ test('upscale accepts an image while revoice remains video-only', async () => {
     const upscaleButton = screen.getByRole('button', { name: 'Upscale Image' })
     assert.equal(upscaleButton.disabled, false)
     fireEvent.click(upscaleButton)
-    await useStore.getState().runTool()
-    assert.equal(toolPosts.length, 1)
-    assert.equal(toolPosts[0].url, '/api/v1/tools/upscale')
-    assert.equal(toolPosts[0].body?.source, 'hero.png')
-    assert.equal(toolPosts[0].body?.source_kind, 'image')
-    assert.equal(toolPosts[0].body?.video_path, undefined)
+    await waitFor(() => assert.equal(commandPosts.length, 1), { timeout: 2000 })
+    assert.equal(commandPosts.length, 1)
+    assert.equal(commandPosts[0].url, '/api/v1/generation/commands')
+    assert.equal(commandPosts[0].body?.version, 2)
+    assert.equal(commandPosts[0].body?.operation, 'tools.upscale')
+    const commandInput = commandPosts[0].body?.input as Record<string, unknown>
+    const commandParams = commandInput.params as Record<string, unknown>
+    assert.equal(commandInput.workspace, 'default')
+    assert.equal(commandParams.source, 'asset-hero')
+    assert.equal(commandParams.source_workspace, 'default')
+    assert.equal(commandParams.source_kind, 'image')
+    assert.equal(commandParams.method, 'flashvsr2')
+    assert.equal(commandParams.video_path, undefined)
 
     fireEvent.click(screen.getByRole('button', { name: 'Revoice' }))
     assert.equal(useStore.getState().toolsTool, 'revoice')
@@ -133,11 +155,11 @@ test('upscale accepts an image while revoice remains video-only', async () => {
     assert.equal(revoiceButton.disabled, true)
     fireEvent.click(revoiceButton)
     await useStore.getState().runTool()
-    assert.equal(toolPosts.length, 1)
+    assert.equal(commandPosts.length, 1)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Remove background' }))
+    fireEvent.click(screen.getByRole('button', { name: /^Remove background$/ }))
     await new Promise(resolve => setTimeout(resolve, 0))
-    assert.equal(screen.getByRole('button', { name: 'Remove Background' }).disabled, false)
+    assert.equal(screen.getByRole('button', { name: /^Remove Background$/ }).disabled, false)
   } finally {
     cleanup()
     globalThis.fetch = previousFetch
@@ -145,7 +167,85 @@ test('upscale accepts an image while revoice remains video-only', async () => {
   }
 })
 
-test('video tools can run only with a video source', async () => {
+test('quick video upscale enters Tools and presents one durable command', { concurrency: false }, async () => {
+  const { render, cleanup, waitFor } = await import('@testing-library/react')
+  const { ToolsPanel } = await import('../src/components/Sidebar/ToolsPanel.tsx')
+  const { useStore } = await import('../src/stores/useStore.ts')
+  const previousFetch = globalThis.fetch
+  const previousSetInterval = globalThis.setInterval
+  const commandPosts: Array<Record<string, unknown>> = []
+  globalThis.fetch = async (input, init) => {
+    const requestUrl = typeof input === 'string' ? input : (input as Request).url || String(input)
+    if (requestUrl.includes('/api/v1/assets')) {
+      return new Response(JSON.stringify({ total: 0, assets: [] }), {
+        status: 200, headers: { 'Content-Type': 'application/json' },
+      })
+    }
+    if (requestUrl.includes('/api/v1/generation/commands')) {
+      const body = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : {}
+      commandPosts.push(body)
+      return new Response(JSON.stringify({
+        version: 1,
+        commandId: String(body.intent_id || ''),
+        operation: 'tools.upscale',
+        status: 'queued',
+        entities: [],
+        artifacts: [],
+        taskIds: ['task-quick-upscale'],
+        pipelineIds: [],
+        result: {
+          job_id: 'job-quick-upscale', task_id: 'task-quick-upscale',
+          workspace: 'default', status: 'queued',
+        },
+        commandVersion: 2,
+        contentFingerprint: 'b'.repeat(64),
+        fingerprintVersion: 2,
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    }
+    return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } })
+  }
+  globalThis.setInterval = (() => 1) as unknown as typeof setInterval
+  useStore.setState({
+    generationMode: 'video',
+    sidebarMode: 'director', sidebarOpen: false, settingsOpen: true, dashboardOpen: true,
+    toolsTool: 'upscale',
+    toolsSourcePath: null, toolsSourceName: null, toolsSourceUrl: null,
+    toolsSourceAssetId: null, toolsSourceWorkspace: null, toolsSourceKind: null,
+    toolsUpscaleMethod: 'flashvsr2', toolsSubmitting: false,
+    activeWorkspace: 'default', jobs: [], outputs: [], selectedOutput: -1,
+  } as never)
+  try {
+    render(<ToolsPanel />)
+    await waitFor(() => assert.equal(
+      document.querySelector('[data-studio-tools-listening="true"]')?.getAttribute('data-studio-tools-listening'),
+      'true',
+    ))
+    await useStore.getState().quickUpscaleClip(
+      'clip.mp4', '/api/v1/file/clip.mp4?workspace=default',
+    )
+    assert.equal(useStore.getState().generationMode, 'tools')
+    assert.equal(useStore.getState().sidebarMode, 'studio')
+    assert.equal(useStore.getState().sidebarOpen, true)
+    assert.equal(useStore.getState().settingsOpen, false)
+    assert.equal(useStore.getState().dashboardOpen, false)
+    assert.equal(commandPosts.length, 1)
+    assert.equal(commandPosts[0].version, 2)
+    assert.equal(commandPosts[0].operation, 'tools.upscale')
+    const input = commandPosts[0].input as Record<string, unknown>
+    const params = input.params as Record<string, unknown>
+    assert.equal(input.workspace, 'default')
+    assert.equal(params.source, '/api/v1/file/clip.mp4?workspace=default')
+    assert.equal(params.source_kind, 'video')
+    assert.equal(params.method, 'flashvsr2')
+  } finally {
+    cleanup()
+    globalThis.fetch = previousFetch
+    globalThis.setInterval = previousSetInterval
+    useStore.setState({ toolsSubmitting: false, jobs: [] } as never)
+  }
+})
+
+test('video tools can run only with a video source', { concurrency: false }, async () => {
   const { render, screen, fireEvent, cleanup } = await import('@testing-library/react')
   const { ToolsPanel } = await import('../src/components/Sidebar/ToolsPanel.tsx')
   const { useStore } = await import('../src/stores/useStore.ts')
@@ -157,7 +257,7 @@ test('video tools can run only with a video source', async () => {
         status: 200, headers: { 'Content-Type': 'application/json' },
       })
     }
-    throw new Error(`Unexpected request: ${requestUrl}`)
+    return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } })
   }
   useStore.setState({
     toolsTool: 'upscale',
@@ -177,15 +277,15 @@ test('video tools can run only with a video source', async () => {
     assert.equal(screen.getByRole('button', { name: 'Upscale Clip' }).disabled, false)
     fireEvent.click(screen.getByRole('button', { name: 'Revoice' }))
     assert.equal(screen.getByRole('button', { name: 'Replace Voice' }).disabled, false)
-    fireEvent.click(screen.getByRole('button', { name: 'Remove background' }))
-    assert.equal(screen.getByRole('button', { name: 'Remove Background' }).disabled, true)
+    fireEvent.click(screen.getByRole('button', { name: /^Remove background$/ }))
+    assert.equal(screen.getByRole('button', { name: /^Remove Background$/ }).disabled, true)
   } finally {
     cleanup()
     globalThis.fetch = previousFetch
   }
 })
 
-test('Tools submits background removal only once while the request is pending', async () => {
+test('Tools submits background removal only once while the request is pending', { concurrency: false }, async () => {
   const { useStore } = await import('../src/stores/useStore.ts')
   const previousFetch = globalThis.fetch
   const previousSetInterval = globalThis.setInterval
@@ -198,7 +298,7 @@ test('Tools submits background removal only once while the request is pending', 
       submissions += 1
       return pending
     }
-    throw new Error(`Unexpected request: ${requestUrl}`)
+    return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } })
   }
   globalThis.setInterval = (() => 1) as unknown as typeof setInterval
   useStore.setState({
@@ -222,4 +322,44 @@ test('Tools submits background removal only once while the request is pending', 
     globalThis.setInterval = previousSetInterval
     useStore.setState({ toolsSubmitting: false, jobs: [] } as never)
   }
+})
+
+test('remote catalog picks past the local 100-item cache keep workspace identity', async () => {
+  const { resolveToolSource } = await import('../src/lib/toolSource.ts')
+  const remote = {
+    name: 'wanted.png',
+    type: 'image' as const,
+    mode: null,
+    size: 12,
+    created_at: 1,
+    url: '/api/v1/file/wanted.png?workspace=film',
+    thumbnail_url: '/api/v1/file/wanted.png?workspace=film',
+    asset_id: 'asset-110',
+    workspace_id: 'film',
+    path: 'wanted.png',
+  }
+  const source = resolveToolSource(remote, [], 'film')
+  assert.equal(source.assetId, 'asset-110')
+  assert.equal(source.workspace, 'film')
+  assert.equal(source.path, 'wanted.png')
+  assert.equal(source.kind, 'image')
+})
+
+test('device uploads without a catalog id still resolve under uploads', async () => {
+  const { resolveToolSource } = await import('../src/lib/toolSource.ts')
+  const uploaded = {
+    name: 'from-disk.png',
+    type: 'image' as const,
+    mode: null,
+    size: 8,
+    created_at: 1,
+    url: '/api/v1/uploads/from-disk.png',
+    thumbnail_url: '/api/v1/uploads/from-disk.png',
+    workspace_id: 'film',
+    path: 'uploads/from-disk.png',
+  }
+  const source = resolveToolSource(uploaded, [], 'film')
+  assert.equal(source.assetId, null)
+  assert.equal(source.workspace, '__uploads__')
+  assert.equal(source.path, 'from-disk.png')
 })

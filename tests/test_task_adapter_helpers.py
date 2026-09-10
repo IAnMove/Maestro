@@ -113,9 +113,10 @@ def test_canonical_legacy_progress_prioritizes_current_total_and_clamps():
     "adapter", ["_publish_generation_task", "_publish_generic_legacy_task"],
 )
 def test_legacy_adapters_use_the_canonical_progress_helper(adapter):
+    function = "_generation_task_fields" if adapter == "_publish_generation_task" else adapter
     calls = {
         node.func.id
-        for node in ast.walk(_function(adapter))
+        for node in ast.walk(_function(function))
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
     }
     assert "_canonical_legacy_progress" in calls
@@ -144,8 +145,8 @@ def test_generation_adapter_publishes_exact_story_song_identity():
         "_local_gpu_lane": SimpleNamespace(key="local_gpu:0"),
         "_upsert_canonical_task": upsert,
     }
-    node = _function("_publish_generation_task")
-    exec(compile(ast.Module(body=[node], type_ignores=[]), str(LAUNCH_PATH), "exec"), namespace)
+    nodes = [_function("_generation_task_fields"), _function("_publish_generation_task")]
+    exec(compile(ast.Module(body=nodes, type_ignores=[]), str(LAUNCH_PATH), "exec"), namespace)
 
     namespace["_publish_generation_task"]({
         "id": "song-job",
@@ -181,6 +182,8 @@ def _load_publisher(name: str):
         _function(helper)
         for helper in ("_task_legacy_id", "_task_status", "_task_timestamp", name)
     ]
+    if name == "_publish_generation_task":
+        selected.insert(0, _function("_generation_task_fields"))
     module = ast.Module(body=selected, type_ignores=[])
     ast.fix_missing_locations(module)
     captured = {}

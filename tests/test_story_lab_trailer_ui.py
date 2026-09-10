@@ -146,12 +146,12 @@ def test_direct_trailer_cast_approval_does_not_require_identity_images():
     approval = panel.split("const approve =", 1)[1].split("const isApproved", 1)[0]
     catalog = json.loads(CATALOG_EN.read_text(encoding="utf-8"))
 
-    assert "const requiresVisualIdentities = !directVideo" in approval
+    assert "storyRecipeRequiresVisualIdentities(visualMode)" in approval
     assert "t('notice.descriptionsApproved')" in approval
     assert catalog["notice"]["descriptionsApproved"] == "Character descriptions approved. Direct-video mode does not require identity images."
     assert "project.projectType === 'trailer'" in panel
-    assert "? trailerProductionIssues" in panel
-    assert "requiresVisualIdentities={!directVideo}" in panel
+    assert "collectStoryProductionIssues(project, visualMode, t)" in panel
+    assert "requiresVisualIdentities={storyRecipeRequiresVisualIdentities(visualMode)}" in panel
 
 
 def test_trailer_can_review_generate_reopen_and_reuse_ordered_assembly():

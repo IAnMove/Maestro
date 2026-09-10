@@ -49,6 +49,9 @@ def test_h3_preserves_authored_spanish_tag_without_global_contract():
 
 def test_h3_language_inference_uses_broad_tags_only_when_tag_is_missing():
     assert infer_h3_spoken_language("¿Dónde está la puerta?") == "Spanish"
+    assert infer_h3_spoken_language("Qué silencio.") == "Spanish"
+    assert infer_h3_spoken_language('Ana dice "Qué silencio."') == "Spanish"
+    assert infer_h3_spoken_language("Hello there.") == "English"
     assert infer_h3_spoken_language("Je ne suis pas ici.") == "French"
     assert infer_h3_spoken_language("日本語です") == "Japanese"
 

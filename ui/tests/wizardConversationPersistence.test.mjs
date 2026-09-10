@@ -19,6 +19,7 @@ const {
   isWizardConversationWriteCurrent,
   hasExclusiveWizardMessages,
   mergeWizardMessages,
+  applyRemoteWizardConversation,
   shouldFollowWizardWorkspace,
 } = await import('../src/features/agent/wizardConversationSync.ts')
 
@@ -407,6 +408,40 @@ test('a normal queued save cannot delete canonical turns outside the 40-message 
   }, snapshots, transport)
 })
 
+test('a CAS recovery without a hydration snapshot keeps server turns outside the UI window', async () => {
+  const ids = Array.from({ length: 50 }, (_value, index) => `msg-${index + 1}`)
+  let canonical = payload(7, ids)
+  const localWindow = payload(0, [...ids.slice(-40), 'new-local'])
+  const snapshots = new Map()
+  let saves = 0
+  const transport = {
+    async fetch() { return clone(canonical) },
+    async save(_workspace, conversation) {
+      saves += 1
+      if (saves === 1) {
+        assert.equal(conversation.revision, 0)
+        throw revisionConflict(conversation.revision, canonical.revision)
+      }
+      assert.equal(conversation.revision, 7)
+      assert.equal(conversation.messages.some(message => message.id === 'msg-1'), true)
+      assert.deepEqual(conversation.messages.map(message => message.id), [...ids, 'new-local'])
+      canonical = { ...clone(conversation), revision: 8 }
+      return clone(canonical)
+    },
+  }
+
+  const saved = await persistQueuedWizardConversation({
+    workspace: 'workspace-a',
+    captured: localWindow,
+  }, snapshots, transport)
+
+  assert.equal(saved.merged, true)
+  assert.equal(saved.conversation.revision, 8)
+  assert.equal(saved.conversation.messages.length, 51)
+  assert.equal(saved.conversation.messages[0].id, 'msg-1')
+  assert.equal(saved.conversation.messages.at(-1).id, 'new-local')
+})
+
 test('a conflict retry keeps using the recorded clear ancestor', async () => {
   const clearBase = payload(1, ['cleared-user', 'cleared-assistant'])
   const capturedClear = payload(1, ['welcome-after-clear'])
@@ -605,4 +640,88 @@ test('explicit clear deletes base turns while retaining concurrent canonical add
     'concurrent-user',
     'welcome-after-clear',
   ])
+})
+
+test('rebasing a delayed snapshot keeps a local answer beside its question', () => {
+  const visible = payload(2, ['u1', 'a1', 'u2', 'a2'])
+  const confirmed = payload(3, ['u1', 'u2'])
+  const ids = ['u1', 'a1', 'u2', 'a2']
+  const assertOrder = conversation => assert.deepEqual(conversation.messages.map(message => message.id), ids)
+  assertOrder(mergeWizardConversationSnapshots(visible, confirmed))
+  assertOrder(mergeQueuedWizardConversationSnapshots(visible, payload(1, ['u1']), confirmed))
+  const rebased = rebaseWizardConversationAfterSave(visible, payload(1, ['u1']), confirmed)
+  assertOrder(rebased.conversation)
+  assertOrder(mergeWizardConversationSnapshots(rebased.conversation, confirmed))
+  assert.equal(new Set(rebased.conversation.messages.map(message => message.id)).size, 4)
+})
+
+test('first hydration keeps exclusive local answers that sit beside the oldest shared questions', async () => {
+  const localIds = Array.from({ length: 20 }, (_value, index) => [`u${index + 1}`, `a${index + 1}`]).flat()
+  const remoteIds = Array.from({ length: 40 }, (_value, index) => `u${index + 1}`)
+  const local = payload(1, localIds)
+  const remote = payload(4, remoteIds)
+  const earlyAnswers = Array.from({ length: 10 }, (_value, index) => `a${index + 1}`)
+  const newestRemoteQuestions = Array.from({ length: 19 }, (_value, index) => `u${index + 22}`)
+
+  const choice = applyRemoteWizardConversation({
+    localMessages: local.messages,
+    localRevision: 1,
+    remoteMessages: remote.messages,
+    remoteRevision: 4,
+  })
+  const merged = mergeWizardMessages(local.messages, remote.messages)
+
+  assert.deepEqual(earlyAnswers.filter(id => merged.some(message => message.id === id)), earlyAnswers)
+  assert.deepEqual(earlyAnswers.filter(id => choice.messages.some(message => message.id === id)), earlyAnswers)
+  assert.deepEqual(
+    newestRemoteQuestions.filter(id => merged.some(message => message.id === id)),
+    newestRemoteQuestions,
+  )
+  assert.deepEqual(
+    newestRemoteQuestions.filter(id => choice.messages.some(message => message.id === id)),
+    newestRemoteQuestions,
+  )
+  assert.equal(choice.source, 'local')
+
+  const snapshots = new Map([['workspace-a', clone(remote)]])
+  const saved = await persistQueuedWizardConversation({
+    workspace: 'workspace-a',
+    captured: {
+      ...local,
+      revision: remote.revision,
+      messages: choice.messages,
+    },
+    base: remote,
+  }, snapshots, {
+    async fetch() { return clone(remote) },
+    async save(_workspace, conversation) {
+      return { ...clone(conversation), revision: 5 }
+    },
+  })
+  assert.deepEqual(
+    earlyAnswers.filter(id => saved.conversation.messages.some(message => message.id === id)),
+    earlyAnswers,
+  )
+  assert.deepEqual(
+    newestRemoteQuestions.filter(id => saved.conversation.messages.some(message => message.id === id)),
+    newestRemoteQuestions,
+  )
+
+  const reloaded = applyRemoteWizardConversation({
+    localMessages: choice.messages,
+    localRevision: 0,
+    remoteMessages: saved.conversation.messages.slice(-40),
+    remoteRevision: saved.conversation.revision,
+  })
+  assert.deepEqual(
+    newestRemoteQuestions.filter(id => reloaded.messages.some(message => message.id === id)),
+    newestRemoteQuestions,
+  )
+})
+
+test('an unsaved answer stays after its known question before another client turn', () => {
+  const local = payload(1, ['u1', 'a1'])
+  const remote = payload(2, ['u1', 'remote-u', 'remote-a'])
+  const merged = mergeWizardConversationSnapshots(local, remote)
+  assert.deepEqual(merged.messages.map(message => message.id), ['u1', 'a1', 'remote-u', 'remote-a'])
 })

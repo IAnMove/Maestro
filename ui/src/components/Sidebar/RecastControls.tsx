@@ -1,5 +1,5 @@
-import { useRef, useCallback, useState } from 'react'
-import { Upload, X, UserRoundPen, Loader2, Eye, Plus } from 'lucide-react'
+import { useCallback, useState } from 'react'
+import { X, UserRoundPen, Loader2, Eye, Plus } from 'lucide-react'
 import { useStore } from '../../stores/useStore'
 import { useUiTranslation } from '../../i18n'
 import type { RecastCharacterMapping } from '../../types'
@@ -7,6 +7,10 @@ import { VideoTimelineSelector } from '../shared/VideoTimelineSelector'
 import { InfoTooltip } from './InfoTooltip'
 import { ScailResolutionSelector } from './ScailResolutionSelector'
 import * as api from '../../api/client'
+import type { ApiOutput } from '../../api/outputs'
+import { AssetInput } from '../../features/asset-picker/AssetInput.tsx'
+import { StudioSourceField } from '../../lib/StudioSourceField.tsx'
+import { applyChosenStudioMedia, useWorkspaceOutputs } from '../../lib/studioAssetPick.ts'
 
 const MAPPING_COLORS = ['#0000ff', '#ff0000', '#00c853', '#ff00ff', '#00cfd1']
 const MAPPING_LABELS = ['A', 'B', 'C', 'D', 'E']
@@ -63,7 +67,9 @@ export function RecastControls() {
   const [mappingResults, setMappingResults] = useState<MappingPreviewResult[]>([])
   const [referencePreviews, setReferencePreviews] = useState<ReferencePreview[]>([])
   const [previewError, setPreviewError] = useState('')
-  const videoFileRef = useRef<HTMLInputElement>(null)
+  const activeWorkspace = useStore(s => s.activeWorkspace)
+  const videoItems = useWorkspaceOutputs(activeWorkspace, 'video')
+  const imageItems = useWorkspaceOutputs(activeWorkspace, 'image')
 
   const resetPreview = useCallback(() => {
     setPreviewImg(null)
@@ -82,56 +88,38 @@ export function RecastControls() {
     resetPreview()
   }, [resetPreview, setMappings])
 
-  const handleVideoUpload = useCallback(async (file: File) => {
-    try {
-      const result = await api.uploadImage(file)
-      const url = URL.createObjectURL(file)
-      const video = document.createElement('video')
-      video.src = url
-      video.onloadedmetadata = () => {
-        const duration = video.duration && isFinite(video.duration) ? video.duration : 0
-        const resolution = `${video.videoWidth}x${video.videoHeight}`
-        setEditVideo(file, result.path, url, duration, resolution)
-      }
+  const handleChooseVideo = useCallback((item: ApiOutput) => {
+    applyChosenStudioMedia(item, next => {
+      setEditVideo(next.file, next.path, next.url, next.duration, `${next.width}x${next.height}`)
       resetPreview()
-    } catch {
-      console.error('Failed to upload video')
-    }
+    })
   }, [resetPreview, setEditVideo])
 
-  const handlePrimaryUpload = useCallback(async (mappingIndex: number, file: File) => {
-    try {
-      const result = await api.uploadImage(file)
-      updateMapping(mappingIndex, {
-        refFile: file,
-        refPath: result.path,
-        refUrl: URL.createObjectURL(file),
+  const handleChoosePrimary = useCallback((mappingId: string, item: ApiOutput) => {
+    const index = useStore.getState().editRecastMappings.findIndex(mapping => mapping.id === mappingId)
+    if (index < 0) return
+    applyChosenStudioMedia(item, next => {
+      const live = useStore.getState().editRecastMappings.findIndex(mapping => mapping.id === mappingId)
+      if (live < 0) return
+      updateMapping(live, {
+        refFile: next.file,
+        refPath: next.path,
+        refUrl: next.url,
         referenceAlignedToSource: false,
       })
-    } catch {
-      console.error('Failed to upload reference image')
-    }
+    })
   }, [updateMapping])
 
-  const handleAdditionalUploads = useCallback(async (mappingIndex: number, files: File[]) => {
-    try {
-      const available = Math.max(
-        0,
-        4 - (useStore.getState().editRecastMappings[mappingIndex]?.additionalRefs.length || 0),
-      )
-      const selected = files.slice(0, available)
-      const uploaded = await Promise.all(selected.map(async file => {
-        const result = await api.uploadImage(file)
-        return { file, path: result.path, url: URL.createObjectURL(file) }
-      }))
-      const current = useStore.getState().editRecastMappings[mappingIndex]
-      if (!current) return
-      updateMapping(mappingIndex, {
-        additionalRefs: [...current.additionalRefs, ...uploaded],
+  const handleChooseAdditional = useCallback((mappingId: string, item: ApiOutput) => {
+    applyChosenStudioMedia(item, next => {
+      const live = useStore.getState().editRecastMappings.findIndex(mapping => mapping.id === mappingId)
+      if (live < 0) return
+      const current = useStore.getState().editRecastMappings[live]
+      if (!current || current.additionalRefs.length >= 4) return
+      updateMapping(live, {
+        additionalRefs: [...current.additionalRefs, { file: next.file, path: next.path, url: next.url }],
       })
-    } catch {
-      console.error('Failed to upload additional reference view')
-    }
+    })
   }, [updateMapping])
 
   const handlePreview = useCallback(async () => {
@@ -205,28 +193,14 @@ export function RecastControls() {
       />
 
       {!editVideoFile ? (
-        <div
-          onDragOver={event => event.preventDefault()}
-          onDrop={event => {
-            event.preventDefault()
-            const file = event.dataTransfer.files[0]
-            if (file && file.type.startsWith('video/')) void handleVideoUpload(file)
-          }}
-          onClick={() => videoFileRef.current?.click()}
-          className="border-2 border-dashed border-border rounded-lg p-6 text-center cursor-pointer hover:border-accent-blue/50 hover:bg-bg-hover/30 transition-all"
-        >
-          <Upload size={24} className="mx-auto mb-2 text-text-muted" />
-          <p className="text-xs text-text-secondary">{t('chrome.dropVideo')}</p>
-          <input
-            ref={videoFileRef}
-            type="file"
-            accept="video/*"
-            className="hidden"
-            onChange={event => {
-              if (event.target.files?.[0]) void handleVideoUpload(event.target.files[0])
-            }}
-          />
-        </div>
+        <StudioSourceField
+          label={t('chrome.dropVideo')}
+          items={videoItems}
+          accept="video/*"
+          kinds={['video']}
+          workspaceId={activeWorkspace}
+          onChoose={handleChooseVideo}
+        />
       ) : (
         <div className="relative">
           <button
@@ -326,19 +300,15 @@ export function RecastControls() {
               <div>
                 <label className="text-[9px] text-text-muted block mb-0.5">{t('recast.replacement')}</label>
                 {!mapping.refPath ? (
-                  <label className="block border border-dashed border-border rounded p-3 text-center cursor-pointer hover:border-accent-blue/50 hover:bg-bg-hover/30">
-                    <Upload size={15} className="mx-auto mb-1 text-text-muted" />
-                    <span className="text-[9px] text-text-secondary">{t('recast.uploadCharacter')}</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={event => {
-                        if (event.target.files?.[0]) void handlePrimaryUpload(mappingIndex, event.target.files[0])
-                        event.currentTarget.value = ''
-                      }}
-                    />
-                  </label>
+                  <AssetInput
+                    label={t('recast.uploadCharacter')}
+                    placeholder={t('recast.uploadCharacter')}
+                    items={imageItems}
+                    accept="image/*"
+                    workspaceId={activeWorkspace}
+                    constraints={{ kinds: ['image'], maxCount: 1, optional: false }}
+                    onChoose={item => { if (item) handleChoosePrimary(mapping.id, item) }}
+                  />
                 ) : (
                   <div className="relative inline-block">
                     <img src={mapping.refUrl} alt={t('recast.refAlt', { label: MAPPING_LABELS[mappingIndex] })} className="h-24 rounded border border-border" />
@@ -387,22 +357,17 @@ export function RecastControls() {
                       </div>
                     ))}
                     {mapping.additionalRefs.length < 4 && (
-                      <label className="h-14 w-14 flex flex-col items-center justify-center rounded border border-dashed border-border cursor-pointer hover:border-accent-blue/50 text-text-muted">
-                        <Plus size={13} />
-                        <span className="text-[7px]">{t('recast.view')}</span>
-                        <input
-                          type="file"
+                      <div className="min-w-[9rem]">
+                        <AssetInput
+                          label={t('recast.view')}
+                          placeholder={t('recast.view')}
+                          items={imageItems}
                           accept="image/*"
-                          multiple
-                          className="hidden"
-                          onChange={event => {
-                            if (event.target.files?.length) {
-                              void handleAdditionalUploads(mappingIndex, Array.from(event.target.files))
-                            }
-                            event.currentTarget.value = ''
-                          }}
+                          workspaceId={activeWorkspace}
+                          constraints={{ kinds: ['image'], maxCount: 1, optional: false }}
+                          onChoose={item => { if (item) handleChooseAdditional(mapping.id, item) }}
                         />
-                      </label>
+                      </div>
                     )}
                   </div>
                 </div>

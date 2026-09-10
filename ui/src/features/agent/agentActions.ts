@@ -1,9 +1,10 @@
+import { rejectedWizardAction, type WizardActionRejection } from './wizardTurnReport'
 import { getModelsForFamily, getFamiliesForMode, useStore } from '../../stores/useStore'
 import { comicArtworkInventory } from '../comics/generateArtwork'
 import { buildWizardContextSnapshot, buildWizardLabSnapshots, comicLabSnapshot, type BuildWizardContextOptions, type WizardContextSnapshot } from './wizardContext'
 import type { AspectRatio, ResolutionPreset } from '../../types'
 import type { AgentExecutionReport, AgentExecutionTarget } from './agentContract'
-import type { AgentRemoveBackgroundAction } from './toolCapabilities'
+import type { AgentRemoveBackgroundAction, AgentUpscaleAction } from './toolCapabilities'
 import type { CommandEnvelope, CommandResult } from './commandContract'
 import {
   bindDirectorProductionTarget,
@@ -61,6 +62,10 @@ import {
   normalizeConversationLanguageTag,
   parseRegisteredCapability,
   registeredCapabilitySchemas,
+  reconcileProgrammaticVideoRequest,
+  restoreAuthoredMusicFields,
+  authoredSfxPackInput,
+  type AgentPrepareProgrammaticVideoAction,
   type AgentTab,
   type LanguageIntent,
 } from './capabilityRegistry'
@@ -76,7 +81,7 @@ import {
 
 export { isNewMusicVideoSongRequest } from '../stories/musicVideoLook'
 export type { ExampleConversation }
-export type { AgentRemoveBackgroundAction } from './toolCapabilities'
+export type { AgentRemoveBackgroundAction, AgentUpscaleAction } from './toolCapabilities'
 export { AGENT_TABS }
 export type { AgentTab }
 
@@ -127,6 +132,21 @@ export interface AgentPrepareAudioAction extends AgentLanguageAwareAction {
   modelType?: string
   durationSeconds?: number
   negativePrompt?: string
+  /** ACE-Step Music Caption (style/genre/instruments), kept verbatim. */
+  altPrompt?: string
+  /** Visible Music description, persisted separately from lyrics. */
+  musicDescription?: string
+  /** Whether the Music form is explicitly instrumental. */
+  musicInstrumental?: boolean
+  seed?: number
+  inferenceSteps?: number
+  guidanceScale?: number
+  /** Music native generation currently admits one output per command. */
+  outputCount?: number
+  /** Native MMAudio SFX text-conditioning weight (0..5). */
+  sfxTextWeight?: number
+  /** Canonical SFX video reference; omitted preserves the selected guide, null removes it. */
+  videoGuide?: string | null
 }
 
 export interface AgentDownloadModelAction {
@@ -278,6 +298,18 @@ export interface AgentStageStoryComicAction extends AgentLanguageAwareAction {
   confirm: true
 }
 
+export interface AgentStageSeriesComicAction extends AgentLanguageAwareAction {
+  type: 'stage_series_comic'
+  seriesTitle: string
+  targetEpisodeTitle: string
+  seriesId: string
+  episodeId: string
+  title: string
+  pageCount: number
+  panelsPerPage: number
+  confirm: true
+}
+
 export interface AgentStageStoryVideoAction extends AgentLanguageAwareAction {
   type: 'stage_story_video'
   targetStoryTitle: string
@@ -398,7 +430,7 @@ export interface AgentReviewSeriesAttemptsAction {
   seriesTitle: string
   targetEpisodeTitle: string
   decision: 'approve' | 'reject'
-  scope: 'selected_latest' | 'all_latest'
+  scope: 'selected_latest' | 'all_latest' | 'replace_latest'
   shotNumbers: number[]
   attemptId: string
   confirm: true
@@ -587,6 +619,7 @@ export interface AgentUpdateWorkspaceCollectionAction {
 }
 
 export type AgentAction = AgentOpenTabAction
+  | AgentPrepareProgrammaticVideoAction
   | AgentOpenStorySectionAction
   | AgentOpenSeriesSectionAction
   | AgentPrepareVideoAction
@@ -617,6 +650,7 @@ export type AgentAction = AgentOpenTabAction
   | AgentReviewSeriesAttemptsAction
   | AgentAssembleSeriesEpisodeAction
   | AgentCommitSeriesCanonAction
+  | AgentStageSeriesComicAction
   | AgentOpen3dSceneAction
   | AgentSave3dSceneAction
   | AgentExport3dSceneAction
@@ -629,6 +663,7 @@ export type AgentAction = AgentOpenTabAction
   | AgentAttachStudioReferencesAction
   | AgentConfigureStudioLorasAction
   | AgentRemoveBackgroundAction
+  | AgentUpscaleAction
   | AgentInspectQueueAction
   | AgentCancelTaskAction
   | AgentResumeTaskAction
@@ -660,6 +695,10 @@ export type AgentAction = AgentOpenTabAction
 export interface AgentTurn {
   reply: string
   actions: AgentAction[]
+  /** Locally derived validation/policy diagnostics, never trusted from the model. */
+  rejections?: WizardActionRejection[]
+  /** Original proposal positions when parser exclusions shifted action indices. */
+  proposalIndices?: number[]
   /** ISO language tag inferred from the user's final message, not the UI. */
   conversationLanguage?: string
 }
@@ -804,18 +843,18 @@ const SERIES_RENDER_MODES = new Set<AgentRenderSeriesShotsAction['mode']>([
   'selected', 'missing', 'failed', 'all',
 ])
 const SERIES_REVIEW_DECISIONS = new Set<AgentReviewSeriesAttemptsAction['decision']>(['approve', 'reject'])
-const SERIES_REVIEW_SCOPES = new Set<AgentReviewSeriesAttemptsAction['scope']>(['selected_latest', 'all_latest'])
+const SERIES_REVIEW_SCOPES = new Set<AgentReviewSeriesAttemptsAction['scope']>(['selected_latest', 'all_latest', 'replace_latest'])
 const SERIES_CANON_DECISIONS = new Set<AgentCommitSeriesCanonAction['decision']>([
   'accept_all', 'reject_all', 'accept_selected', 'reject_selected',
 ])
 const STORY_SECTIONS = new Set<AgentStorySection>([
-  'overview', 'world', 'characters', 'relationships', 'structure', 'productions',
+  'overview', 'assets', 'world', 'characters', 'relationships', 'structure',
+  'music', 'trailer', 'productions', 'assembly',
 ])
 const SERIES_SECTIONS = new Set<AgentSeriesSection>([
   'setup', 'canon', 'episode', 'shots', 'review',
 ])
 const MAX_ACTIONS = 6
-const AUDIO_SUB_MODES = new Set<AgentPrepareAudioAction['subMode']>(['speech', 'music', 'sfx'])
 const ACTION_TYPE_ALIASES: Record<string, AgentAction['type']> = {
   opentab: 'open_tab',
   openstorysection: 'open_story_section',
@@ -998,7 +1037,7 @@ const CANONICAL_FIELD_NAMES = [
   'scene_name', 'layer_name', 'audio_output_name', 'videoclip_name', 'cue_source', 'rhythm_profile', 'intensity',
   'confirm', 'characters', 'locations', 'outline_beats', 'story_visual_selections', 'story_visual_scope', 'target_names',
   'target_kind', 'target_name', 'asset_name', 'primary',
-  'audio_sub_mode', 'sfx_clips', 'name', 'preset', 'comic_panels', 'comic_pages', 'caption', 'stage', 'image_provider',
+  'audio_sub_mode', 'alt_prompt', 'music_description', 'music_instrumental', 'sfx_text_weight', 'video_guide', 'sfx_clips', 'name', 'preset', 'comic_panels', 'comic_pages', 'caption', 'stage', 'image_provider',
   'page_number', 'panel_number', 'page_numbers', 'pilot',
   'factual_biography', 'biography_review',
   'kit_name', 'look_notes', 'preset_id',
@@ -1110,21 +1149,6 @@ function parseComicPages(value: unknown): AgentComicPage[] {
   }) : []
 }
 
-function parseSfxClips(value: unknown): AgentSfxClip[] {
-  return Array.isArray(value) ? value.slice(0, 12).flatMap(item => {
-    if (!item || typeof item !== 'object' || Array.isArray(item)) return []
-    const raw = item as Record<string, unknown>
-    const name = cleanString(raw.name, 80)
-    const prompt = cleanString(raw.prompt, 1_500)
-    if (!name || !prompt) return []
-    return [{
-      name,
-      prompt,
-      durationSeconds: optionalPositiveNumber(raw.duration_seconds, 1, 20) ?? 1,
-    }]
-  }) : []
-}
-
 function parseAction(value: unknown): AgentAction | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
   const raw = canonicalRecord(value as Record<string, unknown>)
@@ -1187,19 +1211,6 @@ function parseAction(value: unknown): AgentAction | null {
       outputCount: optionalPositiveNumber(raw.output_count, 1, 8, true),
     }
   }
-  if (type === 'prepare_audio') {
-    const prompt = cleanString(raw.prompt, 8_000)
-    if (!prompt) return null
-    const subMode = cleanString(raw.audio_sub_mode, 12) as AgentPrepareAudioAction['subMode']
-    return {
-      type: 'prepare_audio',
-      subMode: AUDIO_SUB_MODES.has(subMode) ? subMode : 'sfx',
-      prompt,
-      modelType: cleanString(raw.model_type, 160) || undefined,
-      durationSeconds: optionalPositiveNumber(raw.duration_seconds, 1, 20),
-      negativePrompt: cleanString(raw.negative_prompt, 2_000) || undefined,
-    }
-  }
   if (type === 'prepare_3d') {
     const prompt = cleanString(raw.prompt, 8_000)
     if (!prompt) return null
@@ -1209,19 +1220,6 @@ function parseAction(value: unknown): AgentAction | null {
       modelType: cleanString(raw.model_type, 160) || undefined,
       preset: cleanString(raw.preset, 40) || undefined,
       seed: optionalNumber(raw.seed, -1, 2_147_483_647, true),
-    }
-  }
-  if (type === 'queue_sfx_pack') {
-    if (raw.confirm !== true) return null
-    const clips = parseSfxClips(raw.sfx_clips)
-    if (!clips.length) return null
-    return {
-      type: 'queue_sfx_pack',
-      style: cleanString(raw.visual_style, 2_000) || cleanString(raw.theme, 1_000),
-      clips,
-      modelType: cleanString(raw.model_type, 160) || undefined,
-      negativePrompt: cleanString(raw.negative_prompt, 2_000) || undefined,
-      confirm: true,
     }
   }
   if (type === 'start_generation') return raw.confirm === true ? { type: 'start_generation', confirm: true } : null
@@ -1467,7 +1465,7 @@ function parseAction(value: unknown): AgentAction | null {
     const shotNumbers = positiveIntegerArray(raw.shot_numbers, 200)
     const attemptId = cleanString(raw.attempt_id, 160)
     if (scope === 'selected_latest' && !shotNumbers.length) return null
-    if (scope === 'all_latest' && (decision !== 'approve' || shotNumbers.length || attemptId)) return null
+    if ((scope === 'all_latest' || scope === 'replace_latest') && (decision !== 'approve' || shotNumbers.length || attemptId)) return null
     if (decision === 'reject' && (shotNumbers.length !== 1 || scope !== 'selected_latest')) return null
     if (attemptId && shotNumbers.length !== 1) return null
     return {
@@ -1739,21 +1737,38 @@ export function parseAgentTurn(raw: string): AgentTurn {
     if (typeof nested?.reply === 'string') reply = cleanString(nested.reply, 8_000)
   }
   const proposed = Array.isArray(object.actions) ? object.actions.slice(0, MAX_ACTIONS) : []
+  const rejections: WizardActionRejection[] = []
+  if (Object.hasOwn(object, 'actions') && !Array.isArray(object.actions)) {
+    rejections.push(rejectedWizardAction(null, 0, 'invalid_action_list'))
+  }
+  if (Array.isArray(object.actions) && object.actions.length > MAX_ACTIONS) {
+    rejections.push(rejectedWizardAction(null, MAX_ACTIONS, 'action_limit'))
+  }
   const actions: AgentAction[] = []
+  const proposalIndices: number[] = []
   let preparedStudio = false
   let startedGeneration = false
-  for (const value of proposed) {
+  for (const [index, value] of proposed.entries()) {
     const action = parseAction(value)
-    if (!action) continue
+    if (!action) {
+      rejections.push(rejectedWizardAction(value, index))
+      continue
+    }
     if (isPreparedStudioAction(action)) preparedStudio = true
-    if (!generationStartAllowed(action, preparedStudio, startedGeneration)) continue
+    if (!generationStartAllowed(action, preparedStudio, startedGeneration)) {
+      rejections.push(rejectedWizardAction(value, index, startedGeneration ? 'duplicate_generation' : 'preparation_required'))
+      continue
+    }
     if (action.type === 'start_generation') startedGeneration = true
     actions.push(action)
+    proposalIndices.push(index)
   }
   const conversationLanguage = normalizeConversationLanguageTag(object.conversation_language)
   return {
     reply: reply || (actions.length ? 'El hechizo está trazado; voy a mover HocusPocus.' : humanReply(raw.trim())),
     actions,
+    ...(proposalIndices.some((index, position) => index !== position) ? { proposalIndices } : {}),
+    ...(rejections.length ? { rejections } : {}),
     ...(conversationLanguage ? { conversationLanguage } : {}),
   }
 }
@@ -1804,16 +1819,46 @@ const EXPLICIT_VIDEO_REQUESTS = [
 const NEGATED_VIDEO_REQUEST = /\b(?:no|sin|don['’]?t|do\s+not)\b[^.!?\n]{0,32}\b(?:hagas|generes|crees|lances|encoles|hacer|generar|crear|lanzar|encolar|make|create|generate|render|launch|start|queue)\b/i
 
 const EXPLICIT_CANCEL_REQUESTS = [
-  /\b(?:cancela|cancelad|cancelar|para|parad|det[eé]n|detened)\b[^.!?\n]*\b(?:tarea|trabajo|job|cola|generaci[oó]n|v[ií]deo|video|clip)\b/i,
-  /\b(?:para|parad|det[eé]n)\b[^.!?\n]*\b(?:lo que est[aá] (?:generando|renderizando|en cola|corriendo))\b/i,
+  /\b(?:cancela|cancelad|cancelar|parad|det[eé]n|detened)\b[^.!?\n]*\b(?:tarea|trabajo|job|cola|generaci[oó]n|v[ií]deo|video|clip)\b/i,
+  // "para" is also the Spanish preposition ("pasos para generar un vídeo").
+  // Treat it as the imperative of parar only at a sentence start and only
+  // when the object is a job, never media or an infinitive.
+  /(?:^|[.!?;]\s*)(?:por favor[, ]+)?para\b(?:\s+(?:ya|ahora))?\s+(?:el|la|este|esta|esa)?\s*(?:tarea|trabajo|job|cola|generaci[oó]n)\b/i,
+  /\b(?:parad|det[eé]n)\b[^.!?\n]*\b(?:lo que est[aá] (?:generando|renderizando|en cola|corriendo))\b/i,
+  /(?:^|[.!?;]\s*)(?:por favor[, ]+)?para\b[^.!?\n]{0,24}\blo que est[aá] (?:generando|renderizando|en cola|corriendo)\b/i,
   /\b(?:cancel|stop|abort)\b[^.!?\n]*\b(?:task|job|queue|generation|video|clip|active)\b/i,
 ]
 const NEGATED_CANCEL_REQUEST = /\b(?:no|sin|don['’]?t|do\s+not)\b[^.!?\n]{0,24}\b(?:cancel|cancela|canceles|pares|detengas|stop|abort)\b/i
 
+function requestLooksLikeStudioGeneration(text: string): boolean {
+  // Quoted cancel/retry language inside a generate command is scene text,
+  // not permission to kill or relaunch the active GPU job.
+  return isExplicitVideoGenerationRequest(text)
+    || isExplicitImageGenerationRequest(text)
+    || isExplicitAudioGenerationRequest(text)
+    || isExplicit3dGenerationRequest(text)
+    || isExplicitSfxGenerationRequest(text)
+}
+
+function hasTaskControlOutsideSceneText(text: string, patterns: RegExp[]): boolean {
+  // Only the derived classifier input is masked. Never edit the submitted prompt.
+  const unquoted = text.replace(/"(?:\\.|[^"\\])*"|“[^”]*”|«[^»]*»|(?<!\w)'[^']*'(?!\w)|‘[^’]*’/gu, ' ')
+  const controlText = requestLooksLikeStudioGeneration(unquoted) ? unquoted : text
+  return controlText.split(/[.!?;\n]+/).some(part => {
+    const clause = part.trim()
+    return patterns.some(pattern => {
+      const match = pattern.exec(clause)
+      // A leading task command, or one in a later sentence, keeps authority.
+      // Within a generation clause, later task words describe the scene.
+      return match !== null && !requestLooksLikeStudioGeneration(clause.slice(0, match.index))
+    })
+  })
+}
+
 export function isExplicitCancelRequest(request: string): boolean {
   const text = request.trim()
-  if (!text || NEGATED_CANCEL_REQUEST.test(text)) return false
-  return EXPLICIT_CANCEL_REQUESTS.some(pattern => pattern.test(text))
+  if (!text || NEGATED_CANCEL_REQUEST.test(text) || isHowToGenerateQuestion(text)) return false
+  return hasTaskControlOutsideSceneText(text, EXPLICIT_CANCEL_REQUESTS)
 }
 
 const EXPLICIT_RETRY_REQUESTS = [
@@ -1824,20 +1869,19 @@ const NEGATED_RETRY_REQUEST = /\b(?:no|sin|don['’]?t|do\s+not)\b[^.!?\n]{0,24}
 
 export function isExplicitRetryRequest(request: string): boolean {
   const text = request.trim()
-  return Boolean(text)
-    && !NEGATED_RETRY_REQUEST.test(text)
-    && EXPLICIT_RETRY_REQUESTS.some(pattern => pattern.test(text))
+  if (!text || NEGATED_RETRY_REQUEST.test(text) || isHowToGenerateQuestion(text)) return false
+  return hasTaskControlOutsideSceneText(text, EXPLICIT_RETRY_REQUESTS)
 }
 
 export function isExplicitVideoGenerationRequest(request: string): boolean {
   const text = request.trim()
-  if (!text || NEGATED_VIDEO_REQUEST.test(text)) return false
+  if (!text || NEGATED_VIDEO_REQUEST.test(text) || isHowToGenerateQuestion(text)) return false
   return EXPLICIT_VIDEO_REQUESTS.some(pattern => pattern.test(text))
 }
 
 export function isResumePreparedStudioVideoRequest(request: string): boolean {
   const text = request.trim()
-  if (!text || NEGATED_VIDEO_REQUEST.test(text)) return false
+  if (!text || NEGATED_VIDEO_REQUEST.test(text) || isHowToGenerateQuestion(text)) return false
   const match = text.match(
     /\b(?:genera|generad|lanza|lanzad|encola|encolad|env[ií]a|enviad|start|queue|launch)\b[^.!?\n]{0,24}\b(?:el|la|este|esta|the)\s+(?:video|v[ií]deo|clip)\b(.*)$/i,
   )
@@ -1861,17 +1905,20 @@ const EXPLICIT_IMAGE_REQUESTS = [
 
 export function isExplicitImageGenerationRequest(request: string): boolean {
   const text = request.trim()
-  if (!text || NEGATED_VIDEO_REQUEST.test(text)) return false
+  if (!text || NEGATED_VIDEO_REQUEST.test(text) || isHowToGenerateQuestion(text)) return false
   if (isExplicitVideoGenerationRequest(text)) return false
   return EXPLICIT_IMAGE_REQUESTS.some(pattern => pattern.test(text))
 }
 
 const EXPLICIT_AUDIO_GENERATION_REQUESTS = [
-  /\b(?:gen[eé]ra(?:la|lo|r|d|me)?|crea(?:la|lo|r|d|me)?|lanza(?:la|lo|r|d)?|encola(?:la|lo|r|d)?)\b[^.!?\n]{0,120}\b(?:audio|canci[oó]n|m[uú]sica|voz|speech)\b/i,
+  /\b(?:gen[eé]ra(?:la|lo|r|d|me)?|crea(?:la|lo|r|d|me)?|lanza(?:la|lo|r|d)?|encola(?:la|lo|r|d)?|ejec[uú]ta(?:la|lo|r|d|me)?)\b[^.!?\n]{0,120}\b(?:audio|canci[oó]n|m[uú]sica|voz|speech)\b/i,
+  /\b(?:make|create|generate|render|queue|start|launch|run|execute)\b[^.!?\n]{0,120}\b(?:audio|song|music|voice|speech|track)\b/i,
   /\b(?:audio|canci[oó]n|m[uú]sica|voz|speech)\b[^.!?\n]{0,160}\b(?:gen[eé]ra(?:la|lo|r|d|me)?|l[aá]nza(?:la|lo|r|d)?|enc[oó]la(?:la|lo|r|d)?)\b/i,
+  /\b(?:audio|song|music|voice|speech|track)\b[^.!?\n]{0,160}\b(?:make|create|generate|render|queue|start|launch|run|execute)\b/i,
 ]
 const STUDIO_AUDIO_CONTEXT = [
-  /\bstudio\s*(?:(?:→|->|›|\/|-)\s*)?audio\b/i,
+  /\bstudio\s*(?:(?:→|->|›|\/|-)\s*)?(?:audio|music|m[uú]sica)\b/i,
+  /\b(?:audio|song|music|voice|speech|canci[oó]n|m[uú]sica|voz)\b[^.!?\n]{0,80}\b(?:in|from|through|en|del|de)\s+(?:the\s+|el\s+|la\s+)?studio\b/i,
   /\baudio\s+(?:de|del|en)\s+studio\b/i,
   /\b(?:pestaña|tab|secci[oó]n|modo|panel|formulario)\s+(?:de\s+)?audio\b/i,
 ]
@@ -1879,7 +1926,7 @@ const STUDIO_AUDIO_CONTEXT = [
 export function isExplicitAudioGenerationRequest(request: string): boolean {
   const text = request.trim()
   if (!text || NEGATED_VIDEO_REQUEST.test(text) || MUSIC_VIDEO_CONTEXT.test(text)) return false
-  if (isExplicitSfxGenerationRequest(text)) return false
+  if (isHowToGenerateQuestion(text) || isExplicitSfxGenerationRequest(text)) return false
   if (!STUDIO_AUDIO_CONTEXT.some(pattern => pattern.test(text))) return false
   return EXPLICIT_AUDIO_GENERATION_REQUESTS.some(pattern => pattern.test(text))
 }
@@ -1900,7 +1947,7 @@ const EXPLICIT_3D_REQUESTS = [
 
 export function isExplicit3dGenerationRequest(request: string): boolean {
   const text = request.trim()
-  if (!text || NEGATED_VIDEO_REQUEST.test(text)) return false
+  if (!text || NEGATED_VIDEO_REQUEST.test(text) || isHowToGenerateQuestion(text)) return false
   if (isExplicitVideoGenerationRequest(text) || isExplicitImageGenerationRequest(text) || isExplicitSfxGenerationRequest(text)) return false
   return EXPLICIT_3D_REQUESTS.some(pattern => pattern.test(text))
 }
@@ -1965,6 +2012,109 @@ function comicPanelTarget(
   }
 }
 
+const HOW_TO_GENERATE = [
+  /\b(?:c[oó]mo(?:\s+(?:lo|la|las|los|puedo|se))?\s+(?:genero|generar|lanzo|lanzar|creo|crear|hago|hacer)|how\s+(?:can|do)\s+(?:i|we|you)\s+(?:generate|create|launch|start|make)|how\s+do\s+i\s+(?:generate|create|launch|start|make))\b/i,
+  /\bhow\s+to\s+(?:generate|create|launch|start|make)\b/i,
+  /\b(?:explain|describe|tell\s+me|show(?:\s+me)?|can\s+you\s+(?:explain|describe|tell\s+me|show\s+me))\b[^.!?\n]{0,96}\b(?:how\s+(?:to|do(?:\s+i)?)|steps?(?:\s+to)?|(?:what|which)\s+happens)\b/i,
+  /\b(?:what|which)\s+(?:model|provider|steps?)\b[^.!?\n]{0,160}\b(?:generate|create|launch|start|make)\b/i,
+  /\b(?:before\s+i\s+(?:generate|create|launch|start|make)|what\s+(?:should|do)\s+i\s+(?:configure|set|know|check|prepare))\b/i,
+  /\b(?:dime|expl[ií]came|descr[ií]beme|mu[eé]strame)\b[^.!?\n]{0,96}\b(?:c[oó]mo|pasos?(?:\s+para)?)\b/i,
+  /\b(?:qu[eé])\s+pasos?\b[^.!?\n]{0,160}\b(?:gener|cre|lanz)/i,
+  /\b(?:antes\s+de\s+(?:generar|crear|lanzar)|qu[eé]\s+(?:debo|deber[ií]a)\s+(?:configurar|saber|preparar))\b/i,
+  // Educational stop/cancel questions must not kill the active GPU job.
+  /\bhow\s+(?:can|do|would|should)\s+(?:i|we|you)\s+(?:stop|cancel|abort)\b/i,
+  /\bhow\s+to\s+(?:stop|cancel|abort)\b/i,
+  /\bwhen\s+(?:should|do|can|would)\s+(?:i|we|you)\s+(?:stop|cancel|abort)\b/i,
+  /\bshould\s+(?:i|we)\s+(?:stop|cancel|abort)\b/i,
+  // Capability questions cover cancel and retry. "Can you cancel" stays a command.
+  // Anchor these additions to the request opening, not a caption inside a prompt.
+  /^(?:can|could|may)\s+(?:i|we)\s+(?:please\s+)?(?:stop|cancel|abort|retry|try\s+again)\b/i,
+  /^where\s+(?:do|can|should|would)\s+(?:i|we|you)\s+(?:stop|cancel|abort|retry|try\s+again)\b/i,
+  /^is\s+there\s+a\s+(?:way|button|option|control)\s+to\s+(?:stop|cancel|abort|retry|try\s+again)\b/i,
+  /\b(?:what|why)\b[^.!?\n]{0,80}\b(?:stop|cancel|abort)\b/i,
+  /\b(?:explain|describe|tell\s+me)\b[^.!?\n]{0,96}\b(?:stop|cancel|abort)\b/i,
+  /\b(?:c[oó]mo(?:\s+(?:lo|la|las|los|puedo|se))?\s+(?:paro|parar|cancelo|cancelar|detengo|detener))\b/i,
+  /\b(?:cu[aá]ndo|por\s+qu[eé]|qu[eé]\s+pasa)\b[^.!?\n]{0,80}\b(?:paro|parar|cancelo|cancelar|detengo|detener|stop|cancel)\b/i,
+  /\b(?:puedo|podemos|podr[ií]a)\s+(?:cancelar|parar|detener)\b/i,
+  /\b(?:debo|deber[ií]a)\s+(?:cancelar|parar|detener)\b/i,
+  /^(?:¿\s*)?d[oó]nde\b[^.!?\n]{0,80}\b(?:paro|parar|cancelo|cancelar|detengo|detener|reintento|reintentar|repite|repetir|stop|cancel|retry)\b/i,
+  /^(?:¿\s*)?(?:hay|existe)\s+(?:(?:alguna?|un|una)\s+)?(?:forma|manera|modo|bot[oó]n|opci[oó]n)\s+(?:de|para)\s+(?:cancelar|parar|detener|reintentar|repetir)\b/i,
+  // Educational retry questions must not relaunch a failed GPU job.
+  /\bhow\s+(?:can|do|would|should)\s+(?:i|we|you)\s+(?:retry|try\s+again)\b/i,
+  /\bhow\s+to\s+(?:retry|try\s+again)\b/i,
+  /\bwhen\s+(?:should|do|can|would)\s+(?:i|we|you)\s+(?:retry|try\s+again)\b/i,
+  /\bshould\s+(?:i|we)\s+(?:retry|try\s+again)\b/i,
+  /\b(?:what|why)\b[^.!?\n]{0,80}\b(?:retry|try\s+again)\b/i,
+  /\b(?:explain|describe|tell\s+me)\b[^.!?\n]{0,96}\b(?:retry|try\s+again)\b/i,
+  /\b(?:c[oó]mo(?:\s+(?:lo|la|las|los|puedo|se))?\s+(?:reintento|reintentar|repite|repetir))\b/i,
+  /\b(?:cu[aá]ndo|por\s+qu[eé]|qu[eé]\s+pasa)\b[^.!?\n]{0,80}\b(?:reintento|reintentar|repite|repetir|retry)\b/i,
+  /\b(?:puedo|podemos|podr[ií]a)\s+(?:reintentar|repetir)\b/i,
+  /\b(?:debo|deber[ií]a)\s+(?:reintentar|repetir)\b/i,
+  // UI-label questions mention "generate video" without being a launch command.
+  /\bwhat\s+does\b[^.!?\n]{0,80}\b(?:the\s+)?(?:generate|genera|launch|start)\b/i,
+  /^how\s+does\b[^.!?\n]{0,80}\b(?:the\s+)?(?:generate|genera|launch|start)\b/i,
+  /^what\s+is\b[^.!?\n]{0,80}\b(?:the\s+)?(?:generate\s+video|generate\s+button|video\s+generation|generation\s+workflow)\b/i,
+  /\btell\s+me\s+about\b[^.!?\n]{0,64}\b(?:the\s+)?(?:generate\s+video|video\s+generation|generation\s+workflow)\b/i,
+  /\bexpli(?:ca|came)\b[^.!?\n]{0,80}\b(?:qu[eé]\s+)?(?:significa|hace)\b[^.!?\n]{0,48}\b(?:genera|generate)\b/i,
+  /\bqu[eé]\s+hace\b[^.!?\n]{0,80}\b(?:el\s+)?(?:bot[oó]n\s+)?(?:genera|generate)\b/i,
+  /^(?:¿\s*)?qu[eé]\s+(?:es|significa)\b[^.!?\n]{0,80}\b(?:el\s+)?(?:bot[oó]n\s+)?(?:genera|generate)\b/i,
+  /^(?:¿\s*)?c[oó]mo\s+funciona\b[^.!?\n]{0,80}\b(?:el\s+)?(?:bot[oó]n\s+)?(?:genera|generate)\b/i,
+]
+
+// A real launch clause: verb plus a Studio medium in the same sentence.
+// Bare start/create/make must not disable how-to for a later question
+// ("Start over. How do I generate a video?").
+const OPENS_WITH_GENERATION_COMMAND = /^(?:¿\s*)?(?:(?:por favor|please)[, ]+)?(?:haz(?:me)?|haced(?:me)?|genera(?:me|d)?|gen[eé]rame|crea(?:me|d)?|cr[eé]ame|lanza(?:d)?|encola(?:d)?|renderiza(?:d)?|make|create|generate|render|launch|start|queue)\b[^.!?\n]{0,200}\b(?:v[ií]deos?|clips?|imagen(?:es)?|fotos?|retratos?|ilustraci[oó]n(?:es)?|images?|pictures?|photos?|portraits?|illustrations?|audio|canciones?|canci[oó]n|m[uú]sica|songs?|music|voices?|speech|tracks?|voz(?:es)?|3d)\b/i
+
+// Spoken filler before a real how-to. Do not unanchor the ^ patterns:
+// a caption inside the same generate sentence must stay a launch command.
+const HOW_TO_SPOKEN_PREFIX = /^(?:¿\s*)?(?:(?:hey|hi|hello|wait|ok|okay|so|um+|please|por\s+favor|oye|bueno|mira)[,.]?\s+)+/i
+
+function howToQuestionClauses(text: string): string[] {
+  const window = text.slice(0, 240)
+  // Only clause windows: the raw 240-character span would let unanchored
+  // "how to make" inside a later generate sentence classify the whole turn
+  // as educational ("Start over. Generate a video about how to make pasta").
+  // Do not split on newlines: a caption can wrap without becoming a new request.
+  return window.split(/[.!?]+/).map(clause => clause.replace(HOW_TO_SPOKEN_PREFIX, '').trim()).filter(Boolean)
+}
+
+export function isHowToGenerateQuestion(request: string): boolean {
+  const text = request.trim()
+  if (!text) return false
+  // Classify from the opening window so a long explanation after
+  // "how do I generate a video?" stays educational. A later command
+  // after 240 characters is treated as a separate request.
+  const clauses = howToQuestionClauses(text)
+  // The first clause is the user intent. If it is already a generate
+  // command, later !/? fragments are scene text, not a product question.
+  if (clauses[0] && OPENS_WITH_GENERATION_COMMAND.test(clauses[0])) return false
+  return clauses.some(part => {
+    if (OPENS_WITH_GENERATION_COMMAND.test(part)) return false
+    return HOW_TO_GENERATE.some(pattern => pattern.test(part))
+  })
+}
+
+const LABS_INVENTORY = /(?:¿\s*)?(?:qu[eé]\s+puedes\s+hacer|what\s+can\s+you\s+do)(?:\s+(?:en|in|con|with))?\s+(?:el\s+)?(?:series\s+lab|story\s+lab)/i
+
+export function isLabsInventoryQuestion(request: string): boolean {
+  const text = request.trim()
+  if (!text || text.length > 240) return false
+  return LABS_INVENTORY.test(text)
+}
+
+const EDITORIAL_COMMIT_TYPES = new Set([
+  'apply_story_proposal',
+  'approve_story_section',
+  'approve_story_visuals',
+  'commit_series_canon',
+])
+const EXPLICIT_EDITORIAL_COMMIT = /\b(?:aplica(?:r|d|me)?|acepta(?:r|d|me)?|aprueba(?:r|d|me)?|sella(?:r|d)?|marca(?:r)?\s+revisado|usa(?:r)?\s+esta\s+toma|apply|accept|approve|commit)\b/i
+
+export function requestAuthorizesEditorialCommit(request: string): boolean {
+  return EXPLICIT_EDITORIAL_COMMIT.test(request.trim())
+}
+
 export function isComicLaunchHowQuestion(request: string, history: ExampleConversation[] = []): boolean {
   const text = request.trim()
   if (!text || !COMIC_LAUNCH_HOW.test(text)) return false
@@ -1998,10 +2148,14 @@ export function isExplicitComicArtworkRequest(request: string, history: ExampleC
 
 function inferComicContext(text: string, history: ExampleConversation[]): boolean {
   if (/\b(?:c[oó]mics?|vi[nñ]etas?|tebeo)\b/i.test(text)) return true
-  return [...history].reverse().some(entry => (
+  // An assistant's general app inventory is not a user-selected comic context.
+  // An explicit Studio request also takes precedence over an older comic turn.
+  const studioContext = /\b(?:studio|flux|hunyuan(?:3d)?|(?:image|video)\s+(?:task|model|generation))\b/i
+  if (studioContext.test(text)) return false
+  const latestStudio = [...history].reverse().findIndex(entry => entry.role === 'user' && studioContext.test(entry.text))
+  const recent = latestStudio < 0 ? history : history.slice(history.length - latestStudio)
+  return [...recent].reverse().some(entry => (
     entry.role === 'user' && /\b(?:c[oó]mics?|vi[nñ]etas?|tebeo)\b/i.test(entry.text)
-  )) || [...history].reverse().some(entry => (
-    /\b(?:c[oó]mics?|vi[nñ]etas?|Comics Lab|Comic Director)\b/i.test(entry.text)
   ))
 }
 
@@ -2050,6 +2204,12 @@ export async function reconcileAgentTurnWithRequest(
   turn: AgentTurn,
   history: ExampleConversation[] = [],
 ): Promise<AgentTurn> {
+  const { reconcileStoryVisualRequest, isComicVisualContext } = await import('./storyVisualRequest')
+  if (isComicVisualContext(request)) turn = { ...turn, actions: turn.actions.filter(action => action.type !== 'generate_story_visuals') }
+  const storyVisualTurn = reconcileStoryVisualRequest(request, turn)
+  if (storyVisualTurn) return storyVisualTurn
+  const programmaticTurn = reconcileProgrammaticVideoRequest(request, turn)
+  if (programmaticTurn) return programmaticTurn
   const { maybeExampleTurn } = await import('./agentExamples')
   const exactEpisodeTitle = request.match(/\bepisodio\s+titulad[oa]\s+(?:exactamente\s+)?["“]([^"”]+)["”]/i)?.[1]?.trim()
   const preserveExactEpisodeTitle = (candidate: AgentTurn): AgentTurn => exactEpisodeTitle
@@ -2061,6 +2221,26 @@ export async function reconcileAgentTurnWithRequest(
       }
     : candidate
   turn = preserveExactEpisodeTitle(turn)
+  if (isComicLaunchHowQuestion(request, history)) {
+    return {
+      reply: [
+        'No hay un botón llamado **Render page**.',
+        'El dibujo de las viñetas es **Generate all images** en Comic Director (barra de Comics), o dímelo aquí: **lánzalo**.',
+        'Las viñetas entran en la **misma GPU**, una detrás de otra, no en paralelo. No es un segundo motor.',
+      ].join('\n\n'),
+      actions: [{ type: 'open_tab', tab: 'comics' }],
+    }
+  }
+  if (isHowToGenerateQuestion(request)) {
+    return {
+      ...turn,
+      actions: turn.actions.filter(action => (
+        action.type === 'open_tab'
+        || action.type === 'open_story_section'
+        || action.type === 'open_series_section'
+      )),
+    }
+  }
   if (isResumePreparedStudioVideoRequest(request)) {
     const existing = turn.actions.find(
       (action): action is AgentPrepareVideoAction => action.type === 'prepare_video',
@@ -2099,15 +2279,12 @@ export async function reconcileAgentTurnWithRequest(
       actions: [rhythmic3dWorkflow],
     }
   }
-  if (isComicLaunchHowQuestion(request, history)) {
-    return {
-      reply: [
-        'No hay un botón llamado **Render page**.',
-        'El dibujo de las viñetas es **Generate all images** en Comic Director (barra de Comics), o dímelo aquí: **lánzalo**.',
-        'Las viñetas entran en la **misma GPU**, una detrás de otra, no en paralelo. No es un segundo motor.',
-      ].join('\n\n'),
-      actions: [{ type: 'open_tab', tab: 'comics' }],
-    }
+  if (isLabsInventoryQuestion(request)) {
+    return { ...turn, actions: [] }
+  }
+  if (!requestAuthorizesEditorialCommit(request)) {
+    const actions = turn.actions.filter(action => !EDITORIAL_COMMIT_TYPES.has(action.type))
+    if (actions.length !== turn.actions.length) turn = { ...turn, actions }
   }
   const targetedComicPanel = comicPanelTarget(request, history)
   if (targetedComicPanel) {
@@ -2322,22 +2499,31 @@ export async function reconcileAgentTurnWithRequest(
     }
   }
   if (isExplicitSfxGenerationRequest(request)) {
-    const existing = turn.actions.find(
+    const authored = authoredSfxPackInput(request)
+    const proposed = turn.actions.find(
       (action): action is AgentQueueSfxPackAction => action.type === 'queue_sfx_pack',
     )
+    const existing = authored ? parseRegisteredCapability('queue_sfx_pack', authored) as AgentQueueSfxPackAction | null : proposed
     const clips = existing?.clips.length
       ? existing.clips
-      : GAME_SFX_HINT.test(request) ? ARCADE_HORDE_SFX_PACK : []
+      : !authored && GAME_SFX_HINT.test(request) ? ARCADE_HORDE_SFX_PACK : []
     if (clips.length) {
       return {
         reply: 'Prepararé Studio → Audio → SFX y encolaré el pack de efectos. Irán detrás de lo que ya use la GPU. La galería Audios solo muestra resultados cuando terminen. 🪄',
         actions: [{
+          ...existing,
           type: 'queue_sfx_pack',
           style: existing?.style || 'retro fantasy arcade',
           clips,
           confirm: true,
         }],
       }
+    }
+    if (authored || /\b(?:pack|paquete|lote|queue_sfx_pack|sfx_clips)\b/i.test(request)) {
+      // Missing pack data is not permission to invent a Video generation.
+      return { ...turn, reply: '', actions: [], rejections: [
+        ...(turn.rejections || []), rejectedWizardAction({ type: 'queue_sfx_pack' }, 0),
+      ] }
     }
   }
   if (isExplicitCancelRequest(request)) {
@@ -2371,13 +2557,13 @@ export async function reconcileAgentTurnWithRequest(
       (action): action is AgentPrepareAudioAction => action.type === 'prepare_audio',
     ) || {
         type: 'prepare_audio',
-        subMode: /\b(?:voz|speech|tts)\b/i.test(request) ? 'speech' : 'music',
+        subMode: /\b(?:voz|voice|speech|tts)\b/i.test(request) ? 'speech' : 'music',
         prompt: request.trim().slice(0, 8_000),
         durationSeconds: 15,
       } satisfies AgentPrepareAudioAction
     return {
       reply: 'Prepararé Studio → Audio con los valores visibles y enviaré la generación a la cola. 🪄',
-      actions: [...navigation, prepare, { type: 'start_generation', confirm: true }],
+      actions: [...navigation, restoreAuthoredMusicFields(request, prepare), { type: 'start_generation', confirm: true }],
     }
   }
   if (isExplicitVideoGenerationRequest(request)) {
@@ -2450,7 +2636,28 @@ export async function reconcileAgentTurnWithRequest(
 
 export const HOCUSPOCUS_REGISTERED_ACTION_SCHEMAS = registeredCapabilitySchemas()
 
-export const HOCUSPOCUS_AGENT_RESPONSE_SCHEMA: Record<string, unknown> = {
+function mergeRegisteredActionProperties(schema: Record<string, unknown>): Record<string, unknown> {
+  const items = (schema as {
+    properties?: { actions?: { items?: { properties?: Record<string, unknown> } } }
+  }).properties?.actions?.items
+  if (!items?.properties) return schema
+  const properties = { ...items.properties }
+  for (const capabilitySchema of HOCUSPOCUS_REGISTERED_ACTION_SCHEMAS) {
+    const declared = capabilitySchema && typeof capabilitySchema === 'object'
+      ? (capabilitySchema as { properties?: Record<string, unknown> }).properties
+      : undefined
+    if (!declared) continue
+    for (const [key, spec] of Object.entries(declared)) {
+      if (key === 'type' || key in properties) continue
+      properties[key] = spec
+    }
+  }
+  items.properties = properties
+  items.properties.type = { type: 'string', enum: listCapabilities().map(item => item.name) }
+  return schema
+}
+
+export const HOCUSPOCUS_AGENT_RESPONSE_SCHEMA: Record<string, unknown> = mergeRegisteredActionProperties({
   type: 'object',
   additionalProperties: false,
   properties: {
@@ -2514,6 +2721,8 @@ export const HOCUSPOCUS_AGENT_RESPONSE_SCHEMA: Record<string, unknown> = {
           world_summary: { type: 'string', maxLength: 3_000 },
           language: { type: 'string', maxLength: 120 },
           series_title: { type: 'string', maxLength: 300 },
+          series_id: { type: 'string', maxLength: 160 },
+          episode_id: { type: 'string', maxLength: 160 },
           series_premise: { type: 'string', maxLength: 3_000 },
           series_logline: { type: 'string', maxLength: 2_000 },
           episode_title: { type: 'string', maxLength: 300 },
@@ -2531,7 +2740,7 @@ export const HOCUSPOCUS_AGENT_RESPONSE_SCHEMA: Record<string, unknown> = {
           shot_numbers: { type: 'array', maxItems: 200, items: { type: 'integer', minimum: 1, maximum: 10_000 } },
           attempt_id: { type: 'string', maxLength: 160 },
           review_decision: { type: 'string', enum: ['', 'approve', 'reject'] },
-          review_scope: { type: 'string', enum: ['', 'selected_latest', 'all_latest'] },
+          review_scope: { type: 'string', enum: ['', 'selected_latest', 'all_latest', 'replace_latest'] },
           canon_decision: { type: 'string', enum: ['', 'accept_all', 'reject_all', 'accept_selected', 'reject_selected'] },
           canon_item_ids: { type: 'array', maxItems: 200, items: { type: 'string', maxLength: 160 } },
           target_names: { type: 'array', maxItems: 40, items: { type: 'string', maxLength: 300 } },
@@ -2578,19 +2787,8 @@ export const HOCUSPOCUS_AGENT_RESPONSE_SCHEMA: Record<string, unknown> = {
             },
           },
           audio_sub_mode: { type: 'string', enum: ['', 'speech', 'music', 'sfx'] },
+          sfx_text_weight: { type: 'number', minimum: 0, maximum: 5 },
           preset: { type: 'string', maxLength: 40 },
-          sfx_clips: {
-            type: 'array', maxItems: 12,
-            items: {
-              type: 'object', additionalProperties: false,
-              properties: {
-                name: { type: 'string', maxLength: 80 },
-                prompt: { type: 'string', maxLength: 1_500 },
-                duration_seconds: { type: 'number', minimum: 0, maximum: 20 },
-              },
-              required: ['name', 'prompt', 'duration_seconds'],
-            },
-          },
           story_visual_selections: {
             type: 'array', maxItems: 40,
             items: {
@@ -2684,6 +2882,10 @@ export const HOCUSPOCUS_AGENT_RESPONSE_SCHEMA: Record<string, unknown> = {
     },
   },
   required: ['reply', 'actions'],
+})
+
+export function wizardLlmRequestSchema(): Record<string, unknown> {
+  return HOCUSPOCUS_AGENT_RESPONSE_SCHEMA
 }
 
 export function buildAgentAppSnapshot(contextOptions: BuildWizardContextOptions = {}): AgentAppSnapshot {

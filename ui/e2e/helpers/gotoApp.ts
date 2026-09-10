@@ -1,13 +1,12 @@
 import { expect, type Page } from '@playwright/test'
 import { formatUnhandled, installApiRoutes, type ApiRouteOptions, type ApiRouteSession } from './apiRoutes'
 import { bootWatchdogPlaceholderPath } from './bootWatchdogPlaceholderPath'
+import { lockUiLanguage } from './lockUiLanguage'
 
 export async function gotoApp(page: Page, options: ApiRouteOptions = {}): Promise<ApiRouteSession> {
   await page.emulateMedia({ reducedMotion: 'reduce' })
   const session = await installApiRoutes(page, options)
-  await page.addInitScript(() => {
-    window.localStorage.setItem('hocuspocus_welcome_seen_v1', '1')
-  })
+  await lockUiLanguage(page, 'en')
   // index.html replaces the document after 10s if #root has no element
   // children. The production bundle can take longer than that to parse
   // on a cold CI runner; keep a placeholder so the watchdog stays inert.

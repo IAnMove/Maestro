@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Check, Plus, RotateCcw, Trash2 } from 'lucide-react'
 import { Pill, SeriesField } from './components'
-import { SeriesShotDurationControl } from './SeriesShotDurationControl'
+import { SeriesShotDraftFields } from './SeriesShotDraftFields'
 import { greenButton, inputClass, secondaryButton, textareaClass } from './styles'
 import type { SeriesEpisode, SeriesProject, SeriesScene, SeriesShot } from './types'
 import { useUiTranslation } from '../../i18n'
@@ -91,24 +91,9 @@ export function SeriesEpisodeProposalReview({
       <div className="grid gap-3 xl:grid-cols-2">
         {draft.shots.map((shot, shotIndex) => <div key={shot.id} className="rounded-xl border border-border bg-bg-primary p-3">
           <div className="mb-3 flex flex-wrap items-center gap-2"><Pill tone="violet">{t('proposal.shot', { number: shotIndex + 1 })}</Pill><Pill tone="blue">{shot.durationSeconds}s</Pill><span className="truncate text-[10px] text-text-muted">{t('proposal.scene', { number: draft.script.findIndex(scene => scene.id === shot.sceneId) + 1 })}</span></div>
-          <div className="grid gap-2 sm:grid-cols-3">
-            <SeriesField label={t('proposal.sceneField')}><select className={inputClass} value={shot.sceneId} onChange={event => updateShot(shotIndex, item => ({ ...item, sceneId: event.target.value, locationId: draft.script.find(scene => scene.id === event.target.value)?.locationId || item.locationId }))}>{draft.script.map((scene, index) => <option key={scene.id} value={scene.id}>{t('proposal.sceneOption', { number: index + 1, purpose: scene.purpose.slice(0, 40) })}</option>)}</select></SeriesField>
-            <SeriesShotDurationControl workspace={workspace} series={series} shot={shot} onChange={planned => updateShot(shotIndex, () => planned)} />
-            <SeriesField label={t('proposal.framing')}><input className={inputClass} value={shot.framing} onChange={event => updateShot(shotIndex, item => ({ ...item, framing: event.target.value }))} /></SeriesField>
-          </div>
-          <div className="mt-2 grid gap-2 lg:grid-cols-2">
-            <SeriesField label={t('proposal.camera')}><textarea className={textareaClass} value={shot.camera} onChange={event => updateShot(shotIndex, item => ({ ...item, camera: event.target.value }))} /></SeriesField>
-            <SeriesField label={t('proposal.action')}><textarea className={textareaClass} value={shot.action} onChange={event => updateShot(shotIndex, item => ({ ...item, action: event.target.value }))} /></SeriesField>
-            <SeriesField label={t('proposal.prompt')}><textarea className={textareaClass} value={shot.prompt} onChange={event => updateShot(shotIndex, item => ({ ...item, prompt: event.target.value }))} /></SeriesField>
-            <SeriesField label={t('proposal.negative')}><textarea className={textareaClass} value={shot.negativePrompt} onChange={event => updateShot(shotIndex, item => ({ ...item, negativePrompt: event.target.value }))} /></SeriesField>
-            <SeriesField label={t('proposal.audio')}><textarea className={textareaClass} value={shot.audioDirection || ''} onChange={event => updateShot(shotIndex, item => ({ ...item, audioDirection: event.target.value }))} /></SeriesField>
-          </div>
+          <SeriesField label={t('proposal.sceneField')}><select className={inputClass} value={shot.sceneId} onChange={event => updateShot(shotIndex, item => ({ ...item, sceneId: event.target.value, locationId: draft.script.find(scene => scene.id === event.target.value)?.locationId || item.locationId }))}>{draft.script.map((scene, index) => <option key={scene.id} value={scene.id}>{t('proposal.sceneOption', { number: index + 1, purpose: scene.purpose.slice(0, 40) })}</option>)}</select></SeriesField>
+          <SeriesShotDraftFields workspace={workspace} series={series} shot={shot} onChange={next => updateShot(shotIndex, () => next)} />
           <div className="mt-2"><p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-text-muted">{t('proposal.visibleCharacters')}</p><div className="flex flex-wrap gap-2">{series.characters.map(character => { const isSpeaker = shot.dialogueBeats.some(line => line.characterId === character.id); return <label key={character.id} title={isSpeaker ? t('proposal.speakerMustStay') : undefined} className="flex items-center gap-1 rounded-md border border-border bg-bg-secondary px-2 py-1 text-[10px] text-text-secondary"><input type="checkbox" disabled={isSpeaker} checked={shot.visibleCharacterIds.includes(character.id) || isSpeaker} onChange={event => updateShot(shotIndex, item => ({ ...item, visibleCharacterIds: event.target.checked ? [...item.visibleCharacterIds, character.id] : item.visibleCharacterIds.filter(id => id !== character.id) }))} />{character.name}</label> })}</div></div>
-          {shot.dialogueBeats.length > 0 && <div className="mt-3 space-y-2"><p className="text-[10px] font-semibold uppercase tracking-wide text-text-muted">{t('proposal.dialogueInShot')}</p>{shot.dialogueBeats.map((line, lineIndex) => <div key={line.id} className="grid gap-2 rounded-lg border border-border bg-bg-secondary p-2 md:grid-cols-[150px_1fr_120px]">
-            <select className={inputClass} value={line.characterId} onChange={event => updateShot(shotIndex, item => ({ ...item, dialogueBeats: item.dialogueBeats.map((entry, index) => index === lineIndex ? { ...entry, characterId: event.target.value } : entry), visibleCharacterIds: item.visibleCharacterIds.includes(event.target.value) ? item.visibleCharacterIds : [...item.visibleCharacterIds, event.target.value] }))}>{series.characters.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select>
-            <textarea className={`${textareaClass} min-h-10`} value={line.text} onChange={event => updateShot(shotIndex, item => ({ ...item, dialogueBeats: item.dialogueBeats.map((entry, index) => index === lineIndex ? { ...entry, text: event.target.value } : entry) }))} />
-            <input className={inputClass} value={line.emotion} placeholder={t('proposal.emotion')} onChange={event => updateShot(shotIndex, item => ({ ...item, dialogueBeats: item.dialogueBeats.map((entry, index) => index === lineIndex ? { ...entry, emotion: event.target.value } : entry) }))} />
-          </div>)}</div>}
         </div>)}
       </div>
     </ProposalSection>

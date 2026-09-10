@@ -1,5 +1,6 @@
 import type { SceneFaceBindingState, SceneLayer } from '../types'
 import type { SceneRecipeInventoryItem } from './sceneRecipe'
+import { assertFacePatchPose, facePatchSceneTransform, isFacePatchCompatible, type FacePatchMetadata } from './characterFacePatch'
 
 export type CharacterKitStyle = 'cutout' | 'children-illustration' | 'anime-2d'
 export type CharacterKitReviewState = 'pending' | 'approved' | 'rejected'
@@ -16,6 +17,7 @@ export interface CharacterKitAsset {
   prompt?: string
   model?: string
   workspace?: string
+  facePatch?: FacePatchMetadata
 }
 
 export interface CharacterFaceAnchor {
@@ -26,6 +28,13 @@ export interface CharacterFaceAnchor {
 }
 
 export interface CharacterKit {
+  /** Additive to the existing 2D kit; scene utterances never live in the character. */
+  speech3d?: {
+    model: import('../features/scene3d/types').Scene3DSourceRef
+    digest: string
+    settings?: import('../features/scene3d/speech/profiles').FaceSettings
+  }
+  voice?: import('./characterVoice').CharacterVoice
   version: 1
   id: string
   name: string
@@ -65,9 +74,66 @@ export const emptyCharacterKitLibrary = (): CharacterKitLibrary => ({ version: 1
 
 const cleanId = (value: string) => value.trim().toLocaleLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 120)
 
-export function createCharacterKit(name: string, style: CharacterKitStyle = 'cutout'): CharacterKit {
+// getRandomValues is also available on plain-HTTP LAN sessions; randomUUID is not.
+function randomIdSuffix(): string {
+  const bytes = globalThis.crypto.getRandomValues(new Uint8Array(8))
+  return Array.from(bytes, value => value.toString(16).padStart(2, '0')).join('')
+}
+
+function wipedAssetId(parentId: string): string {
+  return `${parentId.slice(0, 70)}-wiped-${randomIdSuffix()}${randomIdSuffix()}`
+}
+
+/** Prefer a stable slug from the display name. Never reuse a taken library id. */
+export function nextCharacterKitId(name: string, takenIds: Iterable<string> = []): string {
+  const base = cleanId(name) || `character-${Date.now().toString(36)}`
+  const used = new Set([...takenIds].filter(Boolean))
+  if (!used.has(base)) return base
+  let candidate = `${base.slice(0, 100)}-${randomIdSuffix()}`
+  while (used.has(candidate)) candidate = `${base.slice(0, 100)}-${randomIdSuffix()}`
+  return candidate
+}
+
+function retargetKitIdentity(kit: CharacterKit, nextId: string): CharacterKit {
+  if (kit.id === nextId) return kit
+  const rewrite = (asset?: CharacterKitAsset) => {
+    if (!asset) return asset
+    return { ...asset, id: asset.id.startsWith(`${kit.id}-`) ? `${nextId}${asset.id.slice(kit.id.length)}` : asset.id }
+  }
+  return {
+    ...kit,
+    id: nextId,
+    identityReference: rewrite(kit.identityReference),
+    base: rewrite(kit.base),
+    poses: Object.fromEntries(Object.entries(kit.poses).map(([key, asset]) => [key, rewrite(asset)!])),
+    mouth: Object.fromEntries(Object.entries(kit.mouth).map(([key, asset]) => [key, rewrite(asset)!])),
+    eyes: Object.fromEntries(Object.entries(kit.eyes).map(([key, asset]) => [key, rewrite(asset)!])),
+    updatedAt: new Date().toISOString(),
+  }
+}
+
+/**
+ * A brand-new Scene Animator / Face Rig draft that collided on the name slug
+ * must not PATCH over an existing actor. Editing the opened kit keeps its id.
+ */
+export function claimUnusedCharacterKitId(kit: CharacterKit, library: CharacterKitLibrary): CharacterKit {
+  const existing = library.kits[kit.id]
+  if (!existing) return kit
+  const method = typeof kit.provenance[0]?.method === 'string' ? kit.provenance[0].method : ''
+  const freshDraft = method === 'scene-layer-assignment' || method === 'character-creator-handoff'
+  if (!freshDraft) return kit
+  if (existing.base?.source && existing.base.source === kit.base?.source) return kit
+  if (existing.identityReference?.source && existing.identityReference.source === kit.identityReference?.source) return kit
+  return retargetKitIdentity(kit, nextCharacterKitId(kit.name, Object.keys(library.kits)))
+}
+
+export function createCharacterKit(
+  name: string,
+  style: CharacterKitStyle = 'cutout',
+  takenIds: Iterable<string> = [],
+): CharacterKit {
   const now = new Date().toISOString()
-  const id = cleanId(name) || `character-${Date.now().toString(36)}`
+  const id = nextCharacterKitId(name, takenIds)
   return { version: 1, id, name: name.trim() || 'Untitled character', style, poses: {}, mouth: {}, eyes: {}, anchors: {}, provenance: [], createdAt: now, updatedAt: now }
 }
 
@@ -89,7 +155,7 @@ export function registerGeneratedKitPose(
   }
 }
 
-/** Replace a pose with a mouth-wiped copy. Keeps review state; does not delete the original file. */
+/** A changed image is a new pending asset. Never inherit visual approval from its parent. */
 export function registerWipedKitPose(
   kit: CharacterKit,
   poseId: string,
@@ -99,11 +165,13 @@ export function registerWipedKitPose(
   if (!asset.source || asset.source.startsWith('blob:')) throw new Error('Wiped poses need a persistent source.')
   const current = normalizedPoseId === 'base' ? kit.base : kit.poses[normalizedPoseId]
   if (!current) throw new Error(`Character Kit “${kit.name}” has no ${normalizedPoseId} pose to wipe.`)
+  if (asset.source === current.source) throw new Error('Save the changed pose as a new image before replacing it.')
   const nextAsset: CharacterKitAsset = {
     ...current,
     ...asset,
     kind: 'image',
-    reviewState: current.reviewState === 'approved' ? 'approved' : 'pending',
+    id: asset.id === current.id ? wipedAssetId(current.id) : asset.id,
+    reviewState: 'pending',
   }
   return {
     ...kit,
@@ -171,6 +239,7 @@ export function mountCharacterKitLayers(
   poseId = 'base',
   transform: SceneLayer['transform'] = { x: 50, y: 55, scale: .72, opacity: 1, rotation: 0 },
   duration = 10,
+  viewport = { width: 1280, height: 720 },
 ): SceneLayer[] {
   const poseAsset = poseId === 'base' ? kit.base : kit.poses[poseId]
   if (!poseAsset) throw new Error(`Character Kit “${kit.name}” has no ${poseId} pose.`)
@@ -189,7 +258,10 @@ export function mountCharacterKitLayers(
   for (const state of ['closed', 'small', 'wide', 'round'] as const) {
     const asset = kit.mouth[state]
     if (!asset || asset.reviewState !== 'approved') continue
-    const mouthTransform = { ...faceTransform(anchors?.mouthStates?.[state] ?? mouthAnchor), opacity: state === 'closed' ? 1 : 0 }
+    assertFacePatchPose(asset, poseId, poseAsset.source)
+    const anchor = anchors?.mouthStates?.[state] ?? mouthAnchor
+    const placed = asset.facePatch ? facePatchSceneTransform(transform, anchor, asset.facePatch, viewport) : faceTransform(anchor)
+    const mouthTransform = { ...placed, opacity: state === 'closed' ? 1 : 0 }
     layers.push({
       id: `kit-${kit.id}-mouth-${state}`, name: `${kit.name} Mouth ${state}`, type: 'overlay', source: asset.source,
       visible: true, locked: false, z: z++, fill: false, parallax: 1, transform: mouthTransform,
@@ -228,11 +300,18 @@ export function syncMountedCharacterKitLayers(
   layers: SceneLayer[],
   kit: CharacterKit,
   poseId = 'base',
+  viewport = { width: 1280, height: 720 },
 ): SceneLayer[] {
   const poseLayerId = `kit-${kit.id}-pose-${cleanId(poseId) || 'base'}`
   const pose = layers.find(layer => layer.id === poseLayerId)
   if (!pose) return layers
-  const mounted = mountCharacterKitLayers(kit, poseId, pose.transform, pose.animation?.duration ?? 10)
+  const sourcePose = poseId === 'base' ? kit.base : kit.poses[poseId]
+  // A pending/replaced pose must not silently alter an already-authored scene,
+  // or throw from React's automatic library-sync effect. Explicit mounting still rejects it.
+  if (!sourcePose || sourcePose.reviewState !== 'approved') return layers
+  if (Object.values(kit.mouth).some(asset => asset?.reviewState === 'approved'
+    && !isFacePatchCompatible(asset, poseId, sourcePose.source))) return layers
+  const mounted = mountCharacterKitLayers(kit, poseId, pose.transform, pose.animation?.duration ?? 10, viewport)
   const byId = new Map(mounted.map(layer => [layer.id, layer]))
   const next = layers.map(layer => {
     const replacement = byId.get(layer.id)
@@ -272,7 +351,7 @@ export function parseCharacterKitPoseLayerId(layerId: string): { kitId: string, 
 }
 
 /** Re-apply the live Character Kit library onto any kit puppets already in a scene. */
-export function syncSceneCharacterKits(layers: SceneLayer[], library: CharacterKitLibrary): SceneLayer[] {
+export function syncSceneCharacterKits(layers: SceneLayer[], library: CharacterKitLibrary, viewport = { width: 1280, height: 720 }): SceneLayer[] {
   const poseLayerIds = new Set<string>()
   for (const layer of layers) {
     if (parseCharacterKitPoseLayerId(layer.id)) poseLayerIds.add(layer.id)
@@ -284,7 +363,7 @@ export function syncSceneCharacterKits(layers: SceneLayer[], library: CharacterK
     const parsed = parseCharacterKitPoseLayerId(poseLayerId)
     const kit = parsed ? library.kits[parsed.kitId] : undefined
     if (!parsed || !kit) continue
-    next = syncMountedCharacterKitLayers(next, kit, parsed.poseId)
+    next = syncMountedCharacterKitLayers(next, kit, parsed.poseId, viewport)
   }
   return next
 }

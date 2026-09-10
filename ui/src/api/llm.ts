@@ -1,8 +1,11 @@
-import type { H3WindowPlan } from '../types'
+import type { H3WindowPlan, GenerateParams } from '../types'
 import { BASE } from './http'
+import { normalizeVisualEvidence, type VisualEvidence } from '../features/agent/visualEvidence'
 
 export async function planH3Windows(params: {
   prompt: string
+  planning_style?: 'faithful' | 'creative'
+  h3_audio_policy?: 'native' | 'legacy'
   model_type: string
   resolution: string
   total_frames: number
@@ -13,6 +16,9 @@ export async function planH3Windows(params: {
   has_start_image?: boolean
   has_end_image?: boolean
   image_paths?: string[]
+  reference_context?: string
+  minimax_h3_references?: GenerateParams["minimax_h3_references"]
+  minimax_h3_reference_sequence?: boolean
 }): Promise<H3WindowPlan> {
   const res = await fetch(`${BASE}/api/v1/llm/plan-h3-windows`, {
     method: 'POST',
@@ -62,6 +68,9 @@ export async function writeSong(params: {
 // --- LLM Service ---
 
 export async function generateLlmText(params: {
+  onMediaEvidence?: (evidence: VisualEvidence[]) => void
+  media?: { source: string; kind: 'image' | 'video' }[]
+  workspace?: string
   prompt: string
   system_prompt?: string
   max_new_tokens?: number
@@ -83,6 +92,8 @@ export async function generateLlmText(params: {
       frequency_penalty: params.frequency_penalty ?? 0,
       presence_penalty: params.presence_penalty ?? 0,
       json_schema: params.json_schema,
+      media: params.media,
+      workspace: params.workspace,
     }),
   })
   if (!res.ok) {
@@ -90,6 +101,7 @@ export async function generateLlmText(params: {
     throw new Error(err.detail || err.error || 'LLM generate failed')
   }
   const body = await res.json()
+  params.onMediaEvidence?.(normalizeVisualEvidence(body.media_evidence))
   return String(body.text || '')
 }
 
@@ -141,6 +153,8 @@ export async function testLlmConnection(): Promise<{ ok: boolean; response: stri
 }
 
 export async function llmEnhancePrompt(params: {
+  planning_style?: 'faithful' | 'creative'
+  h3_audio_policy?: 'native' | 'legacy'
   prompt: string
   mode?: string
   model_type?: string

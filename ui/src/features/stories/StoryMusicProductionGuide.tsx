@@ -16,17 +16,17 @@ export function StoryMusicProductionGuide(props: StoryProductionsTabProps) {
         <p className="mt-0.5 text-[9px] leading-relaxed text-text-muted">{t('productions.howToGenerateHint')}</p>
       </div>
       <div className="grid gap-1.5 md:grid-cols-3">
-        <button type="button" onClick={() => patch({ musicVideoGenerationMode: 'image_guided' })}
+        <button type="button" aria-pressed={project.musicVideoGenerationMode === 'image_guided'} onClick={() => patch({ musicVideoGenerationMode: 'image_guided' })}
           className={`${button} flex-col ${project.musicVideoGenerationMode === 'image_guided' ? 'border-pink-500/60 text-pink-300' : ''}`}>
           <span>{t('productions.withImages')}</span>
           <span className="text-[9px] text-text-muted">{t('productions.withImagesHint')}</span>
         </button>
-        <button type="button" onClick={() => patch({ musicVideoGenerationMode: 'direct_references' })}
+        <button type="button" aria-pressed={directReferenceVideo} onClick={() => patch({ musicVideoGenerationMode: 'direct_references' })}
           className={`${button} flex-col ${directReferenceVideo ? 'border-violet-400/70 bg-violet-500/10 text-violet-200' : ''}`}>
           <span>{t('productions.directWithRefs')}</span>
           <span className="text-[9px] text-text-muted">{t('productions.h3NoStart')}</span>
         </button>
-        <button type="button" disabled={project.protagonistConsistency} onClick={() => patch({ musicVideoGenerationMode: 'direct_video' })}
+        <button type="button" aria-pressed={directMusicVideo} disabled={project.protagonistConsistency} onClick={() => patch({ musicVideoGenerationMode: 'direct_video' })}
           className={`${button} flex-col ${directMusicVideo ? 'border-fuchsia-400/70 bg-fuchsia-500/10 text-fuchsia-200' : ''}`}>
           <span>{t('productions.directVideoNoImages')}</span>
           <span className="text-[9px] text-text-muted">{t('productions.pureT2v')}</span>

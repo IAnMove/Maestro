@@ -100,3 +100,69 @@ def resolve_permitted_media_path(
             return candidate
     raise FileNotFoundError("Permitted media file was not found")
 
+
+def resolve_voice_ref_paths(
+    refs: Iterable[str],
+    *,
+    uploads_root: str,
+    workspace_root: str,
+) -> list[str]:
+    """Resolve SeedVC voice refs to real files under uploads or the workspace.
+
+    Upload-audio stores files in uploads/audio/; the UI must send that
+    subfolder (or an absolute path). Bare filenames only match a workspace
+    file or a file sitting directly in uploads/. Unresolvable entries are
+    dropped so a stale ref cannot crash generation.
+    """
+    resolved: list[str] = []
+    for value in refs:
+        if not isinstance(value, str) or not value.strip() or "\x00" in value:
+            continue
+        try:
+            resolved.append(
+                resolve_permitted_media_path(
+                    value,
+                    uploads_root=uploads_root,
+                    workspace_root=workspace_root,
+                    kinds=("audio", "video"),
+                )
+            )
+        except (MediaPathNotAllowed, FileNotFoundError, ValueError):
+            continue
+    return resolved
+
+
+def resolve_story_cover_audio(
+    filename: str,
+    *,
+    uploads_audio_root: str,
+    uploads_root: str,
+    workspace_root: str,
+) -> str:
+    """Resolve a Story cover reference from uploads/audio or the workspace.
+
+    Cover jobs used to look only in uploads/audio/. The shared picker can also
+    bind a catalog track that already lives in the workspace, so fall back to
+    the confined resolver when that basename is not an upload.
+    """
+    name = os.path.basename(str(filename or "").strip())
+    if not name or "\x00" in name:
+        raise FileNotFoundError("Permitted media file was not found")
+
+    audio_root = os.path.realpath(os.path.abspath(uploads_audio_root))
+    uploaded = os.path.realpath(os.path.abspath(os.path.join(audio_root, name)))
+    if (
+        _is_contained(uploaded, audio_root)
+        and uploaded != audio_root
+        and os.path.splitext(uploaded)[1].lower() in _KIND_EXTENSIONS["audio"]
+        and os.path.isfile(uploaded)
+    ):
+        return uploaded
+
+    return resolve_permitted_media_path(
+        name,
+        uploads_root=uploads_root,
+        workspace_root=workspace_root,
+        kinds=("audio",),
+    )
+

@@ -1,0 +1,576 @@
+{
+  "speech": {
+    "resting": "en silencio",
+    "speaking": "hablando",
+    "characterDefinition": "Personaje reutilizable · modelo 3D, cara y voz",
+    "definitionHint": "La ficha guarda el modelo y su cara. Cada escena conserva una copia independiente; sus frases y audios no se guardan en el personaje.",
+    "savedCharacter": "Personaje de la biblioteca",
+    "newCharacter": "Crear personaje nuevo",
+    "useCharacter": "Usar personaje en este plano",
+    "definitionName": "Nombre del personaje",
+    "saveCharacter": "Guardar personaje con cara y voz",
+    "characterSaved": "Personaje guardado. Modelo, boca, ojos y voz disponibles en otros planos.",
+    "characterApplied": "Personaje aplicado. Los turnos del plano se conservan.",
+    "reloadLibrary": "Recargar biblioteca",
+    "libraryReloaded": "Biblioteca actualizada. Revisa el personaje antes de volver a guardar.",
+    "editCharacterFace": "Ajustar boca y ojos en Vídeo3D",
+    "libraryVoice": "Voz preferida (opcional)",
+    "noPreferredVoice": "Sin voz preferida · usar audio existente",
+    "voiceDirection": "Dirección de voz (opcional)",
+    "voiceHint": "Qwen3 CustomVoice local. Idioma detectado por el texto. Requiere el modelo instalado; no se guardan claves ni se genera audio automáticamente.",
+    "generateVoice": "Generar voz de esta frase",
+    "attachGeneratedVoice": "Aplicar audio ya generado",
+    "existingAudioWins": "Esta frase ya tiene audio: se reutiliza y no se genera otra voz.",
+    "explicitGeneration": "Solo este botón genera audio. Se usa el texto literal y luego Rhubarb local calcula los labios.",
+    "voiceTooLong": "El audio dura {{seconds}} s y no cabe en este turno. Amplía su fin y pulsa Aplicar audio ya generado. Archivo conservado: {{file}}",
+    "noLinkedCharacter": "Sin vincular · elegir GLB manualmente",
+    "missingCharacter": "Personaje no disponible en la biblioteca",
+    "otherWorkspace": "Referencia guardada en {{workspace}}.",
+    "textOnlyProduction": "Sin audio: se abrirán los turnos editables. Puedes añadir audio o generar cada frase con la voz del personaje dentro de Vídeo3D.",
+    "sourceCharacter": "Personaje de la historia",
+    "manualCharacter": "Elegir desde la biblioteca",
+    "previousShot": "Volver al plano anterior (conserva este borrador)",
+    "soundtrack": "Audio original de la escena",
+    "soundtrackHint": "Se reproduce una sola vez. Las bocas usan sus propios tiempos; silenciar aquí no elimina la sincronía.",
+    "interventions": "Intervenciones de este personaje",
+    "intervention": "Intervención",
+    "addIntervention": "Añadir intervención",
+    "literalText": "Diálogo o letra (referencia literal)",
+    "end": "Fin de intervención (s)",
+    "playVoice": "Reproducir el audio de esta intervención",
+    "playVoiceHint": "Desactívalo si esta voz ya está en la pista de la escena. La boca seguirá sincronizada.",
+    "saveProfile": "Guardar ajuste para este modelo",
+    "loadProfile": "Recuperar ajuste guardado",
+    "profileSaved": "Ajuste guardado para este GLB. Se reutilizará en otros planos del workspace.",
+    "profileLoaded": "Ajuste recuperado. Las voces y tiempos de esta escena no han cambiado.",
+    "profileMissing": "Este modelo aún no tiene un ajuste guardado.",
+    "loadBeforeSave": "Ya existe un ajuste. Recupéralo antes de actualizarlo.",
+    "phoneticHint": "Rhubarb propone gestos; no reconoce quién habla. Para canciones funciona mejor con voz aislada: puedes usarla como guía muda de la boca y mantener la canción en el audio de la escena.",
+    "productionEntry": "Lip-sync con personajes 3D",
+    "productionHint": "Elige los GLB y el audio existente. Prepararemos un plano en Vídeo 3D sin cambiar la producción original ni generar modelos o voces. Tiempos de reparto sin marcas: propuesta inicial editable; no alineación de palabras.",
+    "twoSpeakers": "Usa uno o dos personajes por plano. Divide las intervenciones si necesitas más.",
+    "openProduction": "Preparar plano en Vídeo 3D",
+    "productionReady": "Audio y personajes proceden de tu producción. Revisa la boca y los tiempos antes de exportar; el original no se ha sustituido.",
+    "kind": {
+      "song": "Canción",
+      "dialogue": "Diálogo",
+      "episode": "Capítulo",
+      "trailer": "Tráiler"
+    },
+    "title": "Voz y lip-sync 3D",
+    "intro": "Edita solo este sujeto: añade labios, elige una voz y pulsa Reproducir.",
+    "option": "Voz y lip-sync",
+    "character": "Personaje",
+    "selectCharacter": "Selecciona un personaje",
+    "chooseModel": "Primero elige un modelo GLB en la tarjeta de este personaje, debajo del visor.",
+    "advancedImport": "Importar ajustes existentes (opcional)",
+    "importKit": "Importar kit de Taberna (.zip)",
+    "enabled": "Activar labios",
+    "profile": "Perfil de colocación",
+    "generic": "Humanoide genérico",
+    "calibrate": "Aplicar referencia",
+    "noFace": "Espera a que cargue el GLB y reintenta. La boca necesita una malla con un único material estándar.",
+    "voice": "Voz del personaje",
+    "pickVoice": "Elige audio (máx. 10 min / 32 MB); analiza fragmentos de hasta 90 s",
+    "analyze": "Calcular gestos con Rhubarb (local)",
+    "importCues": "Importar gestos JSON",
+    "fit": "Ajustar duración a las voces",
+    "cues_one": "{{count}} gesto",
+    "cues_other": "{{count}} gestos",
+    "driver": {
+      "imported": "Gestos importados",
+      "rhubarb": "Gestos fonéticos · Rhubarb",
+      "amplitude": "Movimiento por volumen",
+      "rhubarb-vocals": "Rhubarb · voz aislada"
+    },
+    "amplitudeHint": "El volumen solo abre/cierra la boca: no reconoce fonemas. Calcula gestos con Rhubarb para mejorar el resultado.",
+    "start": "Inicio en escena (s)",
+    "offset": "Recortar inicio del audio (s)",
+    "gain": "Volumen",
+    "needsPlacement": "Añade labios a este sujeto antes de visualizar su voz sobre el modelo.",
+    "busy": "Preparando voz o kit…",
+    "adjust": "Ajustar boca y expresiones",
+    "adjustHint": "X: izquierda/derecha; Y: arriba/abajo; Z: profundidad. Orienta la cara hacia delante (+Z), ajusta anchura/altura y reproduce. El GLB se conserva.",
+    "mouth": "Boca",
+    "width": "Anchura",
+    "height": "Altura",
+    "mesh": "Malla facial",
+    "skin": "Color de piel",
+    "clean": "Cubrir boca original",
+    "strength": "Apertura",
+    "style": "Dibujo de boca",
+    "soft": "Suave",
+    "toon": "Dibujada",
+    "pixel": "Píxel",
+    "lip": "Color de labios",
+    "eyes": "Animar ojos",
+    "blink": "Parpadeo automático",
+    "expressionLabel": "Expresión",
+    "expression": {
+      "neutral": "Neutra",
+      "happy": "Alegre",
+      "angry": "Enfadada",
+      "worried": "Preocupada",
+      "surprised": "Sorprendida",
+      "sleepy": "Somnolienta"
+    },
+    "eyeY": "Altura de ojos",
+    "eyeSpacing": "Separación de ojos",
+    "eyeWidth": "Anchura de ojos",
+    "eyeHeight": "Altura de párpados",
+    "audioBlocked": "No se pudo reproducir la voz. Comprueba el archivo y pulsa Pausar y Reproducir; la exportación avisa si el audio falla.",
+    "addLips": "Añadir labios",
+    "editLips": "Editar labios",
+    "reviewPlacement": "Revisa la posición y el tamaño de la boca sobre este modelo.",
+    "manualPlacement": "No se reconoce la cabeza. Ajusta esta posición inicial con Boca X/Y/Z y Anchura/Altura.",
+    "placementReferences": "Referencias de colocación avanzadas",
+    "referencesHint": "Aplica la colocación a este sujeto. Revisa el encaje si usas la referencia de otro personaje.",
+    "characterLibraryAdvanced": "Avanzado: personajes reutilizables y voz preferida",
+    "recordVoice": "Grabar con micrófono",
+    "stopRecording": "Detener grabación",
+    "cancelRecording": "Cancelar grabación",
+    "exampleVoice": "Usar ejemplo en inglés",
+    "recording": "Grabando… Se detiene a los 90 segundos.",
+    "microphonePermission": "Esperando permiso para el micrófono…",
+    "microphoneUnavailable": "Para grabar necesitas HTTPS o localhost y un navegador compatible. Aquí puedes usar el ejemplo o subir un audio.",
+    "microphoneDenied": "Se ha denegado el acceso al micrófono. Permítelo en el navegador y reintenta.",
+    "recordingFailed": "Ha fallado la grabación. Comprueba el micrófono y reintenta.",
+    "recordingPreview": "Escuchar grabación",
+    "useRecording": "Usar grabación para este sujeto",
+    "discardRecording": "Descartar grabación",
+    "voicePreview": "Escuchar la voz de este sujeto",
+    "pickLips": "Colocar con un clic sobre la cara",
+    "pickHint": "Haz clic en la boca del sujeto seleccionado. Escape cancela.",
+    "pickMissed": "Haz clic en la cara del modelo seleccionado, no en el fondo.",
+    "cancelPlacement": "Cancelar colocación",
+    "isolation": {
+      "label": "Aislar voz antes de calcular labios",
+      "loading": "Comprobando el modelo local opcional…",
+      "ready": "BS-RoFormer instalado · CPU. Separa la voz solo para analizar los labios; conserva el audio original al reproducir. Hasta 90 segundos; puede tardar varios minutos. Sin descargas ni servicios externos.",
+      "missing": "Modelo opcional no disponible. Necesita audio-separator instalado y el checkpoint BS-RoFormer con su YAML en app/ckpts/roformer. No se descarga nada automáticamente.",
+      "error": "No se pudo comprobar el modelo opcional.",
+      "retry": "Comprobar de nuevo"
+    }
+  },
+  "title": "Estudio de escenas 3D",
+  "subtitle": "Elige un plano, coloca tus objetos y pulsa Reproducir.",
+  "templates": "Biblioteca de planos",
+  "search": "Buscar plantillas",
+  "all": "Todas",
+  "noResults": "No hay plantillas para esta búsqueda.",
+  "play": "Reproducir",
+  "pause": "Pausar",
+  "restart": "Volver al inicio",
+  "timeline": "Posición en la escena",
+  "speed": "Velocidad",
+  "speedHelp": "Se aplica a la reproducción y al MP4 exportado.",
+  "outputDuration": "Resultado: {{seconds}} s",
+  "camera": "Cámara",
+  "objects": "Objetos",
+  "translate": "Mover",
+  "rotate": "Girar Y",
+  "scale": "Escalar",
+  "size": "Tamaño",
+  "smaller": "Más pequeño",
+  "larger": "Más grande",
+  "reset": "Restablecer transformación",
+  "gizmoHelp": "Dentro de la escena, pulsa G para mover, R para girar en Y o S para escalar. Arrastra el manipulador; usa su centro para escalar proporcionalmente.",
+  "viewport": "Escena 3D",
+  "transformShortcuts": "Dentro de la escena: R para girar en Y · S para escalar · G para mover. Arrastra el manipulador para ajustar el objeto.",
+  "selectObject": "Selecciona un objeto",
+  "position": "Posición (m)",
+  "yaw": "Giro Y (°)",
+  "keepAssets": "Conservar mis objetos al cambiar de plano",
+  "cameraHelp": "Puedes cambiar la cámara; tus objetos conservan su identidad.",
+  "category": {
+    "cinema": "Cine",
+    "product": "Producto",
+    "music": "Videoclip",
+    "space": "Espacio",
+    "drive": "Conducción"
+  },
+  "template": {
+    "speech-portrait": {
+      "title": "Retrato hablando",
+      "description": "Primer plano con voz, boca integrada y expresiones."
+    },
+    "speech-dialogue": {
+      "title": "Diálogo con lip-sync",
+      "description": "Dos personajes, cada uno con su voz e inicio ajustable."
+    },
+    "speech-presenter": {
+      "title": "Presentador con voz",
+      "description": "Plano medio para narración y animación corporal con lip-sync."
+    },
+    "two-shot": {
+      "title": "Plano de dos",
+      "description": "Encuadre equilibrado de dos sujetos con aproximación suave."
+    },
+    "product-orbit": {
+      "title": "Órbita de producto",
+      "description": "Vuelta pausada al producto con luz principal cálida."
+    },
+    "hero-push": {
+      "title": "Acercamiento al protagonista",
+      "description": "Cámara baja y avance suave hacia el protagonista."
+    },
+    "over-shoulder": {
+      "title": "Sobre el hombro",
+      "description": "Sujetos escalonados para encuadrar una conversación con profundidad."
+    },
+    "tracking": {
+      "title": "Seguimiento lateral",
+      "description": "Composición de perfil con aire por delante del sujeto."
+    },
+    "crane-reveal": {
+      "title": "Revelado de grúa",
+      "description": "Ascenso desde un punto bajo hasta un encuadre abierto."
+    },
+    "establishing": {
+      "title": "Órbita de situación",
+      "description": "Arco amplio para presentar el entorno y un objeto."
+    },
+    "run-loop": {
+      "title": "Carrera continua",
+      "description": "Corredor estable con mundo deslizante; añade un clip de carrera."
+    },
+    "neon-run": {
+      "title": "Sprint neón",
+      "description": "Luz fría y fondo rápido para un clip de carrera enérgico."
+    },
+    "block-street": {
+      "title": "Ritmo callejero",
+      "description": "Plano de perfil relajado con desplazamiento urbano más lento."
+    },
+    "space-float": {
+      "title": "Flotación espacial",
+      "description": "Sujeto elevado entre rocas con un arco de cámara suave."
+    },
+    "walk-void": {
+      "title": "Paseo en el vacío",
+      "description": "Entorno mínimo y aproximación frontal para un clip de paseo."
+    },
+    "dance-orbit": {
+      "title": "Órbita de baile",
+      "description": "Media órbita que mantiene legible al intérprete."
+    },
+    "dance-stage": {
+      "title": "Escenario urbano",
+      "description": "Decorado urbano amplio con arco musical pausado."
+    },
+    "cafe-dance": {
+      "title": "Actuación en el café",
+      "description": "Composición frontal de cuerpo entero en el café texturizado."
+    },
+    "drive-chase": {
+      "title": "Cámara de persecución",
+      "description": "Vista trasera del coche con carretera móvil y oscilación leve."
+    },
+    "drive-hood": {
+      "title": "Sobre el capó",
+      "description": "Vista frontal inmersiva con vibración de carretera contenida."
+    },
+    "drive-wing": {
+      "title": "Perfil costero",
+      "description": "Vista lateral baja del coche junto al fondo costero."
+    },
+    "drive-orbit": {
+      "title": "Órbita del coche",
+      "description": "Barrido bajo que revela la carretera en movimiento."
+    },
+    "drive-tunnel": {
+      "title": "Viaje por el túnel",
+      "description": "Cámara frontal enmarcada por el entorno del túnel."
+    },
+    "drive-hero": {
+      "title": "Retrato del conductor",
+      "description": "Composición de persecución con un personaje reemplazable."
+    },
+    "portrait-arc": {
+      "title": "Arco de retrato",
+      "description": "Órbita íntima corta con aire sobre la cabeza."
+    },
+    "duo-diagonal": {
+      "title": "Diálogo en diagonal",
+      "description": "Dos sujetos en diagonal alrededor de un objeto central."
+    },
+    "high-angle": {
+      "title": "Revelado en picado",
+      "description": "Un punto de vista elevado revela al sujeto y el objeto cercano."
+    },
+    "wide-tableau": {
+      "title": "Escena de conjunto",
+      "description": "Dos sujetos y un objeto cercano en una composición amplia."
+    },
+    "product-detail": {
+      "title": "Detalle de producto",
+      "description": "Encuadre oblicuo cercano para observar la superficie del objeto."
+    },
+    "product-pair": {
+      "title": "Comparación de productos",
+      "description": "Dos productos comparten una composición frontal simétrica y pausada."
+    },
+    "product-pedestal": {
+      "title": "Revelado sobre pedestal",
+      "description": "Coloca el producto sobre un soporte y revélalo desde abajo."
+    },
+    "duet-stage": {
+      "title": "Dúo en escena",
+      "description": "Dos intérpretes comparten escenario; asigna un clip de animación a cada uno."
+    },
+    "cafe-duet": {
+      "title": "Dúo en el café",
+      "description": "Dos intérpretes enmarcan la entrada del café a ambos lados."
+    },
+    "stage-crane": {
+      "title": "Grúa sobre el escenario",
+      "description": "Revela a un intérprete y un objeto escénico con cámara ascendente."
+    },
+    "space-encounter": {
+      "title": "Encuentro espacial",
+      "description": "Dos sujetos suspendidos se miran entre referencias rocosas."
+    },
+    "space-survey": {
+      "title": "Exploración espacial",
+      "description": "Órbita amplia y elevada alrededor de un sujeto y un objeto cercano."
+    },
+    "drive-coast-reveal": {
+      "title": "Revelado de la costa",
+      "description": "Una grúa revela el coche sobre la carretera costera."
+    },
+    "drive-city-wide": {
+      "title": "Plano urbano abierto",
+      "description": "Órbita amplia y baja que sitúa el coche en la ciudad."
+    },
+    "drive-tunnel-wing": {
+      "title": "Perfil en el túnel",
+      "description": "Una cámara lateral baja muestra el coche dentro del túnel."
+    },
+    "siege-ring": {
+      "title": "Asedio a la ciudadela",
+      "description": "Protagonista en el centro y dos enemigos flanqueando una ciudadela de servidores."
+    },
+    "spell-duel": {
+      "title": "Duelo de hechizos",
+      "description": "Encuentro lateral entre dos personajes con espacio para retroceder."
+    },
+    "victory-circle": {
+      "title": "Círculo de victoria",
+      "description": "Órbita de celebración con tres personajes en un escenario de servidores."
+    },
+    "coder-room": {
+      "title": "Cuarto del programador",
+      "description": "Mesa, teclado y pantalla de código animada en un cuarto abierto."
+    },
+    "clone-chase": {
+      "title": "Persecución por el barrio",
+      "description": "Personajes en movimiento y calle fija con referencias visibles en el suelo."
+    },
+    "face-closeup": {
+      "title": "Cara íntima",
+      "description": "Acercamiento suave que sigue la cabeza animada."
+    },
+    "face-extreme": {
+      "title": "Mirada extrema",
+      "description": "Encuadre muy cerrado de ojos y expresión."
+    },
+    "face-profile": {
+      "title": "Perfil en penumbra",
+      "description": "Deslizamiento lateral junto al perfil del personaje."
+    },
+    "face-reaction-arc": {
+      "title": "Arco de reacción",
+      "description": "Arco corto alrededor del rostro para una reacción."
+    },
+    "face-low-angle": {
+      "title": "Héroe desde abajo",
+      "description": "Contrapicado que acerca al rostro desde el pecho."
+    },
+    "face-high-angle": {
+      "title": "Duda desde arriba",
+      "description": "Picado íntimo para momentos de duda o cansancio."
+    },
+    "face-revelation": {
+      "title": "Golpe de revelación",
+      "description": "Acercamiento rápido desde plano medio a rostro."
+    },
+    "face-to-face": {
+      "title": "Cara a cara",
+      "description": "Dos rostros en un encuadre cercano compartido."
+    },
+    "boots-to-face": {
+      "title": "De botas a mirada",
+      "description": "La cámara asciende desde los pies hasta el rostro."
+    },
+    "dutch-charge": {
+      "title": "Carga inclinada",
+      "description": "Avance con cámara inclinada que cambia de lado."
+    },
+    "overhead-formation": {
+      "title": "Formación cenital",
+      "description": "Vista superior giratoria de tres personajes."
+    },
+    "camera-pass": {
+      "title": "Cruce junto a cámara",
+      "description": "El personaje cruza ante una cámara fija que lo sigue con la mirada."
+    },
+    "vehicle-showcase": {
+      "title": "Presentación del coche",
+      "description": "Órbita de tres cuartos alrededor de tu GLB de vehículo."
+    },
+    "vehicle-front-low": {
+      "title": "Frontal a ras de suelo",
+      "description": "Acercamiento bajo al frontal del vehículo."
+    },
+    "vehicle-rear-chase": {
+      "title": "Fuga desde atrás",
+      "description": "Seguimiento trasero de un vehículo en movimiento."
+    },
+    "vehicle-side-track": {
+      "title": "Paralelo lateral",
+      "description": "La cámara acompaña al vehículo desde un lateral."
+    },
+    "vehicle-wheel-detail": {
+      "title": "Detalle de rueda",
+      "description": "Plano de detalle lateral bajo; ajustable al modelo."
+    },
+    "vehicle-roof-orbit": {
+      "title": "Órbita sobre techo",
+      "description": "Órbita alta para revelar el techo y la silueta."
+    },
+    "vehicle-convoy": {
+      "title": "Convoy triple",
+      "description": "Tres vehículos avanzan en formación escalonada."
+    },
+    "vehicle-drift-arc": {
+      "title": "Curva de derrape",
+      "description": "Recorrido curvo con orientación del vehículo según su avance."
+    },
+    "monitor-reveal": {
+      "title": "Revelar monitor",
+      "description": "Una cámara ascendente descubre un monitor junto a tu mascota."
+    },
+    "desk-presenter": {
+      "title": "Presentador de escritorio",
+      "description": "Tu mascota presenta un PC GLB con una malla para imagen o vídeo."
+    },
+    "monitor-detail": {
+      "title": "Detalle de pantalla",
+      "description": "Acercamiento frontal para leer el contenido del monitor."
+    },
+    "screen-gallery": {
+      "title": "Galería de pantallas",
+      "description": "Tres paneles alrededor del protagonista en un observatorio."
+    },
+    "billboard-plaza": {
+      "title": "Plaza de pantallas gigantes",
+      "description": "Arquitectura monumental, cartel elevado y protagonista a escala."
+    },
+    "screen-corridor": {
+      "title": "Pasillo de pantallas",
+      "description": "El protagonista recorre un pasillo de paneles enfrentados."
+    },
+    "control-room": {
+      "title": "Sala de control",
+      "description": "Seis pantallas y una mascota que supervisa el conjunto."
+    },
+    "product-finale": {
+      "title": "Final de producto",
+      "description": "Presentación amplia con protagonista y tres pantallas."
+    }
+  },
+  "gallerySearch": "Buscar en el catálogo",
+  "galleryPlaceholder": "Retrato, baile, naves…",
+  "galleryCount": "{{count}} plantillas",
+  "focusEditor": "Ampliar editor",
+  "exitFocus": "Salir de pantalla completa",
+  "fullscreenUnavailable": "Este navegador no permite la pantalla completa.",
+  "animation": "Animación del GLB",
+  "animationsLoading": "Cargando animaciones del GLB…",
+  "animationsEmpty": "Este GLB no contiene animaciones.",
+  "animationSpeed": "Velocidad de animación",
+  "animationStart": "Inicio en animación (s)",
+  "animationLoop": "Repetir animación",
+  "animationFit": "Ajustar animación al plano",
+  "animationFitHint": "Reproduce una vez la animación restante durante la duración actual del plano (velocidad 0,1–4×). Aplícalo de nuevo si cambias la duración o el inicio.",
+  "clipNumber": "Número de clip",
+  "duration": "Duración (s)",
+  "saveDocument": "Guardar plano JSON",
+  "loadDocument": "Abrir plano JSON",
+  "invalidDocument": "No se pudo abrir: el archivo no es un plano 3D válido.",
+  "travel": {
+    "title": "Desplazarse por el escenario",
+    "help": "El panel de transformación fija la posición inicial. Aquí defines el destino; el recorrido dura todo el plano.",
+    "to": "Destino",
+    "via": "Control de curva",
+    "face": "Orientarse según el recorrido",
+    "curve": "Trayectoria curva",
+    "ease": "Entrada y salida suaves",
+    "distance": "Distancia recta: {{distance}} m · {{speed}} m/s",
+    "floor": "Usar imagen como textura de suelo",
+    "surface": "Uso de la imagen",
+    "backdrop": "Fondo",
+    "wall": "Textura de pared",
+    "ground": "Apoyar el modelo en el suelo",
+    "typing": "Gesto de teclear",
+    "typingHelp": "Gesto para personajes compatibles. Úsalo con la plantilla del cuarto del programador y coloca al personaje cerca de la mesa.",
+    "screen": "Monitor",
+    "code": "Programando",
+    "error": "Build fallido",
+    "success": "Build correcto",
+    "repeat": "Repeticiones de textura"
+  },
+  "framing": {
+    "title": "Encuadre del protagonista",
+    "help": "Sigue un punto del personaje. Ajusta el encuadre al GLB; los modelos sin hueso de cabeza usan su altura.",
+    "target": "Personaje u objeto",
+    "anchor": "Punto de interés",
+    "head": "Cabeza",
+    "center": "Centro",
+    "feet": "Pies / base",
+    "from": "Cámara al inicio",
+    "to": "Cámara al final",
+    "lookFrom": "Mirada al inicio",
+    "lookTo": "Mirada al final",
+    "orbit": "Vueltas de órbita",
+    "rollFrom": "Inclinación inicial (°)",
+    "rollTo": "Inclinación final (°)",
+    "facing": "Seguir la orientación del personaje"
+  },
+  "screens": {
+    "add": "Añadir pantalla",
+    "title": "Pantalla multimedia",
+    "attach": "Usar una malla como pantalla",
+    "mesh": "Malla de la pantalla",
+    "chooseMesh": "Elige una malla",
+    "content": "Imagen o vídeo en la pantalla",
+    "chooseContent": "Elige una imagen o vídeo",
+    "fit": "Ajuste del contenido",
+    "contain": "Completo, sin recortar",
+    "cover": "Llenar y recortar",
+    "style": "Tipo de pantalla",
+    "monitor": "Monitor de escritorio",
+    "billboard": "Cartel / pantalla gigante",
+    "frameless": "Panel sin marco",
+    "width": "Ancho / proporción",
+    "height": "Alto / proporción",
+    "flipY": "Invertir verticalmente",
+    "start": "Inicio del vídeo (s)",
+    "speed": "Velocidad del vídeo",
+    "loop": "Repetir vídeo",
+    "clockHelp": "El vídeo sigue el tiempo de la escena. Su audio está silenciado.",
+    "remove": "Quitar pantalla",
+    "failed": "No se pudo cargar la pantalla. Comprueba la malla y el archivo."
+  },
+  "library": {
+    "name": "Nombre de la escena",
+    "save": "Guardar escena en galería",
+    "open": "Abrir escena",
+    "help": "Elige una escena de Vídeo 3D guardada. Al elegir reemplazas el plano actual; guárdalo antes para conservar tus cambios. También puedes importar y exportar JSON.",
+    "saved": "Escena guardada en esta carpeta. Usa Abrir escena para recuperarla.",
+    "changed": "La escena cambió mientras se cargaba. Vuelve a elegirla para reemplazar la actual.",
+    "previewUnavailable": "Espera a que cargue la vista 3D antes de guardar.",
+    "saveFailed": "No se pudo guardar la escena.",
+    "cancelLoad": "Cancelar carga"
+  }
+}

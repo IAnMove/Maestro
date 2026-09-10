@@ -8,11 +8,14 @@ Comfy-Org's compact consumer weights on machines that cannot hold the full
 
 from __future__ import annotations
 
+import math
 import os
 from contextlib import nullcontext
+from functools import partial
 
 import numpy as np
 import torch
+import torch.nn.functional as F
 from accelerate import init_empty_weights
 from diffusers.models.autoencoders.vae import DiagonalGaussianDistribution
 from diffusers.utils.torch_utils import randn_tensor
@@ -30,10 +33,11 @@ from .checkpoint import (
     preprocess_video_vae_state_dict,
 )
 from .conditioner import MiniMaxH3Conditioner, MiniMaxH3Qwen3VL, build_h3_processor, load_h3_qwen_config
-from .convrot_layout import restore_interleaved_h3_qkv
+from .convrot_layout import has_convrot_layout, restore_interleaved_h3_qkv
 from .packing import (
     MINIMAX_H3_AUDIO_CHANNELS,
     MINIMAX_H3_FPS,
+    MINIMAX_H3_FRAMES_PER_CHUNK,
     MINIMAX_H3_KEYFRAME_ENCODE_SEED,
     MINIMAX_H3_KEYFRAME_NOISE_AUG,
     MINIMAX_H3_MAX_DURATION,
@@ -52,13 +56,25 @@ from .packing import (
     video_latent_num_frames,
 )
 from .ref2va import (
+    MiniMaxH3PreparedReference,
+    add_ref2va_continuation_context,
+    align_ref2va_voice_reference_order,
     build_ref2va_packed_sequence,
     ensure_ref2va_prompt_relationships,
     prepare_references,
+    select_ref2va_window_voice_references,
     trim_reference_num_frames,
 )
-from .scheduler import MiniMaxH3Scheduler
+from .reference_manifest import apply_exact_drive_audio_prompt_contract
+from .scheduler import (
+    MiniMaxH3Scheduler,
+    res_multistep_update,
+)
 from .first_block_cache import MiniMaxH3FirstBlockCache
+from .fused_turbo import (
+    FUSED_H3_MAX_EVALUATIONS,
+    FUSED_H3_MIN_EVALUATIONS,
+)
 from .transformer import (
     MiniMaxH3Transformer,
     _activation_chunk_tokens,
@@ -66,8 +82,15 @@ from .transformer import (
 )
 from .turbo import (
     MINIMAX_H3_TURBO_MIN_STEPS,
+    find_minimax_h3_pdd_loras,
     find_minimax_h3_turbo_loras,
     h3_scheduler_grid_points,
+    minimax_h3_turbo_preset_for_path,
+)
+from .pdd import (
+    PDD_NUM_EVALUATIONS,
+    install_pdd_parallel_heads,
+    release_pdd_parallel_heads,
 )
 from .video_vae import AutoencoderKLMiniMaxH3
 
@@ -193,6 +216,39 @@ AUDIO_LATENTS_STD = (
     1.5613768203168363,
 )
 
+MINIMAX_H3_AUDIO_SAMPLE_RATE = 32000
+
+
+def normalize_h3_overlap_frames(frame_count: int) -> int:
+    """Round an overlap to H3's legal ``17 * n + 1`` lattice."""
+
+    frame_count = int(frame_count or 0)
+    if frame_count < 0:
+        raise ValueError("MiniMax H3 overlap must be zero or a positive frame count.")
+    if frame_count == 0:
+        return 0
+    return max(
+        1,
+        ((frame_count - 1 + MINIMAX_H3_FRAMES_PER_CHUNK // 2)
+         // MINIMAX_H3_FRAMES_PER_CHUNK)
+        * MINIMAX_H3_FRAMES_PER_CHUNK
+        + 1,
+    )
+
+
+def floor_h3_overlap_frames(frame_count: int) -> int:
+    """Floor a short continuation to the nearest usable H3 overlap."""
+
+    frame_count = int(frame_count or 0)
+    if frame_count <= 0:
+        return 0
+    return max(
+        1,
+        ((frame_count - 1) // MINIMAX_H3_FRAMES_PER_CHUNK)
+        * MINIMAX_H3_FRAMES_PER_CHUNK
+        + 1,
+    )
+
 
 def _keyframe_latent_stats_cpu() -> tuple[torch.Tensor, torch.Tensor]:
     """Return the official FL2VA keyframe normalization tensors on CPU.
@@ -242,8 +298,8 @@ def _tensor_to_pil(image) -> Image.Image | None:
     return Image.fromarray(pixels).convert("RGB")
 
 
-def _last_continuation_frame(input_video, prefix_frames_count: int):
-    """Return the final committed frame supplied by the window engine."""
+def _as_video_tensor(input_video) -> torch.Tensor | None:
+    """Normalize a continuation tensor to channel/time/height/width form."""
 
     if input_video is None or not isinstance(input_video, torch.Tensor):
         return None
@@ -252,22 +308,330 @@ def _last_continuation_frame(input_video, prefix_frames_count: int):
         continuation = continuation.unsqueeze(1)
     if continuation.ndim != 4 or continuation.shape[1] < 1:
         return None
-    try:
-        prefix_frames_count = int(prefix_frames_count or 0)
-    except (TypeError, ValueError):
-        prefix_frames_count = 0
-    if prefix_frames_count <= 0:
+    return continuation
+
+
+def _prepare_control_video_tensor(
+    video,
+    height: int,
+    width: int,
+) -> torch.Tensor | None:
+    """Normalize a control video to CPU ``CTHW`` pixels in ``[-1, 1]``."""
+
+    source = _as_video_tensor(video)
+    if source is None:
         return None
-    frame_index = min(prefix_frames_count, int(continuation.shape[1])) - 1
-    return continuation[:, frame_index : frame_index + 1]
+    source = source.detach().to(device="cpu")
+    if source.dtype == torch.uint8:
+        source = source.float().div(127.5).sub(1.0)
+    else:
+        source = source.float()
+        if float(source.amin()) >= -0.01 and float(source.amax()) <= 1.01:
+            source = source.mul(2.0).sub(1.0)
+        source = source.clamp(-1.0, 1.0)
+    if tuple(source.shape[-2:]) != (int(height), int(width)):
+        source = F.interpolate(
+            source.permute(1, 0, 2, 3),
+            size=(int(height), int(width)),
+            mode="bilinear",
+            align_corners=False,
+        ).permute(1, 0, 2, 3)
+    return source.contiguous()
+
+
+def _resize_video_mask(
+    mask: torch.Tensor,
+    latent_shape: tuple[int, int, int],
+    clip_length: int,
+    temporal_ratio: int,
+) -> torch.Tensor:
+    """Project a white-edit/black-preserve video mask onto H3 latents.
+
+    H3's VAE encodes 17-frame clips into a non-uniform temporal lattice.  A
+    plain trilinear resize therefore shifts masks relative to the source
+    motion.  This follows WanGP v12.44's native FL2VA inpainting mapping:
+    select the same source frames used by each latent, then resize only the
+    resulting latent-space mask.
+    """
+
+    if not isinstance(mask, torch.Tensor):
+        mask = torch.as_tensor(mask)
+    if mask.ndim == 3:
+        mask = mask.unsqueeze(0)
+    if mask.ndim != 4 or int(mask.shape[1]) < 1:
+        raise ValueError(
+            "MiniMax H3 masks must be a channel/time/height/width tensor; "
+            f"received {tuple(mask.shape)}."
+        )
+
+    latent_t, latent_h, latent_w = (int(value) for value in latent_shape)
+    mask = mask[:1].unsqueeze(0).float()
+    if float(mask.amin()) < -0.01:
+        mask = mask.add(1.0).mul(0.5)
+    elif float(mask.amax()) > 1.01:
+        mask = mask.div(255.0)
+    mask = mask.clamp(0.0, 1.0)
+
+    pad_frames = (-int(mask.shape[2])) % int(clip_length)
+    if pad_frames:
+        mask = F.pad(mask, (0, 0, 0, 0, 0, pad_frames), mode="replicate")
+    offsets = torch.cat(
+        (
+            torch.zeros(1, dtype=torch.long, device=mask.device),
+            torch.arange(
+                1,
+                int(clip_length),
+                int(temporal_ratio),
+                device=mask.device,
+            ),
+        )
+    )
+    starts = torch.arange(
+        0,
+        int(mask.shape[2]),
+        int(clip_length),
+        device=mask.device,
+    )
+    frame_indices = (starts[:, None] + offsets[None]).flatten()[:latent_t]
+    mask = mask.index_select(2, frame_indices)
+    return F.interpolate(
+        mask,
+        size=(latent_t, latent_h, latent_w),
+        mode="nearest",
+    ).ge(0.5).float()
+
+
+def _reinject_video_source(
+    video_rows: torch.Tensor,
+    source_rows: torch.Tensor,
+    noise_rows: torch.Tensor,
+    editable_mask_rows: torch.Tensor | None,
+    sigma: torch.Tensor | float,
+    buffer_rows: torch.Tensor,
+) -> None:
+    """Re-inject a source video at the next H3 noise level.
+
+    With no mask this implements ordinary video-to-video denoising.  With a
+    mask, white values remain editable while black values are restored from
+    the source for the configured masking-strength portion of the schedule.
+    """
+
+    torch.lerp(source_rows, noise_rows, sigma, out=buffer_rows)
+    if editable_mask_rows is None:
+        video_rows.copy_(buffer_rows)
+    else:
+        video_rows.lerp_(buffer_rows, 1.0 - editable_mask_rows)
+
+
+def _build_frozen_control_video(
+    input_frames,
+    input_video,
+    frame_num: int,
+    prefix_frames_count: int,
+    height: int,
+    width: int,
+) -> torch.Tensor:
+    """Build the exact visual timeline used by H3 video-to-audio mode.
+
+    ``input_video`` is the previous window overlap. WGP may already prepend
+    that overlap to ``input_frames``; this helper detects that combined guide
+    shape and keeps only its fresh tail, returning one complete window for
+    Maestro's ordinary sliding-window assembler.
+    """
+
+    control = _prepare_control_video_tensor(input_frames, height, width)
+    if control is None or int(control.shape[1]) < 1:
+        raise ValueError(
+            "MiniMax H3 video-to-audio mode requires a readable Control Video."
+        )
+
+    requested = max(1, int(frame_num))
+    continuation = _prepare_control_video_tensor(input_video, height, width)
+    prefix_count = (
+        min(
+            max(0, int(prefix_frames_count or 0)),
+            int(continuation.shape[1]),
+            requested,
+        )
+        if continuation is not None
+        else 0
+    )
+    pieces: list[torch.Tensor] = []
+    if prefix_count:
+        pieces.append(continuation[:, -prefix_count:])
+
+    remaining = requested - prefix_count
+    if remaining:
+        # WGP normally prepends the same visual overlap to its processed
+        # guide. Once that overlap is supplied explicitly above, take the
+        # *tail* of the combined guide so those frames are not duplicated.
+        fresh = (
+            control[:, -remaining:]
+            if prefix_count and int(control.shape[1]) > remaining
+            else control[:, :remaining]
+        )
+        if int(fresh.shape[1]) < remaining:
+            # A duration can land a few frames above the decoded source after
+            # H3's 17*n+5 alignment. Hold the final source frame rather than
+            # introducing a gray pad or silently shortening the output.
+            fresh = torch.cat(
+                [
+                    fresh,
+                    fresh[:, -1:].repeat(1, remaining - int(fresh.shape[1]), 1, 1),
+                ],
+                dim=1,
+            )
+        pieces.append(fresh)
+    return torch.cat(pieces, dim=1) if len(pieces) > 1 else pieces[0]
+
+
+def _split_continuation_video(
+    input_video,
+    prefix_frames_count: int,
+    *,
+    has_explicit_start: bool = False,
+) -> tuple[torch.Tensor | None, torch.Tensor | None, int]:
+    """Split a legal overlap into exact history and a regenerated boundary.
+
+    H3's overlap lattice is ``17*n+1``. The first ``17*n`` frames become
+    clean multi-frame history conditions; the final frame remains the normal
+    FL2VA first-frame anchor. The outer window assembler later removes the
+    complete overlap, so only newly generated frames enter the joined movie.
+    """
+
+    if has_explicit_start:
+        return None, None, 0
+    continuation = _as_video_tensor(input_video)
+    if continuation is None:
+        return None, None, 0
+    try:
+        requested_raw = int(prefix_frames_count or 0)
+    except (TypeError, ValueError):
+        requested_raw = 0
+    if requested_raw <= 0:
+        return None, None, 0
+    requested = normalize_h3_overlap_frames(requested_raw)
+    continuation_count = min(requested, int(continuation.shape[1]))
+    if continuation_count < requested:
+        continuation_count = floor_h3_overlap_frames(continuation_count)
+    if continuation_count <= 0:
+        return None, None, 0
+    boundary = continuation[:, -1:]
+    history = (
+        continuation[:, -continuation_count:-1]
+        if continuation_count > 1
+        else None
+    )
+    return history, boundary, continuation_count
+
+
+def _last_continuation_frame(input_video, prefix_frames_count: int):
+    """Compatibility helper returning the regenerated overlap boundary."""
+
+    _, boundary, _ = _split_continuation_video(
+        input_video,
+        prefix_frames_count,
+    )
+    return boundary
+
+
+def _resolve_h3_injected_frame_conditions(
+    frames_to_inject,
+    frames_relative_positions_list,
+    *,
+    history_count: int,
+    target_frame_num: int,
+):
+    """Pair injected pictures with valid target-local frame indices.
+
+    The shared scheduler reports positions relative to the complete pass,
+    including carried motion history. H3's ``frame`` anchor is relative to
+    the newly generated target, so that history prefix is removed once here.
+    """
+
+    frames = list(frames_to_inject or ())
+    positions = list(frames_relative_positions_list or ())
+    if len(frames) != len(positions):
+        raise ValueError(
+            "MiniMax H3 needs one injected-frame position per injected image; "
+            f"received {len(frames)} images and {len(positions)} positions."
+        )
+    resolved = []
+    for image, raw_position in zip(frames, positions):
+        try:
+            frame_index = int(raw_position) - int(history_count)
+        except (TypeError, ValueError) as error:
+            raise ValueError(
+                f"MiniMax H3 received an invalid injected-frame position {raw_position!r}."
+            ) from error
+        if 0 <= frame_index < int(target_frame_num):
+            resolved.append((image, frame_index))
+    return resolved
+
+
+def _prepare_stereo_waveform(
+    waveform,
+    sample_rate: int | None,
+    sample_count: int,
+    *,
+    pad: bool = True,
+) -> torch.Tensor | None:
+    """Convert sample-major or channel-major audio to 32 kHz stereo."""
+
+    if waveform is None or sample_count <= 0:
+        return None
+    audio = torch.as_tensor(waveform, dtype=torch.float32, device="cpu")
+    if audio.ndim == 1:
+        audio = audio.unsqueeze(0)
+    elif audio.ndim == 2:
+        if audio.shape[0] not in (1, MINIMAX_H3_AUDIO_CHANNELS):
+            if audio.shape[1] in (1, MINIMAX_H3_AUDIO_CHANNELS):
+                audio = audio.transpose(0, 1)
+            else:
+                raise ValueError(
+                    "MiniMax H3 continuation audio must be mono or stereo; "
+                    f"got {tuple(audio.shape)}."
+                )
+    else:
+        raise ValueError(
+            "MiniMax H3 continuation audio must be one- or two-dimensional; "
+            f"got {tuple(audio.shape)}."
+        )
+    if audio.shape[0] == 1:
+        audio = audio.expand(MINIMAX_H3_AUDIO_CHANNELS, -1).contiguous()
+    elif audio.shape[0] != MINIMAX_H3_AUDIO_CHANNELS:
+        audio = audio[:MINIMAX_H3_AUDIO_CHANNELS]
+
+    sample_rate = int(sample_rate or MINIMAX_H3_AUDIO_SAMPLE_RATE)
+    if sample_rate <= 0:
+        raise ValueError("MiniMax H3 continuation audio needs a positive sample rate.")
+    if sample_rate != MINIMAX_H3_AUDIO_SAMPLE_RATE:
+        import torchaudio.functional as audio_functional
+
+        audio = audio_functional.resample(
+            audio,
+            sample_rate,
+            MINIMAX_H3_AUDIO_SAMPLE_RATE,
+        )
+    audio = audio[..., :sample_count]
+    if pad and audio.shape[-1] < sample_count:
+        audio = F.pad(audio, (0, sample_count - audio.shape[-1]))
+    return audio.contiguous()
 
 
 def _strip_transformer_wrappers(
     state_dict,
     quantization_map=None,
     tied_weights_map=None,
+    *,
+    interleave_qkv: bool = True,
 ):
-    restore_interleaved_h3_qkv(state_dict)
+    # ConvRot exports store fused QKV rows in Comfy's native grouped
+    # [Q, K, V] order. Preserve that order for the grouped MMGP split used by
+    # INT8 ConvRot checkpoints. Only older checkpoint definitions that declare
+    # the official head-interleaved layout need this physical reorder.
+    if interleave_qkv:
+        restore_interleaved_h3_qkv(state_dict)
     prefixes = ("model.diffusion_model.", "diffusion_model.")
 
     def strip(mapping):
@@ -341,7 +705,11 @@ def _normalize_conditioner_checkpoint_namespaces(
 def probe_h3_checkpoint(filename: str) -> dict[str, int | bool | None]:
     """Inspect H3 tensor headers before allocating its 20B/33B network."""
 
-    state_dict, _ = quant_router.load_metadata_state_dict(filename)
+    state_dict, metadata = quant_router.load_metadata_state_dict(filename)
+    quantization_format = str(
+        (metadata or {}).get("quantization_format", "")
+    ).lower()
+    convrot = "convrot" in quantization_format or has_convrot_layout(state_dict)
     table = None
     for key, tensor in state_dict.items():
         for prefix in ("model.diffusion_model.", "diffusion_model."):
@@ -356,6 +724,7 @@ def probe_h3_checkpoint(filename: str) -> dict[str, int | bool | None]:
             "compressed_modulation": False,
             "adaln_curve_grid": None,
             "time_embed_dim": 2688,
+            "convrot": convrot,
         }
     if len(table.shape) != 2 or int(table.shape[0]) < 2:
         raise ValueError(f"Invalid H3 AdaLN curve table shape: {tuple(table.shape)}")
@@ -363,6 +732,7 @@ def probe_h3_checkpoint(filename: str) -> dict[str, int | bool | None]:
         "compressed_modulation": True,
         "adaln_curve_grid": int(table.shape[0]),
         "time_embed_dim": int(table.shape[1]),
+        "convrot": convrot,
     }
 
 
@@ -371,27 +741,34 @@ def _load_transformer(
     dtype: torch.dtype,
     *,
     qkv_layout: str = "contiguous",
+    sla_config=None,
 ) -> MiniMaxH3Transformer:
     checkpoint = probe_h3_checkpoint(filename)
+    qkv_layout = str(qkv_layout or "contiguous").strip().lower()
+    if qkv_layout not in {"contiguous", "grouped", "interleaved"}:
+        raise ValueError(f"Unsupported MiniMax H3 QKV layout {qkv_layout!r}")
     with init_empty_weights(include_buffers=True):
         transformer = MiniMaxH3Transformer(
             curve_grid=checkpoint["adaln_curve_grid"],
             curve_dim=int(checkpoint["time_embed_dim"]),
             dtype=dtype,
+            sla_config=sla_config,
         )
     inner_size = 56 * 128
-    # Comfy's scaled-FP8 pruned checkpoints already store grouped [Q, K, V]
-    # weights in the exact fused layout used by this runtime.  MMGP 3.7.6's
-    # scaled-FP8 fused splitter rebuilds the three tensors as shared-storage
-    # views and later mistakes them for tied parameters, corrupting attention.
-    # Keep that proven consumer path fused.  Full WanGP ConvRot checkpoints
-    # use the official head-interleaved layout and still require an explicit
-    # split/reorder before inference.
-    split_map = (
-        get_linear_split_map(inner_size, interleaved=True)
-        if qkv_layout == "interleaved"
-        else None
-    )
+    # Comfy's scaled-FP8 pruned checkpoint already stores grouped [Q, K, V]
+    # weights in the exact fused layout used by this runtime. MMGP 3.7.6's
+    # scaled-FP8 splitter rebuilds the tensors as shared-storage views and can
+    # mistake them for tied parameters, so that legacy definition stays fused.
+    # ConvRot checkpoints use WanGP's proven independent-projection path. The
+    # custom INT8 handler splits their quantized data and row scales as three
+    # contiguous [Q, K, V] groups; older BF16/full definitions can still ask
+    # for the head-interleaved split explicitly.
+    split_map = None
+    if qkv_layout in {"grouped", "interleaved"}:
+        split_map = get_linear_split_map(
+            inner_size,
+            interleaved=qkv_layout == "interleaved",
+        )
     if split_map is not None:
         offload.split_linear_modules(transformer, split_map)
     offload.load_model_data(
@@ -399,7 +776,10 @@ def _load_transformer(
         filename,
         writable_tensors=False,
         default_dtype=dtype,
-        preprocess_sd=_strip_transformer_wrappers,
+        preprocess_sd=partial(
+            _strip_transformer_wrappers,
+            interleave_qkv=qkv_layout == "interleaved",
+        ),
         fused_split_map=split_map,
     )
     transformer._model_dtype = dtype
@@ -465,7 +845,12 @@ def _load_conditioner(
     qwen.model._model_dtype = dtype
     qwen.visual._model_dtype = dtype
     qwen.eval().requires_grad_(False)
-    conditioner = MiniMaxH3Conditioner(qwen, tokenizer, processor).eval().requires_grad_(False)
+    conditioner = MiniMaxH3Conditioner(
+        qwen,
+        tokenizer,
+        processor,
+        gguf_vision_autocast=variant.startswith("gguf_"),
+    ).eval().requires_grad_(False)
     conditioner._model_dtype = dtype
     return conditioner
 
@@ -508,6 +893,38 @@ def _load_audio_vae(filename: str) -> AutoencoderKLMiniMaxH3Audio:
     return vae.eval().requires_grad_(False)
 
 
+def _log_h3_asset_sources(components: dict[str, str]) -> None:
+    """Print an actionable component-by-component sharing diagnostic."""
+
+    print("[MiniMax H3 Assets] Resolved component sources:")
+    for component, path in components.items():
+        describe = getattr(fl, "describe_file_source", None)
+        source = describe(path) if describe else {"kind": "resolved", "path": os.path.realpath(path)}
+        kind = source["kind"]
+        installation = source.get("installation")
+        if kind == "linked":
+            origin = f"linked install '{installation}'"
+        elif kind == "primary":
+            origin = f"primary install '{installation}'"
+        else:
+            origin = kind
+        print(f"[MiniMax H3 Assets]   {component}: {origin} -> {source['path']}")
+        if component == "transformer":
+            filename = os.path.basename(str(source["path"])).lower()
+            if "int8_convrot" in filename:
+                checkpoint_format = "INT8 ConvRot"
+            elif "fp8_scaled" in filename:
+                checkpoint_format = "scaled FP8 (legacy compatible)"
+            elif "bf16" in filename:
+                checkpoint_format = "BF16"
+            else:
+                checkpoint_format = "unrecognized filename format"
+            print(
+                "[MiniMax H3 Assets]   transformer quantization: "
+                f"{checkpoint_format}"
+            )
+
+
 class MiniMaxH3Model:
     """Maestro generation wrapper for the H3 Base FL2VA/Ref2VA checkpoints."""
 
@@ -525,6 +942,12 @@ class MiniMaxH3Model:
         self.model_def = model_def
         self.assets_root = model_def.get("minimax_h3_assets_root", "minimax_h3")
         self.omni_reference = bool(model_def.get("omni_reference", False))
+        self._fused_turbo = bool(
+            model_def.get("minimax_h3_fused_turbo", False)
+        )
+        self.sample_solver = str(
+            model_def.get("minimax_h3_sampler") or "euler"
+        ).strip().lower()
 
         transformer_path = _first_path(model_filename)
         if not transformer_path:
@@ -532,18 +955,39 @@ class MiniMaxH3Model:
         if not text_encoder_filename:
             raise FileNotFoundError("MiniMax H3 Qwen3-VL conditioner checkpoint is missing.")
 
+        video_vae_filename = str(
+            model_def.get("minimax_h3_video_vae_filename")
+            or "minimax_h3_video_vae_fp16.safetensors"
+        )
         video_vae_path = fl.locate_file(
-            os.path.join(self.assets_root, "vae", "minimax_h3_video_vae_fp16.safetensors")
+            os.path.join(self.assets_root, "vae", video_vae_filename)
         )
         audio_vae_path = fl.locate_file(
             os.path.join(self.assets_root, "vae", "minimax_h3_audio_vae_fp32.safetensors")
         )
 
+        _log_h3_asset_sources(
+            {
+                "transformer": transformer_path,
+                "text/vision encoder": text_encoder_filename,
+                "video VAE": video_vae_path,
+                "audio VAE": audio_vae_path,
+            }
+        )
+
         self.text_encoder_variant = str(minimax_h3_text_encoder or "nvfp4_awq")
+        qkv_layout = str(model_def.get("minimax_h3_qkv_layout") or "contiguous")
+        qkv_layout = str(
+            model_def.get("compatible_model_qkv_layouts", {}).get(
+                os.path.basename(transformer_path),
+                qkv_layout,
+            )
+        )
         self.transformer = _load_transformer(
             transformer_path,
             dtype,
-            qkv_layout=str(model_def.get("minimax_h3_qkv_layout") or "contiguous"),
+            qkv_layout=qkv_layout,
+            sla_config=model_def.get("sla_attention_config"),
         )
         self.conditioner = _load_conditioner(
             text_encoder_filename,
@@ -553,18 +997,104 @@ class MiniMaxH3Model:
         )
         self.vae = _load_video_vae(video_vae_path)
         self.audio_vae = _load_audio_vae(audio_vae_path)
-        self.scheduler = MiniMaxH3Scheduler(shift=12.0)
+        self.scheduler = MiniMaxH3Scheduler(
+            shift=12.0,
+            solver=self.sample_solver,
+        )
         self.audio_scheduler = MiniMaxH3Scheduler(shift=3.0)
         self._turbo_lora_active = False
         self._turbo_lora_paths: tuple[str, ...] = ()
+        self._pdd_lora_active = False
+        self._pdd_lora_path: str | None = None
+        self._pdd_lora_strength = 1.0
+        self._pdd_controller = None
         self.__interrupt = False
 
     def validate_loras(self, loras_selected) -> None:
         """Validate special H3 adapter requirements before MMGP loads them."""
 
+        # A retained model can be reused across jobs. Always restore its
+        # ordinary heads before inspecting the next job's adapter selection.
+        self.release_special_loras()
+        if getattr(self, "_fused_turbo", False):
+            selected = [
+                str(path).strip()
+                for path in (loras_selected or [])
+                if str(path).strip()
+            ]
+            if selected:
+                raise ValueError(
+                    "H3 Fused 4-Step already contains its Turbo and Mystic "
+                    "adapters; additional LoRAs are disabled for this model."
+                )
+            return
         turbo_paths = tuple(find_minimax_h3_turbo_loras(loras_selected))
+        if len(turbo_paths) > 1:
+            raise ValueError(
+                "MiniMax H3 supports one Turbo accelerator at a time; "
+                "select one preset in H3 Optimizations."
+            )
+        pdd_paths = tuple(find_minimax_h3_pdd_loras(loras_selected))
+        if len(pdd_paths) > 1:
+            raise ValueError(
+                "MiniMax H3 supports one Parallel Decoding Distillation "
+                "adapter at a time."
+            )
+        for path in pdd_paths:
+            preset = minimax_h3_turbo_preset_for_path(path)
+            if preset is None:
+                continue
+            expected = "ref2va" if self.omni_reference else "fl2va"
+            actual = str(preset.get("workflow") or "all").lower()
+            if actual not in {"all", expected}:
+                raise ValueError(
+                    f"{os.path.basename(path)} is for {actual.upper()}, "
+                    f"but the selected model uses {expected.upper()}."
+                )
+            if (
+                preset.get("full_checkpoint_only")
+                and not self.model_def.get("minimax_h3_full_checkpoint", False)
+            ):
+                required_model = (
+                    "H3 Omni — Full"
+                    if actual == "ref2va"
+                    else "H3 First / Last — Full"
+                )
+                raise ValueError(
+                    f"{preset.get('label') or os.path.basename(path)} requires "
+                    f"{required_model}. Choose {required_model} or another "
+                    "Turbo preset."
+                )
         self._turbo_lora_paths = turbo_paths
         self._turbo_lora_active = bool(turbo_paths)
+        self._pdd_lora_active = bool(pdd_paths)
+        self._pdd_lora_path = pdd_paths[0] if pdd_paths else None
+        self._pdd_lora_strength = 1.0
+
+    def configure_special_loras(self, loras_selected, multipliers) -> None:
+        """Capture the PDD head strength before MMGP preprocesses its tensors."""
+
+        if not self._pdd_lora_active or self._pdd_lora_path is None:
+            return
+        selected = [str(path) for path in (loras_selected or [])]
+        try:
+            index = selected.index(self._pdd_lora_path)
+        except ValueError as error:
+            raise ValueError("MiniMax H3 PDD adapter selection became inconsistent.") from error
+        values = list(multipliers or [])
+        strength = values[index] if index < len(values) else 1.0
+        if isinstance(strength, (list, tuple)):
+            unique = {float(value) for value in strength}
+            if len(unique) != 1:
+                raise ValueError(
+                    "MiniMax H3 PDD requires one constant adapter strength "
+                    "for the full eight-step schedule."
+                )
+            strength = unique.pop()
+        strength = float(strength)
+        if not 0.0 <= strength <= 2.0:
+            raise ValueError("MiniMax H3 PDD strength must be between 0 and 2.")
+        self._pdd_lora_strength = strength
 
     def finalize_loras(self) -> None:
         """Preserve ConvRot math after MMGP attaches active LoRA hooks."""
@@ -584,6 +1114,28 @@ class MiniMaxH3Model:
                 "[MiniMax H3 LoRA] Preserved native ConvRot activation math for "
                 f"{installed} adapter-targeted layer(s)."
             )
+        if self._pdd_lora_active:
+            try:
+                self._pdd_controller = install_pdd_parallel_heads(
+                    self.transformer,
+                    self._pdd_lora_path,
+                    strength=self._pdd_lora_strength,
+                )
+                if self._pdd_controller.num_steps != PDD_NUM_EVALUATIONS:
+                    raise ValueError(
+                        "MiniMax H3 PDD checkpoint does not expose the "
+                        f"required {PDD_NUM_EVALUATIONS} evaluations."
+                    )
+            except Exception:
+                self.release_special_loras()
+                raise
+
+    def release_special_loras(self) -> None:
+        """Restore ordinary output heads after a PDD job or failed setup."""
+
+        if hasattr(self, "transformer"):
+            release_pdd_parallel_heads(self.transformer)
+        self._pdd_controller = None
 
     @property
     def _interrupt(self) -> bool:
@@ -601,6 +1153,120 @@ class MiniMaxH3Model:
     def patch_size(self) -> tuple[int, int, int]:
         return tuple(self.transformer.config.patch_size)
 
+    def _condition_pixels(
+        self,
+        source,
+        height: int,
+        width: int,
+    ) -> torch.Tensor:
+        """Convert a PIL keyframe or CTHW window history to normalized pixels."""
+
+        if isinstance(source, Image.Image):
+            pixels = torch.from_numpy(np.array(source.convert("RGB"), dtype=np.uint8))
+            video = pixels.permute(2, 0, 1)[:, None].to(self.device)
+            video = video.float().div(255.0)
+        else:
+            video = _as_video_tensor(source)
+            if video is None:
+                raise ValueError("MiniMax H3 received an invalid visual condition.")
+            video = video.to(self.device)
+            if video.dtype == torch.uint8:
+                video = video.float().div(255.0)
+            else:
+                video = video.float()
+                if float(video.amin()) < -0.01:
+                    video = video.add(1.0).mul(0.5)
+                video = video.clamp(0.0, 1.0)
+
+        if tuple(video.shape[-2:]) != (height, width):
+            video = F.interpolate(
+                video.permute(1, 0, 2, 3),
+                size=(height, width),
+                mode="bilinear",
+                align_corners=False,
+            ).permute(1, 0, 2, 3)
+        pixel_mean = torch.tensor(
+            MINIMAX_H3_PIXEL_MEAN,
+            device=self.device,
+        ).view(1, -1, 1, 1, 1)
+        pixel_std = torch.tensor(
+            MINIMAX_H3_PIXEL_STD,
+            device=self.device,
+        ).view(1, -1, 1, 1, 1)
+        return (video[None] - pixel_mean) / pixel_std
+
+    def _encode_visual_conditions(
+        self,
+        conditions: list[dict],
+        latent_height: int,
+        latent_width: int,
+        generator: torch.Generator,
+        *,
+        height: int,
+        width: int,
+    ) -> tuple[torch.Tensor | None, tuple]:
+        """Encode clean keyframes and multi-frame history in packed order."""
+
+        if not conditions:
+            return None, ()
+
+        means, stds = _keyframe_latent_stats_cpu()
+        rows: list[torch.Tensor] = []
+        condition_shapes: list[tuple[int, int, int]] = []
+        anchors: list[tuple] = []
+        for condition in conditions:
+            if self._interrupt:
+                return None, ()
+            pixels = self._condition_pixels(
+                condition["source"],
+                height,
+                width,
+            )
+            posterior = self.vae.encode_condition(
+                pixels,
+                keep_all_latents=bool(condition.get("keep_all_latents", False)),
+            )
+            encoded = posterior.sample(
+                generator=torch.Generator().manual_seed(
+                    MINIMAX_H3_KEYFRAME_ENCODE_SEED
+                )
+            )
+            encoded = encoded.to(torch.float16).float().cpu()
+            latent_frames = int(encoded.shape[2])
+            condition_shapes.append(
+                (latent_frames, int(encoded.shape[3]), int(encoded.shape[4]))
+            )
+            rows.append(
+                patchify_video_latents(
+                    (encoded - means) / stds,
+                    self.patch_size,
+                )
+            )
+            anchor = str(condition["anchor"])
+            if anchor == "frame":
+                anchors.append(
+                    (anchor, latent_frames, int(condition["frame_index"]))
+                )
+            else:
+                anchors.append((anchor, latent_frames))
+
+        clean_rows = torch.cat(rows).to(self.device)
+        noise = keyframe_condition_noise(
+            tuple(condition_shapes),
+            self.patch_size,
+            24,
+            generator=generator,
+            device=self.device,
+        )
+        return (
+            self.scheduler.scale_noise(
+                clean_rows,
+                MINIMAX_H3_KEYFRAME_NOISE_AUG,
+                noise,
+            ),
+            tuple(anchors),
+        )
+
     def _encode_keyframes(
         self,
         images: list[Image.Image],
@@ -608,35 +1274,122 @@ class MiniMaxH3Model:
         latent_width: int,
         generator: torch.Generator,
     ) -> torch.Tensor | None:
-        if not images:
-            return None
+        """Backward-compatible one-frame wrapper used by focused tests."""
 
-        means, stds = _keyframe_latent_stats_cpu()
-        pixel_mean = torch.tensor(MINIMAX_H3_PIXEL_MEAN, device=self.device).view(1, -1, 1, 1, 1)
-        pixel_std = torch.tensor(MINIMAX_H3_PIXEL_STD, device=self.device).view(1, -1, 1, 1, 1)
-
-        rows = []
-        for image in images:
-            if self._interrupt:
-                return None
-            pixels = torch.from_numpy(np.array(image, dtype=np.uint8)).to(self.device)
-            pixels = pixels.permute(2, 0, 1)[None, :, None]
-            pixels = (pixels.float().div(255.0) - pixel_mean) / pixel_std
-            moments = self.vae._encode_clip(pixels)
-            posterior = DiagonalGaussianDistribution(moments)
-            encoded = posterior.sample(generator=torch.Generator().manual_seed(MINIMAX_H3_KEYFRAME_ENCODE_SEED))
-            encoded = encoded.to(torch.float16).float().cpu()
-            rows.append(patchify_video_latents((encoded - means) / stds, self.patch_size))
-
-        clean_rows = torch.cat(rows).to(self.device)
-        noise = keyframe_condition_noise(
-            ((1, latent_height, latent_width),) * len(images),
-            self.patch_size,
-            24,
-            generator=generator,
-            device=self.device,
+        rows, _ = self._encode_visual_conditions(
+            [
+                {"anchor": "first", "source": image}
+                for image in images
+            ],
+            latent_height,
+            latent_width,
+            generator,
+            height=latent_height * self.vae.spatial_compression_ratio,
+            width=latent_width * self.vae.spatial_compression_ratio,
         )
-        return self.scheduler.scale_noise(clean_rows, MINIMAX_H3_KEYFRAME_NOISE_AUG, noise)
+        return rows
+
+    def _encode_stereo_audio_latents(
+        self,
+        stereo: torch.Tensor,
+    ) -> torch.Tensor:
+        """Encode clean stereo samples into normalized channel-major latents."""
+
+        posterior = self.audio_vae.encode(
+            stereo.to(self.device)[:, None],
+            return_dict=False,
+        )[0]
+        latents = posterior.mode().float().cpu().transpose(1, 2)
+        audio_mean = torch.tensor(
+            AUDIO_LATENTS_MEAN,
+            dtype=torch.float32,
+            device=torch.device("cpu"),
+        ).view(1, 1, -1)
+        audio_std = torch.tensor(
+            AUDIO_LATENTS_STD,
+            dtype=torch.float32,
+            device=torch.device("cpu"),
+        ).view(1, 1, -1)
+        return (latents - audio_mean) / audio_std
+
+    def _encode_target_audio_condition(
+        self,
+        waveform,
+        sample_rate: int | None,
+        history_count: int,
+        target_frame_num: int,
+        fps: float,
+    ) -> torch.Tensor | None:
+        """Encode the source soundtrack portion aligned to generated rows."""
+
+        history_samples = int(
+            round(history_count / fps * MINIMAX_H3_AUDIO_SAMPLE_RATE)
+        )
+        target_samples = int(
+            round(target_frame_num / fps * MINIMAX_H3_AUDIO_SAMPLE_RATE)
+        )
+        stereo = _prepare_stereo_waveform(
+            waveform,
+            sample_rate,
+            history_samples + target_samples,
+            pad=False,
+        )
+        if stereo is None or int(stereo.shape[-1]) <= history_samples:
+            return None
+        target = stereo[..., history_samples : history_samples + target_samples]
+        if int(target.shape[-1]) < 1:
+            return None
+        return self._encode_stereo_audio_latents(target)
+
+    def _encode_continuation_audio(
+        self,
+        waveform,
+        sample_rate: int | None,
+        continuation_count: int,
+        history_count: int,
+        fps: float,
+    ) -> tuple[torch.Tensor | None, tuple, torch.Tensor | None]:
+        """Encode the previous window's matching audio as history/boundary rows."""
+
+        overlap_samples = int(
+            round(continuation_count / fps * MINIMAX_H3_AUDIO_SAMPLE_RATE)
+        )
+        stereo = _prepare_stereo_waveform(
+            waveform,
+            sample_rate,
+            overlap_samples,
+        )
+        if stereo is None:
+            return None, (), None
+        normalized = self._encode_stereo_audio_latents(stereo)
+
+        boundary_latents = (
+            int(normalized.shape[1])
+            if history_count <= 0
+            else min(
+                int(normalized.shape[1]),
+                max(1, round(40 / fps)),
+            )
+        )
+        history_latents = int(normalized.shape[1]) - boundary_latents
+        blocks: list[torch.Tensor] = []
+        anchors: list[tuple[str, int]] = []
+        if history_latents > 0:
+            blocks.append(normalized[:, :history_latents].reshape(-1, 32))
+            anchors.append(("history", history_latents))
+        if boundary_latents > 0:
+            blocks.append(normalized[:, history_latents:].reshape(-1, 32))
+            anchors.append(("first", boundary_latents))
+
+        history_samples = int(
+            round(history_count / fps * MINIMAX_H3_AUDIO_SAMPLE_RATE)
+        )
+        history_waveform = stereo[..., :history_samples] if history_samples else None
+        return (
+            torch.cat(blocks).to(self.device) if blocks else None,
+            tuple(anchors),
+            history_waveform,
+        )
 
     def _encode_references(
         self,
@@ -726,26 +1479,57 @@ class MiniMaxH3Model:
         input_prompt: str,
         image_start=None,
         image_end=None,
+        input_frames=None,
+        input_masks=None,
         input_video=None,
+        input_waveform=None,
+        input_waveform_sample_rate: int | None = None,
+        denoising_strength: float = 1.0,
+        masking_strength: float = 1.0,
         prefix_frames_count: int = 0,
         frame_num: int = 124,
         height: int = 480,
         width: int = 864,
+        fps: float = MINIMAX_H3_FPS,
         sampling_steps: int = 20,
         seed: int | None = None,
         callback=None,
+        set_progress_status=None,
         minimax_h3_references=None,
         minimax_h3_reference_detail: str = "match",
+        minimax_h3_exact_drive_audio_ordinal: int | None = None,
+        frames_to_inject=None,
+        frames_relative_positions_list=None,
+        audio_prompt_type: str = "",
+        video_prompt_type: str = "",
+        window_start_frame_no: int = 0,
+        minimax_h3_semantic_bridge_alpha: float = 0.0,
+        minimax_h3_semantic_bridge_magnitude: str = "per_token",
         **_kwargs,
     ):
         self._interrupt = False
+        from .semantic_bridge import validate_options, apply_bridge
+        bridge_strength = validate_options(minimax_h3_semantic_bridge_alpha,
+            minimax_h3_semantic_bridge_magnitude, self.model_def)
         if not isinstance(input_prompt, str):
             raise ValueError("MiniMax H3 accepts one text prompt per generation.")
         if height % 32 or width % 32:
             raise ValueError(f"MiniMax H3 dimensions must be multiples of 32, got {width}x{height}.")
 
+        fps = float(fps or MINIMAX_H3_FPS)
+        if abs(fps - MINIMAX_H3_FPS) > 1e-6:
+            raise ValueError(
+                f"MiniMax H3 generates at {MINIMAX_H3_FPS} fps, got {fps:g}."
+            )
         frame_num = align_num_frames(int(frame_num))
-        duration = frame_num / MINIMAX_H3_FPS
+        duration = frame_num / fps
+        if self._pdd_lora_active and duration > 10.13:
+            print(
+                "[MiniMax H3 PDD] Long accelerated clip: "
+                f"{duration:.2f}s. Alibaba's published Ref2VA PDD examples "
+                "cover up to 10.13s; Maestro will continue, but quality "
+                "beyond that demonstrated envelope is experimental."
+            )
         if not MINIMAX_H3_MIN_DURATION <= duration <= MINIMAX_H3_MAX_DURATION:
             raise ValueError(
                 f"MiniMax H3 supports {MINIMAX_H3_MIN_DURATION:g}-{MINIMAX_H3_MAX_DURATION:g}s at 24 fps; "
@@ -753,72 +1537,566 @@ class MiniMaxH3Model:
             )
         if int(sampling_steps) < 2:
             raise ValueError("MiniMax H3 needs at least two scheduler grid points.")
+        if self._fused_turbo and not (
+            FUSED_H3_MIN_EVALUATIONS
+            <= int(sampling_steps)
+            <= FUSED_H3_MAX_EVALUATIONS
+        ):
+            raise ValueError(
+                "H3 Fused Turbo supports 4-8 total denoising steps; "
+                f"received {int(sampling_steps)}. Four is the published default."
+            )
         if self._turbo_lora_active and int(sampling_steps) < MINIMAX_H3_TURBO_MIN_STEPS:
             raise ValueError(
                 "MiniMax H3 Turbo LoRA needs at least "
                 f"{MINIMAX_H3_TURBO_MIN_STEPS} denoising steps; "
                 f"received {int(sampling_steps)}."
             )
+        if self._pdd_lora_active and int(sampling_steps) != PDD_NUM_EVALUATIONS:
+            raise ValueError(
+                "Alibaba PAI MiniMax H3 Acc-LoRAs require exactly "
+                f"{PDD_NUM_EVALUATIONS} model evaluations; received "
+                f"{int(sampling_steps)}."
+            )
+
+        audio_prompt_type = str(audio_prompt_type or "")
+        video_prompt_type = str(video_prompt_type or "")
+        denoising_strength = float(denoising_strength)
+        masking_strength = float(masking_strength)
+        if not 0.0 <= denoising_strength <= 1.0:
+            raise ValueError(
+                "MiniMax H3 denoising strength must be between 0 and 1."
+            )
+        if not 0.0 <= masking_strength <= 1.0:
+            raise ValueError(
+                "MiniMax H3 masking strength must be between 0 and 1."
+            )
+        frozen_video_mode = not self.omni_reference and "2" in audio_prompt_type
+        source_audio_mode = (
+            any(flag in audio_prompt_type for flag in "AK")
+            and (
+                not self.omni_reference
+                # ``D`` is Maestro's internal exact-drive marker. Ordinary
+                # Ref2VA voice/style audio remains a creative reference;
+                # Director soundtracks and Studio's Music / Performance
+                # timeline use frozen target-audio conditioning.
+                or "D" in audio_prompt_type
+            )
+        )
+        control_video_mode = (
+            not self.omni_reference
+            and "G" in video_prompt_type
+            and "V" in video_prompt_type
+        )
+        video_to_video_mode = (
+            control_video_mode
+            and not frozen_video_mode
+            and (denoising_strength < 1.0 or input_masks is not None)
+        )
+        if self.omni_reference and "2" in audio_prompt_type:
+            raise ValueError(
+                "MiniMax H3 video-to-audio is a First / Last workflow, not an Omni reference mode."
+            )
+        if frozen_video_mode and not all(
+            flag in video_prompt_type for flag in "GV"
+        ):
+            raise ValueError(
+                "MiniMax H3 video-to-audio requires Use Control Video."
+            )
+        if "K" in audio_prompt_type and not all(
+            flag in video_prompt_type for flag in "GV"
+        ):
+            raise ValueError(
+                "MiniMax H3 Control-Video Audio mode requires Use Control Video."
+            )
+        if source_audio_mode and input_waveform is None:
+            raise ValueError(
+                "MiniMax H3 source-audio mode did not receive a readable soundtrack."
+            )
+        if frozen_video_mode:
+            print(
+                "[MiniMax H3] Video-to-audio: freezing Control Video "
+                "pictures and generating synchronized stereo audio."
+            )
+        elif source_audio_mode:
+            source_label = (
+                "Control Video soundtrack"
+                if "K" in audio_prompt_type
+                else "uploaded soundtrack"
+            )
+            print(
+                f"[MiniMax H3] Audio-driven video: preserving the {source_label} "
+                "as clean target conditioning."
+            )
+        if video_to_video_mode:
+            edit_area = (
+                "masked area"
+                if input_masks is not None
+                else "whole frame"
+            )
+            print(
+                "[MiniMax H3] Native video-to-video editing: "
+                f"{edit_area}, denoising={denoising_strength:.2f}, "
+                f"masking={masking_strength:.2f}."
+            )
+
+        history_video = boundary_video = None
+        continuation_count = history_count = 0
+        history_waveform = None
+        frozen_control_video = None
+        continuation_picture = None
+        keyframes: list[Image.Image] = []
+        visual_conditions: list[dict] = []
+        history_video, boundary_video, continuation_count = (
+            _split_continuation_video(
+                input_video,
+                prefix_frames_count,
+                has_explicit_start=image_start is not None and not frozen_video_mode,
+            )
+        )
+        if frozen_video_mode:
+            frozen_control_video = _build_frozen_control_video(
+                input_frames,
+                input_video,
+                frame_num,
+                continuation_count,
+                height,
+                width,
+            )
+        history_count = (
+            int(history_video.shape[1])
+            if history_video is not None
+            else 0
+        )
+        if history_video is not None:
+            visual_conditions.append(
+                {
+                    "anchor": "history",
+                    "source": history_video,
+                    "keep_all_latents": True,
+                }
+            )
 
         if self.omni_reference:
-            keyframes = []
-            anchors = ()
-        else:
-            # Wan2GP's FL2VA continuation contract: the generic window
-            # engine supplies its committed boundary frame as input_video;
-            # make that the next pass's first-frame condition. The one-frame
-            # duplicate is removed when the window chunks are joined.
-            if image_start is None:
-                image_start = _last_continuation_frame(
-                    input_video,
-                    prefix_frames_count,
+            continuation_picture = _tensor_to_pil(boundary_video)
+            if continuation_picture is not None:
+                continuation_picture = prepare_keyframe_image(
+                    continuation_picture,
+                    height,
+                    width,
+                    stretch=True,
                 )
-            keyframes = [item for item in (_tensor_to_pil(image_start), _tensor_to_pil(image_end)) if item is not None]
-            anchors = tuple(
-                anchor
-                for anchor, item in (("first", image_start), ("last", image_end))
-                if item is not None
-            )
-            keyframes = [
-                prepare_keyframe_image(image, height, width, stretch=index == 0)
-                for index, image in enumerate(keyframes)
+                keyframes.append(continuation_picture)
+                visual_conditions.append(
+                    {
+                        "anchor": "first",
+                        "source": continuation_picture,
+                    }
+                )
+        elif not frozen_video_mode:
+            start_source = image_start if image_start is not None else boundary_video
+            keyframe_sources = [
+                ("first", start_source),
+                ("last", image_end),
             ]
+            for anchor, source in keyframe_sources:
+                image = _tensor_to_pil(source)
+                if image is None:
+                    continue
+                image = prepare_keyframe_image(
+                    image,
+                    height,
+                    width,
+                    stretch=len(keyframes) == 0,
+                )
+                keyframes.append(image)
+                visual_conditions.append(
+                    {"anchor": anchor, "source": image}
+                )
+
+        target_frame_num = frame_num - history_count
+        if target_frame_num <= 0:
+            raise ValueError(
+                "MiniMax H3 sliding-window overlap leaves no frames to generate."
+            )
+        if align_num_frames(target_frame_num) != target_frame_num:
+            raise ValueError(
+                "MiniMax H3 overlap must leave a target on the 17*n+5 frame lattice; "
+                f"{frame_num} total frames minus {history_count} history frames leaves "
+                f"{target_frame_num}."
+            )
+
+        if frames_to_inject and self.omni_reference:
+            raise ValueError(
+                "Timed frame injection is available with MiniMax H3 First / Last, "
+                "not H3 Omni references."
+            )
+        injected_conditions = _resolve_h3_injected_frame_conditions(
+            frames_to_inject,
+            frames_relative_positions_list,
+            history_count=history_count,
+            target_frame_num=target_frame_num,
+        )
+        for source, frame_index in injected_conditions:
+            image = _tensor_to_pil(source)
+            if image is None:
+                raise ValueError("MiniMax H3 received an invalid injected frame image.")
+            # Official H3 injection places each keyframe directly on the
+            # selected output canvas; it must never redefine that aspect.
+            image = prepare_keyframe_image(
+                image,
+                height,
+                width,
+                stretch=True,
+            )
+            keyframes.append(image)
+            visual_conditions.append(
+                {
+                    "anchor": "frame",
+                    "source": image,
+                    "frame_index": frame_index,
+                }
+            )
+        if injected_conditions:
+            suffix = "s" if len(injected_conditions) != 1 else ""
+            print(
+                f"[MiniMax H3] Injecting {len(injected_conditions)} timed "
+                f"frame{suffix} into this window."
+            )
 
         request_seed = int(torch.seed() if seed is None else seed)
         generator = torch.Generator(device=self.device).manual_seed(request_seed)
-        num_latent_frames = video_latent_num_frames(frame_num)
+        num_latent_frames = video_latent_num_frames(target_frame_num)
         latent_height = height // self.vae.spatial_compression_ratio
         latent_width = width // self.vae.spatial_compression_ratio
-        num_audio_latents = audio_latent_num_frames(frame_num)
+        num_audio_latents = audio_latent_num_frames(target_frame_num)
+
+        target_video_condition_rows = None
+        target_video_condition_frames = 0
+        frozen_target_video = None
+        if frozen_control_video is not None:
+            frozen_target_video = frozen_control_video[:, history_count:]
+            pixels = self._condition_pixels(
+                frozen_target_video,
+                height,
+                width,
+            )
+            posterior = self.vae.encode_condition(
+                pixels,
+                keep_all_latents=True,
+            )
+            encoded = posterior.sample(
+                generator=torch.Generator().manual_seed(
+                    MINIMAX_H3_KEYFRAME_ENCODE_SEED
+                )
+            )
+            encoded = encoded.to(torch.float16).float().cpu()
+            target_video_condition_frames = int(encoded.shape[2])
+            if target_video_condition_frames != num_latent_frames:
+                raise ValueError(
+                    "MiniMax H3 could not align the frozen Control Video to "
+                    f"the target latent grid ({target_video_condition_frames} "
+                    f"versus {num_latent_frames} frames)."
+                )
+            video_mean, video_std = _keyframe_latent_stats_cpu()
+            target_video_condition_rows = patchify_video_latents(
+                (encoded - video_mean) / video_std,
+                self.patch_size,
+            ).to(self.device)
+
+        source_video_rows = None
+        editable_mask_rows = None
+        if video_to_video_mode:
+            if set_progress_status is not None:
+                set_progress_status("Encoding H3 control video")
+            source_video = _prepare_control_video_tensor(
+                input_frames,
+                height,
+                width,
+            )
+            if source_video is None:
+                raise ValueError(
+                    "MiniMax H3 video-to-video editing requires a readable "
+                    "Control Video."
+                )
+            source_video = source_video[
+                :,
+                history_count : history_count + target_frame_num,
+            ]
+            if int(source_video.shape[1]) < target_frame_num:
+                if int(source_video.shape[1]) < 1:
+                    raise ValueError(
+                        "The MiniMax H3 Control Video does not contain frames "
+                        "for this generation window."
+                    )
+                source_video = torch.cat(
+                    [
+                        source_video,
+                        source_video[:, -1:].repeat(
+                            1,
+                            target_frame_num - int(source_video.shape[1]),
+                            1,
+                            1,
+                        ),
+                    ],
+                    dim=1,
+                )
+
+            source_pixels = self._condition_pixels(
+                source_video,
+                height,
+                width,
+            )
+            # A V2V source is the clean reconstruction target, not a noised
+            # keyframe/reference. Match WanGP's native path by using the VAE
+            # posterior mode over the ordinary target-video chunking grid.
+            source_posterior = self.vae.encode(
+                source_pixels,
+                return_dict=False,
+            )[0]
+            source_encoded = source_posterior.mode().float().cpu()
+            if int(source_encoded.shape[2]) < num_latent_frames:
+                raise ValueError(
+                    "MiniMax H3 could not align the Control Video to the "
+                    f"target latent grid ({int(source_encoded.shape[2])} "
+                    f"versus {num_latent_frames} frames)."
+                )
+            source_encoded = source_encoded[:, :, :num_latent_frames]
+            video_mean, video_std = _keyframe_latent_stats_cpu()
+            source_video_rows = patchify_video_latents(
+                (source_encoded - video_mean) / video_std,
+                self.patch_size,
+            ).to(self.device)
+
+            if input_masks is not None:
+                source_mask = input_masks[
+                    :,
+                    history_count : history_count + target_frame_num,
+                ]
+                if int(source_mask.shape[1]) < target_frame_num:
+                    if int(source_mask.shape[1]) < 1:
+                        raise ValueError(
+                            "The MiniMax H3 edit mask does not contain frames "
+                            "for this generation window."
+                        )
+                    source_mask = torch.cat(
+                        [
+                            source_mask,
+                            source_mask[:, -1:].repeat(
+                                1,
+                                target_frame_num - int(source_mask.shape[1]),
+                                1,
+                                1,
+                            ),
+                        ],
+                        dim=1,
+                    )
+                latent_mask = _resize_video_mask(
+                    source_mask,
+                    (
+                        num_latent_frames,
+                        latent_height,
+                        latent_width,
+                    ),
+                    self.vae.config.clip_length,
+                    self.vae.temporal_compression_ratio,
+                )
+                editable_mask_rows = patchify_video_latents(
+                    latent_mask.expand(-1, 24, -1, -1, -1),
+                    self.patch_size,
+                ).to(self.device)
+
+            source_video = source_pixels = source_posterior = source_encoded = None
+            source_mask = None
+
+        target_audio_condition = (
+            self._encode_target_audio_condition(
+                input_waveform,
+                input_waveform_sample_rate,
+                history_count,
+                target_frame_num,
+                fps,
+            )
+            if source_audio_mode and input_waveform is not None
+            else None
+        )
+        target_audio_condition_latents = (
+            min(num_audio_latents, int(target_audio_condition.shape[1]))
+            if target_audio_condition is not None
+            else 0
+        )
 
         audio_condition_rows = None
         if self.omni_reference:
+            minimax_h3_reference_detail = str(
+                minimax_h3_reference_detail or "match"
+            ).strip().lower()
+            if minimax_h3_reference_detail not in {"match", "max"}:
+                raise ValueError(
+                    "MiniMax H3 reference detail must be 'match' or 'max'."
+                )
+            if self._pdd_lora_active:
+                reference_preparation = (
+                    "official high detail (2048px short edge)"
+                    if minimax_h3_reference_detail == "max"
+                    else "Match output (no reference upscaling)"
+                )
+                print(
+                    "[MiniMax H3 PDD] Runtime reference preparation: "
+                    f"{reference_preparation}."
+                )
+            if source_audio_mode:
+                input_prompt = apply_exact_drive_audio_prompt_contract(
+                    input_prompt,
+                    minimax_h3_exact_drive_audio_ordinal,
+                )
+            input_prompt, runtime_references, reference_remap = (
+                align_ref2va_voice_reference_order(
+                    input_prompt,
+                    minimax_h3_references,
+                )
+            )
+            if reference_remap:
+                mapping = "; ".join(
+                    f"{kind} " + ", ".join(
+                        f"{old} -> {new}" for old, new in sorted(remap.items())
+                    )
+                    for kind, remap in reference_remap.items()
+                )
+                print(
+                    "[MiniMax H3 Ref2VA] Canonicalized physical reference order "
+                    f"and prompt labels ({mapping})."
+                )
+            input_prompt, runtime_references, voice_scope = (
+                select_ref2va_window_voice_references(
+                    input_prompt,
+                    runtime_references,
+                )
+            )
+            if voice_scope["voice_total"]:
+                kept = ", ".join(voice_scope["kept_roles"]) or "none"
+                print(
+                    "[MiniMax H3 Ref2VA] Window-scoped voice references: "
+                    f"kept {voice_scope['voice_kept']}/{voice_scope['voice_total']} "
+                    f"({kept})."
+                )
+                if voice_scope["voice_omitted"]:
+                    omitted = ", ".join(voice_scope["omitted_roles"])
+                    print(
+                        "[MiniMax H3 Ref2VA] Omitted non-speaking or over-limit "
+                        f"voice references for this window: {omitted}."
+                    )
             conditioned_prompt = ensure_ref2va_prompt_relationships(
                 input_prompt,
-                minimax_h3_references,
-                duration_seconds=frame_num / MINIMAX_H3_FPS,
+                runtime_references,
+                duration_seconds=target_frame_num / fps,
             )
             if conditioned_prompt != str(input_prompt or "").strip():
                 print(
-                    "[MiniMax H3 Ref2VA] Added explicit reference relationships "
-                    "to an untagged prompt."
+                    "[MiniMax H3 Ref2VA] Applied canonical Subject/Speaker/Audio "
+                    "bindings to the final model prompt."
                 )
+            picture_no = video_no = audio_no = 0
+            presentation_order = []
+            for reference in runtime_references:
+                kind = reference.get("type")
+                role = str(
+                    reference.get("character_name")
+                    or reference.get("role")
+                    or kind
+                ).strip()
+                if kind == "image":
+                    picture_no += 1
+                    presentation_order.append(f"Picture {picture_no}={role}")
+                elif kind == "video":
+                    video_no += 1
+                    presentation_order.append(f"Video {video_no}={role}")
+                    if (
+                        (reference.get("has_audio") or reference.get("audio_path"))
+                        and reference.get("include_audio", True)
+                    ):
+                        audio_no += 1
+                        presentation_order.append(f"Audio {audio_no}={role}")
+                elif kind == "audio":
+                    audio_no += 1
+                    presentation_order.append(f"Audio {audio_no}={role}")
+            print(
+                "[MiniMax H3 Ref2VA] Runtime reference bindings: "
+                + "; ".join(presentation_order)
+            )
             references = prepare_references(
-                minimax_h3_references,
+                runtime_references,
                 num_frames=frame_num,
                 target_height=height,
                 target_width=width,
                 audio_sample_rate=32000,
                 detail=minimax_h3_reference_detail,
+                timeline_start_frame=window_start_frame_no,
             )
+            presentation_references = list(references)
+            if continuation_picture is not None:
+                conditioned_prompt = add_ref2va_continuation_context(
+                    conditioned_prompt,
+                )
+                presentation_references.insert(
+                    0,
+                    MiniMaxH3PreparedReference(
+                        kind="image",
+                        image=continuation_picture,
+                        role="previous-window boundary",
+                        image_intent="composition",
+                    ),
+                )
             prompt_embeds, text_tags = self.conditioner.forward_ref2va(
                 conditioned_prompt,
                 self.device,
-                references,
+                presentation_references,
             )
             if prompt_embeds is None or self._interrupt:
                 return None
-            condition_rows, audio_condition_rows = self._encode_references(references, generator)
+            keyframe_rows, anchors = self._encode_visual_conditions(
+                visual_conditions,
+                latent_height,
+                latent_width,
+                generator,
+                height=height,
+                width=width,
+            )
+            reference_rows, reference_audio_rows = self._encode_references(
+                references,
+                generator,
+            )
+            condition_parts = [
+                rows
+                for rows in (keyframe_rows, reference_rows)
+                if rows is not None
+            ]
+            condition_rows = (
+                torch.cat(condition_parts)
+                if condition_parts
+                else None
+            )
+            continuation_audio_rows, audio_anchors, history_waveform = (
+                self._encode_continuation_audio(
+                    input_waveform,
+                    input_waveform_sample_rate,
+                    continuation_count,
+                    history_count,
+                    fps,
+                )
+                if continuation_count > 0
+                else (None, (), None)
+            )
+            audio_parts = [
+                rows
+                for rows in (continuation_audio_rows, reference_audio_rows)
+                if rows is not None
+            ]
+            audio_condition_rows = (
+                torch.cat(audio_parts)
+                if audio_parts
+                else None
+            )
             if self._interrupt:
                 return None
             layout = build_ref2va_packed_sequence(
@@ -829,11 +2107,47 @@ class MiniMaxH3Model:
                 latent_width,
                 num_audio_latents,
                 self.patch_size,
+                keyframe_anchors=anchors,
+                audio_condition_anchors=audio_anchors,
+                target_condition_audio_latents=target_audio_condition_latents,
+                target_condition_video_frames=target_video_condition_frames,
             )
+            if continuation_count > 1:
+                print(
+                    "[MiniMax H3 Ref2VA] Continuing with canonical references, "
+                    f"{history_count} motion-history frames + one boundary "
+                    "frame"
+                    + (
+                        " and matching stereo audio."
+                        if continuation_audio_rows is not None
+                        else "."
+                    )
+                )
         else:
             prompt_embeds, text_tags = self.conditioner(input_prompt, self.device, keyframes or None)
             if prompt_embeds is None or self._interrupt:
                 return None
+            prompt_embeds = apply_bridge(prompt_embeds, bridge_strength,
+                minimax_h3_semantic_bridge_magnitude, model_def=self.model_def)
+            condition_rows, anchors = self._encode_visual_conditions(
+                visual_conditions,
+                latent_height,
+                latent_width,
+                generator,
+                height=height,
+                width=width,
+            )
+            audio_condition_rows, audio_anchors, history_waveform = (
+                self._encode_continuation_audio(
+                    input_waveform,
+                    input_waveform_sample_rate,
+                    continuation_count,
+                    history_count,
+                    fps,
+                )
+                if continuation_count > 0
+                else (None, (), None)
+            )
             layout = build_packed_sequence(
                 text_tags,
                 num_latent_frames,
@@ -842,29 +2156,62 @@ class MiniMaxH3Model:
                 num_audio_latents,
                 self.patch_size,
                 anchors,
+                audio_condition_anchors=audio_anchors,
+                target_condition_audio_latents=target_audio_condition_latents,
+                target_condition_video_frames=target_video_condition_frames,
             )
-            condition_rows = self._encode_keyframes(
-                keyframes,
-                latent_height,
-                latent_width,
-                generator,
-            )
+            if continuation_count > 1:
+                print(
+                    "[MiniMax H3] Continuing with "
+                    f"{history_count} motion-history frames + one boundary frame"
+                    + (
+                        " and matching stereo audio."
+                        if audio_condition_rows is not None
+                        else "."
+                    )
+                )
         if self._interrupt:
             return None
 
-        video_noise = randn_tensor(
-            (1, 24, num_latent_frames, latent_height, latent_width),
-            generator=generator,
-            device=self.device,
-            dtype=torch.float32,
-        )
-        video_rows = patchify_video_latents(video_noise, self.patch_size)
+        if target_video_condition_rows is None:
+            video_noise = randn_tensor(
+                (1, 24, num_latent_frames, latent_height, latent_width),
+                generator=generator,
+                device=self.device,
+                dtype=torch.float32,
+            )
+            video_rows = patchify_video_latents(video_noise, self.patch_size)
+        else:
+            video_rows = target_video_condition_rows
+        if source_video_rows is not None:
+            if tuple(source_video_rows.shape) != tuple(video_rows.shape):
+                raise ValueError(
+                    "MiniMax H3 Control Video rows do not match the generated "
+                    f"target ({tuple(source_video_rows.shape)} versus "
+                    f"{tuple(video_rows.shape)})."
+                )
+            source_noise_rows = video_rows.clone()
+            source_buffer_rows = torch.empty_like(source_video_rows)
+        else:
+            source_noise_rows = source_buffer_rows = None
         audio_rows = randn_tensor(
             (num_audio_latents * MINIMAX_H3_AUDIO_CHANNELS, 32),
             generator=generator,
             device=self.device,
             dtype=torch.float32,
         )
+        if target_audio_condition_latents:
+            conditioned = target_audio_condition[
+                :, :target_audio_condition_latents
+            ].to(audio_rows)
+            audio_rows[:target_audio_condition_latents].copy_(conditioned[0])
+            second_channel_start = num_audio_latents
+            audio_rows[
+                second_channel_start : second_channel_start
+                + target_audio_condition_latents
+            ].copy_(conditioned[1])
+        target_audio_condition = None
+        target_video_condition_rows = None
         if condition_rows is not None:
             video_rows = torch.cat([condition_rows, video_rows])
         if audio_condition_rows is not None:
@@ -874,10 +2221,39 @@ class MiniMaxH3Model:
             int(sampling_steps),
             turbo_active=self._turbo_lora_active,
         )
+        self.scheduler.set_solver(self.sample_solver)
         self.scheduler.set_timesteps(scheduler_points, device=self.device)
         self.audio_scheduler.set_timesteps(scheduler_points, device=self.device)
         timesteps = self.scheduler.timesteps
         audio_timesteps = self.audio_scheduler.timesteps
+        model_steps = len(timesteps)
+        if self._pdd_controller is not None:
+            self._pdd_controller.configure_sigmas(
+                self.scheduler.sigmas,
+                self.audio_scheduler.sigmas,
+            )
+            if self._pdd_controller.num_steps != model_steps:
+                raise ValueError(
+                    "MiniMax H3 PDD produced "
+                    f"{self._pdd_controller.num_steps} head plans for "
+                    f"{model_steps} denoising evaluations."
+                )
+            print(
+                "[MiniMax H3 PDD] Aligned interval heads to the exact "
+                f"{model_steps}-evaluation video/audio sigma schedules."
+            )
+        denoising_start_step = int(
+            round(model_steps * (1.0 - denoising_strength), 4)
+        )
+        mask_end_step = (
+            min(
+                model_steps,
+                denoising_start_step
+                + math.ceil(model_steps * masking_strength),
+            )
+            if editable_mask_rows is not None
+            else 0
+        )
         if self._turbo_lora_active:
             print(
                 "[MiniMax H3 Turbo] Using "
@@ -914,6 +2290,36 @@ class MiniMaxH3Model:
             )
         target_start_index = (
             min(target_starts) if target_starts else layout.sequence_length
+        )
+        video_sink_tokens = (
+            int(video_indices[layout.num_condition_video_rows].item())
+            if video_indices.numel() > layout.num_condition_video_rows
+            else layout.sequence_length
+        )
+        target_video_row_count = (
+            int(video_rows.shape[0]) - layout.num_condition_video_rows
+        )
+        generated_video_row_count = max(
+            0,
+            target_video_row_count - layout.num_target_condition_video_rows,
+        )
+        conditioned_audio_latents = min(
+            num_audio_latents,
+            layout.num_target_condition_audio_latents,
+        )
+        generated_audio_local_indices = torch.cat(
+            [
+                torch.arange(
+                    conditioned_audio_latents,
+                    num_audio_latents,
+                    device=self.device,
+                ),
+                torch.arange(
+                    num_audio_latents + conditioned_audio_latents,
+                    num_audio_latents * MINIMAX_H3_AUDIO_CHANNELS,
+                    device=self.device,
+                ),
+            ]
         )
 
         cache_config = getattr(self.transformer, "cache", None)
@@ -979,13 +2385,35 @@ class MiniMaxH3Model:
 
         if callback is not None:
             callback(-1, None, True, override_num_inference_steps=len(timesteps))
+        old_audio_denoised = None
+        res_multistep = self.sample_solver == "res_multistep"
+        audio_scale = float(self.scheduler.shift) / float(
+            self.audio_scheduler.shift
+        )
         try:
             with tqdm(total=len(timesteps), desc="MiniMax H3 denoising") as progress:
                 for index, (video_timestep, audio_timestep) in enumerate(zip(timesteps, audio_timesteps)):
                     if self._interrupt:
                         return None
+                    if self._pdd_controller is not None:
+                        self._pdd_controller.set_step(index)
                     if first_block_cache is not None:
                         first_block_cache.begin_step(index)
+                    self.transformer.sla_attention.begin_step(
+                        index,
+                        model_steps,
+                    )
+                    if res_multistep and generated_audio_local_indices.numel():
+                        audio_target = audio_rows[
+                            layout.num_condition_audio_rows :
+                        ]
+                        audio_target[generated_audio_local_indices] = (
+                            audio_target[generated_audio_local_indices]
+                            * (
+                                self.audio_scheduler.sigmas[index]
+                                / self.scheduler.sigmas[index]
+                            )
+                        )
                     unique_timesteps, timestep_indices = row_plan[index]
                     prediction = self.transformer(
                         hidden_states=video_rows[None],
@@ -1001,52 +2429,139 @@ class MiniMaxH3Model:
                         return_dict=False,
                         first_block_cache=first_block_cache,
                         target_start_index=target_start_index,
+                        video_sink_tokens=video_sink_tokens,
                     )
                     if prediction is None or self._interrupt:
                         return None
                     video_velocity, audio_velocity = prediction
-                    video_rows[layout.num_condition_video_rows :] = self.scheduler.step(
-                        video_velocity[0, layout.num_condition_video_rows :].float(),
-                        video_timestep,
-                        video_rows[layout.num_condition_video_rows :],
-                        return_dict=False,
-                    )[0]
-                    audio_rows[layout.num_condition_audio_rows :] = self.audio_scheduler.step(
-                        audio_velocity[0, layout.num_condition_audio_rows :].float(),
-                        audio_timestep,
-                        audio_rows[layout.num_condition_audio_rows :],
-                        return_dict=False,
-                    )[0]
+                    if generated_video_row_count:
+                        video_start = layout.num_condition_video_rows
+                        video_stop = video_start + generated_video_row_count
+                        video_rows[video_start:video_stop] = self.scheduler.step(
+                            video_velocity[0, video_start:video_stop].float(),
+                            video_timestep,
+                            video_rows[video_start:video_stop],
+                            return_dict=False,
+                        )[0]
+                        if source_video_rows is not None and (
+                            index < denoising_start_step
+                            or index < mask_end_step
+                        ):
+                            _reinject_video_source(
+                                video_rows[video_start:video_stop],
+                                source_video_rows,
+                                source_noise_rows,
+                                (
+                                    None
+                                    if index < denoising_start_step
+                                    else editable_mask_rows
+                                ),
+                                self.scheduler.sigmas[index + 1],
+                                source_buffer_rows,
+                            )
+                    if generated_audio_local_indices.numel():
+                        audio_target = audio_rows[layout.num_condition_audio_rows :]
+                        audio_velocity_target = audio_velocity[
+                            0, layout.num_condition_audio_rows :
+                        ]
+                        if res_multistep:
+                            audio_sample = audio_target[
+                                generated_audio_local_indices
+                            ]
+                            audio_sigma = self.audio_scheduler.sigmas[index].to(
+                                device=audio_sample.device,
+                                dtype=audio_sample.dtype,
+                            )
+                            audio_denoised = (
+                                audio_velocity_target[
+                                    generated_audio_local_indices
+                                ].float()
+                                * audio_sigma.float()
+                                + audio_sample.float()
+                            ).mul_(audio_scale)
+                            audio_video_coordinate = audio_sample.mul(
+                                self.scheduler.sigmas[index].to(audio_sample)
+                                / self.audio_scheduler.sigmas[index].to(
+                                    audio_sample
+                                )
+                            )
+                            audio_target[generated_audio_local_indices] = (
+                                res_multistep_update(
+                                    audio_video_coordinate,
+                                    audio_denoised,
+                                    old_audio_denoised,
+                                    self.scheduler.coefficients_for_step(index),
+                                )
+                            )
+                            old_audio_denoised = audio_denoised.detach()
+                        else:
+                            audio_target[generated_audio_local_indices] = (
+                                self.audio_scheduler.step(
+                                audio_velocity_target[
+                                    generated_audio_local_indices
+                                ].float(),
+                                audio_timestep,
+                                audio_target[generated_audio_local_indices],
+                                return_dict=False,
+                                )[0]
+                            )
                     if callback is not None:
                         callback(index, None)
                     progress.update()
         finally:
             if first_block_cache is not None:
                 first_block_cache.reset()
+            if res_multistep and offload.shared_state.get("_attention") == "sla":
+                print(
+                    "[MiniMax H3 SLA] Run summary: "
+                    f"{self.transformer.sla_attention.summary()}."
+                )
+
+        # During RES, generated audio is evolved on the video sigma schedule
+        # so both modalities use the same second-order coefficients. Restore
+        # H3's native audio latent scale before decoding. Reference/guide rows
+        # are deliberately excluded, matching WanGP's ``audio_tail`` recipe.
+        if res_multistep and generated_audio_local_indices.numel():
+            audio_target = audio_rows[layout.num_condition_audio_rows :]
+            # Advanced indexing returns a copy, so ``.div_`` on that result
+            # never updated the packed audio rows. Assign the restored scale
+            # explicitly before decoding, matching WanGP's basic-slice path.
+            audio_target[generated_audio_local_indices] = (
+                audio_target[generated_audio_local_indices] / audio_scale
+            )
 
         if self._interrupt:
             return None
-        video_latents = unpatchify_video_tokens(
-            video_rows[layout.num_condition_video_rows :],
-            num_latent_frames,
-            latent_height,
-            latent_width,
-            24,
-            self.patch_size,
-        )
-        video_mean = torch.tensor(VIDEO_LATENTS_MEAN, device=self.device).view(1, -1, 1, 1, 1)
-        video_std = torch.tensor(VIDEO_LATENTS_STD, device=self.device).view(1, -1, 1, 1, 1)
-        video_latents = video_latents * video_std + video_mean
-        autocast = (
-            torch.autocast(device_type="cuda", dtype=torch.float16)
-            if self.device.type == "cuda"
-            else nullcontext()
-        )
-        with autocast:
-            video = self.vae.decode(video_latents, return_dict=False)[0]
-        pixel_mean = torch.tensor(MINIMAX_H3_PIXEL_MEAN, device=self.device).view(1, -1, 1, 1, 1)
-        pixel_std = torch.tensor(MINIMAX_H3_PIXEL_STD, device=self.device).view(1, -1, 1, 1, 1)
-        video = (video.float() * pixel_std + pixel_mean).clamp(0, 1).mul(2).sub(1)
+        if frozen_target_video is None:
+            video_latents = unpatchify_video_tokens(
+                video_rows[layout.num_condition_video_rows :],
+                num_latent_frames,
+                latent_height,
+                latent_width,
+                24,
+                self.patch_size,
+            )
+            video_mean = torch.tensor(VIDEO_LATENTS_MEAN, device=self.device).view(1, -1, 1, 1, 1)
+            video_std = torch.tensor(VIDEO_LATENTS_STD, device=self.device).view(1, -1, 1, 1, 1)
+            video_latents = video_latents * video_std + video_mean
+            autocast = (
+                torch.autocast(device_type="cuda", dtype=torch.float16)
+                if self.device.type == "cuda"
+                else nullcontext()
+            )
+            with autocast:
+                video = self.vae.decode(video_latents, return_dict=False)[0]
+            pixel_mean = torch.tensor(MINIMAX_H3_PIXEL_MEAN, device=self.device).view(1, -1, 1, 1, 1)
+            pixel_std = torch.tensor(MINIMAX_H3_PIXEL_STD, device=self.device).view(1, -1, 1, 1, 1)
+            video = (video.float() * pixel_std + pixel_mean).clamp(0, 1).mul(2).sub(1)
+            output_video = video[0, :, :target_frame_num]
+        else:
+            output_video = frozen_target_video[:, :target_frame_num].cpu()
+        if history_video is not None:
+            output_video = torch.cat(
+                [history_video.to(output_video), output_video],
+                dim=1,
+            )
 
         audio_latents = unpack_audio_tokens(
             audio_rows[layout.num_condition_audio_rows :],
@@ -1056,9 +2571,39 @@ class MiniMaxH3Model:
         audio_std = torch.tensor(AUDIO_LATENTS_STD, device=self.device).view(1, -1, 1)
         audio_latents = audio_latents * audio_std + audio_mean
         audio = self.audio_vae.decode(audio_latents, return_dict=False)[0]
-        audio = audio.float().permute(1, 0, 2)[0].transpose(0, 1).cpu().numpy()
+        audio = audio.float()[:, 0]
+        target_samples = int(
+            round(target_frame_num / fps * MINIMAX_H3_AUDIO_SAMPLE_RATE)
+        )
+        audio = audio[..., :target_samples]
+        if audio.shape[-1] < target_samples:
+            audio = F.pad(audio, (0, target_samples - audio.shape[-1]))
+        if history_count > 0:
+            history_samples = int(
+                round(history_count / fps * MINIMAX_H3_AUDIO_SAMPLE_RATE)
+            )
+            prefix_audio = (
+                history_waveform.to(audio)
+                if history_waveform is not None
+                else torch.zeros(
+                    (MINIMAX_H3_AUDIO_CHANNELS, history_samples),
+                    dtype=audio.dtype,
+                    device=audio.device,
+                )
+            )
+            prefix_audio = prefix_audio[..., :history_samples]
+            if prefix_audio.shape[-1] < history_samples:
+                prefix_audio = F.pad(
+                    prefix_audio,
+                    (0, history_samples - prefix_audio.shape[-1]),
+                )
+            audio = torch.cat([prefix_audio, audio], dim=-1)
+        total_samples = int(
+            round(frame_num / fps * MINIMAX_H3_AUDIO_SAMPLE_RATE)
+        )
+        audio = audio[..., :total_samples].transpose(0, 1).cpu().numpy()
         return {
-            "x": video[0],
+            "x": output_video,
             "audio": audio,
-            "audio_sampling_rate": 32000,
+            "audio_sampling_rate": MINIMAX_H3_AUDIO_SAMPLE_RATE,
         }

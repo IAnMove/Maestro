@@ -1,4 +1,7 @@
+import { sceneFxFields } from '../features/sceneFx/types'
+import { kineticTextFields } from './kineticText'
 import type { Scene, SceneLayer } from '../types'
+import { parseSceneGenerationPolicy, sceneGenerationPolicyFields } from './sceneGenerationPolicy'
 
 const LOCAL_OBJECT_URL = /^blob:/i
 const SCENE_LAYER_TYPES = new Set<SceneLayer['type']>([
@@ -11,6 +14,7 @@ function finiteOr(value: unknown, fallback: number): number {
 
 export const prepareSceneForExport = (scene: Scene): Scene => ({
   ...scene,
+  ...sceneGenerationPolicyFields(scene.generationPolicy),
   version: 1,
   layers: scene.layers.map(layer => {
     if (layer.type === 'camera' || !LOCAL_OBJECT_URL.test(layer.source)) return { ...layer }
@@ -31,6 +35,7 @@ export const parseSceneFile = (text: string): Scene => {
   const parsed: unknown = JSON.parse(normalized)
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('The scene JSON must contain an object.')
   const candidate = parsed as Partial<Scene>
+  const generationPolicy = parseSceneGenerationPolicy(candidate.generationPolicy)
   if (candidate.version !== 1 || !Array.isArray(candidate.layers)) throw new Error('This is not a HocusPocus Scene Animator scene.')
   const ids = new Set<string>()
   candidate.layers.forEach((layer, index) => {
@@ -50,8 +55,11 @@ export const parseSceneFile = (text: string): Scene => {
   if (width <= 0 || height <= 0) throw new Error('Scene width and height must be positive.')
   return {
     ...(candidate as Scene),
+    ...sceneFxFields(candidate.sfx),
+    ...kineticTextFields(candidate.texts),
     version: 1,
     width,
+    ...(generationPolicy ? { generationPolicy } : {}),
     height,
     duration: duration > 0 ? duration : 1,
     fps: candidate.fps === 60 ? 60 : 30,

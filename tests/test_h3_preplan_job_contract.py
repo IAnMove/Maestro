@@ -102,9 +102,9 @@ def _install_h3_fakes(monkeypatch, planner) -> None:
         turbo=turbo,
         minimax_h3_handler=handler,
     )
-    minimax_h3_package.__path__ = []
+    minimax_h3_package.__path__ = [str(ROOT / 'app' / 'models' / 'minimax_h3')]
     models_package = _module("models", minimax_h3=minimax_h3_package)
-    models_package.__path__ = []
+    models_package.__path__ = [str(ROOT / 'app' / 'models')]
     monkeypatch.setitem(sys.modules, "models", models_package)
     monkeypatch.setitem(sys.modules, "models.minimax_h3", minimax_h3_package)
     monkeypatch.setitem(
@@ -133,7 +133,7 @@ def _install_h3_fakes(monkeypatch, planner) -> None:
     )
     duration_module = _module(
         "services.minimax_h3_duration",
-        apply_h3_dialogue_duration=lambda _body, _model_def: None,
+        apply_h3_dialogue_duration=lambda _body, _model_def, **_kwargs: None,
         apply_h3_vocal_timeline=lambda _body, _model_def: None,
         h3_dialogue_split_error=lambda _contract: "dialogue split required",
     )
@@ -148,7 +148,7 @@ def _install_h3_fakes(monkeypatch, planner) -> None:
     )
     provenance_module = _module(
         "services.generation_provenance",
-        normalize_submission_provenance=lambda value: value or {
+        normalize_submission_provenance=lambda value, **_trusted: value or {
             "actor": "unknown", "tool": "studio", "command": {},
         },
     )
@@ -160,7 +160,10 @@ def _install_h3_fakes(monkeypatch, planner) -> None:
         task_manager=task_module,
         generation_provenance=provenance_module,
     )
-    services_package.__path__ = []
+    services_package.__path__ = [str(ROOT / "app" / "services")]
+    # The real WanGP bootstrap imports torch before serving requests. Keep that
+    # initialization outside the queue-admission latency measurement as well.
+    import torch  # noqa: F401
     monkeypatch.setitem(sys.modules, "services", services_package)
     monkeypatch.setitem(
         sys.modules,
@@ -320,6 +323,7 @@ def _harness(
         "acknowledge_cancel": acknowledge_cancel,
         "snapshot_job": lambda job: dict(job),
         "_run_generation": lambda job_id, **_kwargs: gpu_calls.append(job_id),
+        "_image_generation_commands": SimpleNamespace(native_worker=lambda _job: None),
     }
     _load(
         "_new_generation_job",

@@ -12,16 +12,14 @@ test('opens extracted Story Lab Music, Trailer and Productions chrome', async ({
   const navigation = page.getByRole('navigation', { name: 'Story Lab sections' })
   await expect(navigation).toBeVisible()
 
-  await navigation.getByRole('button', { name: 'Music' }).click()
+  await navigation.getByRole('button', { name: 'Audio' }).click()
   await expect(page.getByRole('heading', { name: 'Music bible' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Generate LLM suggestions' })).toBeVisible()
 
-  await navigation.getByRole('button', { name: 'Productions' }).click()
+  await navigation.getByRole('button', { name: 'Generate' }).click()
   await expect(page.getByRole('heading', { name: 'Productions' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Comic adaptation' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Film adaptation' })).toBeVisible()
-
-  await navigation.getByRole('button', { name: 'Trailer' }).click()
   await expect(page.getByRole('heading', { name: 'Cinematic trailer creator' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Generate complete trailer' })).toBeVisible()
 

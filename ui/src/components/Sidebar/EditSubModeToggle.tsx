@@ -35,11 +35,12 @@ export function EditSubModeToggle() {
   }, [showExperimental, editSubMode, setEditSubMode])
 
   return (
-    <div className="flex bg-bg-tertiary rounded-lg p-0.5 border border-border">
+    <div className="flex flex-wrap bg-bg-tertiary rounded-lg p-0.5 border border-border">
       {subModes.map(m => (
         <button
           key={m.value}
-          onClick={() => setEditSubMode(m.value)}
+          onClick={() => setEditSubMode(m.value, m.value === 'recast' ? 'scail' : undefined)}
+          aria-pressed={editSubMode === m.value}
           className={`flex-1 text-[10px] py-1.5 rounded-md transition-all whitespace-nowrap ${
             editSubMode === m.value
               ? 'bg-bg-active text-text-primary'

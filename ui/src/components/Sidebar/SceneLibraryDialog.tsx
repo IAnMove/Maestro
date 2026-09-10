@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, FolderOpen, Loader2, X } from 'lucide-react'
 import { fetchOutputMetadata, fetchOutputs, type ApiOutput } from '../../api/client'
 import { useUiTranslation } from '../../i18n'
 import { ModalShell } from '../common/ModalShell'
-import { SCENE_LIBRARY_PAGE_SIZE, isCompositorVideo, sceneFromLibraryPayload, sceneLibraryTitle } from '../../lib/sceneLibrary'
+import { SCENE_LIBRARY_PAGE_SIZE, isCompositorVideo, isWorld3DLibraryRecipe, sceneFromLibraryPayload, sceneLibraryTitle, world3dDocumentFromLibraryPayload } from '../../lib/sceneLibrary'
+import { commitLibraryChoice, purposeFromTab } from '../../lib/sceneLibraryChoice.ts'
+import type { Scene3DDocument } from '../../features/scene3d/types'
 import type { Scene } from '../../types'
 
 type LibraryTab = 'scenes' | 'videos'
@@ -13,15 +15,18 @@ export function SceneLibraryDialog({
   workspace,
   onClose,
   onOpenScene,
+  onOpenWorld3D,
   onPickFile,
 }: {
   open: boolean
   workspace?: string
   onClose: () => void
   onOpenScene: (scene: Scene, label: string) => void
+  onOpenWorld3D?: (document: Scene3DDocument, label: string) => void
   onPickFile: () => void
 }) {
   const { t } = useUiTranslation('scene3d')
+  const { t: commonT } = useUiTranslation('common')
   const [tab, setTab] = useState<LibraryTab>('scenes')
   const [page, setPage] = useState(0)
   const [items, setItems] = useState<ApiOutput[]>([])
@@ -30,11 +35,25 @@ export function SceneLibraryDialog({
   const [opening, setOpening] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [selected, setSelected] = useState<ApiOutput | null>(null)
+  const generationRef = useRef(0)
+  const openRef = useRef(open)
+  const workspaceRef = useRef(workspace || '')
+  const purposeRef = useRef(purposeFromTab(tab))
+  const purpose = purposeFromTab(tab)
+  // Bump generation during render. A useEffect bump loses to a fetch that
+  // settles in the same turn as Cancel/Escape, and a later reopen would
+  // otherwise reuse the captured generation and apply the stale scene.
+  if (openRef.current && !open) generationRef.current += 1
+  if (workspaceRef.current !== (workspace || '')) generationRef.current += 1
+  openRef.current = open
+  workspaceRef.current = workspace || ''
+  purposeRef.current = purpose
 
   useEffect(() => {
     if (!open) return
     setError(null)
     setOpening(null)
+    setSelected(null)
     const controller = new AbortController()
     setLoading(true)
     const load = async () => {
@@ -47,7 +66,6 @@ export function SceneLibraryDialog({
           })
           setItems(data.outputs)
           setTotal(data.total)
-          setSelected(data.outputs[0] ?? null)
           return
         }
         const data = await fetchOutputs(0, 0, { mediaType: 'video', search: '_3d_', workspace, signal: controller.signal })
@@ -55,13 +73,11 @@ export function SceneLibraryDialog({
         setTotal(videos.length)
         const slice = videos.slice(page * SCENE_LIBRARY_PAGE_SIZE, (page + 1) * SCENE_LIBRARY_PAGE_SIZE)
         setItems(slice)
-        setSelected(slice[0] ?? null)
       } catch (loadError) {
         if ((loadError as { name?: string }).name === 'AbortError') return
         setError(loadError instanceof Error ? loadError.message : t('library.listFailed'))
         setItems([])
         setTotal(0)
-        setSelected(null)
       } finally {
         setLoading(false)
       }
@@ -72,18 +88,41 @@ export function SceneLibraryDialog({
 
   const pages = Math.max(1, Math.ceil(total / SCENE_LIBRARY_PAGE_SIZE))
 
+  const liveChoice = () => ({
+    generation: generationRef.current,
+    workspaceId: workspaceRef.current,
+    purpose: purposeRef.current,
+    open: openRef.current,
+  })
+
   const openItem = async (file: ApiOutput) => {
+    // A newer confirm must invalidate any in-flight open. Paging clears
+    // `opening`, so two fetches can overlap with the same generation and the
+    // slower first confirm would still replace the project (and wipe undo).
+    generationRef.current += 1
+    const capture = { generation: generationRef.current, workspaceId: workspaceRef.current, purpose }
+    const commit = commitLibraryChoice(liveChoice(), capture, file)
+    if (commit.action === 'ignore') return
     setOpening(file.name)
     setError(null)
     try {
-      if (file.type === 'scene') {
-        const response = await fetch(file.url)
+      if (commit.action === 'open-scene') {
+        const response = await fetch(commit.item.url)
         if (!response.ok) throw new Error(t('library.loadFailed'))
-        onOpenScene(sceneFromLibraryPayload(await response.json()), sceneLibraryTitle(file.name))
+        const payload = await response.json()
+        if (commitLibraryChoice(liveChoice(), capture, commit.item).action === 'ignore') return
+        onOpenScene(sceneFromLibraryPayload(payload), sceneLibraryTitle(commit.item.name))
         return
       }
-      const metadata = await fetchOutputMetadata(file.name, workspace)
-      onOpenScene(sceneFromLibraryPayload(metadata), sceneLibraryTitle(file.name))
+      const metadata = await fetchOutputMetadata(commit.item.name, capture.workspaceId || undefined)
+      if (commitLibraryChoice(liveChoice(), capture, commit.item).action === 'ignore') return
+      if (isWorld3DLibraryRecipe(metadata)) {
+        const document = world3dDocumentFromLibraryPayload(metadata)
+        if (!document || !onOpenWorld3D) throw new Error(t('library.world3dExport'))
+        onOpenWorld3D(document, sceneLibraryTitle(commit.item.name))
+        return
+      }
+      onOpenScene(sceneFromLibraryPayload(metadata), sceneLibraryTitle(commit.item.name))
     } catch (openError) {
       setError(openError instanceof Error ? openError.message : t('library.openFailed'))
     } finally {
@@ -98,17 +137,17 @@ export function SceneLibraryDialog({
           <div className="flex items-center gap-2">
             <FolderOpen size={15} className="text-accent-blue" />
             <div>
-              <h2 className="text-sm font-semibold text-text-primary">{t('library.title')}</h2>
-              <p className="text-[10px] text-text-muted">{t('library.subtitle')}</p>
+              <h2 className="text-sm font-semibold text-text-primary">{tab === 'scenes' ? t('library.savedScenes') : t('library.videos')}</h2>
+              <p className="text-[10px] text-text-muted">{tab === 'scenes' ? t('library.scenePurpose') : t('library.recipePurpose')}</p>
             </div>
           </div>
           <button type="button" onClick={onClose} aria-label={t('library.closeAria')} className="rounded border border-border p-1.5 text-text-muted hover:text-text-primary"><X size={13} /></button>
         </div>
         <div className="flex gap-1 border-b border-border px-4 py-2">
           {([['scenes', 'library.savedScenes'], ['videos', 'library.videos']] as const).map(([id, labelKey]) => (
-            <button key={id} type="button" onClick={() => { setTab(id); setPage(0) }} className={`rounded px-2.5 py-1 text-[10px] ${tab === id ? 'bg-accent-blue/15 text-accent-blue' : 'text-text-muted hover:text-text-primary'}`}>{t(labelKey)}</button>
+            <button key={id} type="button" onClick={() => { generationRef.current += 1; setTab(id); setPage(0); setSelected(null) }} className={`rounded px-2.5 py-1 text-[10px] ${tab === id ? 'bg-accent-blue/15 text-accent-blue' : 'text-text-muted hover:text-text-primary'}`}>{t(labelKey)}</button>
           ))}
-          <button type="button" onClick={onPickFile} className="ml-auto rounded border border-border px-2 py-1 text-[10px] text-text-secondary hover:text-text-primary">{t('library.fromJson')}</button>
+          <button type="button" onClick={onPickFile} className="ml-auto rounded border border-border px-2 py-1 text-[10px] text-text-secondary hover:text-text-primary">{commonT('picker.fromDevice')} · {t('library.fromJson')}</button>
         </div>
         <div className="grid min-h-0 flex-1 gap-3 overflow-hidden p-4 md:grid-cols-[minmax(0,1fr)_220px]">
           <div className="min-h-0 overflow-y-auto">
@@ -121,7 +160,6 @@ export function SceneLibraryDialog({
                     key={file.name}
                     type="button"
                     onClick={() => setSelected(file)}
-                    onDoubleClick={() => void openItem(file)}
                     className={`overflow-hidden rounded-lg border text-left ${selected?.name === file.name ? 'border-accent-blue ring-1 ring-accent-blue/40' : 'border-border hover:border-accent-blue/50'}`}
                   >
                     <div className="aspect-video bg-black/40">
@@ -150,7 +188,7 @@ export function SceneLibraryDialog({
                 <div className="mt-2 text-[11px] font-medium text-text-primary">{sceneLibraryTitle(selected.name)}</div>
                 <div className="mt-0.5 text-[9px] text-text-muted">{selected.type === 'scene' ? t('library.editableProject') : t('library.exportedClip')} · {new Date((selected.completed_at || selected.created_at) * 1000).toLocaleString()}</div>
                 <button type="button" disabled={Boolean(opening)} onClick={() => void openItem(selected)} className="mt-auto rounded bg-accent-blue px-2 py-1.5 text-[10px] text-white disabled:opacity-40">
-                  {opening === selected.name ? t('library.opening') : t('library.openIn')}
+                  {opening === selected.name ? t('library.opening') : tab === 'scenes' ? t('library.openScene') : t('library.recoverRecipe')}
                 </button>
               </>
             ) : (
@@ -161,8 +199,8 @@ export function SceneLibraryDialog({
         <div className="flex items-center justify-between gap-2 border-t border-border px-4 py-2">
           <span className="text-[10px] text-text-muted">{t('library.savedPage', { total, current: Math.min(page + 1, pages), pages })}</span>
           <div className="flex gap-1">
-            <button type="button" aria-label={t('library.previousPage')} disabled={page <= 0} onClick={() => setPage(value => Math.max(0, value - 1))} className="rounded border border-border p-1.5 disabled:opacity-30"><ChevronLeft size={13} /></button>
-            <button type="button" aria-label={t('library.nextPage')} disabled={page + 1 >= pages} onClick={() => setPage(value => value + 1)} className="rounded border border-border p-1.5 disabled:opacity-30"><ChevronRight size={13} /></button>
+            <button type="button" aria-label={t('library.previousPage')} disabled={page <= 0} onClick={() => { generationRef.current += 1; setPage(value => Math.max(0, value - 1)) }} className="rounded border border-border p-1.5 disabled:opacity-30"><ChevronLeft size={13} /></button>
+            <button type="button" aria-label={t('library.nextPage')} disabled={page + 1 >= pages} onClick={() => { generationRef.current += 1; setPage(value => value + 1) }} className="rounded border border-border p-1.5 disabled:opacity-30"><ChevronRight size={13} /></button>
           </div>
         </div>
         {error && <p className="border-t border-border px-4 py-2 text-[10px] text-red-300">{error}</p>}

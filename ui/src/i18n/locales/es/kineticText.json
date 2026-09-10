@@ -1,0 +1,6 @@
+{
+  "title": "Textos animados", "help": "Rótulos con tiempos compartidos por 2D y 3D. La vista previa, los planos guardados y el MP4 usan la misma animación.",
+  "text": "Texto", "preset": "Animación", "color": "Color", "start": "Inicio (s)", "end": "Final (s)", "x": "Horizontal (%)", "y": "Vertical (%)", "size": "Tamaño (% de altura)", "rotation": "Inclinación (grados)", "remove": "Quitar texto", "add": "Añadir texto animado", "defaultText": "TU PRÓXIMO VERSO",
+  "presets": { "impact": "Impacto", "rise": "Entrada ascendente", "typewriter": "Terminal", "wave": "Ola de letras" },
+  "font": "Tipografía", "fonts": { "sans": "Sin serifa", "mono": "Monoespaciada / terminal" }
+}

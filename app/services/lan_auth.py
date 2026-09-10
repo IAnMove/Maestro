@@ -165,6 +165,10 @@ def request_requires_lan_auth(
     environ: Mapping[str, str] | None = None,
 ) -> bool:
     path = str(getattr(getattr(request, "url", None), "path", "") or "")
+    # This exact endpoint always authenticates its own opt-in MCP bearer token.
+    # Requiring a second LAN bearer here makes external MCP clients impossible.
+    if path == '/api/v1/wangp/mcp':
+        return False
     if path in _AUTH_PUBLIC_PATHS:
         return False
     if not any(path == prefix or path.startswith(prefix) for prefix in _PROTECTED_PREFIXES):

@@ -8,6 +8,7 @@ import {
 } from '../../types/index.ts'
 import { normalizeStoryMusicModel } from './musicModel'
 import { normalizeLanguageIntent } from '../../lib/languageIntent'
+import { defaultStoryProductionRecipe, normalizeStoryProductionRecipe } from './storyProductionRecipe'
 
 export type StorySection = 'overview' | 'world' | 'characters' | 'relationships' | 'structure'
 
@@ -155,6 +156,18 @@ function normalizeMusicCandidateStatus(value: unknown, source: string): StoryMus
   return source ? 'ready' : undefined
 }
 
+function normalizeMusicExecutionPhase(value: unknown): StoryMusicCandidate['executionPhase'] | undefined {
+  if (
+    value === 'prepared'
+    || value === 'accepted'
+    || value === 'waiting_resource'
+    || value === 'executing'
+    || value === 'cancelling'
+    || value === 'terminal'
+  ) return value
+  return undefined
+}
+
 function keepMusicCandidate(id: string, source: string, status: StoryMusicCandidate['status']): boolean {
   if (!id && !source) return false
   return Boolean(source) || status === 'pending' || status === 'failed'
@@ -196,6 +209,7 @@ function normalizeMusicCandidate(value: unknown, now: string): StoryMusicCandida
     durationSeconds: Math.max(0, Number(candidate.durationSeconds) || 0),
     createdAt: text(candidate.createdAt, now),
     status,
+    executionPhase: normalizeMusicExecutionPhase(candidate.executionPhase),
     taskId: optionalText(candidate.taskId),
     rootTaskId: optionalText(candidate.rootTaskId),
     provenance: normalizeStoryProvenance(candidate.provenance),
@@ -293,6 +307,7 @@ export function normalizeStoryCharacter(value: unknown, index: number): StoryCha
     conflict: text(item.conflict),
     arc: text(item.arc),
     voice: text(item.voice),
+    characterKitRef: item.characterKitRef ? parseCharacterKitRef(item.characterKitRef) : undefined,
     appearance: text(item.appearance),
     wardrobe: text(item.wardrobe),
     visualPrompt: text(item.visualPrompt),
@@ -409,7 +424,8 @@ export function createStoryProject(projectType: StoryProject['projectType'] = 'f
     synopsis: '',
     theme: '',
     ending: '',
-    workflowMode: 'guided',
+    workflowMode: 'automatic',
+    productionRecipe: defaultStoryProductionRecipe(),
     provider: {
       useGlobalProfile: true,
       writingProvider: 'maestro',
@@ -598,6 +614,7 @@ export function normalizeStoryProject(value: unknown): StoryProject {
     theme: text(project.theme),
     ending: text(project.ending),
     workflowMode: project.workflowMode === 'automatic' ? 'automatic' : 'guided',
+    productionRecipe: normalizeStoryProductionRecipe(project.productionRecipe),
     provider: {
       ...fallback.provider,
       ...(project.provider && typeof project.provider === 'object' ? project.provider : {}),
@@ -716,3 +733,4 @@ export function changedSections(before: StoryProject, after: StoryProject): Stor
   if (JSON.stringify(before.beats) !== JSON.stringify(after.beats)) changed.push('structure')
   return changed
 }
+import { parseCharacterKitRef } from '../../lib/characterVoice'

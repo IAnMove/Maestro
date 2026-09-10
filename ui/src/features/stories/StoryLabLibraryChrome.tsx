@@ -196,10 +196,12 @@ export function StoryLabLibraryChrome({
       <select
         className={`${input} w-auto`}
         value={project.workflowMode}
+        title={t('library.workflowModeTitle')}
+        aria-label={t('library.workflowModeTitle')}
         onChange={event => onWorkflowModeChange(event.target.value as StoryProject['workflowMode'])}
       >
-        <option value="guided">{t('library.workflowGuided')}</option>
         <option value="automatic">{t('library.workflowAutomatic')}</option>
+        <option value="guided">{t('library.workflowGuided')}</option>
       </select>
       <StoryLabPrepareButtons
         projectType={project.projectType}

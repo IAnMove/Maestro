@@ -8,6 +8,7 @@ import { inputClass, primaryButton, secondaryButton, textareaClass } from './sty
 import type { SeriesEpisode, SeriesJobStatus, SeriesProject } from './types'
 import { listenForAgentSeriesPlanJob } from '../../lib/uiBus'
 import { useUiTranslation } from '../../i18n'
+import { annotateShotsWithScriptDialogue, syncShotsFromScript } from './shotDialogueSync'
 
 export function SeriesEpisodePanel({
   workspace, series, episode, updateEpisode, saveNow, reload, onAdaptToComic,
@@ -60,6 +61,14 @@ export function SeriesEpisodePanel({
       if (episodeIdRef.current === episode.id) setError((reason as Error).message)
     },
   })
+
+  const dialoguePlan = annotateShotsWithScriptDialogue(episode.script, episode.shots)
+  const staleCount = dialoguePlan.filter(shot => shot.scriptDialogueStatus === 'stale').length
+  const conflictCount = dialoguePlan.filter(shot => shot.scriptDialogueStatus === 'manual_conflict').length
+  const syncShots = () => {
+    const result = syncShotsFromScript(episode.script, episode.shots)
+    updateEpisode(current => ({ ...current, shots: result.shots as typeof current.shots }))
+  }
 
   const start = async (scope: 'outline' | 'script' | 'shots' | 'complete') => {
     const episodeId = episode.id
@@ -133,6 +142,14 @@ export function SeriesEpisodePanel({
       <div className="space-y-2">{episode.outline.beats.map((beat, index) => <div key={index} className="flex items-center gap-2"><span className="w-6 text-right text-[10px] text-text-muted">{index + 1}</span><input className={inputClass} value={beat} onChange={event => updateEpisode(current => ({ ...current, outline: { ...current.outline, beats: current.outline.beats.map((item, i) => i === index ? event.target.value : item) } }))} /></div>)}</div>
     </SectionCard>
 
+    {(staleCount > 0 || conflictCount > 0) && (
+      <SectionCard title={t('episode.staleDialogueTitle')} description={t('episode.staleDialogueDescription', { stale: staleCount, conflicts: conflictCount })}>
+        <p className="text-xs text-amber-200">{t('episode.staleDialogueHint')}</p>
+        <button className={`mt-3 ${primaryButton}`} disabled={busy || staleCount === 0} onClick={syncShots}>
+          {t('episode.syncShots', { count: staleCount })}
+        </button>
+      </SectionCard>
+    )}
     <SectionCard title={t('episode.scriptTitle')} description={t('episode.scriptDescription')}>
       <div className="space-y-3">{episode.script.map((scene, sceneIndex) => <div key={scene.id} id={`series-scene-${scene.id}`} className="rounded-xl border border-border bg-bg-primary p-3">
         <div className="flex items-center gap-2"><Pill tone="blue">{t('episode.scene', { number: sceneIndex + 1 })}</Pill><input className={inputClass} value={scene.purpose} onChange={event => updateEpisode(current => ({ ...current, script: current.script.map((item, i) => i === sceneIndex ? { ...item, purpose: event.target.value } : item) }))} /><button disabled={sceneIndex === 0} onClick={() => updateEpisode(current => { const script = [...current.script]; [script[sceneIndex - 1], script[sceneIndex]] = [script[sceneIndex], script[sceneIndex - 1]]; return { ...current, script: script.map((item, i) => ({ ...item, order: i + 1 })) } })}><ArrowUp size={14} /></button><button disabled={sceneIndex === episode.script.length - 1} onClick={() => updateEpisode(current => { const script = [...current.script]; [script[sceneIndex], script[sceneIndex + 1]] = [script[sceneIndex + 1], script[sceneIndex]]; return { ...current, script: script.map((item, i) => ({ ...item, order: i + 1 })) } })}><ArrowDown size={14} /></button></div>

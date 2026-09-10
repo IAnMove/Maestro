@@ -42,15 +42,6 @@ function itemTone(status: string): string {
   return 'border-border bg-bg-primary'
 }
 
-function safeBatchMode(
-  mode: StoryMusicVideoGenerationMode,
-  referenceCount: number,
-): StoryMusicVideoGenerationMode {
-  return mode === 'direct_references' && referenceCount === 0
-    ? 'image_guided'
-    : mode
-}
-
 export function QuickVideoBatchPanel({
   project, workspace, videoModel, imageModel, resolution, aspectRatio, durationSeconds,
 }: Props) {
@@ -68,10 +59,7 @@ export function QuickVideoBatchPanel({
     }),
     [project, t],
   )
-  const inheritedGenerationMode = safeBatchMode(
-    project.musicVideoGenerationMode,
-    references.length,
-  )
+  const inheritedGenerationMode = project.musicVideoGenerationMode
   const [generationMode, setGenerationMode] = useState<StoryMusicVideoGenerationMode>(
     inheritedGenerationMode,
   )
@@ -138,6 +126,10 @@ export function QuickVideoBatchPanel({
 
   const start = async () => {
     if (!parsedIdeas.length || busy) return
+    if (generationMode === 'direct_references' && references.length === 0) {
+      setError(t('batch.directRefsMissing'))
+      return
+    }
     setBusy(true)
     setError('')
     try {
