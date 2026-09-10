@@ -44,7 +44,8 @@
     "nextPage": "Next page",
     "listFailed": "Could not list saved 3D Video scenes.",
     "loadFailed": "Could not load the saved scene",
-    "openFailed": "Could not open this 3D Video scene."
+    "openFailed": "Could not open this 3D Video scene.",
+    "world3dExport": "This clip is a Video3D export. Open it in Video 3D."
   },
   "timeline": {
     "title": "Timeline · {{current}}s / {{duration}}s · {{fps}} FPS",
