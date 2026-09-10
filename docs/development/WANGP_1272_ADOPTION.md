@@ -83,7 +83,7 @@ reutilizan después de comprobar tamaño y SHA-256.
 
 Face Refiner recibe audio PCM y offsets acordes a sus ventanas. Su modelo privado
 no sustituye el modelo principal ni su perfil global. La detección/tracking añade
-`ultralytics==8.4.142` y `ultralytics-thop==2.0.18`; no exige reemplazar Torch,
+`ultralytics==8.4.142` y `ultralytics-thop==2.1.6`; no exige reemplazar Torch,
 Transformers ni MMGP de la base.
 
 Los controles de H3 nuevo tienen un único propietario de entradas en la UI. No
