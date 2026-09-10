@@ -6,7 +6,15 @@ HocusPocus is an experimental, **non-commercial** fork of [Blizaine/Maestro](htt
 
 The **HocusPocus** mark is a quill shaping a cube: imagination becoming a buildable world. The UI is English and Spanish.
 
-![HocusPocus UI](Maestro_UI_02.jpg)
+<p align="center">
+  <img src="docs/images/readme/gandalf-hero.jpg" alt="Gandalf and Tentri in a HocusPocus Video 3D scene" />
+</p>
+
+Gandalf and Tentri, from a real **Video 3D** production (world compositor, image lip-sync, MiniMax plates on the screens). Not a mockup.
+
+The same clip inside the running studio (gallery, Wizard, Spanish UI):
+
+![HocusPocus gallery playing the Gandalf Video 3D export](docs/images/readme/studio-gallery.jpg)
 
 Install with [Pinokio](https://pinokio.computer) from [`https://github.com/IAnMove/hocuspocus`](https://github.com/IAnMove/hocuspocus). NVIDIA GPU required.
 
@@ -65,6 +73,24 @@ Walkthrough with screenshots: [Story → Comics → Video](docs/MAESTRO_X_STORY_
 **3D Video** is a real compositor (not a video model pretending to be a camera): place GLBs, images, Character Kits, lights and **world SFX** (portals, circles, beams, auras, missiles — they live in the 3D world, occlude, and export with the shot). **Animate** can rig a static GLB. **Face Rig** is the 2D cutout path: mouth overlays on a reviewed pose, not a mesh.
 
 **Example.** Photo of a courier → Character Creator mesh. Drop it in 3D Video with a street plate. Anchor a magic circle to the character, pause mid-walk, nudge the gizmo — the offset follows the live pose. Export MP4. Operator guide: [3D Video compositor](docs/3d-video-compositor/HOWUSEIT.md), [Character Kits](docs/character-kits/HOWUSEIT.md).
+
+**Video 3D editor** (live compositor: stage, Play, world SFX, lip-sync):
+
+![Video 3D scene studio](docs/images/readme/video3d-editor.jpg)
+
+Gandalf speaking in that world (image lips on the mesh, not a baked video):
+
+![Gandalf image lip-sync in Video 3D](docs/images/readme/video3d-gandalf.jpg)
+
+**Video 2.5D** compositor (layers, plates, SFX, export):
+
+![Video 2.5D compositor](docs/images/readme/video2d-editor.jpg)
+
+**Image lips / Face Rig** — click the mouth on the portrait, place overlays, then play them in the stage:
+
+| Close-up | Placement in the 3D stage | Character Creator → Face Rig |
+|---|---|---|
+| ![Gandalf image lips](docs/images/readme/imagelips-closeup.jpg) | ![Mouth overlay on the 3D stage](docs/images/readme/imagelips-stage.jpg) | ![Create or open CharacterKit Face Rig](docs/images/readme/face-rig.jpg) |
 
 ### Talk to the studio
 
