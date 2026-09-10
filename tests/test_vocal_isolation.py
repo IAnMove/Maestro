@@ -6,6 +6,7 @@ import pytest
 from services import vocal_isolation as vocals
 from services.scene3d_speech import SpeechAnalysisUnavailable
 from services.vocal_isolation_worker import installed_separator
+from services.vocal_isolation_worker import inference_input
 import io
 import wave
 
@@ -80,3 +81,16 @@ def test_separator_never_uses_online_catalog_or_downloads(tmp_path):
         separator.download_file_if_not_exists('https://example.invalid', 'unused')
     with pytest.raises(ValueError):
         separator.download_model_files('different.ckpt')
+
+
+def test_short_inputs_are_padded_without_overwriting_original(tmp_path):
+    source = tmp_path / 'voice.wav'
+    original = wav(.5)
+    source.write_bytes(original)
+    padded = Path(inference_input(source, tmp_path))
+    assert padded != source and source.read_bytes() == original
+    with wave.open(str(padded), 'rb') as audio:
+        assert audio.getnframes() == 3 * 16000
+        assert audio.getframerate() == 16000
+    source.write_bytes(wav(6))
+    assert inference_input(source, tmp_path) == str(source)

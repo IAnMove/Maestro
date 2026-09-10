@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import importlib.util
+import logging
 import os
 from pathlib import Path
 import subprocess
@@ -37,14 +38,19 @@ def isolate_voice(data: bytes) -> bytes:
             environment = {**os.environ, 'CUDA_VISIBLE_DEVICES': '-1', 'HF_HUB_OFFLINE': '1',
                            'TRANSFORMERS_OFFLINE': '1', 'OMP_NUM_THREADS': '2', 'MKL_NUM_THREADS': '2'}
             try:
-                done = subprocess.run([sys.executable, str(Path(__file__).with_name('vocal_isolation_worker.py')),
-                                       str(source), str(target), str(MODEL_DIR), MODEL_NAME],
-                                      env=environment, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                                      stderr=subprocess.DEVNULL, timeout=900, check=False,
-                                      creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
+                diagnostic = Path(folder) / 'worker.log'
+                with diagnostic.open('wb') as log:
+                    done = subprocess.run([sys.executable, str(Path(__file__).with_name('vocal_isolation_worker.py')),
+                                           str(source), str(target), str(MODEL_DIR), MODEL_NAME],
+                                          env=environment, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                                          stderr=log, timeout=900, check=False,
+                                          creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
             except (OSError, subprocess.TimeoutExpired) as error:
                 raise SpeechAnalysisUnavailable('Local vocal isolation failed or exceeded 15 minutes. Existing lip cues are unchanged.') from error
             if done.returncode or not target.is_file() or target.stat().st_size > 3_000_000:
+                with diagnostic.open('rb') as log:
+                    log.seek(max(0, diagnostic.stat().st_size - 8000))
+                    logging.getLogger(__name__).warning('Local vocal isolation worker failed: %s', log.read().decode(errors='replace'))
                 raise SpeechAnalysisUnavailable('Local vocal isolation failed. Check the installed model and audio-separator; no downloads were attempted.')
             result = target.read_bytes()
             if abs(validate_voice_wav(result) - duration) > 1 / 16000:

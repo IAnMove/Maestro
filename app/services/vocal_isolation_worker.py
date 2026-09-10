@@ -1,6 +1,21 @@
 """One CPU job, no network, no model discovery/download, no persistent AI runtime."""
 from pathlib import Path
 import sys
+import wave
+
+
+def inference_input(source, folder):
+    """RoFormer needs one full 2.55-second window; preserve the original clock."""
+    with wave.open(str(source), 'rb') as audio:
+        frames, rate = audio.getnframes(), audio.getframerate()
+        if frames >= rate * 3:
+            return str(source)
+        params, pcm = audio.getparams(), audio.readframes(frames)
+    padded = Path(folder) / 'padded-inference.wav'
+    with wave.open(str(padded), 'wb') as audio:
+        audio.setparams(params)
+        audio.writeframes(pcm + b'\0' * ((rate * 3 - frames) * params.nchannels * params.sampwidth))
+    return str(padded)
 
 
 def installed_separator(separator_type, folder, name):
@@ -44,7 +59,7 @@ def main(source, target, model_dir, name):
     separator.torch_device = torch.device('cpu')
     separator.torch_device_mps = None
     separator.load_model(name + '.ckpt')
-    files = separator.separate(source, custom_output_names={'Vocals': 'isolated'})
+    files = separator.separate(inference_input(source, Path(target).parent), custom_output_names={'Vocals': 'isolated'})
     if len(files) != 1:
         raise ValueError('Expected one vocal stem')
     stem = Path(files[0])
