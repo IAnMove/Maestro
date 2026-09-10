@@ -1,5 +1,6 @@
 import { useUiTranslation } from '../../i18n'
-import { WORLD_SFX_KINDS, createWorldSfx, parseWorldSfx, type WorldSfx, type WorldSfxKind } from './world'
+import { WORLD_BEAM_KINDS, WORLD_SFX_KINDS, createWorldSfx, parseWorldSfx, type WorldSfx, type WorldSfxKind } from './world'
+import type { WorldSfxDemoId } from './worldDemo'
 
 export function WorldSfxControls({ cues = [], duration, selectedId, disabled, onChange, onSelect, onDemo }: {
   cues?: WorldSfx[]
@@ -8,7 +9,7 @@ export function WorldSfxControls({ cues = [], duration, selectedId, disabled, on
   disabled?: boolean
   onChange: (cues: WorldSfx[]) => void
   onSelect: (id: string) => void
-  onDemo: () => void
+  onDemo: (id: WorldSfxDemoId) => void
 }) {
   const { t } = useUiTranslation('sceneFx')
   const update = (id: string, patch: Partial<WorldSfx>) => onChange(parseWorldSfx(cues.map(cue => cue.id === id ? { ...cue, ...patch } : cue)))
@@ -43,11 +44,21 @@ export function WorldSfxControls({ cues = [], duration, selectedId, disabled, on
           {(['x', 'y', 'z'] as const).map(axis => <label key={axis} className="text-xs">{t('worldRotation')} {axis.toUpperCase()}<input type="number" step="5" value={cue.rotation[axis]} onChange={e => setAxis(cue.id, 'rotation', axis, e.target.valueAsNumber)} className="mt-1 min-h-9 w-full rounded border border-border bg-bg-tertiary px-2" /></label>)}
         </div>
         <label className="text-xs">{t('anchor')}<input value={cue.anchor?.slotId ?? ''} placeholder={t('anchorNone')} onChange={e => update(cue.id, { anchor: e.target.value.trim() ? { slotId: e.target.value.trim(), offset: cue.anchor?.offset } : undefined })} className="mt-1 min-h-9 w-full rounded border border-border bg-bg-tertiary px-2" /></label>
+        {WORLD_BEAM_KINDS.has(cue.kind) && <>
+          <label className="text-xs">{t('worldTarget')}<input value={cue.target?.slotId ?? ''} placeholder={t('anchorNone')} onChange={e => update(cue.id, { target: e.target.value.trim() ? { slotId: e.target.value.trim(), offset: cue.target?.offset } : undefined })} className="mt-1 min-h-9 w-full rounded border border-border bg-bg-tertiary px-2" /></label>
+          <div className="grid grid-cols-3 gap-2">
+            {(['x', 'y', 'z'] as const).map(axis => <label key={axis} className="text-xs">{t('worldTargetPosition')} {axis.toUpperCase()}<input type="number" step="0.05" value={cue.targetPosition?.[axis] ?? 0} onChange={e => {
+              const value = e.target.valueAsNumber
+              if (!Number.isFinite(value)) return
+              update(cue.id, { targetPosition: { x: cue.targetPosition?.x ?? 0, y: cue.targetPosition?.y ?? 0, z: cue.targetPosition?.z ?? 0, [axis]: value } })
+            }} className="mt-1 min-h-9 w-full rounded border border-border bg-bg-tertiary px-2" /></label>)}
+          </div>
+        </>}
         <button type="button" onClick={() => onChange(cues.filter(item => item.id !== cue.id))} className="min-h-9 text-xs text-red-300">{t('remove')}</button>
       </div>)}
       <div className="flex flex-wrap gap-2">
         {WORLD_SFX_KINDS.map(kind => <button key={kind} type="button" disabled={cues.length >= 64} onClick={() => onChange([...cues, createWorldSfx(kind, duration, cues.map(cue => cue.id))])} className="min-h-10 rounded border border-violet-400/40 px-3 text-xs">{t('addWorld')} · {t(`presets.${kind}`)}</button>)}
-        <button type="button" onClick={onDemo} className="min-h-10 rounded border border-cyan-400/40 px-3 text-xs">{t('worldDemo')}</button>
+        {(['depth', 'duel', 'mixed'] as const).map(id => <button key={id} type="button" data-testid={`world-sfx-demo-${id}`} onClick={() => onDemo(id)} className="min-h-10 rounded border border-cyan-400/40 px-3 text-xs">{t(`worldDemo.${id}`)}</button>)}
       </div>
     </fieldset>
   </details>

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { FX_CATALOG, parseSceneFx } from '../src/features/sceneFx/types'
 import { parseWorldSfx, worldSfxAudioCues, WORLD_SFX_KINDS } from '../src/features/sceneFx/world'
-import { worldSfxDepthDocument } from '../src/features/sceneFx/worldDemo'
+import { worldSfxDepthDocument, worldSfxDuelDocument, worldSfxMixedDocument } from '../src/features/sceneFx/worldDemo'
 import { fxSamples } from '../src/features/sceneFx/audio'
 import { adoptPreparedSceneDocument, isFxShowcaseDocument, sceneHasAuthoredContent, withFxShowcase } from '../src/features/sceneFx/showcase'
 import { createDefaultScene3DDocument, parseScene3DDocument } from '../src/features/scene3d/document'
@@ -58,13 +58,18 @@ test('world SFX stay in meters and do not rewrite screen overlays', () => {
   const reopened = parseScene3DDocument(JSON.parse(JSON.stringify(demo)))
   assert.equal(reopened?.worldSfx?.length, 2)
   assert.equal(reopened?.worldSfx?.[0].kind, 'portal')
-  assert.equal(reopened?.worldSfx?.[0].position.z, -1.35)
+  assert.equal(reopened?.worldSfx?.[0].position.z, -1.55)
   assert.equal(reopened?.sfx?.[0].kind, 'speedlines')
   assert.equal(parseWorldSfx([{ kind: 'sparks', start: 0, end: 1 }]).length, 0)
   assert.equal(parseWorldSfx([{ id: 'a', kind: 'portal', start: 3, end: 2 }]).length, 0)
   const audio = worldSfxAudioCues(demo.worldSfx)
   assert.equal(audio.every(cue => (WORLD_SFX_KINDS as readonly string[]).includes(cue.kind)), true)
   assert.equal(parseScene3DDocument({ ...createDefaultScene3DDocument(), worldSfx: demo.worldSfx })?.sfx?.length ?? 0, 0)
+  const duel = parseScene3DDocument(JSON.parse(JSON.stringify(worldSfxDuelDocument())))
+  assert.equal(duel?.worldSfx?.some(cue => cue.kind === 'energy_beam' && cue.anchor?.slotId === 'subject_1' && cue.target?.slotId === 'subject_2'), true)
+  const mixed = parseScene3DDocument(JSON.parse(JSON.stringify(worldSfxMixedDocument())))
+  assert.equal(mixed?.sfx?.some(cue => cue.kind === 'speedlines'), true)
+  assert.equal(mixed?.worldSfx?.some(cue => cue.kind === 'lightning'), true)
 })
 
 test('2D showcase background matches the requested collection after reopening', () => {

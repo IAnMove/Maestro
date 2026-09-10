@@ -1,8 +1,13 @@
 import catalog from '../../../../app/shared/scene_effects.json' with { type: 'json' }
 import { parseSceneFx, type SceneFx } from './types'
 
-export const WORLD_SFX_KINDS = ['portal', 'magic_circle', 'summoning_gate'] as const
+export const WORLD_SFX_KINDS = [
+  'portal', 'magic_circle', 'summoning_gate',
+  'lightning', 'energy_beam', 'laser',
+  'energy_orb', 'anime_aura', 'arcane_missiles', 'shockwave',
+] as const
 export type WorldSfxKind = (typeof WORLD_SFX_KINDS)[number]
+export const WORLD_BEAM_KINDS = new Set<WorldSfxKind>(['lightning', 'energy_beam', 'laser', 'arcane_missiles'])
 
 export type WorldVec3 = { x: number; y: number; z: number }
 
@@ -26,6 +31,8 @@ export type WorldSfx = {
   sound: boolean
   volume: number
   anchor?: WorldSfxAnchor
+  target?: WorldSfxAnchor
+  targetPosition?: WorldVec3
 }
 
 const PRESETS = Object.fromEntries(catalog.map(item => [item.id, item]))
@@ -45,6 +52,13 @@ export function isWorldSfxKind(value: unknown): value is WorldSfxKind {
   return typeof value === 'string' && (WORLD_SFX_KINDS as readonly string[]).includes(value)
 }
 
+function parseAnchor(raw: WorldSfxAnchor | undefined): WorldSfxAnchor | undefined {
+  const slotId = typeof raw?.slotId === 'string' ? raw.slotId.slice(0, 160) : ''
+  if (!slotId) return undefined
+  const offset = raw?.offset ? worldVec3(raw.offset, { x: 0, y: 0, z: 0 }, -20, 20) : undefined
+  return { slotId, ...(offset ? { offset } : {}) }
+}
+
 export function parseWorldSfx(raw: unknown): WorldSfx[] {
   if (!Array.isArray(raw)) return []
   const ids = new Set<string>()
@@ -56,23 +70,25 @@ export function parseWorldSfx(raw: unknown): WorldSfx[] {
     if (end <= start || ids.has(id)) return []
     ids.add(id)
     const preset = PRESETS[value.kind]
-    const offset = value.anchor?.offset ? worldVec3(value.anchor.offset, { x: 0, y: 0, z: 0 }, -20, 20) : undefined
-    const slotId = typeof value.anchor?.slotId === 'string' ? value.anchor.slotId.slice(0, 160) : ''
+    const floor = value.kind === 'magic_circle' || value.kind === 'shockwave'
+    const standing = value.kind === 'portal' || value.kind === 'summoning_gate'
     return [{
       id,
       kind: value.kind,
       ...(typeof value.label === 'string' ? { label: value.label.slice(0, 80) } : {}),
       start,
       end,
-      position: worldVec3(value.position, { x: 0, y: value.kind === 'magic_circle' ? 0.02 : 1.1, z: 0 }, -50, 50),
+      position: worldVec3(value.position, { x: 0, y: floor ? 0.02 : standing ? 1.1 : 1.0, z: 0 }, -50, 50),
       rotation: worldVec3(value.rotation, { x: 0, y: 0, z: 0 }, -180, 180),
-      scale: number(value.scale, 1.4, 0.05, 20),
+      scale: number(value.scale, value.kind === 'laser' ? 0.7 : 1.4, 0.05, 20),
       intensity: number(value.intensity, 1, 0.1, 2),
       color: typeof value.color === 'string' && /^#[\da-f]{6}$/i.test(value.color) ? value.color : preset.color,
       seed: Math.round(number(value.seed, index + 21, 1, 1000000)),
       sound: value.sound === true,
       volume: number(value.volume, 0.25, 0, 1),
-      ...(slotId ? { anchor: { slotId, ...(offset ? { offset } : {}) } } : {}),
+      ...(parseAnchor(value.anchor) ? { anchor: parseAnchor(value.anchor) } : {}),
+      ...(parseAnchor(value.target) ? { target: parseAnchor(value.target) } : {}),
+      ...(value.targetPosition ? { targetPosition: worldVec3(value.targetPosition, { x: 0, y: 1.2, z: 1.6 }, -50, 50) } : {}),
     }]
   })
 }
@@ -96,13 +112,15 @@ export function createWorldSfx(kind: WorldSfxKind, duration: number, taken: Iter
   let id = `world-${kind}`
   let n = 1
   while (used.has(id)) { n += 1; id = `world-${kind}-${n}` }
-  const standing = kind !== 'magic_circle'
+  const floor = kind === 'magic_circle' || kind === 'shockwave'
+  const beam = WORLD_BEAM_KINDS.has(kind)
   return parseWorldSfx([{
     id,
     kind,
     start: 0,
     end: Math.min(8, Math.max(1, duration)),
-    position: standing ? { x: 0, y: 1.1, z: -1.2 } : { x: 0, y: 0.02, z: 0.2 },
+    position: floor ? { x: 0, y: 0.02, z: 0.2 } : { x: 0, y: 1.1, z: -1.2 },
+    ...(beam ? { targetPosition: { x: 0, y: 1.2, z: 1.8 } } : {}),
     sound: true,
   }])[0]
 }
@@ -128,6 +146,11 @@ export const WORLD_SFX_SCHEMA = {
         slotId: { type: 'string', maxLength: 160 },
         offset: { type: 'object', additionalProperties: false, properties: { x: { type: 'number' }, y: { type: 'number' }, z: { type: 'number' } } },
       }, required: ['slotId'] },
+      target: { type: 'object', additionalProperties: false, properties: {
+        slotId: { type: 'string', maxLength: 160 },
+        offset: { type: 'object', additionalProperties: false, properties: { x: { type: 'number' }, y: { type: 'number' }, z: { type: 'number' } } },
+      }, required: ['slotId'] },
+      targetPosition: { type: 'object', additionalProperties: false, properties: { x: { type: 'number' }, y: { type: 'number' }, z: { type: 'number' } }, required: ['x', 'y', 'z'] },
     },
     required: ['id', 'kind', 'start', 'end'],
   },

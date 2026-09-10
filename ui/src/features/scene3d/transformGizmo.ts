@@ -50,7 +50,7 @@ export function createTransformGizmo(world: GpuWorld, onChange: (id: string, pat
     const rect = canvas.getBoundingClientRect()
     raycaster.setFromCamera(new Vector2((event.clientX - rect.left) / rect.width * 2 - 1, -(event.clientY - rect.top) / rect.height * 2 + 1), world.camera)
     const slotTargets = [...world.slots.entries()].filter(([, slot]) => slot.kind === 'model')
-    const worldTargets = [...world.worldSfx.values()].map(item => item.root)
+    const worldTargets = [...(world.worldSfx?.values() ?? [])].map(item => item.root)
     const hits = raycaster.intersectObjects([...worldTargets, ...slotTargets.map(([, slot]) => slot.root)], true)
     const hit = hits[0]
     if (!hit) return

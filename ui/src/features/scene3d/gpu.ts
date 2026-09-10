@@ -83,7 +83,7 @@ export type GpuWorld = {
   driveMovers: Object3D[]
   driveSpeed: number
   slots: Map<string, SlotGpu>
-  worldSfx: Map<string, WorldSfxGpu>
+  worldSfx?: Map<string, WorldSfxGpu>
 }
 
 export function clipKeyOf(clip: Scene3DSlot['clip']): string {
@@ -369,7 +369,16 @@ export function paintWorld(world: GpuWorld, document: Scene3DDocument, sceneSeco
   world.camera.lookAt(...look)
   if (shot) world.camera.rotateZ(shot.roll)
   world.camera.updateProjectionMatrix()
-  syncWorldSfx(world.scene, world.worldSfx, document.worldSfx, sceneSeconds, posedSlots)
+  world.worldSfx ??= new Map()
+  if (world.scene) {
+    syncWorldSfx(world.scene, world.worldSfx, document.worldSfx, sceneSeconds, posedSlots.map(slot => ({
+      id: slot.id,
+      position: slot.position,
+      rotationY: slot.rotationY,
+      scale: slot.scale,
+      root: world.slots.get(slot.id)?.root,
+    })))
+  }
   world.renderer.render(world.scene, world.camera)
 }
 
@@ -445,7 +454,7 @@ export function createWorld(host: HTMLDivElement, light: Scene3DLight, fov: numb
 
 export function disposeWorld(world: GpuWorld) {
   for (const id of [...world.slots.keys()]) dropSlot(world, id)
-  syncWorldSfx(world.scene, world.worldSfx, [], 0, [])
+  if (world.scene && world.worldSfx) syncWorldSfx(world.scene, world.worldSfx, [], 0, [])
   disposeObject(world.scene)
   world.renderer.dispose()
   world.renderer.forceContextLoss()

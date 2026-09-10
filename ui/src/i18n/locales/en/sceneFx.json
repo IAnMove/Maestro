@@ -56,8 +56,14 @@
   "worldPosition": "Position (m)",
   "worldRotation": "Rotation (°)",
   "addWorld": "Add in the world",
-  "worldDemo": "Load portal depth demo",
+  "worldDemo": {
+    "depth": "Demo: portal depth",
+    "duel": "Demo: arcane duel",
+    "mixed": "Demo: mixed chase"
+  },
   "select": "Select",
   "anchor": "Follow slot id",
-  "anchorNone": "None — stays in the world"
+  "anchorNone": "None — stays in the world",
+  "worldTarget": "Aim at slot id",
+  "worldTargetPosition": "Aim (m)"
 }
