@@ -549,7 +549,7 @@ export function AgentAssistantPanel({ workspace, tasks, onClose, embedded = fals
       aria-modal={panelPresentation.ariaModal}
       aria-label={t('title')}
       data-expanded={expanded ? 'true' : 'false'}
-      className={`hp-agent-panel z-[100] flex flex-col overflow-hidden border border-amber-200/20 bg-[#0d0b13]/95 shadow-2xl backdrop-blur-xl ${expanded
+      className={`hp-agent-panel z-[100] flex flex-col overflow-hidden border border-wizard-soft/20 bg-wizard-ground/95 shadow-2xl backdrop-blur-xl ${expanded
         ? 'hp-agent-panel--expanded fixed inset-0 rounded-none text-sm sm:inset-2 sm:rounded-2xl'
         : embedded
           ? 'relative h-full w-full border-0 text-xs shadow-none'
@@ -560,7 +560,7 @@ export function AgentAssistantPanel({ workspace, tasks, onClose, embedded = fals
         <div className="relative flex items-center gap-3">
           <AgentAvatar state={state} size={48} />
           <div className="min-w-0 flex-1">
-            <h2 className="hp-wordmark max-w-36 whitespace-normal text-xl font-semibold leading-[1.05] text-amber-50">{t('title')}</h2>
+            <h2 className="hp-wordmark max-w-36 whitespace-normal text-xl font-semibold leading-[1.05] text-wizard-lit">{t('title')}</h2>
             <p className="truncate text-[10px] text-white/45">{t('workspace', { name: workspace })}</p>
           </div>
           <button
@@ -592,16 +592,16 @@ export function AgentAssistantPanel({ workspace, tasks, onClose, embedded = fals
           <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div lang={message.language || undefined} className={message.role === 'user'
               ? `${expanded ? 'max-w-[min(42rem,70%)]' : 'max-w-[88%]'} whitespace-pre-wrap rounded-2xl rounded-br-sm bg-blue-500/20 px-3 py-2 leading-relaxed text-blue-50`
-              : `${expanded ? 'max-w-[min(56rem,86%)]' : 'max-w-[92%]'} rounded-2xl rounded-bl-sm border border-amber-200/10 bg-amber-100/[.045] px-3 py-2 leading-relaxed text-amber-50/85`}>
+              : `${expanded ? 'max-w-[min(56rem,86%)]' : 'max-w-[92%]'} rounded-2xl rounded-bl-sm border border-wizard-soft/10 bg-wizard-pale/[.045] px-3 py-2 leading-relaxed text-wizard-lit/85`}>
               {message.role === 'assistant' ? <AgentMarkdown text={message.text} /> : message.text}
               <WizardVisualEvidence evidence={message.mediaEvidence} />
               {message.cards?.map(card => (
-                <div key={card.id} className="mt-2 rounded-xl border border-amber-200/15 bg-black/20 p-2">
+                <div key={card.id} className="mt-2 rounded-xl border border-wizard-soft/15 bg-black/20 p-2">
                   <div className="flex items-center justify-between gap-2 text-[10px]">
-                    <span className="font-medium uppercase tracking-wide text-amber-100/80">{card.state}</span>
+                    <span className="font-medium uppercase tracking-wide text-wizard-pale/80">{card.state}</span>
                     {card.target?.title && <span className="min-w-0 truncate text-white/50">{card.target.title}</span>}
                   </div>
-                  <p className="mt-1 text-[10px] leading-relaxed text-amber-50/80">{card.message}</p>
+                  <p className="mt-1 text-[10px] leading-relaxed text-wizard-lit/80">{card.message}</p>
                   {card.outputNames?.length ? (
                     <p className="mt-1 truncate text-[9px] text-emerald-200/80">{t('outputs', { names: card.outputNames.join(', ') })}</p>
                   ) : null}
@@ -639,7 +639,7 @@ export function AgentAssistantPanel({ workspace, tasks, onClose, embedded = fals
           </p>
         )}
         {busy && (
-          <div className="flex items-center gap-2 text-[10px] text-amber-100/60">
+          <div className="flex items-center gap-2 text-[10px] text-wizard-pale/60">
             <AgentAvatar state={state === 'acting' ? 'acting' : 'thinking'} size={24} />
             <Loader2 size={11} className="animate-spin" /> {busyMessage}
           </div>
@@ -650,15 +650,15 @@ export function AgentAssistantPanel({ workspace, tasks, onClose, embedded = fals
       {messages.length <= 1 && (
         <div className="flex flex-wrap gap-1.5 border-t border-white/5 px-3 pt-2">
           {[t('suggestions.queue'), t('suggestions.video3d'), t('suggestions.comic')].map(suggestion => (
-            <button key={suggestion} type="button" disabled={busy} onClick={() => void ask(suggestion)} className="rounded-full border border-amber-200/15 bg-amber-200/5 px-2 py-1 text-[9px] text-amber-100/65 hover:border-amber-200/35 hover:text-amber-50 disabled:opacity-40">{suggestion}</button>
+            <button key={suggestion} type="button" disabled={busy} onClick={() => void ask(suggestion)} className="rounded-full border border-wizard-soft/15 bg-wizard-soft/5 px-2 py-1 text-[9px] text-wizard-pale/65 hover:border-wizard-soft/35 hover:text-wizard-lit disabled:opacity-40">{suggestion}</button>
           ))}
         </div>
       )}
 
       {pendingInput && (
-        <div className="border-t border-amber-200/10 bg-amber-200/[.035] px-3 py-2" role="group" aria-label={t('pendingAria')}>
-          <p className="text-[10px] font-medium text-amber-100">{t('pendingTitle')}</p>
-          <p className="mt-0.5 text-[9px] text-amber-50/65">{pendingInput.reason}</p>
+        <div className="border-t border-wizard-soft/10 bg-wizard-soft/[.035] px-3 py-2" role="group" aria-label={t('pendingAria')}>
+          <p className="text-[10px] font-medium text-wizard-pale">{t('pendingTitle')}</p>
+          <p className="mt-0.5 text-[9px] text-wizard-lit/65">{pendingInput.reason}</p>
           {pendingInput.options.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-1.5">
               {pendingInput.options.map((option, index) => {
@@ -669,7 +669,7 @@ export function AgentAssistantPanel({ workspace, tasks, onClose, embedded = fals
                     type="button"
                     disabled={busy}
                     onClick={() => void ask(option.label)}
-                    className="rounded-lg border border-amber-200/25 bg-amber-200/10 px-2 py-1 text-[9px] text-amber-50 hover:bg-amber-200/20 disabled:opacity-40"
+                    className="rounded-lg border border-wizard-soft/25 bg-wizard-soft/10 px-2 py-1 text-[9px] text-wizard-lit hover:bg-wizard-soft/20 disabled:opacity-40"
                     title={option.description}
                   >
                     {option.label}{Object.is(option.value, pendingInput.recommended) ? ` · ${t('recommended')}` : ''}
@@ -683,8 +683,8 @@ export function AgentAssistantPanel({ workspace, tasks, onClose, embedded = fals
 
       <form onSubmit={submit} className="border-t border-white/10 p-3">
         <WizardVisualInput media={visualMedia?.workspace === workspace ? visualMedia : null} onChange={setVisualMedia} workspace={workspace} disabled={busy} />
-        <div className="flex items-end gap-2 rounded-xl border border-white/10 bg-black/25 p-2 focus-within:border-amber-200/35">
-          <Sparkles size={14} className="mb-1 shrink-0 text-amber-200/55" />
+        <div className="flex items-end gap-2 rounded-xl border border-white/10 bg-black/25 p-2 focus-within:border-wizard-soft/35">
+          <Sparkles size={14} className="mb-1 shrink-0 text-wizard-soft/55" />
           <textarea
             autoFocus={panelPresentation.autoFocus}
             rows={2}
@@ -695,7 +695,7 @@ export function AgentAssistantPanel({ workspace, tasks, onClose, embedded = fals
             placeholder={t('placeholder')}
             className={`${expanded ? 'max-h-40' : 'max-h-24'} min-h-9 flex-1 resize-none bg-transparent text-[11px] leading-relaxed text-white outline-none placeholder:text-white/30 disabled:opacity-50`}
           />
-          <button type="submit" disabled={busy || !draft.trim()} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-amber-200 text-[#1a1208] transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-30" aria-label={t('title')}>
+          <button type="submit" disabled={busy || !draft.trim()} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-wizard-soft text-[#1a1208] transition hover:bg-wizard-pale disabled:cursor-not-allowed disabled:opacity-30" aria-label={t('title')}>
             {busy ? <Loader2 size={13} className="animate-spin" /> : <ArrowUp size={14} />}
           </button>
         </div>
