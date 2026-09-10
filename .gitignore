@@ -114,6 +114,9 @@ app/postprocessing/seedvc/
 # pushed. Canonical archive lives in the parent checkout's archive/ dir.
 /archive/
 
+# Repo-root dumps (Labs audit, local pipelines). Not app/outputs/.
+/outputs/
+
 # Local build/archive outputs (formerly supplement-pack zips) — never tracked.
 dist/
 .codex-tmp/
