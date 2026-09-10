@@ -10,6 +10,8 @@ The text-driven inpaint pipeline:
 import json
 import logging
 import os
+from services.runtime_environment import engine_python, isolated_environment
+from services.runtime_profiles import managed_ready
 import time
 from typing import Optional
 
@@ -27,16 +29,8 @@ _sam_process = None
 
 def _find_sam_env():
     """Find the SAM conda env python path."""
-    # Look relative to the app directory
-    app_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    candidates = [
-        os.path.join(app_dir, "services", "sam", "env", "python.exe"),  # conda on Windows
-        os.path.join(app_dir, "services", "sam", "env", "bin", "python"),  # conda on Linux
-    ]
-    for c in candidates:
-        if os.path.isfile(c):
-            return c
-    return None
+    executable = engine_python("sam")
+    return str(executable) if executable.is_file() and managed_ready("sam") else None
 
 
 def _find_sam_service_script():
@@ -76,6 +70,7 @@ def ensure_sam_running() -> bool:
     # Don't capture stdout — let SAM's loading messages print to console
     _sam_process = subprocess.Popen(
         [python_path, script_path, "--port", str(port), "--idle-timeout", "120"],
+        env=isolated_environment(engine_python("sam")),
     )
 
     # Wait for it to be ready — model loading can take 2-3 minutes on first use

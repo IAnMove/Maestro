@@ -42,6 +42,7 @@ import importlib
 import re
 import subprocess
 import sys
+from pathlib import Path
 
 
 # Known pre-built wheels, keyed by (python_minor, torch_major_minor, cuda).
@@ -128,7 +129,8 @@ def main() -> int:
         return 0
 
     print(f"[GGUF kernels] Installing: {url}")
-    cmd = [sys.executable, "-m", "pip", "install", url]
+    cmd = [sys.executable, str(Path(__file__).resolve().parents[2] / "scripts" / "runtime_pip.py"),
+           "--engine", "wangp", "--", "install", "--no-deps", url]
     try:
         subprocess.run(cmd, check=True)
         print(

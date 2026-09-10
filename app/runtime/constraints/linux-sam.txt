@@ -1,0 +1,6 @@
+# Runtime ABI constraints; generated from app/runtime/profiles.json.
+numpy==1.26.4
+torch==2.7.0+cu128
+torchvision==0.22.0+cu128
+triton==3.3.0
+xformers==0.0.30

@@ -477,6 +477,10 @@
     "product-finale": {
       "title": "Final de producto",
       "description": "Presentación amplia con protagonista y tres pantallas."
+    },
+    "tv-head-walk": {
+      "title": "Caminata cabeza CRT",
+      "description": "Humanoide generado (piernas, cuerpo, brazos) con un televisor CRT antiguo de cabeza. El plano de la cara va en el hueso headfront."
     }
   },
   "gallerySearch": "Buscar en el catálogo",
@@ -540,7 +544,18 @@
   "screens": {
     "add": "Añadir pantalla",
     "title": "Pantalla multimedia",
-    "attach": "Usar una malla como pantalla",
+    "attach": "Poner cara / pantalla en este personaje",
+    "mode": "Cómo anclar",
+    "modePlane": "Anclar un plano (cabeza-tele, sprites)",
+    "modeMesh": "Pintar una malla existente",
+    "anchor": "Hueso o nodo",
+    "chooseAnchor": "Elige un hueso o nodo",
+    "offsetX": "Desfase X",
+    "offsetY": "Desfase Y",
+    "offsetZ": "Desfase Z",
+    "yaw": "Yaw (°)",
+    "pitch": "Inclinación (°)",
+    "roll": "Giro (°)",
     "mesh": "Malla de la pantalla",
     "chooseMesh": "Elige una malla",
     "content": "Imagen o vídeo en la pantalla",

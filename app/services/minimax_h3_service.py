@@ -25,6 +25,9 @@ from typing import Callable
 import requests
 import websocket as websocket_client
 
+from services.runtime_environment import isolated_environment, python_path
+from services.runtime_profiles import managed_ready
+
 
 # The native WanGP H3 family owns ``minimax_h3`` in Maestro Next. Keep the
 # original isolated ComfyUI implementation available under an explicit model
@@ -285,11 +288,11 @@ DEFAULT_IDLE_SHUTDOWN_SECONDS = 10.0
 
 
 def _python_executable() -> Path:
-    return ENV_DIR / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+    return python_path(ENV_DIR, kind="conda")
 
 
 def is_runtime_installed() -> bool:
-    return _python_executable().is_file() and (COMFY_DIR / "main.py").is_file()
+    return _python_executable().is_file() and (COMFY_DIR / "main.py").is_file() and managed_ready("minimax_h3")
 
 
 def is_runtime_running() -> bool:
@@ -475,6 +478,7 @@ def ensure_runtime(
         _process = subprocess.Popen(
             _runtime_command(_port, profile),
             cwd=str(COMFY_DIR),
+            env=isolated_environment(_python_executable()),
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
