@@ -4,6 +4,14 @@ Verificado el 7 de septiembre de 2026 contra `origin/development` **`ef5b0871`**
 Es una fotografía con evidencia, no un sustituto de Git. Antes de reservar trabajo:
 `git fetch origin development`, consultar PR abiertos y comprobar sus archivos.
 
+## SFX, habla y MCP — 10 septiembre 2026
+
+PR **#299** (draft hacia development), base integrada `729f784c`. Contrato:
+[SCENE_EFFECTS_AND_MCP](SCENE_EFFECTS_AND_MCP.md). 18 efectos compartidos y
+plantillas 2D/3D, preparación de voces con Rhubarb y configuración MCP.
+Tres MP4 reales validados; la preparación MCP no equivale a render en servidor.
+Consultar el HEAD y sus checks en el PR antes de integrar. No es una publicación.
+
 ## Lectura mínima
 
 Lee este documento y el contrato del dominio que vas a modificar. Para contribuir,

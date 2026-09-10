@@ -27,7 +27,7 @@ export function SceneFxOverlay({ cues, seconds, width, height, playing = false, 
     return () => { stopped = true; sources.forEach(source => source.stop()); void context.close(); audio.current = null }
   }, [cues, duration, playing, speed])
   return <>
-    <canvas ref={ref} width={width} height={height} className="pointer-events-none absolute inset-0 h-full w-full" aria-hidden="true" data-testid="scene-fx-overlay" />
+    <canvas ref={ref} width={width} height={height} className="pointer-events-none absolute inset-0 z-[899] h-full w-full" aria-hidden="true" data-testid="scene-fx-overlay" />
     {blocked && <p role="alert">{t('audioBlocked')}</p>}
   </>
 }

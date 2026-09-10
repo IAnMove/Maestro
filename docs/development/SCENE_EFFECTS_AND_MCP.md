@@ -104,3 +104,32 @@ not unlock other API routes. Disabled MCP returns 503; missing/wrong keys 401.
 Enable/rotate requests are restricted to the application's own trusted origin
 and retain normal LAN authentication. Keys grant the tools advertised by this
 app; keep them in the client configuration and out of screenshots or prompts.
+
+## Acceptance run (10 September 2026)
+
+PR #299, based on development `729f784c`, includes three actual native-editor
+exports: 2D and 3D 54-second effect showcases, plus a 13.5-second Nova/Byte dialogue.
+All are 1280×720, 30 fps, H.264 with AAC, decoded completely by FFmpeg.
+The two original robot models were authored procedurally for the demo.
+
+The dialogue uses real local KugelAudio generations (`b618ac8a`, `ee70ef12`),
+submitted through MCP `generation.speech`. Replaying the first intent returned
+the same job ID. Rhubarb produced 33/32 cues: the first voice was uploaded and
+analyzed through the native UI; the second through `scenes.speech.prepare`.
+Native seek checks verified A speaking/B resting, both resting, B speaking/A
+resting, and recovery after seeking backwards. The exported voice duration and
+content were checked with the app's installed Whisper transcription.
+
+The real MiniMax Wizard request initially invented unsupported showcase fields
+and correctly failed. The capability guidance was corrected; repeating the same
+request opened the returned 2D scene and reported prepared, not exported.
+MCP initialize, tools/list, showcase/apply and speech preparation were called
+from an external HTTP client. Settings enable/rotation, disable (503), reenable
+(200), desktop hover help and mobile tap help were exercised in the real UI.
+
+Known limits: this proves two demo models and local audio, not every GLB/voice.
+The Wizard's natural-language speech preparation was not separately tested;
+its shared operation and visible handoff were exercised independently. The
+settings test uses the built app origin; a Vite proxy with another Origin is
+rejected by the settings origin guard. Demo files and captures are local outputs,
+not Git content. Independent agent review is still a separate evidence state.

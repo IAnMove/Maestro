@@ -14,7 +14,7 @@ export function Scene3DInteraction({ enabled, width, height, onMode, children }:
   return <div
     role="region" aria-label={t('viewport')} aria-keyshortcuts="G R S"
     tabIndex={enabled ? 0 : -1}
-    className="relative w-full overflow-hidden rounded-lg border border-border bg-[#10141c] focus-visible:outline-2 focus-visible:outline-cyan-300"
+    className="relative isolate w-full overflow-hidden rounded-lg border border-border bg-[#10141c] focus-visible:outline-2 focus-visible:outline-cyan-300"
     style={{ aspectRatio: `${width} / ${height}` }}
     onFocus={() => { if (enabled) setShowHelp(true) }}
     onBlur={() => setShowHelp(false)}
