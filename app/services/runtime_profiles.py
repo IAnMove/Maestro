@@ -51,7 +51,8 @@ def dependency_fingerprint(engine: str, platform: str) -> str:
     root = APP_DIR.parent
     paths = ["app/runtime/profiles.json", spec["constraintFile"], "runtime_install.js",
              "vendor_revisions.js", "hunyuan_native.js", "torch.js", "scripts/runtime_verify.py",
-             "scripts/runtime_pip.py", "scripts/runtime_failed.py",
+             "scripts/runtime_pip.py", "scripts/runtime_failed.py", "scripts/runtime_vendor.py",
+             "app/runtime/vendors.json", "app/services/runtime_sources.py",
              f"app/runtime/locks/{platform}-{engine}.txt"]
     if engine == "wangp":
         paths.append("app/scripts/install_gguf_kernels.py")
@@ -74,6 +75,9 @@ def installation_current(engine: str, platform: str) -> bool:
         matches = (receipt.get("fingerprint") == dependency_fingerprint(engine, platform)
                    and receipt.get("profile") == spec["id"] and receipt.get("cudaCalculation") is True)
         if not matches:
+            return False
+        from services.runtime_sources import sources_current
+        if not sources_current(spec.get("vendors", []), APP_DIR.parent):
             return False
         from services.runtime_environment import isolated_environment, python_path
         executable = python_path(APP_DIR.parent / spec["env"], kind=spec["environment"], platform=platform)

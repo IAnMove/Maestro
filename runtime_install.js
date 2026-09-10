@@ -81,6 +81,7 @@ function vendorSteps(id) {
     }},
     {method: 'shell.run', params: {path: vendor.path, message: [
       `git fetch --depth 1 origin ${vendor.revision}`, `git checkout --detach ${vendor.revision}`,
+      `python "{{path.resolve(cwd, 'scripts/runtime_vendor.py')}}" ${id}`,
     ]}},
   ]
 }

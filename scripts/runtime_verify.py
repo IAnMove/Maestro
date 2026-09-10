@@ -12,6 +12,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "app"))
 from services.runtime_profiles import dependency_fingerprint, recipe  # noqa: E402
+from services.runtime_sources import sources_current  # noqa: E402
 
 
 def inspect_environment(engine: str) -> dict:
@@ -32,6 +33,8 @@ def inspect_environment(engine: str) -> dict:
 
 def verify(engine: str, *, cuda: bool = True) -> dict:
     spec = recipe(engine, sys.platform)
+    if not sources_current(spec.get("vendors", [])):
+        raise RuntimeError(f"{engine}: pinned source checkout is incomplete or has a different revision")
     installed = inspect_environment(engine)
     torch = importlib.import_module("torch")
     if torch.version.cuda != spec["cuda"]:

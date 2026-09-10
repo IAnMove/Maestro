@@ -4,7 +4,8 @@ One HocusPocus repository selects installation recipes through
 [`profiles.json`](../../app/runtime/profiles.json). Install and Update execute
 the same builder; updating code loads the new setup script after the Git pull.
 External source repositories remain pinned in
-[`vendor_revisions.js`](../../vendor_revisions.js). A platform override can select
+[`vendors.json`](../../app/runtime/vendors.json), also exposed through
+`vendor_revisions.js` for Pinokio. A platform override can select
 different repositories, Python versions, wheels and dependencies without forking
 the entire application.
 
@@ -59,7 +60,10 @@ Assets, projects and output files are not migrated or deleted by this process.
 Setup writes a management intent before modifying an environment. Success is
 recorded only after dependency checks, imports and a real CUDA calculation.
 The receipt contains the recipe fingerprint and the complete installed package
-set. A later package change invalidates it. Once migration has started, old
+set. A later package change invalidates it. Missing source files or a different
+vendor HEAD also trigger repair. Setup restores missing tracked dependency files
+without overwriting existing edits or untracked files; staged custom deletions
+require manual reconciliation. Once migration has started, old
 installation markers cannot make an incomplete environment available to workers
 or Start. Run Install/Update again to repair it; a failure is not a success.
 

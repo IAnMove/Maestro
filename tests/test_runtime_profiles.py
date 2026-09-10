@@ -133,7 +133,8 @@ def test_native_helpers_affect_installation_fingerprint(tmp_path):
     source = tmp_path / "source"
     for name in ["app/runtime", "app/services/hunyuan3d/requirements.txt", "app/services/hunyuan3d/build_mesh_painter.py",
                  "runtime_install.js", "vendor_revisions.js", "hunyuan_native.js", "torch.js", "scripts/runtime_verify.py",
-                 "scripts/runtime_pip.py", "scripts/runtime_failed.py"]:
+                 "scripts/runtime_pip.py", "scripts/runtime_failed.py", "scripts/runtime_vendor.py",
+                 "app/services/runtime_sources.py"]:
         src, dest = ROOT / name, source / name
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copytree(src, dest) if src.is_dir() else shutil.copy2(src, dest)
@@ -189,3 +190,38 @@ def test_package_helper_ignores_inherited_destinations_and_configuration(monkeyp
     monkeypatch.setattr(sys, "prefix", "/foreign/environment")
     with pytest.raises(RuntimeError, match="outside"):
         helper.command("wangp", ["install", "numpy"])
+
+
+def test_missing_vendor_files_and_changed_revisions_trigger_repair(tmp_path, monkeypatch):
+    from services import runtime_sources as sources
+    vendor = tmp_path / "vendor with spaces"
+    vendor.mkdir()
+
+    def git(*args):
+        return subprocess.check_output(["git", "-C", str(vendor), *args], text=True).strip()
+
+    git("init")
+    git("config", "user.name", "Runtime test")
+    git("config", "user.email", "runtime@example.invalid")
+    git("config", "commit.gpgsign", "false")
+    entry = vendor / "main.py"
+    edited = vendor / "custom.py"
+    entry.write_text("# pinned entry\n")
+    edited.write_text("# original\n")
+    git("add", "main.py", "custom.py")
+    git("commit", "-m", "fixture")
+    pinned = git("rev-parse", "HEAD")
+    monkeypatch.setattr(sources, "vendor_catalog", lambda: {"fixture": {
+        "path": vendor.name, "revision": pinned, "requiredPaths": ["main.py"],
+    }})
+    assert sources.sources_current(["fixture"], tmp_path)
+    entry.unlink()
+    edited.write_text("# preserved user edit\n")
+    assert not sources.sources_current(["fixture"], tmp_path)
+    sources.restore_missing("fixture", tmp_path)
+    assert entry.read_text() == "# pinned entry\n"
+    assert edited.read_text() == "# preserved user edit\n"
+    assert sources.sources_current(["fixture"], tmp_path)
+    git("add", "custom.py")
+    git("commit", "-m", "different upstream revision")
+    assert not sources.sources_current(["fixture"], tmp_path)
