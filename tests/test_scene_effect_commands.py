@@ -23,8 +23,8 @@ def showcase(service, dimension='3d'):
 def test_both_templates_use_all_catalog_effects_and_are_replayable(service):
     for dimension in ('2d', '3d'):
         doc = showcase(service, dimension)
-        assert doc['duration'] == 108
-        assert len(doc['sfx']) == 36
+        assert doc['duration'] == 138
+        assert len(doc['sfx']) == 46
         assert all(cue['sound'] and cue['label'] for cue in doc['sfx'])
         assert doc == showcase(service, dimension)
         assert ('slots' in doc) == (dimension == '3d')
@@ -39,7 +39,7 @@ def test_apply_replaces_exact_cue_preserving_scene_and_caller(service):
     assert original == before
     assert first == service.execute(command)
     actual = first['result']['document']
-    assert len(actual['sfx']) == 36
+    assert len(actual['sfx']) == 46
     assert actual['sfx'][3] == cue
     assert actual['slots'] == original['slots']
     assert not first['result']['saved'] and not first['result']['exported']
@@ -138,7 +138,7 @@ def test_speech_rejects_paths_and_unknown_character_before_analysis(service):
 
 def test_shared_catalog_remains_a_packaged_resource():
     path = Path(__file__).parents[1] / 'app/shared/scene_effects.json'
-    assert len(json.loads(path.read_text())) == 36
+    assert len(json.loads(path.read_text())) == 46
 
 
 def test_speech_append_preserves_previous_voice_and_rejects_overlap():
@@ -153,6 +153,17 @@ def test_speech_append_preserves_previous_voice_and_rejects_overlap():
     assert 'clips' not in original
 
 
+def test_retro_showcase_is_screen_only_and_thirty_seconds(service):
+    scene = service.execute({'version': 1, 'operation': 'scenes.effects.showcase',
+                             'input': {'collection': 'retro', 'dimension': '2d'}})['result']['document']
+    assert scene['duration'] == 30 and len(scene['sfx']) == 10
+    assert [cue['kind'] for cue in scene['sfx']] == [
+        'psx', 'n64', 'nes', 'snes', 'gameboy', 'gameboy_color', 'genesis', 'vhs', 'crt', 'c64']
+    catalog = service.execute({'version': 1, 'operation': 'scenes.effects.catalog', 'input': {}})['result']
+    assert 'psx' not in catalog['worldKinds']
+    assert any(item['id'] == 'psx' for item in catalog['effects'])
+
+
 def test_anime_showcase_uses_36_seconds_and_preserves_longer_authored_scenes(service):
     command = {'version': 1, 'operation': 'scenes.effects.showcase', 'input': {'collection': 'anime'}}
     scene = service.execute(command)['result']['document']
@@ -162,7 +173,7 @@ def test_anime_showcase_uses_36_seconds_and_preserves_longer_authored_scenes(ser
     assert service.execute(command)['result']['document']['duration'] == 72
 
 
-@pytest.mark.parametrize('collection,seconds', [('anime', 36), ('all', 108)])
+@pytest.mark.parametrize('collection,seconds', [('anime', 36), ('retro', 30), ('all', 138)])
 def test_default_2d_showcase_has_no_longer_background_tail(service, collection, seconds):
     scene = service.execute({'version': 1, 'operation': 'scenes.effects.showcase',
                              'input': {'dimension': '2d', 'collection': collection}})['result']['document']

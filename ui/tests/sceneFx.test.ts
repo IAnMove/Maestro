@@ -74,7 +74,7 @@ test('world SFX stay in meters and do not rewrite screen overlays', () => {
 })
 
 test('2D showcase background matches the requested collection after reopening', () => {
-  for (const [collection, seconds] of [['anime', 36], ['all', FX_CATALOG.length * 3]] as const) {
+  for (const [collection, seconds] of [['anime', 36], ['retro', 30], ['all', FX_CATALOG.length * 3]] as const) {
     const next = withFxShowcase({ version: 1 as const, name: 'FX', layers: [], width: 640, height: 360, duration: 3 }, collection)
     const reopened = parseSceneFile(serializeSceneFile(next))
     assert.equal(reopened.duration, seconds)
