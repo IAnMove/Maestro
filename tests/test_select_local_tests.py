@@ -8,6 +8,7 @@ from pathlib import Path
 
 from scripts.select_local_tests import (
     ManifestError,
+    check_partition,
     discover_suite_files,
     full_suite_paths,
     group_paths,
@@ -104,11 +105,12 @@ def test_broken_partition_falls_back_to_tests_directory():
     assert unknown == ["mystery.py"]
 
 
-def test_group_selection_refuses_incomplete_partition(tmp_path: Path):
+def test_group_selection_assigns_ungrouped_files_to_the_first_shard(tmp_path: Path):
     root = tmp_path / "repo"
     (root / "tests").mkdir(parents=True)
     (root / "tests" / "test_one.py").write_text("def test_ok():\n    pass\n", encoding="utf-8")
     (root / "tests" / "test_two.py").write_text("def test_ok():\n    pass\n", encoding="utf-8")
+    (root / "tests" / "test_three.py").write_text("def test_ok():\n    pass\n", encoding="utf-8")
     manifest = {
         "groups": [
             {
@@ -116,16 +118,24 @@ def test_group_selection_refuses_incomplete_partition(tmp_path: Path):
                 "job": "python-tests-a",
                 "name": "Python tests A",
                 "paths": ["tests/test_one.py"],
-            }
+            },
+            {
+                "id": "python-b",
+                "job": "python-tests-b",
+                "name": "Python tests B",
+                "paths": ["tests/test_three.py"],
+            },
         ]
     }
+    assert group_paths("python-a", root, manifest) == ["tests/test_one.py", "tests/test_two.py"]
+    assert group_paths("python-b", root, manifest) == ["tests/test_three.py"]
     try:
-        group_paths("python-a", root, manifest)
+        check_partition(root, manifest)
     except ManifestError as exc:
         assert "missing from groups" in str(exc)
         assert "tests/test_two.py" in str(exc)
     else:
-        raise AssertionError("incomplete shard must fail closed")
+        raise AssertionError("stale manifest must still fail --check-partition")
 
 
 def test_missing_manifest_is_not_an_empty_suite(tmp_path: Path):

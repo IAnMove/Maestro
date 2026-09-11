@@ -257,6 +257,8 @@
         "tests/test_tools_upscale_spec.py",
         "tests/test_upload_streaming.py",
         "tests/test_video_editor_animatic.py",
+        "tests/test_video_editor_concat_regression.py",
+        "tests/test_video_editor_frame_accounting.py",
         "tests/test_video_editor_preview_canvas.py",
         "tests/test_video_editor_provenance.py",
         "tests/test_video_extra_info.py",
