@@ -159,6 +159,51 @@ test('lock blocks inspector mutations and the conflict choice is explicit', asyn
   } finally { cleanup() }
 })
 
+test('inspector source edits keep image backdrops as image through draft persist', async () => {
+  const { render, screen, fireEvent, cleanup } = await import('@testing-library/react')
+  const { SceneObjectInspector } = await import('../src/features/scene3d/SceneObjectInspector.tsx')
+  const { persistHistoryDraft, createHistory, readDraftPayload } = await import('../src/features/scene3d/documentHistory.ts')
+  const { parseScene3DDocument } = await import('../src/features/scene3d/document.ts')
+  const document = applyScene3DTemplate('screen-alert')
+  const backdrop = document.slots.find(slot => slot.media === 'image')
+  assert.ok(backdrop)
+  let current = document
+  const memory = new Map<string, string>()
+  const storage = {
+    getItem: (key: string) => memory.get(key) ?? null,
+    setItem: (key: string, value: string) => { memory.set(key, value) },
+    removeItem: (key: string) => { memory.delete(key) },
+  }
+  try {
+    render(
+      <SceneObjectInspector
+        document={current}
+        selectedId={backdrop.id}
+        locked={false}
+        saveState="unsaved"
+        canUndo={false}
+        canRedo={false}
+        conflict={null}
+        onChange={next => { current = next }}
+        onUndo={() => {}}
+        onRedo={() => {}}
+        onCheckpoint={() => {}}
+        onResolveConflict={() => {}}
+      />,
+    )
+    fireEvent.change(screen.getByTestId('scene3d-inspector-source'), { target: { value: '/api/v1/uploads/sky.png' } })
+    assert.equal(current.slots.find(slot => slot.id === backdrop.id)?.media, 'image')
+    assert.equal(current.slots.find(slot => slot.id === backdrop.id)?.sourceUrl, '/api/v1/uploads/sky.png')
+    const history = persistHistoryDraft(
+      createHistory(current, { workspace: 'promo', documentId: 'alert', revision: 0 }, 'tab'),
+      storage,
+    )
+    const restored = readDraftPayload(storage, history.identity)
+    assert.equal(restored?.document.slots.find(slot => slot.id === backdrop.id)?.media, 'image')
+    assert.equal(parseScene3DDocument(JSON.parse(JSON.stringify(current)))?.slots.find(slot => slot.id === backdrop.id)?.media, 'image')
+  } finally { cleanup() }
+})
+
 test('inspector history buttons drive undo and checkpoint', async () => {
   const { render, screen, fireEvent, cleanup } = await import('@testing-library/react')
   const { SceneObjectInspector } = await import('../src/features/scene3d/SceneObjectInspector.tsx')

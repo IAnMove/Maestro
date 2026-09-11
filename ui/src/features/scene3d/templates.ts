@@ -470,6 +470,54 @@ export function patchScene3DSlot(
   }
 }
 
+export function slotHasKeepableAsset(slot: Scene3DSlot) {
+  return Boolean(slot.sourceUrl || slot.screen?.sourceUrl)
+}
+
+function takePreviousSlot(
+  previous: readonly Scene3DSlot[],
+  used: Set<string>,
+  predicate: (item: Scene3DSlot) => boolean,
+): Scene3DSlot | undefined {
+  const found = previous.find(item => !used.has(item.id) && predicate(item))
+  if (found) used.add(found.id)
+  return found
+}
+
+/** One previous slot per destination. Same id wins, then unused same role+media. */
+export function takeKeptSlot(
+  slot: Scene3DSlot,
+  previous: readonly Scene3DSlot[],
+  used: Set<string>,
+): Scene3DSlot | undefined {
+  return takePreviousSlot(previous, used, item => item.id === slot.id && item.media === slot.media && slotHasKeepableAsset(item))
+    ?? takePreviousSlot(previous, used, item => item.slot === slot.slot && item.media === slot.media && slotHasKeepableAsset(item))
+}
+
+export function applyKeptSlotAssets(slot: Scene3DSlot, old: Scene3DSlot | undefined): Scene3DSlot {
+  if (!old) return slot
+  const keptScreenUrl = slot.screen?.sourceUrl || old.screen?.sourceUrl || ''
+  const screen = slot.screen
+    ? {
+        ...slot.screen,
+        sourceUrl: keptScreenUrl,
+        sourceRef: slot.screen.sourceRef || old.screen?.sourceRef,
+        media: slot.screen.sourceUrl ? slot.screen.media : (old.screen?.media || slot.screen.media),
+      }
+    : slot.screen
+  if (slot.sourceUrl) return { ...slot, screen }
+  return {
+    ...slot,
+    character: old.character,
+    sourceUrl: old.sourceUrl,
+    sourceRef: old.sourceRef,
+    clip: old.clip,
+    clipPlayback: old.clipPlayback,
+    speech: old.speech ? structuredClone(old.speech) : undefined,
+    screen,
+  }
+}
+
 /** Carry durable identity and clip choice, but use the new shot's placement. */
 export function remountScene3DTemplate(id: Scene3DTemplateId, previous: Scene3DDocument, keepAssets = true): Scene3DDocument {
   const next = applyScene3DTemplate(id)
@@ -483,13 +531,7 @@ export function remountScene3DTemplate(id: Scene3DTemplateId, previous: Scene3DD
   next.height = previous.height
   next.fps = previous.fps
   if (!keepAssets) return next
-  next.slots = next.slots.map(slot => {
-    if (slot.screen) {
-      const oldScreen = previous.slots.find(item => item.id === slot.id && item.screen?.sourceUrl) ?? previous.slots.find(item => item.screen?.sourceUrl)
-      if (oldScreen?.screen) slot.screen = { ...slot.screen, sourceUrl: oldScreen.screen.sourceUrl, sourceRef: oldScreen.screen.sourceRef, media: oldScreen.screen.media }
-    }
-    const old = previous.slots.find(item => item.slot === slot.slot && item.media === slot.media && item.sourceUrl)
-    return old ? { ...slot, character: old.character, sourceUrl: old.sourceUrl, sourceRef: old.sourceRef, clip: old.clip, clipPlayback: old.clipPlayback, speech: old.speech ? structuredClone(old.speech) : undefined } : slot
-  })
+  const used = new Set<string>()
+  next.slots = next.slots.map(slot => applyKeptSlotAssets(slot, takeKeptSlot(slot, previous.slots, used)))
   return next
 }

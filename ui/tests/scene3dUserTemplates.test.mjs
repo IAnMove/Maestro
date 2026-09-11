@@ -146,6 +146,22 @@ test('keep-objects restores standalone screen media that export stripped', () =>
   assert.equal(kept.slots[0].sourceUrl, gallery.url)
 })
 
+test('keep-objects does not clone the first wall onto every destination screen', () => {
+  const room = applyScene3DTemplate('control-room')
+  room.slots.filter(slot => slot.media === 'screen').forEach((slot, index) => {
+    slot.screen.sourceUrl = `/api/v1/uploads/wall-${index}.mp4`
+    slot.screen.media = 'video'
+  })
+  const pack = createUserTemplate({ document: applyScene3DTemplate('topic-travelling'), title: 'Topics', includeAssets: false, id: 'user-topics' })
+  const kept = remountUserTemplate(pack, room, true)
+  const urls = kept.slots.filter(slot => slot.media === 'screen').map(slot => slot.screen.sourceUrl)
+  assert.deepEqual(urls, [
+    '/api/v1/uploads/wall-0.mp4',
+    '/api/v1/uploads/wall-1.mp4',
+    '/api/v1/uploads/wall-2.mp4',
+  ])
+})
+
 test('keep-objects restores each control-room screen by slot id', () => {
   const document = applyScene3DTemplate('control-room')
   const screens = document.slots.filter(slot => slot.media === 'screen')

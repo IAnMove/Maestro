@@ -293,7 +293,12 @@ function bindSlot(slot: Scene3DSlot, roles: Partial<Record<string, string>> | un
   if (!roles) return next
   const role = Object.keys(aliases).find(name => aliases[name] === slot.id)
   const url = roles[slot.id] ?? (role ? roles[role] : undefined) ?? roles[slot.slot]
-  if (url) next.sourceUrl = url
+  if (!url) return next
+  if (next.media === 'screen') {
+    next.screen = { ...(next.screen ?? defaultMediaScreen()), sourceUrl: url }
+    return next
+  }
+  next.sourceUrl = url
   return next
 }
 

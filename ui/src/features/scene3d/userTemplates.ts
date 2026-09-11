@@ -1,5 +1,6 @@
 import { cloneScene3DDocument, parseScene3DDocument } from './document.ts'
 import type { MediaScreen } from './mediaScreen.ts'
+import { applyKeptSlotAssets, takeKeptSlot } from './templates.ts'
 import type { Scene3DDocument, Scene3DSlot } from './types.ts'
 
 export const WORLD3D_TEMPLATE_KIND = 'hocuspocus.world3d.template'
@@ -119,28 +120,9 @@ function newTemplateId() {
   return `user-${globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`}`
 }
 
-function slotHasKeepableAsset(slot: Scene3DSlot) {
-  return Boolean(slot.sourceUrl || slot.screen?.sourceUrl)
-}
-
-function mergeKeptSlot(slot: Scene3DSlot, previous: Scene3DDocument): Scene3DSlot {
-  const old = previous.slots.find(item => item.id === slot.id && item.media === slot.media && slotHasKeepableAsset(item))
-    || previous.slots.find(item => item.slot === slot.slot && item.media === slot.media && slotHasKeepableAsset(item))
-  if (!old) return slot
-  const screen = slot.screen
-    ? { ...slot.screen, sourceUrl: slot.screen.sourceUrl || old.screen?.sourceUrl || '', sourceRef: slot.screen.sourceRef || old.screen?.sourceRef, media: slot.screen.media || old.screen?.media || slot.screen.media }
-    : slot.screen
-  if (slot.sourceUrl) return { ...slot, screen }
-  return {
-    ...slot,
-    character: old.character,
-    sourceUrl: old.sourceUrl,
-    sourceRef: old.sourceRef,
-    clip: old.clip,
-    clipPlayback: old.clipPlayback,
-    speech: old.speech ? structuredClone(old.speech) : undefined,
-    screen,
-  }
+function mergeKeptSlots(next: Scene3DSlot[], previous: Scene3DDocument): Scene3DSlot[] {
+  const used = new Set<string>()
+  return next.map(slot => applyKeptSlotAssets(slot, takeKeptSlot(slot, previous.slots, used)))
 }
 
 export function remountUserTemplate(pack: World3DUserTemplate, previous: Scene3DDocument, keepAssets: boolean): Scene3DDocument {
@@ -154,7 +136,7 @@ export function remountUserTemplate(pack: World3DUserTemplate, previous: Scene3D
   if (previous.production) next.duration = previous.duration
   if (keepAssets && previous.soundtrack && !next.soundtrack) next.soundtrack = structuredClone(previous.soundtrack)
   if (!keepAssets) return next
-  next.slots = next.slots.map(slot => mergeKeptSlot(slot, previous))
+  next.slots = mergeKeptSlots(next.slots, previous)
   return next
 }
 
