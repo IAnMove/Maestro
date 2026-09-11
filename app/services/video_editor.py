@@ -252,7 +252,8 @@ def _mix_soundtrack(
         (
             f"[1:a:0]atrim=duration={mix_duration:.6f},"
             f"asetpts=PTS-STARTPTS,volume={volume:.4f}[music];"
-            "[0:a:0][music]amix=inputs=2:duration=first:dropout_transition=0[mixed]"
+            "[0:a:0][music]amix=inputs=2:duration=first:dropout_transition=0,"
+            f"apad,atrim=duration={duration:.6f}[mixed]"
         ),
         "-map", "0:v:0", "-map", "[mixed]",
         "-c:v", "copy", "-c:a", "aac", "-b:a", "192k",
