@@ -35,6 +35,11 @@ _REGISTRIES: dict[str, TaskRegistry] = {}
 _LOCK = threading.Lock()
 
 
+def registry_for(workspace: str) -> TaskRegistry:
+    """Task registry for this workspace folder. Shared with World3D export."""
+    return _registry(workspace)
+
+
 def _registry(workspace: str) -> TaskRegistry:
     try:
         folder = core.workspace_dir(workspace)

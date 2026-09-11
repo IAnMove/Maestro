@@ -113,6 +113,39 @@ class CoreRuntimeTests(unittest.TestCase):
         self.assertIn("workspace=default", body["url"])
         self.assertNotIn("..", body["name"])
 
+    def test_world3d_export_admits_on_the_core_profile(self):
+        document = {
+            "version": 1, "units": "meters", "up": "y", "width": 64, "height": 64,
+            "fps": 30, "duration": 2 / 30, "templateId": "two-shot",
+            "camera": {"family": "establishment", "eye": [0, 1.6, 4.2], "look": [0, 1, 0], "fov": 50},
+            "light": {"kind": "directional", "direction": [-0.35, -1, -0.25], "intensity": 1.15, "color": "#fff4e5"},
+            "slots": [{
+                "id": "subject_1", "slot": "subject_1", "position": [0, 0, 0], "rotationY": 0,
+                "scale": 1, "sourceUrl": "", "media": "model3d", "clip": None,
+            }],
+        }
+        folder, previous = self._in_temp_workspace()
+        try:
+            Path("outputs").mkdir()
+            catalog = self.client.get("/api/v1/scenes/world3d/export/commands")
+            with patch("services.world3d_export.threading.Thread", ImmediateThread):
+                admitted = self.client.post("/api/v1/scenes/world3d/export", json={
+                    "version": 1,
+                    "operation": "scenes.world3d.export",
+                    "intent_id": "mac-world3d-export",
+                    "input": {"workspace": "default", "document": document, "refs": []},
+                })
+        finally:
+            self._leave_temp_workspace(folder, previous)
+        self.assertEqual(catalog.status_code, 200, catalog.text)
+        names = {item.get("name") for item in catalog.json().get("operations") or []}
+        self.assertIn("scenes.world3d.export", names)
+        self.assertEqual(admitted.status_code, 200, admitted.text)
+        body = admitted.json()
+        self.assertFalse(body["replayed"])
+        self.assertEqual(body["receipt"]["operation"], "scenes.world3d.export")
+        self.assertTrue(body["receipt"]["taskIds"])
+
     def test_wizard_conversation_put_round_trips_instead_of_emptying(self):
         conversation = {
             "version": 1,
