@@ -12,7 +12,9 @@ UI: **3D Video** sidebar (`SceneAnimatorPanel` → Character Kits). Code:
 `app/_launch_runtime.py`.
 
 Related: [3D Video compositor](../3d-video-compositor/HOWUSEIT.md),
-[Character Creator orbit](../3d-video-compositor/HOWUSEIT.md#54-hunyuan3d-mesh).
+[Character Creator orbit](../3d-video-compositor/HOWUSEIT.md#54-hunyuan3d-mesh),
+[Studio Tools rembg](../tools/HOWUSEIT.md) (general image background removal;
+Face Rig cleanup is a different endpoint).
 
 ---
 
