@@ -219,19 +219,68 @@ export function activityRequestKey(task: ActivityTaskLike, byId: Map<string, Act
   return `root:${root.root_id || root.id}`
 }
 
-function asAttempt(task: ActivityTaskLike, overrides: Partial<ActivityAttempt> = {}): ActivityAttempt {
-  return {
-    id: overrides.id || `${task.id}:${overrides.attempt || task.attempt || 1}`,
-    taskId: task.id,
-    attempt: Number(overrides.attempt || task.attempt || 1),
-    readingState: overrides.readingState || taskReadingState(task),
-    status: overrides.status || task.status,
-    message: overrides.message || task.message || '',
-    error: overrides.error || text(task.error?.message) || (FAILED_TASK_STATUSES.has(task.status) ? (task.detail || task.message || '') : ''),
-    resultRefs: overrides.resultRefs || taskArtifactRefs(task),
-    createdAt: Number(overrides.createdAt || task.created_at || 0),
-    updatedAt: Number(overrides.updatedAt || task.updated_at || 0),
+function firstText(...values: unknown[]): string {
+  for (const value of values) {
+    const next = text(value)
+    if (next) return next
   }
+  return ''
+}
+
+function finiteNumber(value: unknown, fallback: number): number {
+  const parsed = Number(value)
+  if (Number.isFinite(parsed)) return parsed
+  return fallback
+}
+
+const READING_STATES = new Set<string>(['prepared', 'admitted', 'running', 'failed', 'partial', 'completed'])
+
+function asReadingState(value: string): ActivityReadingState | undefined {
+  if (READING_STATES.has(value)) return value as ActivityReadingState
+  return undefined
+}
+
+function failedDetail(task: ActivityTaskLike): string {
+  if (!FAILED_TASK_STATUSES.has(task.status)) return ''
+  return firstText(task.detail, task.message)
+}
+
+function asAttempt(task: ActivityTaskLike, overrides: Partial<ActivityAttempt> = {}): ActivityAttempt {
+  const attempt = finiteNumber(overrides.attempt, finiteNumber(task.attempt, 1))
+  return {
+    id: firstText(overrides.id, `${task.id}:${attempt}`),
+    taskId: task.id,
+    attempt,
+    readingState: overrides.readingState ?? taskReadingState(task),
+    status: firstText(overrides.status, task.status),
+    message: firstText(overrides.message, task.message),
+    error: firstText(overrides.error, task.error?.message, failedDetail(task)),
+    resultRefs: overrides.resultRefs ?? taskArtifactRefs(task),
+    createdAt: finiteNumber(overrides.createdAt, finiteNumber(task.created_at, 0)),
+    updatedAt: finiteNumber(overrides.updatedAt, finiteNumber(task.updated_at, 0)),
+  }
+}
+
+function historyItemRefs(item: Record<string, unknown>): string[] | undefined {
+  if (!Array.isArray(item.result_refs)) return undefined
+  return item.result_refs.filter((value): value is string => typeof value === 'string')
+}
+
+function historyItemAttempt(task: ActivityTaskLike, item: unknown, index: number): ActivityAttempt | null {
+  if (!isRecord(item)) return null
+  const attempt = finiteNumber(item.attempt, index + 1)
+  const nestedError = isRecord(item.error) ? item.error.message : ''
+  return asAttempt(task, {
+    id: firstText(item.id, `${task.id}:history:${attempt}`),
+    attempt,
+    readingState: asReadingState(text(item.readingState)),
+    status: firstText(item.status, task.status),
+    message: text(item.message),
+    error: firstText(item.error, nestedError),
+    resultRefs: historyItemRefs(item),
+    createdAt: finiteNumber(item.created_at, finiteNumber(item.createdAt, finiteNumber(task.created_at, 0))),
+    updatedAt: finiteNumber(item.updated_at, finiteNumber(item.updatedAt, 0)),
+  })
 }
 
 function historyAttempts(task: ActivityTaskLike): ActivityAttempt[] {
@@ -239,25 +288,8 @@ function historyAttempts(task: ActivityTaskLike): ActivityAttempt[] {
   const raw = metadata.previous_attempts || metadata.attempt_history || metadata.attempts
   if (!Array.isArray(raw)) return []
   return raw.flatMap((item, index) => {
-    if (!isRecord(item)) return []
-    const attempt = Number(item.attempt || index + 1)
-    const recordedState = text(item.readingState)
-    return [asAttempt(task, {
-      id: text(item.id) || `${task.id}:history:${attempt}`,
-      attempt,
-      readingState: (
-        recordedState === 'prepared' || recordedState === 'admitted' || recordedState === 'running'
-        || recordedState === 'failed' || recordedState === 'partial' || recordedState === 'completed'
-      ) ? recordedState : undefined,
-      status: text(item.status) || task.status,
-      message: text(item.message),
-      error: text(item.error) || text(isRecord(item.error) ? item.error.message : ''),
-      resultRefs: Array.isArray(item.result_refs)
-        ? item.result_refs.filter((value): value is string => typeof value === 'string')
-        : undefined,
-      createdAt: Number(item.created_at || item.createdAt || task.created_at || 0),
-      updatedAt: Number(item.updated_at || item.updatedAt || 0),
-    })]
+    const attempt = historyItemAttempt(task, item, index)
+    return attempt ? [attempt] : []
   })
 }
 
@@ -270,25 +302,37 @@ function jobAttempts(tasks: ActivityTaskLike[]): ActivityAttempt[] {
   ))
 }
 
+function allStatesAre(states: ActivityReadingState[], allowed: readonly ActivityReadingState[]): boolean {
+  const permitted = new Set<string>(allowed)
+  return states.every(state => permitted.has(state))
+}
+
+function isMixedPartial(states: ActivityReadingState[], missingExpectedArtifact: boolean): boolean {
+  if (missingExpectedArtifact) return true
+  if (states.includes('partial')) return true
+  return states.includes('failed') && states.includes('completed')
+}
+
+function leftoverReading(states: ActivityReadingState[], hasArtifact: boolean): ActivityReadingState {
+  if (states.includes('admitted')) return 'admitted'
+  if (states.includes('prepared')) return 'prepared'
+  if (states.includes('failed')) return 'failed'
+  if (hasArtifact) return 'completed'
+  return 'admitted'
+}
+
 function combineReadingState(
   states: ActivityReadingState[],
   hasArtifact: boolean,
   missingExpectedArtifact = false,
 ): ActivityReadingState {
   if (states.includes('running')) return 'running'
-  if (states.every(state => state === 'prepared')) return 'prepared'
-  if (states.every(state => state === 'admitted' || state === 'prepared') && states.includes('admitted')) {
-    return 'admitted'
-  }
-  if (states.every(state => state === 'failed')) return 'failed'
-  if (states.every(state => state === 'completed') && !missingExpectedArtifact) return 'completed'
-  if (missingExpectedArtifact || states.includes('partial') || (states.includes('failed') && states.includes('completed'))) {
-    return 'partial'
-  }
-  if (states.includes('admitted')) return 'admitted'
-  if (states.includes('prepared')) return 'prepared'
-  if (states.includes('failed')) return 'failed'
-  return hasArtifact ? 'completed' : 'admitted'
+  if (allStatesAre(states, ['prepared'])) return 'prepared'
+  if (allStatesAre(states, ['admitted', 'prepared']) && states.includes('admitted')) return 'admitted'
+  if (allStatesAre(states, ['failed'])) return 'failed'
+  if (allStatesAre(states, ['completed']) && !missingExpectedArtifact) return 'completed'
+  if (isMixedPartial(states, missingExpectedArtifact)) return 'partial'
+  return leftoverReading(states, hasArtifact)
 }
 
 function recoveryReason(tasks: ActivityTaskLike[], readingState: ActivityReadingState): string {
@@ -311,73 +355,94 @@ function projectTarget(task: ActivityTaskLike): ActivityProjectTarget | undefine
   return { kind, id, title: text(metadata.project_title) || text(metadata.entity_title) || id }
 }
 
-function buildGroup(id: string, members: ActivityTaskLike[]): ActivityGroup {
-  const ordered = [...members].sort((left, right) => (
-    Number(left.created_at || 0) - Number(right.created_at || 0) || left.id.localeCompare(right.id)
-  ))
+function byCreatedAsc(left: ActivityTaskLike, right: ActivityTaskLike): number {
+  return finiteNumber(left.created_at, 0) - finiteNumber(right.created_at, 0) || left.id.localeCompare(right.id)
+}
+
+function latestTask(tasks: ActivityTaskLike[]): ActivityTaskLike {
+  return [...tasks].sort((left, right) => (
+    finiteNumber(right.attempt, 1) - finiteNumber(left.attempt, 1)
+    || finiteNumber(right.created_at, 0) - finiteNumber(left.created_at, 0)
+  ))[0]
+}
+
+function selectPrimary(ordered: ActivityTaskLike[]): ActivityTaskLike {
   const roots = ordered.filter(task => !task.parent_id)
   const liveMembers = ordered.filter(task => isLiveStatus(task.status))
-  const latestRoot = [...(roots.length ? roots : ordered)].sort((left, right) => (
-    Number(right.attempt || 1) - Number(left.attempt || 1)
-    || Number(right.created_at || 0) - Number(left.created_at || 0)
-  ))[0]
-  const primary = liveMembers[0] || latestRoot || ordered[0]
-  const childTasks = ordered.filter(task => task.parent_id)
-  const jobBuckets = new Map<string, ActivityTaskLike[]>()
-  if (childTasks.length) {
-    for (const task of childTasks) {
-      const list = jobBuckets.get(task.id) || []
-      list.push(task)
-      jobBuckets.set(task.id, list)
-    }
-  } else {
-    jobBuckets.set(primary.id, roots.length ? roots : ordered)
+  if (liveMembers[0]) return liveMembers[0]
+  return latestTask(roots.length ? roots : ordered)
+}
+
+function missingExpectedArtifact(tasks: ActivityTaskLike[]): boolean {
+  return tasks.some(task => task.status === 'completed' && taskExpectsArtifact(task) && !taskHasArtifact(task))
+}
+
+function jobBucketsFor(ordered: ActivityTaskLike[], primary: ActivityTaskLike): Map<string, ActivityTaskLike[]> {
+  const buckets = new Map<string, ActivityTaskLike[]>()
+  const children = ordered.filter(task => task.parent_id)
+  const members = children.length ? children : ordered.filter(task => !task.parent_id)
+  const source = members.length ? members : [primary]
+  for (const task of source) {
+    const list = buckets.get(task.id) ?? []
+    list.push(task)
+    buckets.set(task.id, list)
   }
-  const jobs: ActivityJob[] = [...jobBuckets.values()].map(tasks => {
-    const jobPrimary = [...tasks].sort((left, right) => (
-      Number(right.attempt || 1) - Number(left.attempt || 1)
-      || Number(right.updated_at || 0) - Number(left.updated_at || 0)
-    ))[0]
-    const attempts = jobAttempts(tasks)
-    const missingExpected = tasks.some(task => task.status === 'completed' && taskExpectsArtifact(task) && !taskHasArtifact(task))
-    return {
-      id: jobPrimary.id,
-      title: jobPrimary.title || jobPrimary.kind || jobPrimary.id,
-      readingState: combineReadingState(tasks.map(taskReadingState), tasks.some(taskHasArtifact), missingExpected),
-      task: jobPrimary,
-      attempts,
-    }
-  }).sort((left, right) => (
-    Number(left.task.created_at || 0) - Number(right.task.created_at || 0) || left.id.localeCompare(right.id)
+  return buckets
+}
+
+function jobFromTasks(tasks: ActivityTaskLike[]): ActivityJob {
+  const jobPrimary = [...tasks].sort((left, right) => (
+    finiteNumber(right.attempt, 1) - finiteNumber(left.attempt, 1)
+    || finiteNumber(right.updated_at, 0) - finiteNumber(left.updated_at, 0)
+  ))[0]
+  return {
+    id: jobPrimary.id,
+    title: firstText(jobPrimary.title, jobPrimary.kind, jobPrimary.id),
+    readingState: combineReadingState(tasks.map(taskReadingState), tasks.some(taskHasArtifact), missingExpectedArtifact(tasks)),
+    task: jobPrimary,
+    attempts: jobAttempts(tasks),
+  }
+}
+
+function previousFromAttempts(attempts: ActivityAttempt[]): ActivityAttempt | undefined {
+  const currentAttempt = Math.max(1, ...attempts.map(item => item.attempt))
+  const previous = [...attempts].reverse().find(item => item.attempt < currentAttempt)
+  if (previous) return previous
+  if (attempts.length > 1) return attempts[attempts.length - 2]
+  return undefined
+}
+
+function buildGroup(id: string, members: ActivityTaskLike[]): ActivityGroup {
+  const ordered = [...members].sort(byCreatedAsc)
+  const roots = ordered.filter(task => !task.parent_id)
+  const primary = selectPrimary(ordered)
+  const jobs = [...jobBucketsFor(ordered, primary).values()].map(jobFromTasks).sort((left, right) => (
+    byCreatedAsc(left.task, right.task)
   ))
   const artifacts = [...new Set(ordered.flatMap(taskArtifactRefs))]
-  const missingExpected = ordered.some(task => (
-    task.status === 'completed' && taskExpectsArtifact(task) && !taskHasArtifact(task)
-  ))
-  const readingState = combineReadingState(ordered.map(taskReadingState), artifacts.length > 0, missingExpected)
-  const attempts = jobAttempts(roots.length ? roots : ordered)
-  const currentAttempt = Math.max(1, ...attempts.map(item => item.attempt))
-  const previousAttempt = [...attempts].reverse().find(item => item.attempt < currentAttempt)
-    || (attempts.length > 1 ? attempts[attempts.length - 2] : undefined)
+  const readingState = combineReadingState(
+    ordered.map(taskReadingState),
+    artifacts.length > 0,
+    missingExpectedArtifact(ordered),
+  )
   const live = ordered.filter(task => isLiveStatus(task.status))
-  const progressSource = live[0] || primary
   return {
     id,
-    intentId: taskIntentId(primary) || taskIntentId(ordered[0]) || '',
-    receiptId: taskReceiptId(primary) || taskReceiptId(ordered[0]) || '',
-    rootId: primary.root_id || primary.id,
+    intentId: firstText(taskIntentId(primary), taskIntentId(ordered[0])),
+    receiptId: firstText(taskReceiptId(primary), taskReceiptId(ordered[0])),
+    rootId: firstText(primary.root_id, primary.id),
     workspace: taskWorkspace(primary),
-    title: primary.title || primary.kind || primary.id,
+    title: firstText(primary.title, primary.kind, primary.id),
     readingState,
-    progress: readingState === 'completed' ? 100 : taskProgressPercent(progressSource),
+    progress: readingState === 'completed' ? 100 : taskProgressPercent(live[0] ?? primary),
     hasArtifact: artifacts.length > 0,
-    createdAt: Math.min(...ordered.map(task => Number(task.created_at) || 0)),
+    createdAt: Math.min(...ordered.map(task => finiteNumber(task.created_at, 0))),
     primary,
     jobs,
     artifacts,
-    previousAttempt,
+    previousAttempt: previousFromAttempts(jobAttempts(roots.length ? roots : ordered)),
     recoveryReason: recoveryReason(ordered, readingState),
-    project: projectTarget(primary) || ordered.map(projectTarget).find(Boolean),
+    project: projectTarget(primary) ?? ordered.map(projectTarget).find(Boolean),
   }
 }
 

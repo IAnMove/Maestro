@@ -74,6 +74,17 @@ export function fallbackPhaseLabel(task: ActivityTaskLike): string {
   return task.phase?.replaceAll('_', ' ') || task.status
 }
 
+export function phaseCatalogKey(task: ActivityTaskLike): string {
+  return PHASE_KEYS[task.phase || ''] || 'fallback'
+}
+
+export function translatedPhase(
+  t: (key: string, options?: object) => string,
+  task: ActivityTaskLike,
+): string {
+  return t(`phases.${phaseCatalogKey(task)}`, { phase: fallbackPhaseLabel(task), defaultValue: fallbackPhaseLabel(task) })
+}
+
 export function resourceSummary(task: ActivityTaskLike): { kind: 'using' | 'waiting' | 'required'; value: string } | '' {
   const acquired = task.acquired_resources || []
   const required = task.resource_requirements || []
@@ -82,88 +93,150 @@ export function resourceSummary(task: ActivityTaskLike): { kind: 'using' | 'wait
   return required.length ? { kind: 'required', value: required.join(' · ') } : ''
 }
 
-export function generationRecipe(task: ActivityTaskLike): string {
+function recipeDetails(task: ActivityTaskLike): Record<string, unknown> {
   const metadata = task.metadata || {}
-  const details = (metadata.generation_details || metadata.settings || {}) as Record<string, unknown>
-  const parts = [task.provider, task.model].filter(Boolean) as string[]
-  const addModel = (label: string, value: unknown) => {
-    if (!value) return
-    const model = String(value)
-    if (!parts.some(part => part === model || part.endsWith(` ${model}`))) {
-      parts.push(label ? `${label} ${model}` : model)
-    }
+  const details = metadata.generation_details || metadata.settings
+  if (details && typeof details === 'object' && !Array.isArray(details)) return details as Record<string, unknown>
+  return {}
+}
+
+function firstDefined(...values: unknown[]): unknown {
+  for (const value of values) {
+    if (value === undefined) continue
+    if (value === null) continue
+    return value
   }
-  addModel('', details.model_name || details.model_type)
-  addModel('text', details.text_model)
-  addModel('image', details.image_model_name || details.image_model_type)
-  addModel('video', details.video_model_name || details.video_model_type)
-  const resolution = details.video_resolution || details.image_resolution || details.resolution
-  const seed = details.seed
-  const steps = details.video_steps || details.image_steps || details.steps || details.numInferenceSteps
-  if (details.simulated === true || details.execution_mode === 'simulate') parts.push('SIMULATED')
+  return undefined
+}
+
+function pushUniqueModel(parts: string[], label: string, value: unknown): void {
+  if (!value) return
+  const model = String(value)
+  if (parts.some(part => part === model || part.endsWith(` ${model}`))) return
+  parts.push(label ? `${label} ${model}` : model)
+}
+
+function appendRecipeModels(parts: string[], details: Record<string, unknown>): void {
+  pushUniqueModel(parts, '', firstDefined(details.model_name, details.model_type))
+  pushUniqueModel(parts, 'text', details.text_model)
+  pushUniqueModel(parts, 'image', firstDefined(details.image_model_name, details.image_model_type))
+  pushUniqueModel(parts, 'video', firstDefined(details.video_model_name, details.video_model_type))
+}
+
+function appendDefined(parts: string[], value: unknown, label: (item: unknown) => string): void {
+  if (value === undefined) return
+  parts.push(label(value))
+}
+
+function appendRecipeCore(parts: string[], details: Record<string, unknown>): void {
+  if (details.simulated === true) parts.push('SIMULATED')
+  else if (details.execution_mode === 'simulate') parts.push('SIMULATED')
+  const resolution = firstDefined(details.video_resolution, details.image_resolution, details.resolution)
   if (resolution) parts.push(String(resolution))
-  if (seed !== undefined) parts.push(`seed ${seed}`)
-  if (steps !== undefined) parts.push(`${steps} steps`)
-  if (details.guidance !== undefined) parts.push(`guidance ${details.guidance}`)
-  if (details.frames !== undefined) parts.push(`${details.frames} frames`)
-  if (details.duration_seconds !== undefined) parts.push(`${details.duration_seconds}s`)
+  appendDefined(parts, details.seed, value => `seed ${value}`)
+  const steps = firstDefined(details.video_steps, details.image_steps, details.steps, details.numInferenceSteps)
+  appendDefined(parts, steps, value => `${value} steps`)
+  appendDefined(parts, details.guidance, value => `guidance ${value}`)
+  appendDefined(parts, details.frames, value => `${value} frames`)
+  appendDefined(parts, details.duration_seconds, value => `${value}s`)
+}
+
+function h3Minimum(details: Record<string, unknown>): string {
+  if (details.dialogue_duration_minimum_limited) return ' · H3 minimum applied'
+  return ''
+}
+
+function dialogueLine(details: Record<string, unknown>): string {
   if (details.dialogue_syllables !== undefined) {
-    parts.push(
-      `dialogue ${details.dialogue_syllables} syllables × ${details.dialogue_seconds_per_syllable}s → ${details.dialogue_duration_calculated}s calculated`
-      + (details.dialogue_duration_minimum_limited ? ' · H3 minimum applied' : ''),
-    )
-  } else if (details.dialogue_words !== undefined) {
-    parts.push(
-      `dialogue ${details.dialogue_words} words → ${details.dialogue_duration_calculated}s calculated`
-      + (details.dialogue_duration_minimum_limited ? ' · H3 minimum applied' : ''),
-    )
+    return `dialogue ${details.dialogue_syllables} syllables × ${details.dialogue_seconds_per_syllable}s → ${details.dialogue_duration_calculated}s calculated${h3Minimum(details)}`
   }
+  if (details.dialogue_words !== undefined) {
+    return `dialogue ${details.dialogue_words} words → ${details.dialogue_duration_calculated}s calculated${h3Minimum(details)}`
+  }
+  return ''
+}
+
+function cacheLine(details: Record<string, unknown>): string {
+  if (details.cache === undefined) return ''
+  if (!details.cache) return 'Cache off'
+  if (details.cache_type) return `Cache on (${details.cache_type})`
+  return 'Cache on'
+}
+
+function loraLine(details: Record<string, unknown>): string {
+  if (details.lora_count === undefined) return ''
+  if (!details.lora_count) return 'LoRAs off'
+  const loras = Array.isArray(details.loras) ? details.loras.map(String).filter(Boolean) : []
+  const suffix = Number(details.lora_count) === 1 ? '' : 's'
+  const names = loras.length ? ` (${loras.join(', ')})` : ''
+  return `${details.lora_count} LoRA${suffix}${names}`
+}
+
+function appendRecipeFlags(parts: string[], details: Record<string, unknown>): void {
   if (details.profile) parts.push(`profile ${details.profile}`)
-  if (details.flow_shift !== undefined || details.flowShift !== undefined) {
-    parts.push(`flow shift ${details.flow_shift ?? details.flowShift}`)
-  }
-  if (details.audio_shift !== undefined || details.audioShift !== undefined) {
-    parts.push(`audio shift ${details.audio_shift ?? details.audioShift}`)
-  }
+  const flow = firstDefined(details.flow_shift, details.flowShift)
+  appendDefined(parts, flow, value => `flow shift ${value}`)
+  const audio = firstDefined(details.audio_shift, details.audioShift)
+  appendDefined(parts, audio, value => `audio shift ${value}`)
   if (details.turbo !== undefined) parts.push(`Turbo ${details.turbo ? 'on' : 'off'}`)
-  if (details.cache !== undefined) {
-    parts.push(details.cache
-      ? `Cache on${details.cache_type ? ` (${details.cache_type})` : ''}`
-      : 'Cache off')
-  }
-  if (details.lora_count !== undefined) {
-    const loras = Array.isArray(details.loras) ? details.loras.map(String).filter(Boolean) : []
-    parts.push(details.lora_count
-      ? `${details.lora_count} LoRA${Number(details.lora_count) === 1 ? '' : 's'}${loras.length ? ` (${loras.join(', ')})` : ''}`
-      : 'LoRAs off')
-  }
-  if (details.clip_count !== undefined) parts.push(`${details.clip_count} clips`)
+  const cache = cacheLine(details)
+  if (cache) parts.push(cache)
+  const loras = loraLine(details)
+  if (loras) parts.push(loras)
+  appendDefined(parts, details.clip_count, value => `${value} clips`)
+}
+
+export function generationRecipe(task: ActivityTaskLike): string {
+  const details = recipeDetails(task)
+  const parts = [task.provider, task.model].filter(Boolean) as string[]
+  appendRecipeModels(parts, details)
+  appendRecipeCore(parts, details)
+  const dialogue = dialogueLine(details)
+  if (dialogue) parts.push(dialogue)
+  appendRecipeFlags(parts, details)
   return parts.join(' · ')
 }
 
 export function generationPrompt(task: ActivityTaskLike): string {
   const metadata = task.metadata || {}
-  const details = (metadata.generation_details || metadata.settings || {}) as Record<string, unknown>
-  const value = details.prompt ?? metadata.prompt ?? metadata.prompt_preview
-  return typeof value === 'string' ? value.trim() : ''
+  const details = recipeDetails(task)
+  const value = firstDefined(details.prompt, metadata.prompt, metadata.prompt_preview)
+  if (typeof value === 'string') return value.trim()
+  return ''
+}
+
+function directorInitiator(task: ActivityTaskLike, mode: string): string {
+  if (task.parent_id?.startsWith('task-director-')) return directorLabel(mode)
+  if (task.workflow === 'director') return directorLabel(mode)
+  return ''
+}
+
+function directorLabel(mode: string): string {
+  if (!mode) return 'Director'
+  if (mode === 'music video') return 'Director · Music video'
+  return `Director · ${mode}`
+}
+
+function studioInitiator(mode: string): string {
+  if (mode === 'model3d') return 'Studio · 3D'
+  if (mode) return `Studio · ${mode[0].toUpperCase()}${mode.slice(1)}`
+  return 'Studio · Generation'
 }
 
 export function generationInitiator(task: ActivityTaskLike): string {
   const metadata = task.metadata || {}
-  const details = (metadata.generation_details || metadata.settings || {}) as Record<string, unknown>
-  const explicit = details.initiator ?? metadata.initiator
+  const details = recipeDetails(task)
+  const explicit = firstDefined(details.initiator, metadata.initiator)
   if (typeof explicit === 'string' && explicit.trim()) return explicit.trim()
-  const mode = String(details.generation_mode || task.kind || '').replaceAll('_', ' ')
-  if (task.parent_id?.startsWith('task-series-') || (task.workflow || '').startsWith('series')) return 'Series Lab · Chapter'
-  if (task.parent_id?.startsWith('task-director-') || task.workflow === 'director') {
-    return `Director${mode ? ` · ${mode === 'music video' ? 'Music video' : mode}` : ''}`
-  }
+  const mode = String(firstDefined(details.generation_mode, task.kind, '')).replaceAll('_', ' ')
+  if (task.parent_id?.startsWith('task-series-')) return 'Series Lab · Chapter'
+  if ((task.workflow || '').startsWith('series')) return 'Series Lab · Chapter'
+  const director = directorInitiator(task, mode)
+  if (director) return director
   if (task.workflow === 'audio-analysis') return 'Story/Director · Audio analysis'
-  if (task.workflow === 'generation') {
-    const room = mode === 'model3d' ? '3D' : mode ? mode[0].toUpperCase() + mode.slice(1) : 'Generation'
-    return `Studio · ${room}`
-  }
-  return task.workflow ? task.workflow.replaceAll('_', ' ') : ''
+  if (task.workflow === 'generation') return studioInitiator(mode)
+  if (task.workflow) return task.workflow.replaceAll('_', ' ')
+  return ''
 }
 
 export function truncatePrompt(prompt: string, limit = 180): string {
