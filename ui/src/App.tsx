@@ -1,6 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import { Menu, Settings } from 'lucide-react'
-import { Sidebar } from './components/Sidebar/Sidebar'
 import { WizardSidebar } from './components/Sidebar/WizardSidebar'
 import { MainContent } from './components/MainContent/MainContent'
 import { LoraBrowser } from './components/LoraBrowser/LoraBrowser'
@@ -79,8 +78,6 @@ function AppContent() {
   const dashboardOpen = useStore(s => s.dashboardOpen)
   const settingsOpen = useStore(s => s.settingsOpen)
   const runtimeIdentity = useStore(s => s.systemStats?.runtime)
-  const toggleSidebar = useStore(s => s.toggleSidebar)
-  const setSidebarOpen = useStore(s => s.setSidebarOpen)
   const toggleSettings = useStore(s => s.toggleSettings)
   const appVersion = useStore(s => s.systemConfig?.app_version)
   const isMobile = useIsMobile()
@@ -193,14 +190,15 @@ function AppContent() {
       {isMobile && (
         <header className="h-12 shrink-0 px-4 border-b border-border flex items-center justify-between bg-bg-secondary">
           <button
-            onClick={toggleSidebar}
+            onClick={() => window.dispatchEvent(new Event('hocuspocus:wizard-open'))}
             className="p-2 rounded-lg hover:bg-bg-hover text-text-secondary hover:text-text-primary transition-colors"
+            aria-label="Ask to the Wizard"
           >
             <Menu size={20} />
           </button>
           <BrandIdentity appVersion={appVersion} />
           <button
-            onClick={() => { setSidebarOpen(false); toggleSettings() }}
+            onClick={() => { toggleSettings() }}
             className="p-2 rounded-lg hover:bg-bg-hover text-text-secondary hover:text-text-primary transition-colors"
           >
             <Settings size={20} />
@@ -210,7 +208,6 @@ function AppContent() {
 
       <div className="flex flex-1 min-h-0 w-full">
         <WizardSidebar />
-        <Sidebar />
         <MainContent />
       </div>
       <GalleryReadyToast />

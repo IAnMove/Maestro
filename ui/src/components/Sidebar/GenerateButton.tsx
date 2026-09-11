@@ -12,7 +12,6 @@ export function GenerateButton() {
   const { t: tCommon } = useUiTranslation('common')
   const jobs = useStore(s => s.jobs)
   const startGeneration = useStore(s => s.startGeneration)
-  const setSidebarOpen = useStore(s => s.setSidebarOpen)
   const [submitting, setSubmitting] = useState(false)
   const [submissionError, setSubmissionError] = useState('')
   const submissionPending = useRef(false)
@@ -63,7 +62,6 @@ export function GenerateButton() {
       // Keep the visible command panel mounted through preparation/admission.
       // A click or a resolved legacy return value is not a queue receipt.
       await startGeneration(undefined, newUserGenerationContext())
-      setSidebarOpen(false)
     } catch (error) {
       setSubmissionError(error instanceof Error ? error.message : tCommon('status.failed'))
     } finally {

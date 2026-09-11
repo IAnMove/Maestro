@@ -57,6 +57,27 @@ export function revealDirectorWorkspace(state: {
   }
 }
 
+export type WorkspaceSurface = 'generate' | 'director' | 'section'
+
+/** Direct generation and Director occupy the main workspace, not a permanent
+ *  420px column. Library/studio filters are a separate destination. */
+export function visibleWorkspaceSurface(state: {
+  mediaFilter: MediaFilter
+  sidebarMode: 'studio' | 'director'
+  sidebarOpen: boolean
+  settingsOpen?: boolean
+  dashboardOpen?: boolean
+}): WorkspaceSurface {
+  if (state.settingsOpen || state.dashboardOpen) return 'section'
+  if (state.sidebarMode === 'director' && state.sidebarOpen && !hidesDirectGenerationSidebar(state.mediaFilter, 'director')) {
+    return 'director'
+  }
+  if (state.sidebarMode === 'studio' && state.sidebarOpen && !hidesDirectGenerationSidebar(state.mediaFilter, 'studio')) {
+    return 'generate'
+  }
+  return 'section'
+}
+
 export function categoryForNavigationDestination(destination: string): NavigationCategory | null {
   if (destination === 'studio') return 'direct-generation'
   if (destination === 'director' || destination === 'productions' || destination === 'video_editor') return 'production'

@@ -1,4 +1,11 @@
 {
+  "groups": {
+    "help": "Completa entrada e instrucciones y ejecuta. Los resultados quedan al lado de este formulario cuando hay espacio.",
+    "input": "Entrada y referencias",
+    "instructions": "Instrucciones",
+    "model": "Modelo y opciones",
+    "run": "Ejecución"
+  },
   "chrome": {
     "uploading": "Subiendo…",
     "optional": "Opcional",
