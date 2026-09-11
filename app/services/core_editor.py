@@ -51,13 +51,28 @@ def thumbnail_path(source: str, workspace: str | None = None) -> str:
     return ensure_media_thumbnail(resolve_media(source, workspace), THUMB_DIR, is_video=True)
 
 
+def unique_output_name(folder: str, filename: str) -> tuple[str, str]:
+    dest = os.path.join(folder, filename)
+    if not os.path.exists(dest):
+        return filename, dest
+    stem, ext = os.path.splitext(filename)
+    suffix = 2
+    while True:
+        candidate = f"{stem}_{suffix}{ext}"
+        dest = os.path.join(folder, candidate)
+        if not os.path.exists(dest):
+            return candidate, dest
+        suffix += 1
+
+
 def screenshot(source: str, time_seconds: float, name: str, workspace: str | None = None) -> dict[str, Any]:
     folder = core.workspace_dir(workspace)
     os.makedirs(folder, exist_ok=True)
-    safe = "".join(ch if ch.isalnum() or ch in "._-" else "-" for ch in name)[:60] or "frame"
-    dest = os.path.join(folder, f"{safe}.png")
+    safe = re.sub(r"[^A-Za-z0-9_-]+", "_", str(name or "video_frame")).strip("_")
+    safe = safe[:60] or "video_frame"
+    stamp = time.strftime("%Y-%m-%d-%Hh%Mm%Ss")
+    filename, dest = unique_output_name(folder, f"{stamp}_{safe}_frame.png")
     info = extract_frame(resolve_media(source, workspace), dest, time_seconds)
-    filename = os.path.basename(dest)
     return {"filename": filename, "url": f"/api/v1/file/{filename}", **info}
 
 
@@ -90,7 +105,7 @@ def start_export(body: dict[str, Any]) -> dict[str, Any]:
     stamp = time.strftime("%Y-%m-%d-%Hh%Mm%Ss")
     safe_name = re.sub(r"[^A-Za-z0-9_-]+", "_", str(body.get("name") or "edit")).strip("_")
     safe_name = safe_name[:60] or "edit"
-    filename = f"{stamp}_{safe_name}.mp4"
+    filename, _dest = unique_output_name(folder, f"{stamp}_{safe_name}.mp4")
     destination = core.safe_join(folder, filename)
     if not destination:
         raise ValueError("Invalid export name")
