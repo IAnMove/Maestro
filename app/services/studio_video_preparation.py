@@ -160,6 +160,12 @@ def prepare_studio_video(
         definition = _definition_for(model_definition, model_type)
         _validate_model(model_type, definition, model_downloaded)
         _validate_frames(working, definition)
+        # T2V forbids sliding windows. primary_settings defaults
+        # sliding_window_size to 129; validate_settings then returns None for
+        # any longer admitted job, and _run_generation treats a skipped-only
+        # queue as success with no file. Pin one window to the requested length.
+        working["sliding_window_size"] = working["video_length"]
+        working.setdefault("multi_prompts_gen_type", 2)
         phases = _validate_sampling(working, definition)
         if working.get("activated_loras") or working.get("loras_multipliers"):
             validate_lora_multipliers(working, phases)
@@ -173,9 +179,11 @@ def prepare_studio_video(
 
         prepared["generation_mode"] = "video"
         prepared["image_mode"] = 0
+        prepared["sliding_window_size"] = prepared["video_length"]
         prepared.setdefault("repeat_generation", 1)
         prepared.setdefault("batch_size", 1)
         prepared.setdefault("prompt_enhancer", "")
+        prepared.setdefault("multi_prompts_gen_type", 2)
         loras = resources.prepare_loras(prepared, definition)
         return prepared, [*media, *deepcopy(loras)]
     except HTTPException:

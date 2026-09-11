@@ -33,7 +33,7 @@ const PARAM_FIELDS = new Set([
   'repeat_generation', 'batch_size', 'activated_loras', 'loras_multipliers',
   'image_start', 'image_end', 'image_refs', 'video_guide', 'video_source',
   'video_mask', 'image_prompt_type', 'video_prompt_type', 'prompt_enhancer',
-  'flow_shift', 'sample_solver', 'guidance_phases',
+  'flow_shift', 'sample_solver', 'guidance_phases', 'multi_prompts_gen_type',
 ])
 
 export type VideoModelType = typeof VIDEO_MODEL_TYPES[number]
@@ -300,6 +300,7 @@ function commandParamsFromAction(action: AgentGenerationVideoAction): Record<str
     guidance_scale: action.guidanceScale,
     generation_mode: 'video',
     image_mode: 0,
+    multi_prompts_gen_type: 2,
   }
   if (action.seed !== undefined) params.seed = action.seed
   if (action.negativePrompt !== undefined) params.negative_prompt = action.negativePrompt

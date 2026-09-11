@@ -90,6 +90,7 @@ test('builder emits the MCP envelope without rewriting the prompt', () => {
   assert.equal(command.input.params.prompt, action.prompt)
   assert.equal(command.input.params.generation_mode, 'video')
   assert.equal(command.input.params.image_mode, 0)
+  assert.equal(command.input.params.multi_prompts_gen_type, 2)
   assert.equal(command.input.workspace_collection_id, 'collection-a')
   const mcp = mcpArgumentsFromCommand(command)
   assert.equal('operation' in mcp, false)

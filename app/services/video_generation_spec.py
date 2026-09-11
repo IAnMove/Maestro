@@ -58,6 +58,10 @@ STUDIO_VIDEO_DEFAULTS: dict[str, Any] = {
     "seed": -1,
     "video_prompt_type": "",
     "image_prompt_type": "",
+    # Keep a literal multi-line prompt as one video. Image/speech/music already
+    # pin this; omitting it lets wgp.primary_settings (default 0) split each
+    # newline into a separate generation at execute time.
+    "multi_prompts_gen_type": 2,
 }
 
 SUPPORTED_INPUT_FIELDS = (
@@ -87,6 +91,7 @@ SUPPORTED_INPUT_FIELDS = (
     "flow_shift",
     "sample_solver",
     "guidance_phases",
+    "multi_prompts_gen_type",
 )
 
 INACTIVE_VIDEO_FIELDS = (
@@ -97,6 +102,7 @@ INACTIVE_VIDEO_FIELDS = (
     "prompt_enhancer=empty",
     "video_prompt_type=empty",
     "image_prompt_type=empty",
+    "multi_prompts_gen_type=2",
     "image_end=empty_or_null",
     "video_source=empty_or_null",
     "video_mask=empty_or_null",
@@ -159,6 +165,7 @@ _Reference = Annotated[
 _Steps = Annotated[StrictInt, Field(ge=1, le=1000)]
 _Seed = Annotated[StrictInt, Field(ge=-(2**63), le=2**63 - 1)]
 _Count = Annotated[StrictInt, Field(ge=1, le=1)]
+_Two = Annotated[StrictInt, Field(ge=2, le=2)]
 _Zero = Annotated[StrictInt, Field(ge=0, le=0)]
 _Frames = Annotated[StrictInt, Field(ge=5, le=10_000)]
 _PhaseCount = Annotated[StrictInt, Field(ge=1, le=3)]
@@ -207,6 +214,7 @@ class VideoGenerationParams(_ClosedModel):
     generation_mode: Literal["video"] = "video"
     repeat_generation: _Count = 1
     batch_size: _Count = 1
+    multi_prompts_gen_type: _Two = 2
     activated_loras: list[_Identity] = Field(default_factory=list, max_length=_MAX_LORA_COUNT)
     loras_multipliers: _ShortText = ""
     prompt_enhancer: Literal["", None] = ""

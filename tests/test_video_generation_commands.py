@@ -144,6 +144,8 @@ def test_http_and_mcp_share_literal_video_admission(tmp_path):
     assert job["params"]["model_type"] == "t2v_1.3B"
     assert job["params"]["generation_mode"] == "video"
     assert job["params"]["image_mode"] == 0
+    assert job["params"]["multi_prompts_gen_type"] == 2
+    assert job["params"]["sliding_window_size"] == command["input"]["params"]["video_length"]
     assert "wrong-image-model" not in job["params"].values()
     entry = native.registry("video-test").command_admission(command["intent_id"])
     assert entry["original"] == command
@@ -218,6 +220,34 @@ def test_cross_workspace_reference_adds_no_tasks(tmp_path):
     assert native.registry("video-test").command_admission("foreign-ref") is None
     assert native.dispatch_calls == []
     assert resources.media_calls
+
+
+def test_prepare_pins_literal_prompt_and_single_window(tmp_path):
+    from services.studio_video_preparation import prepare_studio_video
+
+    resources = RecordingResources()
+    params = {
+        "workspace": "video-test",
+        "model_type": "t2v",
+        "prompt": 'A lantern over wet cobblestones.\n"Mañana"',
+        "resolution": "832x480",
+        "video_length": 161,
+        "num_inference_steps": 30,
+        "guidance_scale": 5.0,
+        "generation_mode": "video",
+        "image_mode": 0,
+    }
+    prepared, media = prepare_studio_video(
+        params,
+        model_definition=lambda _model: deepcopy(T2V_DEFINITION),
+        model_downloaded=lambda _model: True,
+        resources=resources,
+        execution_policy=lambda _workspace: None,
+    )
+    assert prepared["prompt"] == params["prompt"]
+    assert prepared["multi_prompts_gen_type"] == 2
+    assert prepared["sliding_window_size"] == 161
+    assert media == []
 
 
 def test_lost_http_response_still_recovers_the_receipt(tmp_path):
