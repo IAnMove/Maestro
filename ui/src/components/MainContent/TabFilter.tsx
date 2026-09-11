@@ -6,7 +6,7 @@ import {
 import { setUiLanguage, useUiTranslation, type UiLanguage } from '../../i18n'
 import {
   categoryForMediaFilter, DIRECT_GENERATION_MEDIA, hidesDirectGenerationSidebar,
-  type NavigationCategory, WIZARD_NAVIGATION_EVENT,
+  revealDirectorWorkspace, type NavigationCategory, WIZARD_NAVIGATION_EVENT,
 } from '../../lib/navigationCategories'
 import { useStore } from '../../stores/useStore'
 import type { GenerationMode, MediaFilter } from '../../types'
@@ -247,7 +247,7 @@ export function TabFilter() {
       const state = useStore.getState()
       state.setSettingsOpen(false)
       state.setDashboardOpen(false)
-      state.setSidebarMode('director')
+      revealDirectorWorkspace(state)
       window.dispatchEvent(new Event('maestro:director-open'))
       setActiveCategory('production')
       setExpandedCategory('production')

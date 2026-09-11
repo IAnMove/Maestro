@@ -1,4 +1,5 @@
 import { useStore } from '../../stores/useStore'
+import { hidesDirectGenerationSidebar } from '../../lib/navigationCategories'
 import { emptyCharacterKitLibrary } from '../../lib/characterKit'
 import { comicArtworkInventory } from '../comics/generateArtwork'
 import { useComicStore } from '../comics/store'
@@ -840,10 +841,12 @@ export function comicLabSnapshot() {
 function inferredLocation(state: ReturnType<typeof useStore.getState>): WizardContextLocation {
   if (state.settingsOpen) return { area: 'settings', tab: 'settings', section: state.settingsTab || '' }
   if (state.dashboardOpen) return { area: 'productions', tab: 'productions', section: 'queue' }
-  if (state.sidebarMode === 'director' && state.sidebarOpen) {
+  if (state.sidebarMode === 'director' && state.sidebarOpen
+    && !hidesDirectGenerationSidebar(state.mediaFilter, state.sidebarMode)) {
     return { area: 'director', tab: 'director', section: state.directorStep || '' }
   }
-  if (state.sidebarMode === 'studio' && state.sidebarOpen) {
+  if (state.sidebarMode === 'studio' && state.sidebarOpen
+    && !hidesDirectGenerationSidebar(state.mediaFilter, state.sidebarMode)) {
     const section = state.generationMode === 'audio'
       ? state.audioSubMode
       : state.generationMode === 'avatar' ? state.editSubMode : state.generationMode
