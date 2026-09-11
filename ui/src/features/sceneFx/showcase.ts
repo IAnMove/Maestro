@@ -3,7 +3,7 @@ import { FX_CATALOG, parseSceneFx } from './types'
 
 /** Non-destructive to actors/cameras/audio; the authored effect track is replaced explicitly. */
 export function withFxShowcase<T extends { duration: number }>(document: T, collection: 'all' | 'anime' = 'all'): T & { sfx: ReturnType<typeof parseSceneFx> } {
-  const presets = FX_CATALOG.filter(preset => collection === 'all' || preset.collection === collection)
+  const presets = FX_CATALOG.filter(preset => preset.collection !== 'world' && (collection === 'all' || preset.collection === collection))
   const duration = Math.max(document.duration, presets.length * 3)
   const layers = structuredClone(bases['2d'].layers)
   layers[0].animation.duration = duration

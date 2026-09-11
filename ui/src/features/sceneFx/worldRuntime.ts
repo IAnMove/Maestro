@@ -189,6 +189,22 @@ function animate(root: Group, cue: WorldSfx, seconds: number) {
         position.setXYZ(i, bx + sway, y, bz)
       } else if (child.userData.kind === 'drift') {
         position.setXYZ(i, bx + Math.sin(local * 0.3 + i) * 0.2, by + Math.sin(local * 0.5 + i) * 0.12, bz)
+      } else if (child.userData.kind === 'flutter') {
+        const y = ((by - local * 0.32) % 2.6 + 2.6) % 2.6
+        position.setXYZ(i, bx + Math.sin(local * 1.5 + i) * 0.28, y, bz + Math.cos(local * 1.2 + i) * 0.22)
+      } else if (child.userData.kind === 'jet') {
+        const p = Math.min(1, local / span)
+        position.setXYZ(i, bx * (1 + p * 1.8), by + p * 2.2, bz * (1 + p * 0.6))
+      } else if (child.userData.kind === 'sink') {
+        const y = ((by - local * 0.26) % 3 + 3) % 3
+        position.setXYZ(i, bx + Math.sin(local * 0.35 + i) * 0.1, y, bz)
+      } else if (child.userData.kind === 'dart') {
+        const y = ((by - local * 2.5) % 3.4 + 3.4) % 3.4
+        position.setXYZ(i, bx, y, bz)
+      } else if (child.userData.kind === 'orbit') {
+        const spin = local * 1.25
+        const cos = Math.cos(spin), sin = Math.sin(spin)
+        position.setXYZ(i, bx * cos - bz * sin, by + Math.sin(local * 2 + i) * 0.08, bx * sin + bz * cos)
       } else if (child.userData.kind === 'spin') {
         const spin = local * 1.7
         const cos = Math.cos(spin), sin = Math.sin(spin)
