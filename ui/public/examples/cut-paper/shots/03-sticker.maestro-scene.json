@@ -139,14 +139,14 @@
           "x": 36,
           "y": 62,
           "scale": 1,
-          "opacity": 0,
+          "opacity": 1,
           "rotation": 0
         },
         "end": {
           "x": 36,
           "y": 62,
           "scale": 1,
-          "opacity": 0,
+          "opacity": 1,
           "rotation": 0
         },
         "duration": 26,
@@ -1032,14 +1032,14 @@
           "x": 62,
           "y": 64,
           "scale": 0.95,
-          "opacity": 0,
+          "opacity": 1,
           "rotation": 0
         },
         "end": {
           "x": 62,
           "y": 64,
           "scale": 0.95,
-          "opacity": 0,
+          "opacity": 1,
           "rotation": 0
         },
         "duration": 26,
@@ -1925,13 +1925,15 @@
           "x": 118,
           "y": 70,
           "scale": 0.7,
-          "opacity": 0
+          "opacity": 0,
+          "rotation": 0
         },
         "end": {
           "x": 52,
           "y": 70,
           "scale": 0.7,
-          "opacity": 0
+          "opacity": 0,
+          "rotation": 0
         },
         "duration": 26,
         "curve": "ease",
@@ -2758,6 +2760,16 @@
             "opacity": 1,
             "rotation": 0,
             "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-closed-26000",
+            "time": 26,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
           }
         ]
       },
@@ -2791,14 +2803,14 @@
           "x": 118,
           "y": 63,
           "scale": 0.08399999999999999,
-          "opacity": 1,
+          "opacity": 0,
           "rotation": 0
         },
         "end": {
           "x": 118,
           "y": 63,
           "scale": 0.08399999999999999,
-          "opacity": 1,
+          "opacity": 0,
           "rotation": 0
         },
         "duration": 26,
@@ -2973,6 +2985,16 @@
             "opacity": 0,
             "rotation": 0,
             "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-small-26000",
+            "time": 26,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
           }
         ]
       },
@@ -3006,14 +3028,14 @@
           "x": 118,
           "y": 63,
           "scale": 0.08399999999999999,
-          "opacity": 1,
+          "opacity": 0,
           "rotation": 0
         },
         "end": {
           "x": 118,
           "y": 63,
           "scale": 0.08399999999999999,
-          "opacity": 1,
+          "opacity": 0,
           "rotation": 0
         },
         "duration": 26,
@@ -3188,6 +3210,16 @@
             "opacity": 0,
             "rotation": 0,
             "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-wide-26000",
+            "time": 26,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
           }
         ]
       },
@@ -3221,14 +3253,14 @@
           "x": 118,
           "y": 63,
           "scale": 0.08399999999999999,
-          "opacity": 1,
+          "opacity": 0,
           "rotation": 0
         },
         "end": {
           "x": 118,
           "y": 63,
           "scale": 0.08399999999999999,
-          "opacity": 1,
+          "opacity": 0,
           "rotation": 0
         },
         "duration": 26,
@@ -3397,6 +3429,16 @@
           {
             "id": "puppet-kito-mouth-round-dialogue-16000",
             "time": 16,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-round-26000",
+            "time": 26,
             "x": 118,
             "y": 63,
             "scale": 0.08399999999999999,

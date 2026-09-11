@@ -50,8 +50,8 @@
             "curve": "ease"
           },
           {
-            "id": "camera-78000",
-            "time": 78,
+            "id": "camera-40000",
+            "time": 40,
             "x": 50,
             "y": 50,
             "scale": 1.04,
@@ -106,8 +106,8 @@
             "curve": "hold"
           },
           {
-            "id": "location-plaza-78000",
-            "time": 78,
+            "id": "location-plaza-40000",
+            "time": 40,
             "x": 50,
             "y": 50,
             "scale": 1,
@@ -139,14 +139,14 @@
           "x": 36,
           "y": 62,
           "scale": 1,
-          "opacity": 0,
+          "opacity": 1,
           "rotation": 0
         },
         "end": {
           "x": 36,
           "y": 62,
           "scale": 1,
-          "opacity": 0,
+          "opacity": 1,
           "rotation": 0
         },
         "duration": 40,
@@ -163,8 +163,8 @@
             "curve": "hold"
           },
           {
-            "id": "puppet-nilo-78000",
-            "time": 78,
+            "id": "puppet-nilo-40000",
+            "time": 40,
             "x": 36,
             "y": 62,
             "scale": 1,
@@ -232,8 +232,8 @@
             "curve": "hold"
           },
           {
-            "id": "puppet-nilo-legs-78000",
-            "time": 78,
+            "id": "puppet-nilo-legs-40000",
+            "time": 40,
             "x": 36,
             "y": 72,
             "scale": 1.0499999999999998,
@@ -304,8 +304,8 @@
             "curve": "hold"
           },
           {
-            "id": "puppet-nilo-torso-78000",
-            "time": 78,
+            "id": "puppet-nilo-torso-40000",
+            "time": 40,
             "x": 36,
             "y": 64,
             "scale": 1,
@@ -376,8 +376,8 @@
             "curve": "hold"
           },
           {
-            "id": "puppet-nilo-arm-back-78000",
-            "time": 78,
+            "id": "puppet-nilo-arm-back-40000",
+            "time": 40,
             "x": 29,
             "y": 63,
             "scale": 0.7000000000000001,
@@ -448,8 +448,8 @@
             "curve": "hold"
           },
           {
-            "id": "puppet-nilo-arm-front-78000",
-            "time": 78,
+            "id": "puppet-nilo-arm-front-40000",
+            "time": 40,
             "x": 43,
             "y": 64,
             "scale": 0.7000000000000001,
@@ -520,8 +520,8 @@
             "curve": "hold"
           },
           {
-            "id": "puppet-nilo-head-78000",
-            "time": 78,
+            "id": "puppet-nilo-head-40000",
+            "time": 40,
             "x": 36,
             "y": 50,
             "scale": 0.7000000000000001,
@@ -592,8 +592,8 @@
             "curve": "hold"
           },
           {
-            "id": "puppet-nilo-face-78000",
-            "time": 78,
+            "id": "puppet-nilo-face-40000",
+            "time": 40,
             "x": 36,
             "y": 50,
             "scale": 0.5499999999999999,
@@ -664,8 +664,8 @@
             "curve": "hold"
           },
           {
-            "id": "puppet-nilo-hat-78000",
-            "time": 78,
+            "id": "puppet-nilo-hat-40000",
+            "time": 40,
             "x": 36,
             "y": 42,
             "scale": 0.6,
@@ -736,8 +736,8 @@
             "curve": "hold"
           },
           {
-            "id": "puppet-nilo-brow-78000",
-            "time": 78,
+            "id": "puppet-nilo-brow-40000",
+            "time": 40,
             "x": 36,
             "y": 48,
             "scale": 0.2,
@@ -1734,6 +1734,16 @@
             "opacity": 1,
             "rotation": 0,
             "curve": "hold"
+          },
+          {
+            "id": "puppet-nilo-mouth-closed-40000",
+            "time": 40,
+            "x": 36,
+            "y": 52,
+            "scale": 0.12,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
           }
         ]
       },
@@ -1767,14 +1777,14 @@
           "x": 36,
           "y": 52,
           "scale": 0.12,
-          "opacity": 1,
+          "opacity": 0,
           "rotation": 0
         },
         "end": {
           "x": 36,
           "y": 52,
           "scale": 0.12,
-          "opacity": 1,
+          "opacity": 0,
           "rotation": 0
         },
         "duration": 40,
@@ -2729,6 +2739,16 @@
             "opacity": 0,
             "rotation": 0,
             "curve": "hold"
+          },
+          {
+            "id": "puppet-nilo-mouth-small-40000",
+            "time": 40,
+            "x": 36,
+            "y": 52,
+            "scale": 0.12,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
           }
         ]
       },
@@ -2762,14 +2782,14 @@
           "x": 36,
           "y": 52,
           "scale": 0.12,
-          "opacity": 1,
+          "opacity": 0,
           "rotation": 0
         },
         "end": {
           "x": 36,
           "y": 52,
           "scale": 0.12,
-          "opacity": 1,
+          "opacity": 0,
           "rotation": 0
         },
         "duration": 40,
@@ -3724,6 +3744,16 @@
             "opacity": 0,
             "rotation": 0,
             "curve": "hold"
+          },
+          {
+            "id": "puppet-nilo-mouth-wide-40000",
+            "time": 40,
+            "x": 36,
+            "y": 52,
+            "scale": 0.12,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
           }
         ]
       },
@@ -3757,14 +3787,14 @@
           "x": 36,
           "y": 52,
           "scale": 0.12,
-          "opacity": 1,
+          "opacity": 0,
           "rotation": 0
         },
         "end": {
           "x": 36,
           "y": 52,
           "scale": 0.12,
-          "opacity": 1,
+          "opacity": 0,
           "rotation": 0
         },
         "duration": 40,
@@ -4719,6 +4749,16 @@
             "opacity": 0,
             "rotation": 0,
             "curve": "hold"
+          },
+          {
+            "id": "puppet-nilo-mouth-round-40000",
+            "time": 40,
+            "x": 36,
+            "y": 52,
+            "scale": 0.12,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
           }
         ]
       },
@@ -4752,14 +4792,14 @@
           "x": 62,
           "y": 64,
           "scale": 0.95,
-          "opacity": 0,
+          "opacity": 1,
           "rotation": 0
         },
         "end": {
           "x": 62,
           "y": 64,
           "scale": 0.95,
-          "opacity": 0,
+          "opacity": 1,
           "rotation": 0
         },
         "duration": 40,
@@ -4776,8 +4816,8 @@
             "curve": "hold"
           },
           {
-            "id": "puppet-berta-78000",
-            "time": 78,
+            "id": "puppet-berta-40000",
+            "time": 40,
             "x": 62,
             "y": 64,
             "scale": 0.95,
@@ -4845,8 +4885,8 @@
             "curve": "hold"
           },
           {
-            "id": "puppet-berta-legs-78000",
-            "time": 78,
+            "id": "puppet-berta-legs-40000",
+            "time": 40,
             "x": 62,
             "y": 73.5,
             "scale": 0.9974999999999998,
@@ -4917,8 +4957,8 @@
             "curve": "hold"
           },
           {
-            "id": "puppet-berta-torso-78000",
-            "time": 78,
+            "id": "puppet-berta-torso-40000",
+            "time": 40,
             "x": 62,
             "y": 65.9,
             "scale": 0.95,
@@ -4989,8 +5029,8 @@
             "curve": "hold"
           },
           {
-            "id": "puppet-berta-arm-back-78000",
-            "time": 78,
+            "id": "puppet-berta-arm-back-40000",
+            "time": 40,
             "x": 55.35,
             "y": 64.95,
             "scale": 0.665,
@@ -5061,8 +5101,8 @@
             "curve": "hold"
           },
           {
-            "id": "puppet-berta-arm-front-78000",
-            "time": 78,
+            "id": "puppet-berta-arm-front-40000",
+            "time": 40,
             "x": 68.65,
             "y": 65.9,
             "scale": 0.665,
@@ -5133,8 +5173,8 @@
             "curve": "hold"
           },
           {
-            "id": "puppet-berta-head-78000",
-            "time": 78,
+            "id": "puppet-berta-head-40000",
+            "time": 40,
             "x": 62,
             "y": 52.6,
             "scale": 0.665,
@@ -5205,8 +5245,8 @@
             "curve": "hold"
           },
           {
-            "id": "puppet-berta-face-78000",
-            "time": 78,
+            "id": "puppet-berta-face-40000",
+            "time": 40,
             "x": 62,
             "y": 52.6,
             "scale": 0.5225,
@@ -5277,8 +5317,8 @@
             "curve": "hold"
           },
           {
-            "id": "puppet-berta-hat-78000",
-            "time": 78,
+            "id": "puppet-berta-hat-40000",
+            "time": 40,
             "x": 62,
             "y": 45,
             "scale": 0.57,
@@ -5349,8 +5389,8 @@
             "curve": "hold"
           },
           {
-            "id": "puppet-berta-brow-78000",
-            "time": 78,
+            "id": "puppet-berta-brow-40000",
+            "time": 40,
             "x": 62,
             "y": 50.7,
             "scale": 0.19,
@@ -5917,6 +5957,16 @@
             "opacity": 1,
             "rotation": 0,
             "curve": "hold"
+          },
+          {
+            "id": "puppet-berta-mouth-closed-40000",
+            "time": 40,
+            "x": 62,
+            "y": 54.5,
+            "scale": 0.11399999999999999,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
           }
         ]
       },
@@ -5950,14 +6000,14 @@
           "x": 62,
           "y": 54.5,
           "scale": 0.11399999999999999,
-          "opacity": 1,
+          "opacity": 0,
           "rotation": 0
         },
         "end": {
           "x": 62,
           "y": 54.5,
           "scale": 0.11399999999999999,
-          "opacity": 1,
+          "opacity": 0,
           "rotation": 0
         },
         "duration": 40,
@@ -6482,6 +6532,16 @@
             "opacity": 0,
             "rotation": 0,
             "curve": "hold"
+          },
+          {
+            "id": "puppet-berta-mouth-small-40000",
+            "time": 40,
+            "x": 62,
+            "y": 54.5,
+            "scale": 0.11399999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
           }
         ]
       },
@@ -6515,14 +6575,14 @@
           "x": 62,
           "y": 54.5,
           "scale": 0.11399999999999999,
-          "opacity": 1,
+          "opacity": 0,
           "rotation": 0
         },
         "end": {
           "x": 62,
           "y": 54.5,
           "scale": 0.11399999999999999,
-          "opacity": 1,
+          "opacity": 0,
           "rotation": 0
         },
         "duration": 40,
@@ -7047,6 +7107,16 @@
             "opacity": 0,
             "rotation": 0,
             "curve": "hold"
+          },
+          {
+            "id": "puppet-berta-mouth-wide-40000",
+            "time": 40,
+            "x": 62,
+            "y": 54.5,
+            "scale": 0.11399999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
           }
         ]
       },
@@ -7080,14 +7150,14 @@
           "x": 62,
           "y": 54.5,
           "scale": 0.11399999999999999,
-          "opacity": 1,
+          "opacity": 0,
           "rotation": 0
         },
         "end": {
           "x": 62,
           "y": 54.5,
           "scale": 0.11399999999999999,
-          "opacity": 1,
+          "opacity": 0,
           "rotation": 0
         },
         "duration": 40,
@@ -7612,6 +7682,16 @@
             "opacity": 0,
             "rotation": 0,
             "curve": "hold"
+          },
+          {
+            "id": "puppet-berta-mouth-round-40000",
+            "time": 40,
+            "x": 62,
+            "y": 54.5,
+            "scale": 0.11399999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
           }
         ]
       },
@@ -7649,11 +7729,11 @@
           "rotation": -6
         },
         "end": {
-          "x": 78,
-          "y": 82,
-          "scale": 0.18,
-          "opacity": 0,
-          "rotation": 18
+          "x": 50,
+          "y": 58,
+          "scale": 0.22,
+          "opacity": 1,
+          "rotation": -6
         },
         "duration": 40,
         "curve": "ease",
@@ -7669,33 +7749,13 @@
             "curve": "hold"
           },
           {
-            "id": "ice-1",
-            "time": 54,
+            "id": "sticker-ice-40000",
+            "time": 40,
             "x": 50,
             "y": 58,
             "scale": 0.22,
             "opacity": 1,
             "rotation": -6,
-            "curve": "ease"
-          },
-          {
-            "id": "ice-2",
-            "time": 61,
-            "x": 78,
-            "y": 82,
-            "scale": 0.18,
-            "opacity": 0,
-            "rotation": 18,
-            "curve": "ease"
-          },
-          {
-            "id": "ice-3",
-            "time": 78,
-            "x": 78,
-            "y": 82,
-            "scale": 0.18,
-            "opacity": 0,
-            "rotation": 18,
             "curve": "hold"
           }
         ]
