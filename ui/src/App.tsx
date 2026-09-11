@@ -8,6 +8,7 @@ import { RetakeDialog } from './components/RetakeDialog'
 import { OomRecoveryBanner } from './components/OomRecoveryBanner'
 import { DownloadStatusBanner } from './components/DownloadStatusBanner'
 import { PreflightBanner } from './components/PreflightBanner'
+import { PlatformModeBanner } from './components/PlatformModeBanner'
 import { ActivityFooter } from './components/ActivityFooter'
 import { GalleryReadyToast } from './components/MainContent/GalleryReadyToast'
 import { WelcomeModal } from './components/WelcomeModal'
@@ -227,6 +228,7 @@ function AppContent() {
           environment is missing ffmpeg / CUDA or low on disk. Renders
           nothing when everything checks out. */}
       <PreflightBanner />
+      <PlatformModeBanner />
       {/* DownloadStatusBanner — fixed bottom-right overlay, polls
           /api/v1/downloads/active every 2s. Renders nothing unless
           a model file is being downloaded. Highlights stalled

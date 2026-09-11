@@ -3233,13 +3233,23 @@
     },
     {
       "method": "GET",
+      "path": "/api/v1/system/capabilities",
+      "endpoint": "get_capabilities",
+      "status_code": null,
+      "response_model": null,
+      "include_in_schema": null,
+      "source": "app/routers/system_capabilities.py",
+      "ordinal": 323
+    },
+    {
+      "method": "GET",
       "path": "/",
       "endpoint": "index",
       "status_code": null,
       "response_model": null,
       "include_in_schema": null,
       "source": "app/_launch_runtime.py",
-      "ordinal": 323
+      "ordinal": 324
     }
   ]
 }
