@@ -99,7 +99,7 @@ module.exports = {
             params: {
               compile: true
             }
-          }, {
+          }, ...((kernel.platform || require("os").platform()) === "darwin" ? [] : [{
             icon: "fa-solid fa-vector-square",
             text: info.exists("app/services/sam/env")
               ? "Update Inpaint Support (SAM 3.1)"
@@ -111,7 +111,7 @@ module.exports = {
               ? "Update AI Rigging (UniRig)"
               : "Install AI Rigging (UniRig)",
             href: "rigging_install.js",
-          }, {
+          }]), {
             icon: "fa-solid fa-plug",
             text: "Reinstall",
             href: "install.js",

@@ -36958,6 +36958,8 @@ api.include_router(create_wangp_mcp_router(
     command_operations=[*scene_command_catalog(), *workspace_command_catalog()["operations"], *image_command_catalog(
         adapter.catalog for adapter in _image_generation_commands.operations.values()), *wizard_workflow_catalog(), *world3d_export_catalog()],
 ))
+from routers.system_capabilities import create_system_capabilities_router
+api.include_router(create_system_capabilities_router())
 
 # Optional production renderer: pass a callable that drives the existing
 # Video 3D exportFlow through a process-owned headless browser. Closing a
