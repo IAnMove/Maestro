@@ -607,11 +607,15 @@ def _concat_with_transitions(
         transition_type = str(transition.get("type") or "none")
         fade_duration = float(transition.get("duration") or 0)
         if transition_type == "none" or fade_duration <= 0:
+            # concat resets the timebase to AV_TIME_BASE (1/1000000). Restore
+            # 1/fps so a later xfade does not reject the graph.
             filters.append(
-                f"[{video_label}][v{index}s]concat=n=2:v=1:a=0[{out_video}]"
+                f"[{video_label}][v{index}s]concat=n=2:v=1:a=0,"
+                f"settb=1/{output_fps},setpts=N/{output_fps}/TB[{out_video}]"
             )
             filters.append(
-                f"[{audio_label}][a{index}s]concat=n=2:v=0:a=1[{out_audio}]"
+                f"[{audio_label}][a{index}s]concat=n=2:v=0:a=1,"
+                f"aresample=48000,asetpts=PTS-STARTPTS[{out_audio}]"
             )
             running_frames += counts[index]
         else:
@@ -633,11 +637,15 @@ def _concat_with_transitions(
             fade_seconds = _seconds_for_ffmpeg(fade_frames, output_fps)
             offset_seconds = _seconds_for_ffmpeg(offset, output_fps)
             filters.append(
-                f"[{video_label}][v{index}s]xfade=transition={transition_name}:"
+                f"[{video_label}]settb=1/{output_fps},setpts=N/{output_fps}/TB[v{index}l];"
+                f"[v{index}s]settb=1/{output_fps},setpts=N/{output_fps}/TB[v{index}r];"
+                f"[v{index}l][v{index}r]xfade=transition={transition_name}:"
                 f"duration={fade_seconds}:offset={offset_seconds}[{out_video}]"
             )
             filters.append(
-                f"[{audio_label}][a{index}s]acrossfade=d={fade_seconds}:"
+                f"[{audio_label}]aresample=48000,asetpts=PTS-STARTPTS[a{index}l];"
+                f"[a{index}s]aresample=48000,asetpts=PTS-STARTPTS[a{index}r];"
+                f"[a{index}l][a{index}r]acrossfade=d={fade_seconds}:"
                 f"c1=tri:c2=tri[{out_audio}]"
             )
             running_frames += counts[index] - fade_frames
