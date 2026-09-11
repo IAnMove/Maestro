@@ -36924,6 +36924,14 @@ from services.scene_commands import SceneCommands, command_catalog as scene_comm
 from routers.scene_commands import create_scene_commands_router
 _scene_commands = SceneCommands(_workspace_dir)
 api.include_router(create_scene_commands_router(_scene_commands))
+from routers.world3d_export import create_world3d_export_router
+from services.world3d_export import World3DExportService, command_catalog as world3d_export_catalog, command_handlers as world3d_export_handlers
+_world3d_export = World3DExportService(
+    workspace_dir=_workspace_dir,
+    registry_for=_task_registry,
+    app_url=os.environ.get("HOCUS_APP_URL", ""),
+)
+api.include_router(create_world3d_export_router(_world3d_export))
 
 from services.mcp_access import McpAccess
 from routers.mcp_access import create_mcp_access_router
@@ -36945,13 +36953,17 @@ api.include_router(create_wangp_mcp_router(
     token_getter=_mcp_access.token,
     handlers={"models": lambda args: get_model_options(args['model_type']) if args.get('model_type') else list_models(), "processors": wangp_capabilities, "status": get_status,
               "generate": generate, "recast": recast_endpoint, "upscale": tools_upscale,
-              **wangp_agent_handlers(api), **image_command_handlers(_image_generation_commands), **wizard_workflow_command_handlers(_wizard_workflow_executor), **_scene_commands.handlers()},
+              **wangp_agent_handlers(api), **image_command_handlers(_image_generation_commands), **wizard_workflow_command_handlers(_wizard_workflow_executor), **world3d_export_handlers(_world3d_export), **_scene_commands.handlers()},
     journal_path=os.path.join(os.path.dirname(__file__), "settings", "wangp-mcp-requests.sqlite3"),
     command_operations=[*scene_command_catalog(), *workspace_command_catalog()["operations"], *image_command_catalog(
-        adapter.catalog for adapter in _image_generation_commands.operations.values()), *wizard_workflow_catalog()],
+        adapter.catalog for adapter in _image_generation_commands.operations.values()), *wizard_workflow_catalog(), *world3d_export_catalog()],
 ))
 from routers.system_capabilities import create_system_capabilities_router
 api.include_router(create_system_capabilities_router())
+
+# Optional production renderer: pass a callable that drives the existing
+# Video 3D exportFlow through a process-owned headless browser. Closing a
+# user tab must not join or kill that worker.
 
 # ============================================================================
 # Serve React build at /
