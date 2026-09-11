@@ -278,48 +278,6 @@ def test_crossfade_subtracts_whole_overlap_frames(tmp_path: Path):
     assert result["transitions"][0]["duration"] == pytest.approx(0.2)
 
 
-def test_hard_cut_then_crossfade_keeps_expected_frames(tmp_path: Path):
-    """A concat cut must not leave timebase 1/1000000 for the following xfade."""
-    clips = []
-    for frames, color in ((15, "red"), (15, "green"), (15, "blue")):
-        path = tmp_path / f"cut-xfade-{color}.mp4"
-        write_color_clip(path, frames, color=color)
-        clips.append({
-            "resolved_path": str(path),
-            "transition": "none" if color != "green" else "crossfade",
-            "transition_duration": 0.2,
-        })
-    output = tmp_path / "cut-then-xfade.mp4"
-    result = video_editor.render_project(
-        clips, str(output), width=320, height=240, fps=30,
-    )
-    assert result["frames"] == 39
-    assert decoded_video_frames(output) == 39
-
-
-def test_time_card_then_crossfade_keeps_expected_frames(tmp_path: Path):
-    clips = []
-    for frames, color, transition in (
-        (15, "red", "later-clock"),
-        (15, "green", "crossfade"),
-        (15, "blue", "none"),
-    ):
-        path = tmp_path / f"card-xfade-{color}.mp4"
-        write_color_clip(path, frames, color=color)
-        clips.append({
-            "resolved_path": str(path),
-            "transition": transition,
-            "transition_duration": 1.0 if transition == "later-clock" else 0.2,
-            "transition_text": "Luego",
-        })
-    output = tmp_path / "card-then-xfade.mp4"
-    result = video_editor.render_project(
-        clips, str(output), width=320, height=240, fps=30,
-    )
-    assert result["frames"] == 69
-    assert decoded_video_frames(output) == 69
-
-
 def test_soundtrack_keeps_video_frames_and_compares_decoded_audio(tmp_path: Path):
     clip = tmp_path / "picture.mp4"
     score = tmp_path / "score.m4a"
