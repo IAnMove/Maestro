@@ -154,6 +154,10 @@ def system_config() -> dict[str, Any]:
     }
 
 
+def services_raw() -> dict[str, Any]:
+    return dict(load_config().get("services", {}))
+
+
 def services_config() -> dict[str, Any]:
     services = load_config().get("services", {})
     return {

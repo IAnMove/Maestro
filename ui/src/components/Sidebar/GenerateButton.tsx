@@ -6,6 +6,7 @@ import { splitPromptSchedule } from '../../lib/promptScheduler'
 import { newUserGenerationContext } from '../../features/studio/generationProvenance'
 import { useViggleGenerationGuard } from '../../lib/useViggleGenerationGuard'
 import { isGenerationJobActive } from '../../lib/generationJobState'
+import { usePlatformCapabilities } from '../../lib/usePlatformCapabilities'
 
 export function GenerateButton() {
   const { t } = useUiTranslation('studio')
@@ -50,7 +51,8 @@ export function GenerateButton() {
   const schedulerApplies = promptSchedulerEnabled && generationMode === 'video' && imageMode === 0
   const scheduledVideoCount = schedulerApplies ? splitPromptSchedule(prompt).length : 0
   const needsScheduledPrompts = schedulerApplies && scheduledVideoCount === 0
-  const blocked = needsImage || needsReference || needsOutpaintSource || needsOutpaintArea || needsScheduledPrompts
+  const localUnavailable = usePlatformCapabilities()?.capabilities.wangp_local?.state === 'hidden'
+  const blocked = localUnavailable || needsImage || needsReference || needsOutpaintSource || needsOutpaintArea || needsScheduledPrompts
 
   const handleClick = async () => {
     if (blocked || submissionPending.current) return
@@ -73,7 +75,9 @@ export function GenerateButton() {
   const queueCount = jobs.filter(job => isGenerationJobActive(job.status)).length
 
   if (blocked) {
-    const label = needsImage
+    const label = localUnavailable
+      ? t('generate.localUnavailable')
+      : needsImage
       ? t('generate.needImage')
       : needsReference
         ? t('generate.needReference')
@@ -82,7 +86,9 @@ export function GenerateButton() {
       : needsOutpaintArea
         ? t('generate.chooseCanvas')
         : t('generate.addPrompt')
-    const title = needsOutpaintArea
+    const title = localUnavailable
+      ? t('generate.localUnavailableHint')
+      : needsOutpaintArea
       ? t('generate.outpaintAreaHint')
       : needsReference
         ? t('generate.referenceHint')

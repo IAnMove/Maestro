@@ -42,6 +42,9 @@ class CoreRuntimeTests(unittest.TestCase):
         self.assertEqual(self.client.post("/api/v1/rig/generate").status_code, 409)
         mcp = self.client.post("/api/v1/wangp/mcp", json={"params": {"name": "generate"}})
         self.assertEqual(mcp.status_code, 409)
+        self.assertEqual(self.client.post("/api/v1/tools/remove-background").status_code, 409)
+        missing = self.client.post("/api/v1/video-editor/probe", json={"source": "missing.mp4"})
+        self.assertEqual(missing.status_code, 400)
 
     def test_remote_llm_load_is_not_blocked_as_local_engine(self):
         with patch("services.llm_service.load_model"), patch(

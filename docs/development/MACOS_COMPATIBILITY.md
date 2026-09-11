@@ -52,6 +52,9 @@ import CUDA. `POST /api/v1/generate`, recast, upscale, Hunyuan3D and UniRig retu
 blocked; remote MiniMax/OpenAI/Grok/Anthropic loads stay available.
 The Pinokio Advanced menu hides SAM and UniRig installers on Darwin.
 Settings hides CUDA/VRAM/Triton controls when `show_cuda_controls` is false.
+Studio Generate is disabled with an NVIDIA hint. Video Editor probe/export
+and Video3D scene/recording save use FFmpeg/WebCodecs, not CUDA. Comics CRUD
+and remote MiniMax image keys are available.
 
 Linux/Windows NVIDIA recipes and receipt IDs (`linux-x64-nvidia-wangp`)
 are unchanged.

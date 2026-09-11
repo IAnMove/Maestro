@@ -55,7 +55,9 @@
     "referenceHint": "Añade al menos una referencia de imagen o vídeo. El audio no puede ser la única referencia.",
     "queuedCount": "{{count}} en cola",
     "queueCount": "Encolar {{count}}",
-    "goCount": "Ir ({{count}})"
+    "goCount": "Ir ({{count}})",
+    "localUnavailable": "La generación local necesita NVIDIA",
+    "localUnavailableHint": "Este Mac sirve para editar y usar proveedores remotos. Abre el proyecto en un host NVIDIA Windows/Linux para generar en local."
   },
   "prompt": {
     "placeholderImage": "Describe tu imagen...",

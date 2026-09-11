@@ -9,7 +9,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from fastapi import File, UploadFile
+
 from routers.assets import create_assets_router
+from routers.comics import create_comics_router
 from routers.lan_auth import create_lan_auth_router
 from routers.projects import create_projects_router
 from routers.productions import create_productions_router
@@ -17,7 +20,7 @@ from routers.recipes import create_recipes_router
 from routers.style_library import create_style_library_router
 from routers.system_capabilities import create_system_capabilities_router, require_capability_http
 from routers.workspace_collections import create_workspace_collections_router
-from services import core_workspace as core
+from services import core_editor, core_workspace as core
 from services.platform_capabilities import platform_capabilities
 from services.style_library import StyleLibrary
 from services.ui_distribution import build_status, recovery_html, report_identity
@@ -52,6 +55,13 @@ api.include_router(create_workspace_collections_router(
     registry=lambda: WorkspaceRegistry(os.path.join(str(core.outputs_root()), "_hocuspocus", "workspaces-v1.json")),
 ))
 api.include_router(create_style_library_router(StyleLibrary(str(core.outputs_root()))))
+api.include_router(create_comics_router(
+    workspace_dir=core.workspace_dir,
+    get_active_workspace=core.active_workspace,
+    safe_join=core.safe_join,
+    get_services_config=core.services_raw,
+    publish_legacy_task=None,
+))
 
 BLOCKED = (
     ("POST", "/api/v1/generate", "wangp_local"),
@@ -59,6 +69,9 @@ BLOCKED = (
     ("POST", "/api/v1/tools/upscale", "wangp_local"),
     ("POST", "/api/v1/model3d/generate", "hunyuan3d_local"),
     ("POST", "/api/v1/rig/generate", "unirig_ai"),
+    ("POST", "/api/v1/tools/remove-background", "sam_inpaint"),
+    ("POST", "/api/v1/tools/revoice", "local_audio_ai"),
+    ("POST", "/api/v1/retake", "wangp_local"),
 )
 
 
@@ -347,13 +360,74 @@ async def save_scene(request: Request):
 
 @api.post("/api/v1/video-editor/probe")
 def probe_video(body: dict):
-    from services.video_editor import probe_media
-    source = str((body or {}).get("source") or "")
-    workspace = (body or {}).get("workspace")
-    path = core.safe_join(core.workspace_dir(workspace), os.path.basename(source))
+    try:
+        return core_editor.probe_video(str((body or {}).get("source") or ""), (body or {}).get("workspace"))
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@api.post("/api/v1/video-editor/probe-audio")
+def probe_audio_route(body: dict):
+    try:
+        return core_editor.probe_soundtrack(str((body or {}).get("source") or ""), (body or {}).get("workspace"))
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@api.get("/api/v1/video-editor/thumbnail")
+def video_thumbnail(source: str):
+    try:
+        path = core_editor.thumbnail_path(source)
+    except Exception as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    return FileResponse(path, media_type="image/jpeg")
+
+
+@api.post("/api/v1/video-editor/screenshot")
+def video_screenshot(body: dict):
+    try:
+        return core_editor.screenshot(
+            str((body or {}).get("source") or ""),
+            float((body or {}).get("time") or 0),
+            str((body or {}).get("name") or "frame"),
+            (body or {}).get("workspace"),
+        )
+    except (ValueError, RuntimeError) as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@api.post("/api/v1/video-editor/export", status_code=202)
+def video_export(body: dict):
+    try:
+        return core_editor.start_export(body or {})
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@api.get("/api/v1/video-editor/export/{job_id}")
+def video_export_status(job_id: str):
+    job = core_editor.get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Export job not found")
+    return job
+
+
+@api.post("/api/v1/upload")
+async def upload_file(file: UploadFile = File(...)):
+    folder = core.uploads_dir()
+    name = os.path.basename(file.filename or "upload.bin")
+    dest = os.path.join(folder, name)
+    with open(dest, "wb") as handle:
+        handle.write(await file.read())
+    return {"filename": name, "url": f"/api/v1/file/{name}?workspace=__uploads__"}
+
+
+@api.get("/api/v1/uploads/{filename:path}")
+def serve_upload(filename: str):
+    path = core.safe_join(core.uploads_dir(), filename)
     if not path or not os.path.isfile(path):
-        raise HTTPException(status_code=400, detail="Video source could not be found")
-    return probe_media(path)
+        raise HTTPException(status_code=404, detail="Upload not found")
+    return FileResponse(path)
 
 
 @api.post("/api/v1/llm/load")

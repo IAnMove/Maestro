@@ -55,7 +55,9 @@
     "referenceHint": "Add at least one image or video reference. Audio cannot be the only reference.",
     "queuedCount": "{{count}} queued",
     "queueCount": "Queue {{count}}",
-    "goCount": "Go ({{count}})"
+    "goCount": "Go ({{count}})",
+    "localUnavailable": "Local generation needs NVIDIA",
+    "localUnavailableHint": "This Mac runs editing and remote providers. Open the project on a Windows/Linux NVIDIA host to generate locally."
   },
   "prompt": {
     "placeholderImage": "Describe your image...",
