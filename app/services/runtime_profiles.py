@@ -96,38 +96,46 @@ def installation_current(engine: str, platform: str) -> bool:
         return False
 
 
+def _common_reason(manifest: dict, platform: str, arch: str, gpu: str) -> str | None:
+    if platform == "darwin" and arch == "arm64":
+        return None
+    if platform not in manifest["platforms"]:
+        return f"No installation recipe for {platform}. Supported: Windows, Linux and Apple Silicon."
+    if arch not in manifest["architectures"]:
+        return f"No installation recipe for architecture {arch}; x64 is required."
+    if gpu not in manifest["accelerators"]:
+        return "Local AI installation currently requires NVIDIA; CPU/AMD/Intel/MPS recipes are not enabled."
+    return None
+
+
+def _engine_support(definition: dict, platform: str, arch: str, driver: str | None, common: str | None, manifest: dict) -> tuple[str | None, str | None, str | None]:
+    macos_core = platform == "darwin" and arch == "arm64"
+    reason = common
+    warning = None
+    if macos_core and definition.get("cuda"):
+        reason = "Local NVIDIA engine; hidden on Apple Silicon core/remote."
+    elif not reason and platform not in definition["platforms"]:
+        reason = definition.get("unsupportedReason", "No compatible engine recipe.")
+    minimum = None
+    if definition.get("cuda"):
+        minimum = manifest["driverMinimum"][definition["cuda"]].get(platform)
+    if not reason and driver and minimum and _version(driver) < _version(minimum):
+        reason = f"{definition['label']} needs NVIDIA driver >= {minimum} for CUDA {definition['cuda']} (detected {driver})."
+    if not reason and not driver and definition.get("cuda"):
+        warning = "NVIDIA driver version could not be verified; the runtime check must confirm CUDA before use."
+    return reason, warning, minimum
+
+
 def select_profiles(platform: str, arch: str, gpu: str, driver: str | None = None) -> dict:
     """Pure selection; unknown/unsupported capabilities never silently use CUDA."""
     arch = normalize_arch(arch)
     gpu = (gpu or "unknown").lower()
     manifest = catalog()
-    macos_core = platform == "darwin" and arch == "arm64"
-    common = None
-    if macos_core:
-        common = None
-    elif platform not in manifest["platforms"]:
-        common = f"No installation recipe for {platform}. Supported: Windows, Linux and Apple Silicon."
-    elif arch not in manifest["architectures"]:
-        common = f"No installation recipe for architecture {arch}; x64 is required."
-    elif gpu not in manifest["accelerators"]:
-        common = "Local AI installation currently requires NVIDIA; CPU/AMD/Intel/MPS recipes are not enabled."
+    common = _common_reason(manifest, platform, arch, gpu)
     engines = {}
     for name, definition in manifest["engines"].items():
-        selected = recipe(name, platform, arch)
-        reason = common
-        warning = None
-        if macos_core and definition.get("cuda"):
-            reason = "Local NVIDIA engine; hidden on Apple Silicon core/remote."
-        elif not reason and platform not in definition["platforms"]:
-            reason = definition.get("unsupportedReason", "No compatible engine recipe.")
-        minimum = None
-        if definition.get("cuda"):
-            minimum = manifest["driverMinimum"][definition["cuda"]].get(platform)
-        if not reason and driver and minimum and _version(driver) < _version(minimum):
-            reason = f"{definition['label']} needs NVIDIA driver >= {minimum} for CUDA {definition['cuda']} (detected {driver})."
-        if not reason and not driver and definition.get("cuda"):
-            warning = "NVIDIA driver version could not be verified; the runtime check must confirm CUDA before use."
-        engines[name] = {**selected, "supported": reason is None, "reason": reason,
+        reason, warning, minimum = _engine_support(definition, platform, arch, driver, common, manifest)
+        engines[name] = {**recipe(name, platform, arch), "supported": reason is None, "reason": reason,
                          "warning": warning, "driverMinimum": minimum}
     required = [
         engines[name]["supported"]
