@@ -11,6 +11,7 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 from core_runtime import api
+from services import core_upload
 from services.platform_capabilities import FEATURE_UNAVAILABLE
 from services.scene_commands import SceneCommands
 from services.core_remote_image import catalog_entry
@@ -612,6 +613,68 @@ class CoreRuntimeTests(unittest.TestCase):
         self.assertEqual(len(seen[0]["audio_tracks"]), 1)
         self.assertIn("scene-audio", mix_path)
         self.assertFalse(os.path.isfile(mix_path))
+
+    def _multipart_upload(self, filename: str, payload: bytes, content_type: str = "image/png"):
+        boundary = "----CoreUploadBoundary"
+        body = (
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="file"; filename="{filename}"\r\n'
+            f"Content-Type: {content_type}\r\n"
+            f"\r\n"
+        ).encode("utf-8") + payload + f"\r\n--{boundary}--\r\n".encode("utf-8")
+        return self.client.post(
+            "/api/v1/upload",
+            content=body,
+            headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+        )
+
+    def test_multipart_upload_keeps_file_bytes_and_unique_names(self):
+        png = b"\x89PNG\r\n\x1a\nfirst-clip"
+        jpeg = b"\xff\xd8\xffsecond-clip"
+        folder, previous = self._in_temp_workspace()
+        try:
+            first = self._multipart_upload("../shot / take.png", png)
+            second = self._multipart_upload("take.jpg", jpeg)
+            self.assertEqual(first.status_code, 200, first.text)
+            self.assertEqual(second.status_code, 200, second.text)
+            first_body = first.json()
+            second_body = second.json()
+            served = self.client.get(first_body["url"])
+            first_bytes = Path(first_body["path"]).read_bytes()
+            second_bytes = Path(second_body["path"]).read_bytes()
+        finally:
+            self._leave_temp_workspace(folder, previous)
+        self.assertTrue(first_body["filename"].endswith(".png"))
+        self.assertTrue(second_body["filename"].endswith(".jpg"))
+        self.assertNotEqual(first_body["filename"], second_body["filename"])
+        self.assertNotIn("..", first_body["filename"])
+        self.assertNotIn("/", first_body["filename"])
+        self.assertTrue(first_body["url"].startswith("/api/v1/uploads/"))
+        self.assertEqual(first_bytes, png)
+        self.assertEqual(second_bytes, jpeg)
+        self.assertNotIn(b"Content-Disposition", first_bytes)
+        self.assertEqual(served.status_code, 200)
+        self.assertEqual(served.content, png)
+
+    def test_extract_upload_prefers_file_part_and_rejects_empty_multipart(self):
+        extra = (
+            b"------Part\r\n"
+            b'Content-Disposition: form-data; name="note"\r\n\r\n'
+            b"ignore\r\n"
+            b"------Part\r\n"
+            b'Content-Disposition: form-data; name="file"; filename="hero.png"\r\n'
+            b"Content-Type: image/png\r\n\r\n"
+            b"PIXELS\r\n"
+            b"------Part--\r\n"
+        )
+        data, name = core_upload.extract_upload(extra, "multipart/form-data; boundary=----Part")
+        self.assertEqual(name, "hero.png")
+        self.assertEqual(data, b"PIXELS")
+        with self.assertRaises(ValueError):
+            core_upload.extract_upload(
+                b"------Part\r\nContent-Disposition: form-data; name=\"note\"\r\n\r\nx\r\n------Part--\r\n",
+                "multipart/form-data; boundary=----Part",
+            )
 
 
 if __name__ == "__main__":
