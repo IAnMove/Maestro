@@ -354,6 +354,7 @@ function exactCatalog(): Record<string, ReturnType<typeof json> | { sse: true }>
     'GET /api/v1/character-kits/speech/capabilities': json({ rhubarb: true,
       vocalIsolation: { available: false, model: 'BS-RoFormer', device: 'cpu', downloads: false, maxSeconds: 90, reason: 'optional_model_missing' },
     }),
+    'GET /api/v1/character-kits/speech/digest': json({ digest: '0'.repeat(64), bytes: 12 }),
     'GET /api/v1/system-config': json(SYSTEM_CONFIG),
     'GET /api/v1/services-config': json(SERVICES_CONFIG),
     'GET /api/v1/llm/status': json({

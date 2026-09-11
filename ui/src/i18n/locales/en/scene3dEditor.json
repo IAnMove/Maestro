@@ -161,6 +161,7 @@
       "selection": "Selection {{start}}–{{end}} s",
       "manual": "Manual",
       "waveform": "Waveform",
+      "playback": "Gesture timeline playback",
       "noAudio": "Add a voice to see the waveform. Imported cues can still be edited."
     },
     "isolation": {

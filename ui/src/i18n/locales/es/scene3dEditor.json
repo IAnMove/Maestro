@@ -161,6 +161,7 @@
       "selection": "Selección {{start}}–{{end}} s",
       "manual": "Manual",
       "waveform": "Forma de onda",
+      "playback": "Reproducción de la línea de gestos",
       "noAudio": "Añade una voz para ver la forma de onda. Los gestos importados se pueden editar igual."
     },
     "isolation": {

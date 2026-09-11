@@ -190,7 +190,7 @@ function CueTools({ url, span, zoom, loop, selection, locked, audioRef, onZoom, 
 function VoicePlayer({ url, audioRef, onPlayhead }: { url: string; audioRef: RefObject<HTMLAudioElement | null>; onPlayhead: (value: number) => void }) {
   const { t } = useUiTranslation('scene3dEditor')
   if (!url) return <p className="text-xs text-text-muted">{t('speech.timeline.noAudio')}</p>
-  return <audio ref={audioRef} controls src={url} preload="metadata" className="w-full min-w-0" aria-label={t('speech.voicePreview')}
+  return <audio ref={audioRef} controls src={url} preload="metadata" className="w-full min-w-0" aria-label={t('speech.timeline.playback')}
     onTimeUpdate={event => onPlayhead(event.currentTarget.currentTime)} />
 }
 function toggleLoop(audio: HTMLAudioElement | null, selection: CueInterval | undefined, onLoop: (value: (current: boolean) => boolean) => void) {
