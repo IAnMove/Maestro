@@ -131,11 +131,11 @@ export function ModelSelector() {
                       >
                         <span className="flex-1 min-w-0 text-xs truncate"><H3ModelName modelType={model.model_type} fallback={model.name} /></span>
                         {vramGb != null && (
-                          <span className="shrink-0 text-[9px] text-text-muted tabular-nums">
+                          <span aria-hidden="true" className="shrink-0 text-[9px] text-text-muted tabular-nums">
                             {t('modelCatalog.vramBadge', { vram: vramGb })}
                           </span>
                         )}
-                        <ModelBadges model={model} />
+                        <span aria-hidden="true"><ModelBadges model={model} /></span>
                         {isSelected && <Check size={12} className="shrink-0 text-accent-blue" />}
                       </button>
                       {help && (
