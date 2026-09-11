@@ -4092,11 +4092,13 @@ export const useStore = create<AppState>((set, get) => {
     state.setSidebarMode('studio')
     state.setSidebarOpen(true)
     state.setGenerationMode('tools')
+    state.setMediaFilter('videos')
     await get().runTool()
   },
   sendClipToTools: (name, url, tool) => {
     set({ toolsTool: tool, toolsSourcePath: name, toolsSourceName: name, toolsSourceUrl: url, toolsSourceAssetId: null, toolsSourceWorkspace: null, toolsSourceKind: 'video' })
     get().setGenerationMode('tools')
+    get().setMediaFilter('all')
   },
 
   // Director-mode post-processing (separate image/video)

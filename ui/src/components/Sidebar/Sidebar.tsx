@@ -37,6 +37,7 @@ import { BrandIdentity } from '../BrandIdentity'
 import { DirectorChat } from './DirectorChat'
 import { useUiTranslation } from '../../i18n'
 import { StudioCommandPanels } from '../../features/studio/StudioCommandPanels'
+import { hidesDirectGenerationSidebar } from '../../lib/navigationCategories'
 
 const ViggleControls = lazy(() => import('./ViggleControls').then(module => ({ default: module.ViggleControls })))
 const ToolsPanel = lazy(() => import('./ToolsPanel').then(module => ({ default: module.ToolsPanel })))
@@ -316,8 +317,9 @@ export function Sidebar() {
     </>
   )
 
-  // This workspace owns its controls in the central area, including on mobile.
-  if (mediaFilter === 'character-replacement') return null
+  // Studio destinations own the central area. Direct generation is a separate
+  // top-level destination. Comic Director stays mounted on the comics workspace.
+  if (hidesDirectGenerationSidebar(mediaFilter, sidebarMode)) return null
 
   // Mobile: overlay drawer
   if (isMobile) {
