@@ -14,6 +14,7 @@ from core_runtime import api
 from services import core_upload
 from services.platform_capabilities import FEATURE_UNAVAILABLE
 from services.scene_commands import SceneCommands
+from services import core_remote_image
 from services.core_remote_image import catalog_entry
 
 
@@ -410,6 +411,33 @@ class CoreRuntimeTests(unittest.TestCase):
         status = self.client.get(f"/api/v1/status/{response.json()['job_id']}")
         self.assertEqual(status.status_code, 200)
 
+    def test_minimax_image_generate_encodes_upload_subject_reference(self):
+        captured = {}
+
+        def fake_generate(**kwargs):
+            captured.update(kwargs)
+            return {"name": "minimax.jpg", "path": "minimax.jpg", "prompt": "a lantern", "aspect_ratio": "1:1"}
+
+        folder, previous = self._in_temp_workspace()
+        try:
+            Path("uploads").mkdir()
+            Path("uploads", "hero.png").write_bytes(b"\x89PNG\r\n\x1a\n")
+            Path("outputs").mkdir()
+            with patch("services.core_remote_image.generate_image", side_effect=fake_generate), patch(
+                "services.execution_mode.validate_remote_provider",
+            ), patch("services.core_remote_image.threading.Thread", ImmediateThread):
+                response = self.client.post("/api/v1/generate", json={
+                    "model_type": "minimax:image-01",
+                    "generation_mode": "image",
+                    "prompt": "a lantern in the rain",
+                    "workspace": "default",
+                    "subject_reference": "/api/v1/uploads/hero.png",
+                })
+        finally:
+            self._leave_temp_workspace(folder, previous)
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertTrue(captured["subject_reference"].startswith("data:image/png;base64,"))
+
     def _studio_image_command(self, intent="mac-image-intent"):
         return {
             "version": 2,
@@ -648,6 +676,74 @@ class CoreRuntimeTests(unittest.TestCase):
         self.assertEqual(failed["state"], "failed")
         self.assertEqual(failed["steps"][0]["state"], "failed")
         self.assertEqual(failed["workflowId"], "wf-mac-fail")
+
+    def test_studio_image_command_encodes_upload_refs_for_minimax(self):
+        command = self._studio_image_command("mac-image-ref")
+        command["input"]["params"]["image_refs"] = ["/api/v1/uploads/hero.png"]
+        captured = {}
+
+        def fake_generate(**kwargs):
+            captured.update(kwargs)
+            return {"name": "minimax.jpg", "path": "minimax.jpg", "prompt": "a lantern", "aspect_ratio": "1:1"}
+
+        folder, previous = self._in_temp_workspace()
+        try:
+            Path("uploads").mkdir()
+            Path("uploads", "hero.png").write_bytes(b"\x89PNG\r\n\x1a\n")
+            Path("outputs").mkdir()
+            with patch("services.core_remote_image.generate_image", side_effect=fake_generate), patch(
+                "services.execution_mode.validate_remote_provider",
+            ), patch("services.core_remote_image.threading.Thread", ImmediateThread):
+                response = self.client.post("/api/v1/generation/commands", json=command)
+        finally:
+            self._leave_temp_workspace(folder, previous)
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertTrue(captured["subject_reference"].startswith("data:image/png;base64,"))
+
+    def test_studio_image_command_rejects_oversized_prompt_before_admit(self):
+        command = self._studio_image_command("mac-image-long")
+        command["input"]["params"]["prompt"] = "x" * 10001
+        folder, previous = self._in_temp_workspace()
+        try:
+            Path("outputs").mkdir()
+            with patch("services.execution_mode.validate_remote_provider"):
+                rejected = self.client.post("/api/v1/generation/commands", json=command)
+                command["input"]["params"]["prompt"] = "a lantern in the rain"
+                fake = {"name": "minimax.jpg", "path": "minimax.jpg", "prompt": "a lantern", "aspect_ratio": "1:1"}
+                with patch("services.minimax_image_service.generate_image", return_value=fake), patch(
+                    "services.core_remote_image.threading.Thread", ImmediateThread,
+                ):
+                    accepted = self.client.post("/api/v1/generation/commands", json=command)
+        finally:
+            self._leave_temp_workspace(folder, previous)
+        self.assertEqual(rejected.status_code, 400, rejected.text)
+        self.assertEqual(rejected.json()["detail"]["code"], "invalid_command")
+        self.assertEqual(accepted.status_code, 200, accepted.text)
+        self.assertFalse(accepted.json()["replayed"])
+
+    def test_studio_image_command_replay_restarts_a_missing_job(self):
+        from services import core_remote_image
+        command = self._studio_image_command("mac-image-replay")
+        folder, previous = self._in_temp_workspace()
+        try:
+            Path("outputs").mkdir()
+            fake = {"name": "minimax.jpg", "path": "minimax.jpg", "prompt": "a lantern", "aspect_ratio": "1:1"}
+            with patch("services.minimax_image_service.generate_image", return_value=fake), patch(
+                "services.execution_mode.validate_remote_provider",
+            ), patch("services.core_remote_image.threading.Thread", ImmediateThread):
+                first = self.client.post("/api/v1/generation/commands", json=command)
+                job_id = first.json()["receipt"]["result"]["job_id"]
+                core_remote_image._JOBS.pop(job_id, None)
+                replay = self.client.post("/api/v1/generation/commands", json=command)
+                status = self.client.get(f"/api/v1/status/{job_id}")
+        finally:
+            self._leave_temp_workspace(folder, previous)
+        self.assertEqual(first.status_code, 200, first.text)
+        self.assertEqual(replay.status_code, 200, replay.text)
+        self.assertTrue(replay.json()["replayed"])
+        self.assertEqual(replay.json()["receipt"]["result"]["job_id"], job_id)
+        self.assertEqual(status.status_code, 200, status.text)
+        self.assertEqual(status.json()["job_id"], job_id)
 
     def test_series_plan_start_uses_the_remote_llm(self):
         series = {
