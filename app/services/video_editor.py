@@ -232,8 +232,16 @@ def _mix_soundtrack(
     output_path: str,
     soundtrack: dict[str, Any],
     duration: float,
+    *,
+    frames: int | None = None,
+    fps: int | None = None,
 ) -> None:
-    """Mix one validated soundtrack over the assembled video's own audio."""
+    """Mix one validated soundtrack over the assembled video's own audio.
+
+    Normalised AAC is re-encoded here. Without padding back to the video span,
+    ``amix=duration=first`` plus a second AAC encode shortens short clips
+    (0.4s → 0.341s, 1.0s → 0.938s) and export validation then rejects them.
+    """
     source = str(soundtrack["resolved_path"])
     trim_start = max(0.0, float(soundtrack.get("trim_start") or 0))
     trim_end = float(soundtrack.get("trim_end") or 0)
@@ -241,6 +249,12 @@ def _mix_soundtrack(
     mix_duration = duration if bool(soundtrack.get("loop")) else min(available, duration)
     raw_volume = soundtrack.get("volume")
     volume = max(0.0, min(2.0, float(1 if raw_volume is None else raw_volume)))
+    video_span = (
+        _seconds_for_ffmpeg(int(frames), int(fps))
+        if frames and fps
+        else f"{float(duration):.10f}"
+    )
+    music_span = video_span if bool(soundtrack.get("loop")) or mix_duration >= float(duration) else f"{mix_duration:.10f}"
     command = ["ffmpeg", "-y", "-i", video_path]
     if bool(soundtrack.get("loop")):
         command.extend(["-stream_loop", "-1"])
@@ -250,12 +264,16 @@ def _mix_soundtrack(
         "-i", source,
         "-filter_complex",
         (
-            f"[1:a:0]atrim=duration={mix_duration:.6f},"
+            f"[0:a:0]apad,atrim=duration={video_span},asetpts=PTS-STARTPTS[base];"
+            f"[1:a:0]atrim=duration={music_span},"
             f"asetpts=PTS-STARTPTS,volume={volume:.4f}[music];"
-            "[0:a:0][music]amix=inputs=2:duration=first:dropout_transition=0[mixed]"
+            "[base][music]amix=inputs=2:duration=first:dropout_transition=0,"
+            f"apad,atrim=duration={video_span},asetpts=PTS-STARTPTS[mixed]"
         ),
         "-map", "0:v:0", "-map", "[mixed]",
         "-c:v", "copy", "-c:a", "aac", "-b:a", "192k",
+        "-muxpreload", "0",
+        "-muxdelay", "0",
         "-movflags", "+faststart", output_path,
     ])
     _run(
@@ -838,7 +856,14 @@ def render_project(
             if progress:
                 progress(96, "Mixing external soundtrack…")
             mixed_path = os.path.join(temp_dir, "final.mp4")
-            _mix_soundtrack(assembled_path, mixed_path, soundtrack, duration_seconds)
+            _mix_soundtrack(
+                assembled_path,
+                mixed_path,
+                soundtrack,
+                duration_seconds,
+                frames=expected_frames,
+                fps=fps,
+            )
             staging_path = mixed_path
 
         if progress:
