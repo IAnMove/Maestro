@@ -1,0 +1,185 @@
+"""Studio generation.image commands on the core/remote profile.
+
+The shared UI admits MiniMax Image-01 through POST /api/v1/generation/commands.
+The NVIDIA runtime owns that surface; core must honour the same receipt
+contract or Generate 404s and never starts the remote job.
+"""
+from __future__ import annotations
+
+import sqlite3
+import threading
+import uuid
+from copy import deepcopy
+from typing import Any
+
+from services import core_remote_image, core_workspace as core, execution_mode
+from services.image_generation_commands import command_error
+from services.image_generation_spec import ImageGenerationSpecError, freeze_image_generation_spec
+from services.task_command_admission import TaskCommandConflict
+from services.task_manager import TaskRegistry
+from routers.system_capabilities import require_capability_http
+
+_REGISTRIES: dict[str, TaskRegistry] = {}
+_LOCK = threading.Lock()
+
+
+def _registry(workspace: str) -> TaskRegistry:
+    try:
+        folder = core.workspace_dir(workspace)
+    except ValueError as error:
+        raise command_error(422, "invalid_workspace", "Use an explicit valid output workspace") from error
+    with _LOCK:
+        existing = _REGISTRIES.get(folder)
+        if existing is not None:
+            return existing
+        registry = TaskRegistry(folder, interrupt_stale=True)
+        _REGISTRIES[folder] = registry
+        return registry
+
+
+def _freeze(command: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+    if not isinstance(command, dict):
+        raise command_error(422, "invalid_command", "Command must be a JSON object")
+    if command.get("operation") != "generation.image":
+        raise command_error(422, "unsupported_operation", "This runtime admits generation.image only")
+    if type(command.get("version")) is int and command["version"] == 2:
+        from services.studio_image_spec import freeze_studio_image_spec
+        frozen = freeze_studio_image_spec(command)
+        params = {
+            **deepcopy(frozen["effective"]["input"]["params"]),
+            "workspace": frozen["effective"]["input"]["workspace"],
+        }
+        return frozen, params
+    frozen = freeze_image_generation_spec(command)
+    return frozen, deepcopy(frozen["effective"]["input"])
+
+
+def _require_minimax_image(params: dict[str, Any]) -> None:
+    model = str(params.get("model_type") or "")
+    if model.startswith("minimax:") or model == "image-01":
+        return
+    require_capability_http("wangp_local")
+    raise command_error(422, "unsupported_model", "Choose MiniMax Image-01 on this runtime")
+
+
+def _subject_reference(params: dict[str, Any]) -> str:
+    refs = params.get("image_refs")
+    if isinstance(refs, list) and refs:
+        return str(refs[0] or "")
+    for key in ("subject_reference", "image_start"):
+        value = params.get(key)
+        if value:
+            return str(value)
+    return ""
+
+
+def _task_fields(workspace: str, job_id: str, params: dict[str, Any]) -> dict[str, Any]:
+    task_id = f"task-generation-{job_id}"
+    return {
+        "id": task_id,
+        "root_id": task_id,
+        "kind": "generation",
+        "workflow": "generation.image",
+        "status": "queued",
+        "phase": "queued",
+        "message": "MiniMax image request queued",
+        "title": "MiniMax Image-01",
+        "workspace": workspace,
+        "backend_job_id": job_id,
+        "provider": "minimax",
+        "model": str(params.get("model_type") or core_remote_image.MODEL_ID),
+        "cancelable": True,
+    }
+
+
+class CoreGenerationCommands:
+    def canonicalize_reference(self, value: str, media_kind: str = "image") -> str:
+        from services.studio_image_resources import StudioImageResources
+        from services.studio_speech_resources import StudioSpeechResources
+        from services.studio_sfx_resources import StudioSfxResources
+        from services.studio_video_resources import StudioVideoResources
+
+        resource_type = {
+            "image": StudioImageResources,
+            "audio": StudioSpeechResources,
+            "video": StudioSfxResources,
+            "studio_video": StudioVideoResources,
+        }.get(media_kind)
+        if resource_type is None:
+            raise command_error(422, "invalid_reference", "Unsupported media kind")
+        resources = resource_type(
+            workspace_dir=core.workspace_dir,
+            uploads_dir=core.uploads_dir,
+            list_workspaces=core.list_workspaces,
+            lora_search_dirs=lambda: [],
+            lora_compatible=lambda *_args, **_kwargs: True,
+        )
+        try:
+            return resources.canonicalize_legacy(value)
+        except ValueError as error:
+            raise command_error(422, "invalid_reference", str(error)) from error
+
+    def receipt(self, workspace: str, intent_id: str) -> dict[str, Any]:
+        if not isinstance(intent_id, str) or not 1 <= len(intent_id) <= 160:
+            raise command_error(422, "invalid_command", "An exact intent_id is required")
+        try:
+            registry = _registry(workspace)
+            entry = registry.command_admission(intent_id)
+            if entry is None:
+                raise command_error(
+                    404, "receipt_not_found",
+                    "No admission exists for this intention in this workspace",
+                )
+            return {"receipt": entry["receipt"], "task": registry.get(entry["task_id"])}
+        except (OSError, sqlite3.Error) as error:
+            raise command_error(503, "storage_unavailable", "Command storage is unavailable") from error
+
+    async def submit(self, command, *, trusted_tool=None, submission_context=None):
+        del trusted_tool, submission_context
+        try:
+            frozen, params = _freeze(command)
+            workspace = str(params.get("workspace") or "")
+            _require_minimax_image(params)
+            execution_mode.validate_remote_provider(workspace, "minimax-image")
+            registry = _registry(workspace)
+            job_id = uuid.uuid4().hex
+            admitted = registry.admit_command_task(
+                intent_id=command["intent_id"],
+                operation=frozen["original"]["operation"],
+                digest=frozen["fingerprint"],
+                original=frozen["original"],
+                effective=frozen["effective"],
+                task_fields=_task_fields(workspace, job_id, params),
+                fingerprint_version=frozen["fingerprint_version"],
+            )
+            if admitted.get("replayed"):
+                return admitted
+            body = {
+                "model_type": params.get("model_type") or core_remote_image.MODEL_ID,
+                "generation_mode": "image",
+                "prompt": params.get("prompt") or "",
+                "resolution": params.get("resolution") or "1024x1024",
+                "aspect_ratio": params.get("aspect_ratio") or "",
+                "subject_reference": _subject_reference(params),
+                "workspace": workspace,
+            }
+            core_remote_image.start_job(body, workspace=workspace, job_id=job_id)
+            return admitted
+        except ImageGenerationSpecError as error:
+            raise command_error(422, "invalid_command", str(error)) from error
+        except TaskCommandConflict as error:
+            raise command_error(409, "intent_conflict", str(error)) from error
+        except execution_mode.ExecutionModeError as error:
+            raise command_error(409, "execution_policy", str(error)) from error
+        except (OSError, sqlite3.Error) as error:
+            raise command_error(
+                503, "storage_unavailable",
+                "Command storage is unavailable; retry with the same intention",
+            ) from error
+
+
+_SERVICE = CoreGenerationCommands()
+
+
+def service() -> CoreGenerationCommands:
+    return _SERVICE

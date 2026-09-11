@@ -141,7 +141,7 @@ def _patch(job_id: str, **fields: Any) -> None:
             job.update(fields)
 
 
-def start_job(body: dict[str, Any], *, workspace: str) -> dict[str, Any]:
+def start_job(body: dict[str, Any], *, workspace: str, job_id: str | None = None) -> dict[str, Any]:
     from services import execution_mode
 
     prompt = prepare_prompt(str(body.get("prompt") or ""))
@@ -149,7 +149,7 @@ def start_job(body: dict[str, Any], *, workspace: str) -> dict[str, Any]:
     if ratio not in SUPPORTED_ASPECT_RATIOS:
         ratio = aspect_ratio_for_resolution(str(body.get("resolution") or "1024x1024"))
     execution_mode.validate_remote_provider(workspace, "minimax-image")
-    job_id = uuid.uuid4().hex
+    job_id = str(job_id or "").strip() or uuid.uuid4().hex
     now = time.time()
     job = {
         "id": job_id, "task_id": job_id, "root_task_id": job_id,

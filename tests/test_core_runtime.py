@@ -336,6 +336,98 @@ class CoreRuntimeTests(unittest.TestCase):
         status = self.client.get(f"/api/v1/status/{response.json()['job_id']}")
         self.assertEqual(status.status_code, 200)
 
+    def _studio_image_command(self, intent="mac-image-intent"):
+        return {
+            "version": 2,
+            "operation": "generation.image",
+            "intent_id": intent,
+            "input": {
+                "workspace": "default",
+                "params": {
+                    "model_type": "minimax:image-01",
+                    "prompt": "a lantern in the rain",
+                    "resolution": "1024x1024",
+                    "num_inference_steps": 1,
+                    "guidance_scale": 1.0,
+                    "seed": 1,
+                    "generation_mode": "image",
+                    "image_mode": 1,
+                    "video_length": 1,
+                },
+            },
+        }
+
+    def test_studio_image_command_admits_minimax_and_replays(self):
+        from services.studio_image_spec import freeze_studio_image_spec
+
+        command = self._studio_image_command()
+        folder, previous = self._in_temp_workspace()
+        try:
+            Path("outputs").mkdir()
+            fake = {"name": "minimax.jpg", "path": "minimax.jpg", "prompt": "a lantern", "aspect_ratio": "1:1"}
+            with patch("services.minimax_image_service.generate_image", return_value=fake), patch(
+                "services.execution_mode.validate_remote_provider",
+            ), patch("services.core_remote_image.threading.Thread", ImmediateThread):
+                missing = self.client.post("/api/v1/generation/commands", json=[])
+                first = self.client.post("/api/v1/generation/commands", json=command)
+                replay = self.client.post("/api/v1/generation/commands", json=command)
+                changed = dict(command)
+                changed["input"] = {**command["input"], "params": {**command["input"]["params"], "prompt": "another"}}
+                conflict = self.client.post("/api/v1/generation/commands", json=changed)
+                receipt = self.client.get(
+                    "/api/v1/generation/commands/receipt",
+                    params={"workspace": "default", "intent_id": command["intent_id"]},
+                )
+                local = self.client.post("/api/v1/generation/commands", json={
+                    **self._studio_image_command("local-flux"),
+                    "input": {
+                        "workspace": "default",
+                        "params": {
+                            **self._studio_image_command()["input"]["params"],
+                            "model_type": "pi_flux2",
+                        },
+                    },
+                })
+        finally:
+            self._leave_temp_workspace(folder, previous)
+        self.assertEqual(missing.status_code, 422, missing.text)
+        self.assertEqual(first.status_code, 200, first.text)
+        body = first.json()
+        receipt_body = body["receipt"]
+        self.assertFalse(body["replayed"])
+        self.assertEqual(receipt_body["commandId"], command["intent_id"])
+        self.assertEqual(receipt_body["operation"], "generation.image")
+        self.assertEqual(receipt_body["status"], "queued")
+        self.assertEqual(receipt_body["commandVersion"], 2)
+        self.assertEqual(receipt_body["contentFingerprint"], freeze_studio_image_spec(command)["fingerprint"])
+        self.assertTrue(receipt_body["result"]["job_id"])
+        self.assertEqual(receipt_body["result"]["workspace"], "default")
+        self.assertEqual(replay.status_code, 200, replay.text)
+        self.assertTrue(replay.json()["replayed"])
+        self.assertEqual(replay.json()["receipt"]["result"]["job_id"], receipt_body["result"]["job_id"])
+        self.assertEqual(conflict.status_code, 409, conflict.text)
+        self.assertEqual(conflict.json()["detail"]["code"], "intent_conflict")
+        self.assertEqual(receipt.status_code, 200, receipt.text)
+        self.assertEqual(receipt.json()["receipt"]["commandId"], command["intent_id"])
+        status = self.client.get(f"/api/v1/status/{receipt_body['result']['job_id']}")
+        self.assertEqual(status.status_code, 200, status.text)
+        self.assertEqual(local.status_code, 409, local.text)
+        self.assertEqual(local.json()["detail"]["code"], FEATURE_UNAVAILABLE)
+
+    def test_studio_image_command_canonicalizes_upload_references(self):
+        folder, previous = self._in_temp_workspace()
+        try:
+            Path("uploads").mkdir()
+            Path("uploads", "hero.png").write_bytes(b"\x89PNG\r\n\x1a\n")
+            Path("outputs").mkdir()
+            response = self.client.post("/api/v1/generation/commands/references", json={
+                "references": [str(Path("uploads", "hero.png").resolve())],
+            })
+        finally:
+            self._leave_temp_workspace(folder, previous)
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["references"], ["/api/v1/uploads/hero.png"])
+
     def test_series_plan_start_uses_the_remote_llm(self):
         series = {
             "id": "series_mac", "revision": 1, "provider": {},
