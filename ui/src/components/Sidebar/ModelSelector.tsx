@@ -1,10 +1,13 @@
 import { ChevronDown, Check, Plus } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
+import type { TFunction } from 'i18next'
 import { useStore, getFamiliesForMode, getModelsForFamily } from '../../stores/useStore'
 import { useUiTranslation } from '../../i18n'
+import { h3CatalogEntry } from '../../lib/h3Catalog'
+import { catalogVramGb, resolveModelCatalog } from '../../lib/modelCatalog'
+import type { ModelDef } from '../../types'
 import { InfoTooltip } from './InfoTooltip'
 import { H3ModelName } from './H3ModelInfo'
-import { modelRequirementsText } from '../../lib/minimaxMusicCatalog'
 
 export function ModelSelector() {
   const { t } = useUiTranslation('studio')
@@ -108,8 +111,8 @@ export function ModelSelector() {
                 {/* Models in family */}
                 {famModels.map(model => {
                   const isSelected = model.model_type === currentModelType
-                  const requirements = modelRequirementsText(model.resource_requirements)
-                  const help = [model.selector_help, requirements].filter(Boolean).join('\n\n')
+                  const help = selectorModelHelp(model, t)
+                  const vramGb = catalogVramGb(model)
                   return (
                     <div
                       key={model.model_type}
@@ -127,9 +130,9 @@ export function ModelSelector() {
                         className="min-w-0 flex-1 px-3 py-1.5 flex items-center gap-2 text-left"
                       >
                         <span className="flex-1 min-w-0 text-xs truncate"><H3ModelName modelType={model.model_type} fallback={model.name} /></span>
-                        {model.resource_requirements?.vram_gb != null && (
+                        {vramGb != null && (
                           <span className="shrink-0 text-[9px] text-text-muted tabular-nums">
-                            ~{model.resource_requirements.vram_gb} GB VRAM
+                            ~{vramGb} GB VRAM
                           </span>
                         )}
                         <ModelBadges model={model} />
@@ -153,6 +156,26 @@ export function ModelSelector() {
       )}
     </div>
   )
+}
+
+function selectorModelHelp(model: ModelDef, t: TFunction<'studio'>): string {
+  if (h3CatalogEntry(model.model_type)) {
+    return [model.selector_help, model.description].filter(Boolean).join('\n\n')
+  }
+  const catalog = resolveModelCatalog(model)
+  return [
+    t(`modelCatalog.${catalog.variant}Hint`),
+    t(`modelCatalog.capability.${catalog.capability}`),
+    model.selector_help || model.description || '',
+    [
+      catalog.requirements.vram_gb != null ? t('modelCatalog.vram', { vram: catalog.requirements.vram_gb }) : '',
+      catalog.requirements.ram_gb != null ? t('modelCatalog.ram', { ram: catalog.requirements.ram_gb }) : '',
+      catalog.requirements.storage_gb != null
+        ? t('modelCatalog.storage', { storage: catalog.requirements.storage_gb })
+        : '',
+      model.resource_requirements?.note || '',
+    ].filter(Boolean).join('\n'),
+  ].filter(Boolean).join('\n\n')
 }
 
 function ModelBadges({ model }: {
