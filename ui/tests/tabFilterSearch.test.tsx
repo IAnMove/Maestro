@@ -255,6 +255,45 @@ test('library filters leave Direct generation and Studios occupy the main worksp
   } finally { cleanup() }
 })
 
+test('settings and Director events still work when Direct generation is unmounted', { concurrency: false }, async () => {
+  const { render, screen, fireEvent, cleanup } = await import('@testing-library/react')
+  const { ensureUiI18n, setUiLanguage } = await import('../src/i18n/index.ts')
+  const { TabFilter } = await import('../src/components/MainContent/TabFilter.tsx')
+  const { WorkspaceEventBridge } = await import('../src/components/Sidebar/WorkspaceEventBridge.tsx')
+  const { useStore } = await import('../src/stores/useStore.ts')
+  const { visibleWorkspaceSurface } = await import('../src/lib/navigationCategories.ts')
+  ensureUiI18n()
+  await setUiLanguage('en')
+  useStore.setState({
+    mediaFilter: 'stories', outputSearchQuery: '', generationMode: 'video',
+    sidebarMode: 'studio', sidebarOpen: false, settingsOpen: false, dashboardOpen: true,
+    activeWorkspace: 'default', loadOutputs: async () => undefined,
+  })
+  try {
+    render(<>
+      <WorkspaceEventBridge />
+      <TabFilter />
+    </>)
+    assert.equal(visibleWorkspaceSurface(useStore.getState()), 'section')
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+    assert.equal(useStore.getState().settingsOpen, true)
+    assert.equal(useStore.getState().dashboardOpen, false)
+    useStore.setState({ settingsOpen: false, mediaFilter: 'stories', sidebarMode: 'studio', sidebarOpen: false })
+    window.dispatchEvent(new Event('maestro:director-open'))
+    const afterDirector = useStore.getState()
+    assert.equal(afterDirector.sidebarMode, 'director')
+    assert.equal(afterDirector.sidebarOpen, true)
+    assert.equal(afterDirector.mediaFilter, 'all')
+    assert.equal(visibleWorkspaceSurface(afterDirector), 'director')
+    useStore.setState({ sidebarMode: 'director', sidebarOpen: false, mediaFilter: 'all', settingsOpen: false })
+    window.dispatchEvent(new Event('hocuspocus:studio-open'))
+    const afterStudio = useStore.getState()
+    assert.equal(afterStudio.sidebarMode, 'studio')
+    assert.equal(afterStudio.sidebarOpen, true)
+    assert.equal(visibleWorkspaceSurface(afterStudio), 'generate')
+  } finally { cleanup() }
+})
+
 test('favorites compact label stays empty instead of leaking the catalog key', { concurrency: false }, async () => {
   const { render, screen, cleanup } = await import('@testing-library/react')
   const { ensureUiI18n, setUiLanguage } = await import('../src/i18n/index.ts')

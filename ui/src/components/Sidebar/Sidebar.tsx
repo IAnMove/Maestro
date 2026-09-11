@@ -36,7 +36,6 @@ import { PanoramaLoopPanel } from './PanoramaLoopPanel'
 
 import { useUiTranslation } from '../../i18n'
 import { StudioCommandPanels } from '../../features/studio/StudioCommandPanels'
-import { revealDirectorWorkspace } from '../../lib/navigationCategories'
 
 const ViggleControls = lazy(() => import('./ViggleControls').then(module => ({ default: module.ViggleControls })))
 const ToolsPanel = lazy(() => import('./ToolsPanel').then(module => ({ default: module.ToolsPanel })))
@@ -49,11 +48,7 @@ export function DirectGenerationWorkspace() {
   const imageMode = useStore(s => s.params.image_mode)
   const modelOptions = useStore(s => s.modelOptions)
   const sidebarOpen = useStore(s => s.sidebarOpen)
-  const setSidebarOpen = useStore(s => s.setSidebarOpen)
-  const setSidebarMode = useStore(s => s.setSidebarMode)
   const sidebarMode = useStore(s => s.sidebarMode)
-  const setSettingsOpen = useStore(s => s.setSettingsOpen)
-  const setDashboardOpen = useStore(s => s.setDashboardOpen)
   const editSubMode = useStore(s => s.editSubMode)
   const modelType = useStore(s => s.params.model_type)
   const workspace = useStore(s => s.activeWorkspace)
@@ -94,50 +89,6 @@ export function DirectGenerationWorkspace() {
   const setToolsSidebarCollapsed = (collapsed: boolean) => {
     window.localStorage.setItem('hocuspocus-tools-sidebar-collapsed', String(collapsed))
   }
-
-  useEffect(() => {
-    const openImageSubmission = () => {
-      setToolsSidebarCollapsed(false)
-      setSidebarOpen(true)
-    }
-    const openSpeechSubmission = () => {
-      setToolsSidebarCollapsed(false)
-      setSidebarOpen(true)
-    }
-    window.addEventListener('hocuspocus:studio-image-open', openImageSubmission)
-    window.addEventListener('hocuspocus:studio-speech-open', openSpeechSubmission)
-    return () => {
-      window.removeEventListener('hocuspocus:studio-image-open', openImageSubmission)
-      window.removeEventListener('hocuspocus:studio-speech-open', openSpeechSubmission)
-    }
-  }, [setSidebarOpen])
-
-  useEffect(() => {
-    const openStudio = () => {
-      setSidebarMode('studio')
-      setToolsSidebarCollapsed(false)
-      setSidebarOpen(true)
-    }
-    const openSettings = () => {
-      setDashboardOpen(false)
-      setSidebarOpen(false)
-      setSettingsOpen(true)
-    }
-    const openDirector = () => {
-      revealDirectorWorkspace(useStore.getState())
-      setToolsSidebarCollapsed(false)
-    }
-    window.addEventListener('hocuspocus:studio-open', openStudio)
-    window.addEventListener('hocuspocus:settings-open', openSettings)
-    window.addEventListener('maestro:director-open', openDirector)
-    return () => {
-      window.removeEventListener('hocuspocus:studio-open', openStudio)
-      window.removeEventListener('hocuspocus:settings-open', openSettings)
-      window.removeEventListener('maestro:director-open', openDirector)
-    }
-  // The event bridge deliberately tracks stable Zustand actions only.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
 
   useEffect(() => {
     const context = `${generationMode}:${editSubMode}`

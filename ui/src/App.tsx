@@ -1,6 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import { Menu, Settings } from 'lucide-react'
 import { WizardSidebar } from './components/Sidebar/WizardSidebar'
+import { WorkspaceEventBridge } from './components/Sidebar/WorkspaceEventBridge'
 import { MainContent } from './components/MainContent/MainContent'
 import { LoraBrowser } from './components/LoraBrowser/LoraBrowser'
 import { StorageDashboard } from './components/StorageDashboard/StorageDashboard'
@@ -29,9 +30,10 @@ const DirectorDashboard = lazy(() => import('./components/DirectorDashboard/Dire
 // Settings is a drawer that boots closed, and the two panels behind it are
 // the largest thing in the app that nobody sees on load — hardware and
 // service configuration, plus the theme catalogue. Loading it on first open
-// keeps all of that out of the initial chunk. The open event is handled in
-// Sidebar.tsx and lands in the store, so nothing here needs to be mounted to
-// receive it.
+// keeps all of that out of the initial chunk. The open event is handled by
+// WorkspaceEventBridge (always mounted) and lands in the store. Direct
+// generation only mounts while that workspace is visible, so the listener
+// cannot live there.
 const SettingsDrawer = lazy(() => import('./components/SettingsDrawer/SettingsDrawer').then(module => ({
   default: module.SettingsDrawer,
 })))
@@ -207,6 +209,7 @@ function AppContent() {
       )}
 
       <div className="flex flex-1 min-h-0 w-full">
+        <WorkspaceEventBridge />
         <WizardSidebar />
         <MainContent />
       </div>
