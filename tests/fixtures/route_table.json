@@ -3212,6 +3212,76 @@
       "ordinal": 320
     },
     {
+      "method": "GET",
+      "path": "/api/v1/wizard/workflows/executor/commands",
+      "endpoint": "commands",
+      "status_code": null,
+      "response_model": null,
+      "include_in_schema": null,
+      "source": "app/routers/wizard_workflow_executor.py",
+      "ordinal": 321
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/wizard/workflows/executor",
+      "endpoint": "list_workflows",
+      "status_code": null,
+      "response_model": null,
+      "include_in_schema": null,
+      "source": "app/routers/wizard_workflow_executor.py",
+      "ordinal": 322
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/wizard/workflows/executor/{workflow_id}",
+      "endpoint": "get_workflow",
+      "status_code": null,
+      "response_model": null,
+      "include_in_schema": null,
+      "source": "app/routers/wizard_workflow_executor.py",
+      "ordinal": 323
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/wizard/workflows/executor",
+      "endpoint": "start",
+      "status_code": null,
+      "response_model": null,
+      "include_in_schema": null,
+      "source": "app/routers/wizard_workflow_executor.py",
+      "ordinal": 324
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/wizard/workflows/executor/answer",
+      "endpoint": "answer",
+      "status_code": null,
+      "response_model": null,
+      "include_in_schema": null,
+      "source": "app/routers/wizard_workflow_executor.py",
+      "ordinal": 325
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/wizard/workflows/executor/resume",
+      "endpoint": "resume",
+      "status_code": null,
+      "response_model": null,
+      "include_in_schema": null,
+      "source": "app/routers/wizard_workflow_executor.py",
+      "ordinal": 326
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/wizard/workflows/executor/reconcile",
+      "endpoint": "reconcile",
+      "status_code": null,
+      "response_model": null,
+      "include_in_schema": null,
+      "source": "app/routers/wizard_workflow_executor.py",
+      "ordinal": 327
+    },
+    {
       "method": "POST",
       "path": "/api/v1/wangp/mcp",
       "endpoint": "mcp",
@@ -3219,7 +3289,7 @@
       "response_model": null,
       "include_in_schema": null,
       "source": "app/routers/wangp_mcp.py",
-      "ordinal": 321
+      "ordinal": 328
     },
     {
       "method": "GET",
@@ -3229,7 +3299,7 @@
       "response_model": null,
       "include_in_schema": null,
       "source": "app/routers/wangp_mcp.py",
-      "ordinal": 322
+      "ordinal": 329
     },
     {
       "method": "GET",
@@ -3239,7 +3309,7 @@
       "response_model": null,
       "include_in_schema": null,
       "source": "app/routers/system_capabilities.py",
-      "ordinal": 323
+      "ordinal": 330
     },
     {
       "method": "GET",
@@ -3249,7 +3319,7 @@
       "response_model": null,
       "include_in_schema": null,
       "source": "app/_launch_runtime.py",
-      "ordinal": 324
+      "ordinal": 331
     }
   ]
 }
