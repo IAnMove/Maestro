@@ -2,6 +2,7 @@ import { effectsTemplateDocument, EFFECTS_TEMPLATES } from './effectsTemplates'
 import { cinematicDocument, CINEMATIC_TEMPLATES, CINEMATIC_CATEGORIES } from './cinematicTemplates'
 import { speechTemplateDocument, SPEECH_TEMPLATES, SPEECH_CATEGORIES } from './speech/templates'
 import { mediaTemplateDocument, MEDIA_TEMPLATES, MEDIA_CATEGORIES } from './mediaTemplates'
+import { campaignTemplateDocument, CAMPAIGN_TEMPLATES, CAMPAIGN_CATEGORIES } from './campaignTemplates'
 import { createDefaultScene3DDocument } from './document.ts'
 import { SCENE3D_TEMPLATE_IDS, type Scene3DCamera, type Scene3DCameraFamily, type Scene3DDocument, type Scene3DSlot, type Scene3DSlotId, type Scene3DTemplateId } from './types.ts'
 
@@ -19,6 +20,7 @@ export const TEMPLATE_CATEGORIES: Record<Scene3DTemplateId, Scene3DTemplateCateg
   ...CINEMATIC_CATEGORIES,
   ...SPEECH_CATEGORIES,
   ...MEDIA_CATEGORIES,
+  ...CAMPAIGN_CATEGORIES,
   'reflective-stage': 'cinema',
   'character-materialization': 'cinema',
   'blast-stage': 'cinema',
@@ -155,6 +157,7 @@ export const SCENE3D_TEMPLATES: readonly Scene3DTemplate[] = [
   ...SPEECH_TEMPLATES,
   ...MEDIA_TEMPLATES,
   ...EFFECTS_TEMPLATES,
+  ...CAMPAIGN_TEMPLATES,
 ]
 
 const LAYOUTS: Partial<Record<Scene3DTemplateId, Partial<Record<Scene3DSlotId, Pick<Scene3DSlot, 'position' | 'rotationY' | 'scale'>>>>> = {
@@ -347,6 +350,8 @@ function emptySlot(id: Scene3DSlotId): Scene3DSlot {
 }
 
 export function applyScene3DTemplate(id: Scene3DTemplateId): Scene3DDocument {
+  const campaign = campaignTemplateDocument(id)
+  if (campaign) return campaign
   const effects = effectsTemplateDocument(id)
   if (effects) return effects
   const speech = speechTemplateDocument(id)

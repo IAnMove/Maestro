@@ -535,6 +535,38 @@
     "blast-stage": {
       "title": "Ground blast",
       "description": "A cinematic explosion on the metal floor: flash, fireball, shock ring, debris and smoke."
+    },
+    "server-inspection": {
+      "title": "Server inspection",
+      "description": "A crane drops onto a rack while an inspector walks in from the aisle."
+    },
+    "coding-desk": {
+      "title": "Coding desk",
+      "description": "The coder sits at a workshop desk; the monitor is a replaceable screen."
+    },
+    "tracking-chase": {
+      "title": "Tracking chase",
+      "description": "A side-on track follows two runners along a street; they enter left and exit right."
+    },
+    "character-presentation": {
+      "title": "Character presentation",
+      "description": "An orbit around a materializing hero on a reflective pedestal."
+    },
+    "screen-alert": {
+      "title": "Screen alert",
+      "description": "An operator rushes a giant alert board as lightning hits the glass."
+    },
+    "product-comparison": {
+      "title": "Product comparison",
+      "description": "Two products slide in from opposite sides while the camera orbits the pair."
+    },
+    "topic-travelling": {
+      "title": "Topic travelling",
+      "description": "A guide walks a plaza corridor past replaceable topic screens."
+    },
+    "heroic-close": {
+      "title": "Heroic close",
+      "description": "A low pursuit push lands on the face as the hero steps into a close-up."
     }
   },
   "gallerySearch": "Search the catalog",
