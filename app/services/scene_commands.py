@@ -117,7 +117,8 @@ class WorldFxCue(Strict):
         self.color = self.color or preset['color']
         if self.sourceUrl is not None:
             url = self.sourceUrl.strip()
-            if not url or url.lower().startswith('javascript:'):
+            lowered = url.lower()
+            if not url or lowered.startswith(('javascript:', 'blob:', 'file:', 'filesystem:')):
                 self.sourceUrl = None
             else:
                 self.sourceUrl = url[:2000]

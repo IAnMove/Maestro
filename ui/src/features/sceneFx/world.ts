@@ -43,6 +43,15 @@ const PRESETS = Object.fromEntries(catalog.map(item => [item.id, item]))
 const number = (value: unknown, fallback: number, min: number, max: number) =>
   typeof value === 'number' && Number.isFinite(value) ? Math.max(min, Math.min(max, value)) : fallback
 
+const TRANSIENT_MEDIA = /^(javascript|blob|file|filesystem):/i
+
+/** Persistable portal media only. Blob/file URLs cannot be saved with the scene. */
+export function worldMediaUrl(raw: unknown): string | undefined {
+  if (typeof raw !== 'string') return undefined
+  const url = raw.trim()
+  return url && !TRANSIENT_MEDIA.test(url) ? url.slice(0, 2000) : undefined
+}
+
 export function worldAnchorOffsetFromWorldPoint(
   slot: { position: readonly [number, number, number]; rotationY: number },
   point: readonly [number, number, number],
@@ -109,7 +118,7 @@ export function parseWorldSfx(raw: unknown): WorldSfx[] {
     const standing = value.kind === 'portal' || value.kind === 'summoning_gate' || value.kind === 'media_portal'
     const blast = value.kind === 'explosion' || value.kind === 'ice_burst'
     const weather = value.kind === 'rain' || value.kind === 'snow' || value.kind === 'fog'
-    const sourceUrl = typeof value.sourceUrl === 'string' && value.sourceUrl && !value.sourceUrl.startsWith('javascript:') ? value.sourceUrl.slice(0, 2000) : undefined
+    const sourceUrl = worldMediaUrl(value.sourceUrl)
     return [{
       id,
       kind: value.kind,
