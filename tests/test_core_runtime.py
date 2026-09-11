@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import json
 import os
 import tempfile
 import unittest
@@ -465,6 +466,152 @@ class CoreRuntimeTests(unittest.TestCase):
         blocked = self.client.post("/api/v1/llm/load", json={"provider": "local"})
         self.assertEqual(blocked.status_code, 409)
         self.assertEqual(blocked.json()["detail"]["code"], FEATURE_UNAVAILABLE)
+
+    def test_scene_recording_muxes_sidecar_audio_and_keeps_unique_names(self):
+        from services import core_scene_recording
+
+        folder, previous = self._in_temp_workspace()
+        try:
+            Path("outputs").mkdir()
+            Path("outputs", "client-a").mkdir(parents=True)
+            source = Path("outputs", "client-a", "capture.webm")
+            voice = Path("outputs", "client-a", "mix.wav")
+            source.write_bytes(b"webm")
+            voice.write_bytes(b"wav")
+            seen = []
+
+            def fake_transcode(src, dest, *, fps, audio_tracks, duration, embedded_audio):
+                Path(dest).write_bytes(b"mp4-bytes")
+                seen.append({
+                    "src": src,
+                    "dest": dest,
+                    "fps": fps,
+                    "audio_tracks": list(audio_tracks),
+                    "duration": duration,
+                    "embedded_audio": embedded_audio,
+                })
+
+            scene = {
+                "version": 1,
+                "name": "Harbour Shot",
+                "width": 64,
+                "height": 64,
+                "fps": 30,
+                "duration": 2,
+                "layers": [],
+            }
+            with patch("services.core_scene_recording.transcode_scene_recording", side_effect=fake_transcode), patch(
+                "services.core_scene_recording.publish_generation_sidecar",
+            ):
+                first = core_scene_recording.finalize_scene_recording(
+                    source_path=str(source),
+                    output_dir=str(Path("outputs", "client-a")),
+                    scene=scene,
+                    recipe={"engine": "world3d"},
+                    prompt="",
+                    embedded_audio=False,
+                    extra_audio_path=str(voice),
+                    workspace="client-a",
+                )
+                second = core_scene_recording.finalize_scene_recording(
+                    source_path=str(source),
+                    output_dir=str(Path("outputs", "client-a")),
+                    scene=scene,
+                    recipe={"engine": "world3d"},
+                    prompt="",
+                    embedded_audio=False,
+                    extra_audio_path=str(voice),
+                    workspace="client-a",
+                )
+        finally:
+            self._leave_temp_workspace(folder, previous)
+        self.assertEqual(len(seen), 2)
+        self.assertEqual(seen[0]["audio_tracks"][0]["path"], str(voice))
+        self.assertFalse(seen[0]["embedded_audio"])
+        self.assertNotEqual(first["name"], second["name"])
+        self.assertTrue(first["name"].endswith(".mp4"))
+        self.assertIn("Harbour-Shot", first["name"])
+        self.assertIn("workspace=client-a", first["url"])
+        self.assertNotEqual(first["name"], "Harbour Shot.webm")
+
+    def test_scene_recording_reads_workspace_from_metadata_not_a_form_field(self):
+        from services import core_scene_recording
+
+        details = core_scene_recording.parse_recording_metadata(json.dumps({
+            "workspace": "client-a",
+            "embeddedAudio": False,
+            "prompt": "",
+            "recipe": {"engine": "world3d"},
+            "scene": {
+                "version": 1,
+                "name": "clip-01-world3d-scene",
+                "width": 64,
+                "height": 64,
+                "fps": 30,
+                "duration": 1,
+                "layers": [],
+            },
+        }))
+        self.assertEqual(details["workspace"], "client-a")
+        self.assertEqual(details["scene"]["name"], "clip-01-world3d-scene")
+        with self.assertRaises(ValueError):
+            core_scene_recording.parse_recording_metadata("{}")
+
+    def test_scene_recording_form_keeps_the_separate_voice_mix(self):
+        import asyncio
+
+        from services import core_scene_recording
+
+        class ChunkUpload:
+            def __init__(self, payload):
+                self._payload = payload
+
+            async def read(self, size=-1):
+                data, self._payload = self._payload, b""
+                return data
+
+            async def close(self):
+                return None
+
+        folder, previous = self._in_temp_workspace()
+        try:
+            Path("outputs").mkdir()
+            seen = []
+
+            def fake_transcode(src, dest, *, fps, audio_tracks, duration, embedded_audio):
+                Path(dest).write_bytes(b"mp4-bytes")
+                seen.append({"audio_tracks": [dict(item) for item in audio_tracks]})
+
+            form = {
+                "file": ChunkUpload(b"silent-webm"),
+                "audio": ChunkUpload(b"voice-wav"),
+                "metadata": json.dumps({
+                    "workspace": "default",
+                    "embeddedAudio": False,
+                    "prompt": "",
+                    "recipe": {"engine": "world3d"},
+                    "scene": {
+                        "version": 1,
+                        "name": "Harbour Shot",
+                        "width": 64,
+                        "height": 64,
+                        "fps": 30,
+                        "duration": 2,
+                        "layers": [],
+                    },
+                }),
+            }
+            with patch("services.core_scene_recording.transcode_scene_recording", side_effect=fake_transcode), patch(
+                "services.core_scene_recording.publish_generation_sidecar",
+            ):
+                saved = asyncio.run(core_scene_recording.publish_from_form(form))
+            mix_path = seen[0]["audio_tracks"][0]["path"]
+        finally:
+            self._leave_temp_workspace(folder, previous)
+        self.assertTrue(saved["name"].endswith(".mp4"))
+        self.assertEqual(len(seen[0]["audio_tracks"]), 1)
+        self.assertIn("scene-audio", mix_path)
+        self.assertFalse(os.path.isfile(mix_path))
 
 
 if __name__ == "__main__":
