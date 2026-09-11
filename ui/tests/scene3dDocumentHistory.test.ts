@@ -21,11 +21,13 @@ import {
   endHistoryGroup,
   historySaveState,
   ingestRemotePayload,
+  lastIdentityKey,
   persistHistoryDraft,
   readDraftPayload,
   redoHistory,
   restoreOrCreateHistory,
   switchHistoryDocument,
+  switchHistoryWorkspace,
   undoHistory,
   withHistoryLock,
   type DraftStorage,
@@ -258,6 +260,77 @@ test('gallery save writes a new revision and leaves the previous payload untouch
   const skipped = acknowledgeGallerySave(other, storage, { document: saved, identity: from, revision: 10 })
   assert.equal(skipped.identity.documentId, 'gallery-b')
   assert.equal(skipped.present.slots[0].sourceUrl, '/other.glb')
+})
+
+test('workspace switch persists the source draft and restores the destination last document', () => {
+  const storage = memoryStorage()
+  const owner = createOwnerId()
+  const fallback = sampleDocument()
+  const docA = changeGlb(sampleDocument(), '/ws-a.glb')
+  const docB = changeGlb(sampleDocument(), '/ws-b.glb')
+  persistHistoryDraft(applyHistoryChange(createHistory(sampleDocument(), identity('scene-b', 'ws-b', 0), owner), docB), storage)
+  let history = applyHistoryChange(createHistory(sampleDocument(), identity('scene-a', 'ws-a', 0), owner), docA)
+  history = persistHistoryDraft(history, storage)
+  history = switchHistoryWorkspace(history, storage, 'ws-b', owner, fallback)
+  assert.equal(history.identity.workspace, 'ws-b')
+  assert.equal(history.identity.documentId, 'scene-b')
+  assert.equal(history.present.slots[0].sourceUrl, '/ws-b.glb')
+  assert.equal(readDraftPayload(storage, identity('scene-a', 'ws-a', 0))?.document.slots[0].sourceUrl, '/ws-a.glb')
+  history = applyHistoryChange(history, changeGlb(history.present, '/ws-b-edited.glb'))
+  history = persistHistoryDraft(history, storage)
+  history = switchHistoryWorkspace(history, storage, 'ws-a', owner, fallback)
+  assert.equal(history.identity.documentId, 'scene-a')
+  assert.equal(history.present.slots[0].sourceUrl, '/ws-a.glb')
+  history = switchHistoryWorkspace(history, storage, 'ws-b', owner, fallback)
+  assert.equal(history.present.slots[0].sourceUrl, '/ws-b-edited.glb')
+})
+
+test('workspace switch into an empty workspace opens a fresh fallback instead of retagging the source', () => {
+  const storage = memoryStorage()
+  const owner = createOwnerId()
+  const fallback = sampleDocument()
+  const docA = changeGlb(sampleDocument(), '/keep-a.glb')
+  let history = persistHistoryDraft(applyHistoryChange(createHistory(sampleDocument(), identity('scene-a', 'ws-a', 0), owner), docA), storage)
+  history = switchHistoryWorkspace(history, storage, 'ws-empty', owner, fallback)
+  assert.equal(history.identity.workspace, 'ws-empty')
+  assert.notEqual(history.identity.documentId, 'scene-a')
+  assert.equal(history.present.slots[0].sourceUrl, fallback.slots[0].sourceUrl)
+  assert.equal(readDraftPayload(storage, identity('scene-a', 'ws-a', 0))?.document.slots[0].sourceUrl, '/keep-a.glb')
+  const lastEmpty = JSON.parse(storage.getItem(lastIdentityKey('ws-empty')) || 'null') as Scene3DDocumentRef
+  assert.equal(lastEmpty.workspace, 'ws-empty')
+  assert.notEqual(lastEmpty.documentId, 'scene-a')
+})
+
+test('gallery save that no longer matches the live document does not steal the last-identity pointer', () => {
+  const storage = memoryStorage()
+  const gallery = sampleDocument()
+  const from = identity('gallery-a', 'ws-a', 4)
+  let live = persistHistoryDraft(applyHistoryChange(createHistory(gallery, from, 'tab-1'), moveMouth(gallery, 0.2)), storage)
+  const saved = live.present
+  live = switchHistoryDocument(live, storage, changeGlb(sampleDocument(), '/other.glb'), identity('gallery-b', 'ws-a', 0), 'tab-1')
+  const skipped = acknowledgeGallerySave(live, storage, { document: saved, identity: from, revision: 9 })
+  assert.equal(skipped.identity.documentId, 'gallery-b')
+  assert.equal(JSON.parse(storage.getItem(lastIdentityKey('ws-a')) || 'null').documentId, 'gallery-b')
+  const restored = restoreOrCreateHistory(createDefaultScene3DDocument(), 'ws-a', 'tab-1', storage)
+  assert.equal(restored.identity.documentId, 'gallery-b')
+  assert.equal(restored.present.slots[0].sourceUrl, '/other.glb')
+  assert.equal(readDraftPayload(storage, { ...from, revision: 9 })?.identity.revision, 9)
+})
+
+test('edits after a gallery save stay on the last-identity pointer', () => {
+  const storage = memoryStorage()
+  const start = sampleDocument()
+  const from = identity('live-edit', 'ws-a', 1)
+  let history = persistHistoryDraft(applyHistoryChange(createHistory(start, from, 'tab-1'), moveMouth(start, 0.2)), storage)
+  const saved = history.present
+  history = applyHistoryChange(history, changeGlb(history.present, '/after-save.glb'))
+  history = acknowledgeGallerySave(history, storage, { document: saved, identity: from, revision: 8 })
+  assert.equal(history.identity.revision, 1)
+  assert.equal(history.present.slots[0].sourceUrl, '/after-save.glb')
+  history = persistHistoryDraft(history, storage)
+  const restored = restoreOrCreateHistory(createDefaultScene3DDocument(), 'ws-a', 'tab-1', storage)
+  assert.equal(restored.identity.revision, 1)
+  assert.equal(restored.present.slots[0].sourceUrl, '/after-save.glb')
 })
 
 test('another tab marks an explicit conflict instead of clobbering the live document', () => {
