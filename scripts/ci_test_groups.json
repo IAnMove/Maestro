@@ -136,6 +136,7 @@
         "tests/test_voice_reference_settings.py",
         "tests/test_wangp1272_runtime.py",
         "tests/test_wizard_conversations.py",
+        "tests/test_wizard_mcp_corpus.py",
         "tests/test_wizard_workflows.py",
         "tests/test_workspace_collections_router.py",
         "tests/test_workspace_commands.py",
