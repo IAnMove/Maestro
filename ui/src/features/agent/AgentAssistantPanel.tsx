@@ -14,6 +14,7 @@ import {
   type AgentActionResult,
 } from './agentActions'
 import { applyPollToCard, cardsFromResults, tabForExecutionTarget, type WizardExecutionCard } from './executionCards'
+import { openAgentActivityDetails } from './agentUiBus'
 import {
   applyRemoteWizardConversation,
   isWizardConversationWriteCurrent,
@@ -619,6 +620,19 @@ export function AgentAssistantPanel({ workspace, tasks, onClose, embedded = fals
                   <div className="mt-2 flex flex-wrap gap-1">
                     {card.controls.open && (
                       <button type="button" className="rounded border border-white/10 px-1.5 py-0.5 text-[9px] text-white/70 hover:bg-white/5" onClick={() => void executeAgentActions([{ type: 'open_tab', tab: tabForExecutionTarget(card.target?.kind) }])}>{t('openTarget')}</button>
+                    )}
+                    {(card.taskId || (typeof card.metadata?.commandId === 'string' && card.metadata.commandId) || (typeof card.metadata?.intent_id === 'string' && card.metadata.intent_id)) && (
+                      <button
+                        type="button"
+                        className="rounded border border-white/10 px-1.5 py-0.5 text-[9px] text-white/70 hover:bg-white/5"
+                        onClick={() => openAgentActivityDetails({
+                          taskId: card.taskId,
+                          intentId: typeof card.metadata?.commandId === 'string' ? card.metadata.commandId : typeof card.metadata?.intent_id === 'string' ? card.metadata.intent_id : undefined,
+                          receiptId: typeof card.metadata?.receiptId === 'string' ? card.metadata.receiptId : undefined,
+                        })}
+                      >
+                        {t('viewInActivity')}
+                      </button>
                     )}
                     {card.controls.cancel && (
                       <button type="button" className="rounded border border-white/10 px-1.5 py-0.5 text-[9px] text-white/70 hover:bg-white/5" onClick={() => void executeAgentActions([{ type: 'cancel_task', taskId: card.taskId || 'latest', confirm: true }])}>{tCommon('actions.cancel')}</button>
