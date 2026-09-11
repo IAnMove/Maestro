@@ -23,6 +23,16 @@ One PNG, no divider lines, no text, no extra panels.
 The engine looks up `column = viseme`, `row = expression`. Talking never
 moves the row by itself.
 
+## Cube-front plane (required look)
+
+The tile is the **front face of a cube**, not a round portrait. Skin fills the
+square edge to edge; only eyes, nose and mouth. Prompts:
+`/face-pack-maker.html` (copy + drop stills) and
+`ui/src/features/scene3d/speech/facePackPrompts.ts`.
+
+CLI: `python3 ui/scripts/assemble_face_pack_from_dir.py stills/ -o pack.png`
+with files named `rest.png`, `A.png`, `happy.png`, …
+
 ## Two ways to author
 
 ### A. Draw the full 9×6 sheet (54 cells)
