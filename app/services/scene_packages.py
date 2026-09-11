@@ -936,6 +936,9 @@ def _sidecar_hash(path: Path) -> str | None:
     manifest = read_asset_manifest(path)
     if not isinstance(manifest, Mapping):
         return None
+    asset = manifest.get("asset")
+    if isinstance(asset, Mapping) and str(asset.get("filename") or "") not in {"", path.name}:
+        return None
     technical = manifest.get("technical")
     if isinstance(technical, Mapping):
         digest = str(technical.get("sha256") or "")
@@ -957,7 +960,12 @@ def find_existing_by_hash(root: Path, digest: str, size: int | None = None) -> P
             continue
         marked = _sidecar_hash(entry)
         if marked == digest:
-            return entry
+            try:
+                if sha256_file(entry) == digest:
+                    return entry
+            except OSError:
+                continue
+            continue
         try:
             if size is not None and entry.stat().st_size == size:
                 sized.append(entry)

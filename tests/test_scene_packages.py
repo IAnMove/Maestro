@@ -496,6 +496,39 @@ def test_import_avoids_sidecar_stem_collision(tmp_path: Path):
     assert screen_name.endswith(".png")
 
 
+def test_hash_reuse_ignores_sibling_that_shares_a_sidecar(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    client, roots = _client(tmp_path)
+    refs = _seed_film(roots["film"])
+    digest = sha256_bytes(b"glb-shared")
+    dest = roots["lab"] / "hero.glb"
+    dest.write_bytes(b"glb-shared")
+    from services.asset_manifest import build_asset_manifest, sidecar_path, write_asset_manifest
+    write_asset_manifest(dest, build_asset_manifest(
+        dest, kind="model3d", workspace_id="lab", tool="seed", actor="user",
+        execution_mode="import", technical={"sha256": digest},
+    ))
+    portrait = roots["lab"] / "hero.png"
+    portrait.write_bytes(_png() + b"-portrait")
+    original = Path.iterdir
+
+    def png_first(self: Path):
+        if self.resolve() == roots["lab"].resolve():
+            return iter((portrait, dest, sidecar_path(dest)))
+        return original(self)
+
+    monkeypatch.setattr(Path, "iterdir", png_first)
+    shot = _shot(title="Reuse", glb=refs["glb"], voice=refs["voice"], screen=refs["screen"], environment=refs["env"])
+    exported = client.post("/api/v1/scene-packages/export", json={"workspace": "film", "documents": [shot]})
+    assert exported.status_code == 200, exported.text
+    imported = _post_zip(client, "/api/v1/scene-packages/import", exported.content, workspace="lab")
+    assert imported.status_code == 200, imported.text
+    document = json.loads(next(roots["lab"].glob("*.world3d.scene.json")).read_text())
+    assert document["slots"][0]["sourceRef"]["filename"] == "hero.glb"
+    assert "hero.glb" in document["slots"][0]["sourceUrl"]
+    assert "workspace=lab" in document["slots"][0]["sourceUrl"]
+    assert find_existing_by_hash(roots["lab"], digest, len(b"glb-shared")) == dest
+
+
 def test_service_helpers_without_http(tmp_path: Path):
     film = tmp_path / "film"
     lab = tmp_path / "lab"
