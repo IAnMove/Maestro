@@ -211,13 +211,37 @@ def select_paths(
     return targets, "mapped", []
 
 
+def ungrouped_suite_files(root: Path, manifest: dict[str, Any]) -> list[str]:
+    """Automated tests that the committed manifest does not list yet."""
+    owned: set[str] = set()
+    for group in manifest["groups"]:
+        owned.update(posix_path(item) for item in group["paths"])
+    return [path for path in discover_suite_files(root) if path not in owned]
+
+
 def group_paths(group_id: str, root: Path, manifest: dict[str, Any]) -> list[str]:
-    check_partition(root, manifest)
+    """Return one shard. Ungrouped suite files go to the first group.
+
+    ``--check-partition`` still fails on a stale manifest. ``--group`` must
+    not drop those files: a new test module would otherwise turn every PR red
+    and skip the tests.
+    """
     groups = group_by_id(manifest)
     if group_id not in groups:
         known = ", ".join(sorted(groups))
         raise ManifestError(f"unknown group {group_id!r}; known: {known}")
     paths = unique_paths([posix_path(item) for item in groups[group_id]["paths"]])
+    first_id = str(manifest["groups"][0]["id"])
+    extra = ungrouped_suite_files(root, manifest) if group_id == first_id else []
+    if extra:
+        print(
+            "select_local_tests: assigning ungrouped files to "
+            + group_id
+            + ": "
+            + ", ".join(extra),
+            file=sys.stderr,
+        )
+        paths = unique_paths(paths + extra)
     if not paths:
         raise ManifestError(f"empty group {group_id!r}")
     return paths
