@@ -104,18 +104,29 @@ function aura(color: string) {
 }
 function explosion(color: string) {
   const root = new Group()
-  const core = surface('fireball', color, 1.85, 1.85, true)
-  core.userData.kind = 'fireball'
-  const inner = surface('flash', '#fff6d2', 1.35, 1.35, true)
+  for (let i = 0; i < 3; i++) {
+    const core = surface('fireball', color, 1.7 + i * .18, 2.05 + i * .12, true)
+    core.userData.kind = 'fireball'
+    core.userData.seedOffset = i * 13
+    core.position.set((i - 1) * .08, i * .05, (i - 1) * .06)
+    root.add(core)
+  }
+  const inner = surface('flash', color, 1.05, 1.05, true)
   inner.userData.kind = 'flash'
-  const shock = surface('shock', color, 6.2)
-  shock.rotation.x = -Math.PI / 2
-  shock.position.y = .02
-  const debris = sparks(color, 'burst', .22, 220)
-  const plume = mist('#5c463c')
+  const tongues = surface('aura', color, 1.7, 2.4, true)
+  tongues.userData.kind = 'fireball'
+  tongues.position.y = .25
+  const ring = surface('blastRing', color, 7.2)
+  ring.rotation.x = -Math.PI / 2
+  ring.position.y = .03
+  const debris = sparks(color, 'burst', .28, 280)
+  debris.material = softSparkMaterial(color, .07)
+  const cinders = sparks('#ffcc77', 'burst', .18, 120)
+  cinders.material = softSparkMaterial('#ffcc77', .045)
+  const plume = mist('#3a2c26')
   plume.userData.kind = 'plume'
-  plume.position.y = .18
-  root.add(inner, core, shock, debris, plume)
+  plume.position.y = .2
+  root.add(inner, tongues, ring, debris, cinders, plume)
   return root
 }
 function missiles(color: string) {

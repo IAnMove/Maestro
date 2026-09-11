@@ -1,7 +1,6 @@
 import { createDefaultScene3DDocument } from './document'
 import { createScreenSlot, mediaTemplateDocument } from './mediaTemplates'
 import { parseWorldSfx } from '../sceneFx/world'
-import { parseSceneFx } from '../sceneFx/types'
 import type { Scene3DDocument, Scene3DSlotId } from './types'
 
 export const EFFECTS_TEMPLATES = (['reflective-stage', 'character-materialization', 'blast-stage'] as const).map(id => ({
@@ -41,6 +40,6 @@ export function effectsTemplateDocument(id: string): Scene3DDocument | null {
       { id: 'sparks', kind: 'sparks', start: 2, end: 4.5, position: { x: 0, y: .3, z: 0 }, color: '#f7c186', intensity: 1.3 },
     ] : []),
   ])
-  if (blast) doc.sfx = parseSceneFx([{ id: 'flash-2d', kind: 'explosion', start: 1.05, end: 2.4, x: 50, y: 58, size: 92, intensity: 1.15, color: '#ff7040', seed: 11, sound: false, volume: 0 }])
+
   return doc
 }

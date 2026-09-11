@@ -1,91 +1,92 @@
 import { fxRandom, type SceneFx } from './types'
 
-const tau = Math.PI * 2
-
-function disk(ctx: CanvasRenderingContext2D, x: number, y: number, radius: number) {
+function blob(ctx: CanvasRenderingContext2D, x: number, y: number, rx: number, ry: number, rot: number) {
+  ctx.save()
+  ctx.translate(x, y)
+  ctx.rotate(rot)
   ctx.beginPath()
-  ctx.arc(x, y, Math.max(0.0001, radius), 0, tau)
+  ctx.ellipse(0, 0, Math.max(0.0008, rx), Math.max(0.0008, ry), 0, 0, Math.PI * 2)
   ctx.fill()
+  ctx.restore()
 }
 
-/** Timed blast: flash, fireball lobes, shock rings, debris and delayed smoke. */
+function rgba(r: number, g: number, b: number, a: number) {
+  return `rgba(${r | 0},${g | 0},${b | 0},${Math.max(0, Math.min(1, a))})`
+}
+
+/** Volumetric blast. No stroked rings or single-gradient orbs. */
 export function paintExplosion(ctx: CanvasRenderingContext2D, cue: SceneFx, _time: number, progress: number) {
   const power = cue.intensity
-  const flash = Math.pow(Math.max(0, 1 - progress * 4.6), 1.7)
-  const fire = Math.pow(Math.max(0, 1 - progress * 1.12), 0.72)
-  const shock = Math.min(1, progress * 1.65)
-  const smoke = Math.max(0, (progress - 0.14) / 0.86)
+  const flash = Math.pow(Math.max(0, 1 - progress * 5.2), 2)
+  const fire = Math.pow(Math.max(0, 1 - progress * 1.05), 0.62)
+  const smoke = Math.max(0, (progress - 0.08) / 0.92)
+  const expand = Math.pow(progress, 0.38)
 
-  if (flash > 0.02) {
-    const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, 0.42)
-    glow.addColorStop(0, `rgba(255,255,248,${flash})`)
-    glow.addColorStop(0.18, `rgba(255,230,140,${0.9 * flash})`)
-    glow.addColorStop(0.45, `rgba(255,140,40,${0.45 * flash})`)
-    glow.addColorStop(1, 'rgba(255,40,0,0)')
-    ctx.globalAlpha = 1
-    ctx.fillStyle = glow
-    disk(ctx, 0, 0, 0.42)
+  ctx.save()
+  ctx.globalCompositeOperation = 'source-over'
+  for (let i = 0; i < 48; i++) {
+    const a = fxRandom(cue.seed, i) * Math.PI * 2
+    const d = smoke * (0.04 + fxRandom(cue.seed, i + 40) * 0.34)
+    const lift = smoke * (0.02 + fxRandom(cue.seed, i + 80) * 0.28)
+    blob(ctx, Math.cos(a) * d, Math.sin(a) * d * 0.55 - lift,
+      0.05 + fxRandom(cue.seed, i + 120) * 0.12 + smoke * 0.08,
+      0.04 + fxRandom(cue.seed, i + 160) * 0.1 + smoke * 0.07,
+      a * 0.4)
+    ctx.fillStyle = rgba(28 + fxRandom(cue.seed, i + 200) * 40, 22, 18, 0.07 * smoke * power)
   }
 
-  const coreBall = ctx.createRadialGradient(0, 0, 0, 0, 0, 0.16 * (0.4 + fire))
-  coreBall.addColorStop(0, `rgba(255,248,220,${0.95 * fire * power})`)
-  coreBall.addColorStop(0.4, cue.color)
-  coreBall.addColorStop(1, 'rgba(80,10,0,0)')
-  ctx.globalAlpha = 0.95 * fire
-  ctx.fillStyle = coreBall
-  disk(ctx, 0, 0, 0.16 * (0.4 + fire))
-
-  for (let i = 0; i < 14; i++) {
-    const angle = i / 14 * tau + fxRandom(cue.seed, i) * 0.45
-    const reach = fire * (0.05 + fxRandom(cue.seed, i + 20) * 0.16)
-    const radius = (0.045 + fxRandom(cue.seed, i + 40) * 0.09) * (0.35 + fire)
-    const x = Math.cos(angle) * reach
-    const y = Math.sin(angle) * reach * 0.78 - progress * 0.04
-    const lobe = ctx.createRadialGradient(x, y, 0, x, y, radius)
-    lobe.addColorStop(0, `rgba(255,244,210,${0.85 * fire * power})`)
-    lobe.addColorStop(0.35, cue.color)
-    lobe.addColorStop(1, 'rgba(40,8,0,0)')
-    ctx.globalAlpha = 0.9 * fire
-    ctx.fillStyle = lobe
-    disk(ctx, x, y, radius)
+  ctx.globalCompositeOperation = 'lighter'
+  for (let i = 0; i < 140; i++) {
+    const a = fxRandom(cue.seed, i + 300) * Math.PI * 2
+    const d = fire * expand * (0.02 + fxRandom(cue.seed, i + 340) * 0.28)
+    const heat = fxRandom(cue.seed, i + 380)
+    const x = Math.cos(a) * d
+    const y = Math.sin(a) * d * 0.72 - fire * 0.03 - progress * 0.05
+    ctx.fillStyle = heat > 0.72
+      ? rgba(255, 236, 170, 0.16 * fire * power)
+      : heat > 0.4
+        ? rgba(255, 120, 28, 0.2 * fire * power)
+        : rgba(180, 28, 6, 0.14 * fire * power)
+    blob(ctx, x, y,
+      0.018 + fxRandom(cue.seed, i + 420) * 0.055,
+      0.012 + fxRandom(cue.seed, i + 460) * 0.05,
+      a + fxRandom(cue.seed, i + 500))
   }
 
-  ctx.strokeStyle = cue.color
-  for (let i = 0; i < 3; i++) {
-    const phase = Math.max(0, shock - i * 0.09)
-    if (phase <= 0) continue
-    ctx.globalAlpha = (1 - phase) * 0.62 * power
-    ctx.lineWidth = 0.016 * (1 - phase)
-    ctx.beginPath()
-    ctx.arc(0, 0.02, 0.06 + phase * 0.52, 0, tau)
-    ctx.stroke()
+  for (let i = 0; i < 22; i++) {
+    const a = fxRandom(cue.seed, i + 540) * Math.PI * 2
+    ctx.fillStyle = rgba(255, 250, 230, 0.22 * fire * power)
+    blob(ctx,
+      Math.cos(a) * fire * 0.03,
+      Math.sin(a) * fire * 0.02,
+      0.02 + fxRandom(cue.seed, i + 580) * 0.03,
+      0.015 + fxRandom(cue.seed, i + 620) * 0.025,
+      a)
   }
 
-  ctx.lineCap = 'round'
-  ctx.strokeStyle = '#ffe7a8'
-  for (let i = 0; i < 52; i++) {
-    const angle = fxRandom(cue.seed, i + 80) * tau
-    const dist = Math.pow(progress, 0.42) * (0.12 + fxRandom(cue.seed, i + 100) * 0.58)
-    const len = 0.03 + fxRandom(cue.seed, i + 120) * 0.14
-    ctx.globalAlpha = Math.pow(1 - progress, 0.55) * (0.35 + fxRandom(cue.seed, i + 140) * 0.55) * power
-    ctx.lineWidth = 0.004 + fxRandom(cue.seed, i + 160) * 0.007
-    ctx.beginPath()
-    ctx.moveTo(Math.cos(angle) * dist, Math.sin(angle) * dist)
-    ctx.lineTo(Math.cos(angle) * (dist + len), Math.sin(angle) * (dist + len) + progress * 0.05)
-    ctx.stroke()
+  if (flash > 0.04) {
+    for (let i = 0; i < 18; i++) {
+      const a = fxRandom(cue.seed, i + 700) * Math.PI * 2
+      ctx.fillStyle = rgba(255, 252, 240, 0.18 * flash)
+      blob(ctx, Math.cos(a) * 0.03, Math.sin(a) * 0.02,
+        0.04 + fxRandom(cue.seed, i + 740) * 0.08,
+        0.03 + fxRandom(cue.seed, i + 780) * 0.06, a)
+    }
   }
 
-  for (let i = 0; i < 11; i++) {
-    const angle = fxRandom(cue.seed, i + 200) * tau
-    const lift = smoke * (0.06 + fxRandom(cue.seed, i + 220) * 0.22)
-    const x = Math.cos(angle) * smoke * (0.04 + fxRandom(cue.seed, i + 240) * 0.16)
-    const y = -lift + fxRandom(cue.seed, i + 260) * 0.04
-    const radius = 0.05 + fxRandom(cue.seed, i + 280) * 0.11 + smoke * 0.08
-    const puff = ctx.createRadialGradient(x, y, 0, x, y, radius)
-    puff.addColorStop(0, 'rgba(90,72,62,0.55)')
-    puff.addColorStop(1, 'rgba(40,32,28,0)')
-    ctx.globalAlpha = 0.45 * smoke * (1 - smoke * 0.35) * power
-    ctx.fillStyle = puff
-    disk(ctx, x, y, radius)
+  ctx.globalCompositeOperation = 'lighter'
+  for (let i = 0; i < 110; i++) {
+    const a = fxRandom(cue.seed, i + 820) * Math.PI * 2
+    const dist = expand * (0.06 + fxRandom(cue.seed, i + 860) * 0.55)
+    const lift = progress * 0.06 * fxRandom(cue.seed, i + 900)
+    const glow = fxRandom(cue.seed, i + 940)
+    ctx.fillStyle = glow > 0.62
+      ? rgba(255, 210, 90, Math.pow(1 - progress, 0.75) * 0.55 * power)
+      : rgba(255, 90, 20, Math.pow(1 - progress, 0.6) * 0.28 * power)
+    blob(ctx, Math.cos(a) * dist, Math.sin(a) * dist * 0.78 + lift,
+      0.004 + fxRandom(cue.seed, i + 980) * 0.012,
+      0.003 + fxRandom(cue.seed, i + 1020) * 0.01,
+      a)
   }
+  ctx.restore()
 }

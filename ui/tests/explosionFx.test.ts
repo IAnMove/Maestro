@@ -24,7 +24,7 @@ test('ground blast template roundtrips 3D explosion plus 2D overlay', () => {
   assert.equal(parsed.duration, 6)
   assert.ok(parsed.worldSfx?.some(cue => cue.kind === 'explosion'))
   assert.ok(parsed.worldSfx?.some(cue => cue.kind === 'shockwave'))
-  assert.ok(parsed.sfx?.some(cue => cue.kind === 'explosion'))
+  assert.equal(parsed.sfx?.some(cue => cue.kind === 'explosion') ?? false, false)
   assert.equal(parsed.environment?.reflectiveFloor, true)
 })
 
@@ -45,29 +45,23 @@ test('3D explosion nodes seek and release like other cinematic kinds', () => {
   assert.equal(nodes.size, 0)
 })
 
-test('2D explosion painter is seeded and draws flash, rings and debris', () => {
+test('2D explosion painter is seeded and draws fire, debris and smoke without stroked rings', () => {
   const cue = parseSceneFx([{ id: 'e', kind: 'explosion', start: 0, end: 1, x: 50, y: 50, size: 80, intensity: 1.2, seed: 9 }])[0]
   const ops: string[] = []
-  const gradient = { addColorStop: () => { ops.push('stop') } }
   const ctx = {
     save() { ops.push('save') }, restore() { ops.push('restore') },
     translate() {}, scale() {}, rotate() {}, beginPath() { ops.push('path') },
-    arc() { ops.push('arc') }, fill() { ops.push('fill') }, stroke() { ops.push('stroke') },
-    moveTo() {}, lineTo() {},
-    createRadialGradient() { ops.push('grad'); return gradient },
-    fillRect() {}, measureText: () => ({ width: 0 }),
-    fillStyle: '', strokeStyle: '', globalAlpha: 1, lineWidth: 1, lineCap: 'butt',
+    ellipse() { ops.push('blob') }, fill() { ops.push('fill') }, stroke() { ops.push('stroke') },
+    fillRect() { ops.push('chunk') }, measureText: () => ({ width: 0 }),
+    fillStyle: '', strokeStyle: '', globalAlpha: 1, globalCompositeOperation: 'source-over',
     font: '', textAlign: 'left',
   } as unknown as CanvasRenderingContext2D
-  paintSceneFx(ctx, 96, 96, 0.08, [cue])
+  paintSceneFx(ctx, 96, 96, 0.12, [cue])
   const first = ops.join(',')
   ops.length = 0
-  paintSceneFx(ctx, 96, 96, 0.08, [cue])
+  paintSceneFx(ctx, 96, 96, 0.12, [cue])
   assert.equal(ops.join(','), first)
-  assert.ok(first.includes('grad'))
-  assert.ok(first.includes('arc'))
-  assert.ok(first.includes('stroke'))
-  ops.length = 0
-  paintSceneFx(ctx, 96, 96, 0.8, [cue])
-  assert.ok(ops.filter(op => op === 'grad').length >= 8)
+  assert.ok(first.includes('blob'))
+  assert.equal(first.includes('stroke'), false)
+  assert.equal(first.includes('chunk'), false)
 })
