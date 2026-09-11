@@ -144,7 +144,7 @@ function ObjectPanel({ slot, document, locked, onChange }: {
       </label>
       <label className="block">{t('inspector.source')}
         <input data-testid="scene3d-inspector-source" aria-label={t('inspector.source')} className={`${fieldClass} mt-1 w-full`} value={slot.sourceUrl}
-          onChange={event => onChange(patchScene3DSlot(document, slot.id, { sourceUrl: event.target.value, media: slot.media === 'screen' ? slot.media : 'model3d' }))} />
+          onChange={event => onChange(patchScene3DSlot(document, slot.id, { sourceUrl: event.target.value }))} />
       </label>
       <MouthFields slot={slot} face={face} document={document} onChange={onChange} />
       <div className="flex flex-wrap gap-2">

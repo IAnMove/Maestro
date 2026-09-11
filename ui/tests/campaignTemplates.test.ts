@@ -88,6 +88,23 @@ test('apply, bind roles, optional audio/text and H/V variants reopen as native s
   }
 })
 
+test('campaign display roles bind the board URL onto screen.sourceUrl', () => {
+  const bound = applyCampaignTemplate('screen-alert', {
+    roles: {
+      operator: '/api/v1/uploads/hero.glb',
+      display: '/api/v1/uploads/alert.mp4',
+    },
+  })
+  assert.ok(bound)
+  const board = bound.slots.find(slot => slot.id === 'alert-screen')
+  const operator = bound.slots.find(slot => slot.id === 'subject_1')
+  assert.equal(operator?.sourceUrl, '/api/v1/uploads/hero.glb')
+  assert.equal(board?.media, 'screen')
+  assert.equal(board?.sourceUrl, '')
+  assert.equal(board?.screen?.sourceUrl, '/api/v1/uploads/alert.mp4')
+  assert.equal(parseScene3DDocument(JSON.parse(JSON.stringify(bound)))?.slots.find(slot => slot.id === 'alert-screen')?.screen?.sourceUrl, '/api/v1/uploads/alert.mp4')
+})
+
 test('the eight shots use distinct cameras and distinct in/out actions', () => {
   const families = new Set<string>()
   const cameras = new Set<string>()
