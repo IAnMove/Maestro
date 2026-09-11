@@ -4,6 +4,7 @@ import { speechTemplateDocument, SPEECH_TEMPLATES, SPEECH_CATEGORIES } from './s
 import { mediaTemplateDocument, MEDIA_TEMPLATES, MEDIA_CATEGORIES } from './mediaTemplates'
 import { campaignTemplateDocument, CAMPAIGN_TEMPLATES, CAMPAIGN_CATEGORIES } from './campaignTemplates'
 import { adaptAuthoredCameraToFrame } from './frameFormat.ts'
+import { actionTemplateDocument, ACTION_TEMPLATES, ACTION_CATEGORIES } from './actionTemplates'
 import { createDefaultScene3DDocument } from './document.ts'
 import { SCENE3D_TEMPLATE_IDS, type Scene3DCamera, type Scene3DCameraFamily, type Scene3DDocument, type Scene3DSlot, type Scene3DSlotId, type Scene3DTemplateId } from './types.ts'
 
@@ -16,12 +17,13 @@ export type Scene3DTemplate = {
   slots: Scene3DSlotId[]
 }
 
-export type Scene3DTemplateCategory = 'cinema' | 'product' | 'music' | 'space' | 'drive'
+export type Scene3DTemplateCategory = 'cinema' | 'action' | 'product' | 'music' | 'space' | 'drive'
 export const TEMPLATE_CATEGORIES: Record<Scene3DTemplateId, Scene3DTemplateCategory> = {
   ...CINEMATIC_CATEGORIES,
   ...SPEECH_CATEGORIES,
   ...MEDIA_CATEGORIES,
   ...CAMPAIGN_CATEGORIES,
+  ...ACTION_CATEGORIES,
   'reflective-stage': 'cinema',
   'character-materialization': 'cinema',
   'blast-stage': 'cinema',
@@ -159,6 +161,7 @@ export const SCENE3D_TEMPLATES: readonly Scene3DTemplate[] = [
   ...MEDIA_TEMPLATES,
   ...EFFECTS_TEMPLATES,
   ...CAMPAIGN_TEMPLATES,
+  ...ACTION_TEMPLATES,
 ]
 
 const LAYOUTS: Partial<Record<Scene3DTemplateId, Partial<Record<Scene3DSlotId, Pick<Scene3DSlot, 'position' | 'rotationY' | 'scale'>>>>> = {
@@ -351,6 +354,8 @@ function emptySlot(id: Scene3DSlotId): Scene3DSlot {
 }
 
 export function applyScene3DTemplate(id: Scene3DTemplateId): Scene3DDocument {
+  const action = actionTemplateDocument(id)
+  if (action) return action
   const campaign = campaignTemplateDocument(id)
   if (campaign) return campaign
   const effects = effectsTemplateDocument(id)

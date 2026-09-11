@@ -2,9 +2,10 @@ import { useState } from 'react'
 import { Search } from 'lucide-react'
 import { useUiTranslation } from '../../i18n'
 import { campaignCard } from './campaignTemplates'
+import { actionCard } from './actionTemplates'
 import { SCENE3D_TEMPLATES, TEMPLATE_CATEGORIES, type Scene3DTemplateCategory, type Scene3DTemplateId } from './templates'
 
-const categories = ['cinema', 'product', 'music', 'space', 'drive'] as const
+const categories = ['cinema', 'action', 'product', 'music', 'space', 'drive'] as const
 
 export function Scene3DTemplateBrowser({ selected, disabled, onSelect }: {
   selected?: Scene3DTemplateId; disabled: boolean; onSelect: (id: Scene3DTemplateId) => void
@@ -14,7 +15,7 @@ export function Scene3DTemplateBrowser({ selected, disabled, onSelect }: {
   const [query, setQuery] = useState('')
   const locale = i18n.language.startsWith('es') ? 'es' : 'en'
   const templates = SCENE3D_TEMPLATES.filter(item => {
-    const card = campaignCard(item.id, locale)
+    const card = campaignCard(item.id, locale) ?? actionCard(item.id, locale)
     const haystack = `${t(`template.${item.id}.title`)} ${t(`template.${item.id}.description`)} ${card?.requirements.join(' ') ?? ''}`
     return (category === 'all' || TEMPLATE_CATEGORIES[item.id] === category)
       && haystack.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())
@@ -34,7 +35,7 @@ export function Scene3DTemplateBrowser({ selected, disabled, onSelect }: {
     </div>
     <div className="grid max-h-72 grid-cols-1 gap-2 overflow-y-auto p-1 sm:grid-cols-2 xl:grid-cols-3">
       {templates.map(item => {
-        const card = campaignCard(item.id, locale)
+        const card = campaignCard(item.id, locale) ?? actionCard(item.id, locale)
         return <button key={item.id} type="button" disabled={disabled} onClick={() => onSelect(item.id)} aria-pressed={selected === item.id}
           data-testid={`world3d-template-${item.id}`}
           className={`rounded-lg border p-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-cyan-200 disabled:opacity-40 ${selected === item.id ? 'border-cyan-300 bg-cyan-300/10' : 'border-border bg-bg-primary hover:border-cyan-300/50'}`}>

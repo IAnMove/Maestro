@@ -226,6 +226,7 @@
   "cameraHelp": "Puedes cambiar la cámara; tus objetos conservan su identidad.",
   "category": {
     "cinema": "Cine",
+    "action": "Acción",
     "product": "Producto",
     "music": "Videoclip",
     "space": "Espacio",
@@ -567,6 +568,70 @@
     "heroic-close": {
       "title": "Cierre heroico",
       "description": "Un empuje bajo a la cara mientras el héroe entra en primer plano."
+    },
+    "sea-deck": {
+      "title": "Cubierta en el mar",
+      "description": "Dos protagonistas recorren la cubierta de un barco en mar abierto mientras el agua golpea la proa."
+    },
+    "lunar-outpost": {
+      "title": "Puesto lunar",
+      "description": "Un astronauta cruza el regolito hacia el hábitat con la Tierra en el cielo."
+    },
+    "car-chase": {
+      "title": "Persecución en coche",
+      "description": "Un travelling lateral se pega a dos coches a toda velocidad por la ciudad."
+    },
+    "ship-chase": {
+      "title": "Persecución de naves",
+      "description": "Dos naves cruzan un pasillo de asteroides mientras los láseres cortan la oscuridad."
+    },
+    "rooftop-run": {
+      "title": "Carrera en azotea",
+      "description": "La cámara de persecución sigue a dos corredores por la azotea hacia el helipuerto."
+    },
+    "alley-motorcycle": {
+      "title": "Moto en callejón",
+      "description": "Una carrera a ras de faro por una calle estrecha con el objetivo al frente."
+    },
+    "hangar-standoff": {
+      "title": "Enfrentamiento en hangar",
+      "description": "Dos figuras cierran distancias en un hangar hasta quedarse a pocos metros."
+    },
+    "train-roof": {
+      "title": "Techo del tren",
+      "description": "Dos luchadores se cierran en el techo de un tren en marcha mientras el paisaje vuela."
+    },
+    "desert-convoy": {
+      "title": "Convoy en el desierto",
+      "description": "Una cámara de seguimiento monta tres vehículos por un cañón entre dunas."
+    },
+    "night-rain-pursuit": {
+      "title": "Persecución bajo la lluvia",
+      "description": "Persecución de frente por una calle inundada cuando cae el rayo."
+    },
+    "dock-ambush": {
+      "title": "Emboscada en el muelle",
+      "description": "Un paseo por el muelle acaba en explosión cuando sale la segunda figura."
+    },
+    "bridge-standoff": {
+      "title": "Enfrentamiento en el puente",
+      "description": "Dos figuras recorren un puente aéreo desde extremos opuestos y se detienen en el centro."
+    },
+    "cockpit-pursuit": {
+      "title": "Persecución desde cabina",
+      "description": "Vista de cabina mientras la nave enemiga llena el cristal."
+    },
+    "helicopter-extract": {
+      "title": "Extracción en helicóptero",
+      "description": "Una grúa baja al helipuerto mientras el protagonista entra a la carrera."
+    },
+    "warehouse-breach": {
+      "title": "Asalto al almacén",
+      "description": "La puerta salta y el protagonista entra mientras el guardia busca cobertura."
+    },
+    "canyon-run": {
+      "title": "Carrera en el cañón",
+      "description": "Dos vehículos se cuelan por un cañón del desierto con la arena saltando de las paredes."
     }
   },
   "gallerySearch": "Buscar en el catálogo",

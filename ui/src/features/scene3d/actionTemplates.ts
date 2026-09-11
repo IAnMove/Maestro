@@ -1,0 +1,533 @@
+import { createDefaultScene3DDocument, parseScene3DDocument } from './document.ts'
+import { parseSceneFx } from '../sceneFx/types.ts'
+import { parseWorldSfx } from '../sceneFx/world.ts'
+import type { KineticText } from '../../lib/kineticText.ts'
+import type {
+  Scene3DCamera,
+  Scene3DCameraFamily,
+  Scene3DDocument,
+  Scene3DLight,
+  Scene3DSlot,
+  Scene3DSlotId,
+  Scene3DSourceRef,
+  Vec3,
+} from './types.ts'
+
+export const ACTION_TEMPLATE_IDS = [
+  'sea-deck',
+  'lunar-outpost',
+  'car-chase',
+  'ship-chase',
+  'rooftop-run',
+  'alley-motorcycle',
+  'hangar-standoff',
+  'train-roof',
+  'desert-convoy',
+  'night-rain-pursuit',
+  'dock-ambush',
+  'bridge-standoff',
+  'cockpit-pursuit',
+  'helicopter-extract',
+  'warehouse-breach',
+  'canyon-run',
+] as const
+
+export type ActionTemplateId = typeof ACTION_TEMPLATE_IDS[number]
+export type ActionOrientation = 'horizontal' | 'vertical'
+export type ActionApplyOptions = {
+  orientation?: ActionOrientation
+  roles?: Partial<Record<string, string>>
+  audio?: Scene3DSourceRef
+  text?: boolean | string
+}
+export type ActionCardCopy = { title: string; description: string; requirements: string[] }
+
+type ActionSpec = {
+  category: 'action'
+  duration: number
+  dressing?: Scene3DDocument['dressing']
+  environment?: Scene3DDocument['environment']
+  light: Scene3DLight
+  camera: Scene3DCamera
+  slots: Scene3DSlot[]
+  aliases: Record<string, string>
+  texts: KineticText[]
+  worldSfx: Array<Record<string, unknown>>
+  sfx: Array<Record<string, unknown>>
+  copy: { en: ActionCardCopy; es: ActionCardCopy }
+}
+
+const PI = Math.PI
+const model = (id: string, slot: Scene3DSlotId, position: Vec3, patch: Partial<Scene3DSlot> = {}): Scene3DSlot => ({
+  id, slot, media: 'model3d', sourceUrl: '', clip: null, position, rotationY: 0, scale: 1, ...patch,
+})
+const backdrop = (position: Vec3, patch: Partial<Scene3DSlot> = {}): Scene3DSlot => (
+  model('background', 'background', position, { media: 'image', scale: 8, ...patch })
+)
+const cam = (family: Scene3DCameraFamily, eye: Vec3, look: Vec3, fov: number, patch: Partial<Scene3DCamera> = {}): Scene3DCamera => (
+  { family, eye, look, fov, ...patch }
+)
+const light = (direction: Vec3, intensity: number, color: string): Scene3DLight => (
+  { kind: 'directional', direction, intensity, color }
+)
+const title = (id: string, text: string, preset: KineticText['preset'], x: number, y: number, size: number, color: string, end: number): KineticText => (
+  { id, text, start: 0.2, end, preset, x, y, size, color, rotation: 0 }
+)
+const copy = (en: ActionCardCopy, es: ActionCardCopy) => ({ en, es })
+
+export function isActionTemplateId(id: string): id is ActionTemplateId {
+  return (ACTION_TEMPLATE_IDS as readonly string[]).includes(id)
+}
+
+const SPECS: Record<ActionTemplateId, ActionSpec> = {
+  'sea-deck': {
+    category: 'action', duration: 8, dressing: 'open-sea',
+    light: light([-0.35, -0.85, 0.25], 2.6, '#ffe2b0'),
+    camera: cam('establishment', [6.4, 2.6, 9.2], [0, 0.85, 0.4], 42),
+    slots: [
+      model('subject_1', 'subject_1', [-0.6, 0, 4.6], { rotationY: PI, motion: { to: [0.15, 0, 0.55], faceTravel: true, easing: 'smooth' } }),
+      model('subject_2', 'subject_2', [1.35, 0, -4.2], { rotationY: 0, scale: 0.96, motion: { to: [1.2, 0, 1.1], faceTravel: true, easing: 'smooth' } }),
+    ],
+    aliases: { captain: 'subject_1', crew: 'subject_2' },
+    texts: [title('sea-label', 'OPEN WATER', 'rise', 50, 14, 9, '#d7f4ff', 6.8)],
+    worldSfx: [
+      { id: 'bow-splash', kind: 'splash', start: 0, end: 8, position: { x: 0, y: 0.02, z: -6.2 }, scale: 1.6, color: '#9ad8ff' },
+      { id: 'sea-fog', kind: 'fog', start: 0, end: 8, position: { x: 0, y: 0.08, z: -4 }, scale: 2.2, color: '#c5e7f4' },
+    ],
+    sfx: [{ id: 'horizon', kind: 'aurora', start: 0.3, end: 7.6, x: 50, y: 22 }],
+    copy: copy(
+      { title: 'Sea deck', description: 'Two leads walk the deck of a boat on open water while spray hits the bow.', requirements: ['GLB captain (lead)', 'GLB crew (second)', 'Optional seascape plate', 'Optional title / soundtrack'] },
+      { title: 'Cubierta en el mar', description: 'Dos protagonistas recorren la cubierta de un barco en mar abierto mientras el agua golpea la proa.', requirements: ['GLB capitán (protagonista)', 'GLB tripulación (segundo)', 'Placa de mar opcional', 'Título / banda sonora opcionales'] },
+    ),
+  },
+  'lunar-outpost': {
+    category: 'action', duration: 9, dressing: 'lunar',
+    environment: { reflectiveFloor: false, platform: false, bloom: 0.38 },
+    light: light([-0.55, -0.7, -0.2], 2.8, '#e8f0ff'),
+    camera: cam('orbit', [0, 1.7, 6.4], [0, 1.1, 0], 42, { orbitRadius: 6.4, orbitHeight: 1.35, orbitTurns: 0.32 }),
+    slots: [
+      model('subject_1', 'subject_1', [-4.6, 0, 2.8], { motion: { to: [0.35, 0, -0.4], faceTravel: true, easing: 'smooth' } }),
+      model('prop', 'prop', [2.4, 0, -1.8], { scale: 0.85, grounded: true }),
+    ],
+    aliases: { astronaut: 'subject_1', habitat: 'prop' },
+    texts: [title('moon-label', 'NEAR SIDE', 'typewriter', 18, 86, 7, '#d7e8ff', 7.6)],
+    worldSfx: [
+      { id: 'regolith', kind: 'dust', start: 0.4, end: 9, position: { x: 0, y: 0.03, z: 0 }, scale: 1.8, color: '#c9c4b8' },
+      { id: 'suit-ice', kind: 'ice_burst', start: 2.2, end: 4.4, position: { x: 0.3, y: 0.4, z: -0.3 }, color: '#cfefff' },
+    ],
+    sfx: [{ id: 'stars', kind: 'stars', start: 0.2, end: 8.6, x: 50, y: 28 }],
+    copy: copy(
+      { title: 'Lunar outpost', description: 'An astronaut crosses cratered ground toward a habitat with Earth hanging in the sky.', requirements: ['GLB astronaut (lead)', 'Optional habitat prop', 'Optional sky plate', 'Optional title / soundtrack'] },
+      { title: 'Puesto lunar', description: 'Un astronauta cruza el regolito hacia el hábitat con la Tierra en el cielo.', requirements: ['GLB astronauta (protagonista)', 'Atrezzo de hábitat opcional', 'Placa de cielo opcional', 'Título / banda sonora opcionales'] },
+    ),
+  },
+  'car-chase': {
+    category: 'action', duration: 6, dressing: 'chase-street',
+    light: light([-0.15, -0.65, 0.55], 1.9, '#ffe6c8'),
+    camera: cam('side', [0, 1.2, 5.2], [0, 0.85, 0], 40, {
+      eyeOffset: [5.6, 0.08, 0.55], targetOffset: [0, 0.05, 0],
+      framing: { targetSlot: 'subject_1', anchor: 'center', from: [5.5, 0.12, 0.45], to: [5.5, 0.2, -0.3], relativeToFacing: true },
+    }),
+    slots: [
+      model('subject_1', 'subject_1', [-8.4, 0, 0], { rotationY: PI / 2, motion: { to: [9.2, 0, 0], faceTravel: true, easing: 'linear' } }),
+      model('subject_2', 'subject_2', [-11.6, 0, -1.35], { rotationY: PI / 2, scale: 0.96, motion: { to: [6.4, 0, -1.35], faceTravel: true, easing: 'linear' } }),
+      backdrop([0, 1, -7], { scale: 14 }),
+    ],
+    aliases: { leadCar: 'subject_1', pursuer: 'subject_2', backdrop: 'background' },
+    texts: [title('chase-label', 'DO NOT LOSE THEM', 'impact', 78, 16, 9, '#ffe3a0', 5.2)],
+    worldSfx: [
+      { id: 'tire-dust', kind: 'dust', start: 0, end: 6, position: { x: 0, y: 0.03, z: 0 }, scale: 1.7 },
+      { id: 'exhaust', kind: 'smoke', start: 0.3, end: 6, position: { x: -3, y: 0.25, z: -0.5 }, color: '#6b5348', anchor: { slotId: 'subject_2', offset: { x: 0, y: 0.3, z: 1.6 } } },
+      { id: 'rim-sparks', kind: 'sparks', start: 1.4, end: 5.6, position: { x: 0, y: 0.12, z: 0 }, color: '#ffbb55', anchor: { slotId: 'subject_1', offset: { x: -0.8, y: 0.1, z: 0 } } },
+    ],
+    sfx: [{ id: 'whoosh', kind: 'speedlines', start: 0.15, end: 6, x: 50, y: 48 }],
+    copy: copy(
+      { title: 'Car chase', description: 'A side track sticks to two cars screaming down a city street.', requirements: ['GLB lead car', 'GLB pursuer car', 'Optional street plate', 'Optional title / soundtrack'] },
+      { title: 'Persecución en coche', description: 'Un travelling lateral se pega a dos coches a toda velocidad por la ciudad.', requirements: ['GLB coche principal', 'GLB coche perseguidor', 'Placa de calle opcional', 'Título / banda sonora opcionales'] },
+    ),
+  },
+  'ship-chase': {
+    category: 'action', duration: 7, dressing: 'space-lane',
+    environment: { reflectiveFloor: false, platform: false, bloom: 0.62 },
+    light: light([-0.4, -0.35, 0.7], 2.2, '#dceaff'),
+    camera: cam('chase', [0.4, 1.4, 6.2], [0, 0.9, -1.2], 46),
+    slots: [
+      model('subject_1', 'subject_1', [-1.6, 1.1, 2.4], { scale: 0.85, motion: { to: [2.4, 0.7, -7.2], faceTravel: true, easing: 'linear' } }),
+      model('subject_2', 'subject_2', [1.8, 2.2, 6.4], { scale: 0.78, motion: { to: [3.6, 1.1, -3.4], faceTravel: true, easing: 'linear' } }),
+    ],
+    aliases: { fighter: 'subject_1', hunter: 'subject_2' },
+    texts: [title('space-label', 'LOCK ON', 'impact', 76, 18, 10, '#9be7ff', 5.8)],
+    worldSfx: [
+      { id: 'cannon', kind: 'laser', start: 0.6, end: 6.4, position: { x: 1.8, y: 2.1, z: 5.2 }, targetPosition: { x: -1.2, y: 1.1, z: 1.6 }, color: '#66ffbb' },
+      { id: 'beam', kind: 'energy_beam', start: 2.1, end: 4.8, position: { x: 3, y: 1.6, z: 0.4 }, targetPosition: { x: 1.4, y: 0.9, z: -4.2 }, color: '#70dcff' },
+      { id: 'burst', kind: 'explosion', start: 5.2, end: 7, position: { x: 2.8, y: 1.2, z: -3.6 }, color: '#ff7040', scale: 1.4 },
+    ],
+    sfx: [{ id: 'hud', kind: 'scanline', start: 0, end: 7, x: 50, y: 42, color: '#66ffbb' }],
+    copy: copy(
+      { title: 'Ship chase', description: 'Two craft tear through an asteroid lane while lasers stitch the dark.', requirements: ['GLB lead ship', 'GLB hunter ship', 'Optional nebula plate', 'Optional title / soundtrack'] },
+      { title: 'Persecución de naves', description: 'Dos naves cruzan un pasillo de asteroides mientras los láseres cortan la oscuridad.', requirements: ['GLB nave principal', 'GLB nave cazadora', 'Placa de nebulosa opcional', 'Título / banda sonora opcionales'] },
+    ),
+  },
+  'rooftop-run': {
+    category: 'action', duration: 6, dressing: 'rooftop',
+    light: light([-0.2, -0.75, 0.4], 2.1, '#ffd7c0'),
+    camera: cam('pursuit', [0, 1.4, 4.2], [0, 1.1, 0], 44, {
+      eyeOffset: [-2.2, 0.2, 3.1], targetOffset: [0, 0.1, 0],
+      framing: { targetSlot: 'subject_1', anchor: 'center', from: [-2.0, 0.25, 3.0], to: [-1.6, 0.18, 2.4], relativeToFacing: true },
+    }),
+    slots: [
+      model('subject_1', 'subject_1', [-7.2, 0, 0.4], { rotationY: PI / 2, motion: { to: [7.4, 0, 0.4], faceTravel: true, easing: 'linear' } }),
+      model('subject_2', 'subject_2', [-9.4, 0, -1.1], { rotationY: PI / 2, scale: 0.97, motion: { to: [5.1, 0, -1.1], faceTravel: true, easing: 'linear' } }),
+      backdrop([0, 1, -10], { scale: 12 }),
+    ],
+    aliases: { runner: 'subject_1', pursuer: 'subject_2', backdrop: 'background' },
+    texts: [title('roof-label', 'NO WAY DOWN', 'impact', 78, 18, 9, '#ffe3a0', 5.1)],
+    worldSfx: [
+      { id: 'grit', kind: 'dust', start: 0, end: 6, position: { x: 0, y: 0.03, z: 0.4 }, scale: 1.4 },
+      { id: 'vent-steam', kind: 'smoke', start: 0.8, end: 6, position: { x: -6.4, y: 1.1, z: -5.2 }, color: '#9aa4b0' },
+    ],
+    sfx: [{ id: 'dash', kind: 'speedlines', start: 0.2, end: 6, x: 52, y: 46 }],
+    copy: copy(
+      { title: 'Rooftop run', description: 'A pursuit camera chases two runners across a city roof toward the helipad.', requirements: ['GLB lead runner', 'GLB pursuer', 'Optional skyline plate', 'Optional title / soundtrack'] },
+      { title: 'Carrera en azotea', description: 'La cámara de persecución sigue a dos corredores por la azotea hacia el helipuerto.', requirements: ['GLB corredor principal', 'GLB perseguidor', 'Placa de skyline opcional', 'Título / banda sonora opcionales'] },
+    ),
+  },
+  'alley-motorcycle': {
+    category: 'action', duration: 5, dressing: 'chase-street',
+    light: light([0.1, -0.55, 0.7], 1.7, '#ffc8a0'),
+    camera: cam('side', [0, 0.85, 4.4], [0, 0.7, 0], 38, {
+      eyeOffset: [4.4, -0.15, 0.7], targetOffset: [0, -0.05, 0],
+      framing: { targetSlot: 'subject_1', anchor: 'center', from: [4.3, -0.1, 0.55], to: [4.3, -0.05, -0.2], relativeToFacing: true },
+    }),
+    slots: [
+      model('subject_1', 'subject_1', [-7.2, 0, 0.2], { rotationY: PI / 2, scale: 0.85, motion: { to: [8.4, 0, 0.2], faceTravel: true, easing: 'linear' } }),
+      model('subject_2', 'subject_2', [-10.4, 0, -1.2], { rotationY: PI / 2, scale: 0.82, motion: { to: [5.6, 0, -1.2], faceTravel: true, easing: 'linear' } }),
+      backdrop([0, 1, -7], { scale: 12 }),
+    ],
+    aliases: { rider: 'subject_1', target: 'subject_2', backdrop: 'background' },
+    texts: [title('bike-label', 'HOLD ON', 'impact', 50, 80, 10, '#ffd18a', 4.4)],
+    worldSfx: [
+      { id: 'alley-sparks', kind: 'sparks', start: 0.4, end: 5, position: { x: -0.6, y: 0.08, z: -1.2 }, color: '#ffbb55' },
+      { id: 'engine-smoke', kind: 'smoke', start: 0, end: 5, position: { x: 0, y: 0.2, z: 1.1 }, color: '#5a4a42' },
+    ],
+    sfx: [{ id: 'rush', kind: 'speedlines', start: 0, end: 5, x: 50, y: 50 }],
+    copy: copy(
+      { title: 'Alley motorcycle', description: 'A hood-mounted rush down a tight street with the target dead ahead.', requirements: ['GLB rider or bike (lead)', 'GLB target ahead', 'Optional alley plate', 'Optional title / soundtrack'] },
+      { title: 'Moto en callejón', description: 'Una carrera a ras de faro por una calle estrecha con el objetivo al frente.', requirements: ['GLB piloto o moto (protagonista)', 'GLB objetivo delante', 'Placa de callejón opcional', 'Título / banda sonora opcionales'] },
+    ),
+  },
+  'hangar-standoff': {
+    category: 'action', duration: 7, dressing: 'hangar',
+    light: light([-0.45, -0.8, -0.15], 2.45, '#fff0d9'),
+    camera: cam('encounter', [0, 1.7, 7.4], [0, 1.15, 0], 40),
+    slots: [
+      model('subject_1', 'subject_1', [-5.2, 0, 1.4], { rotationY: 1.15, motion: { to: [-1.55, 0, 0.25], turnTo: 1.05, easing: 'smooth' } }),
+      model('subject_2', 'subject_2', [5.4, 0, 1.2], { rotationY: -1.15, scale: 0.98, motion: { to: [1.6, 0, 0.2], turnTo: -1.05, easing: 'smooth' } }),
+      model('prop', 'prop', [0, 0, -3.4], { scale: 1.1, grounded: true }),
+      backdrop([0, 1.6, -10], { scale: 10 }),
+    ],
+    aliases: { agent: 'subject_1', rival: 'subject_2', crate: 'prop', backdrop: 'background' },
+    texts: [title('hangar-label', 'NO DEAL', 'impact', 50, 16, 10, '#ffe3a0', 5.8)],
+    worldSfx: [
+      { id: 'weld', kind: 'sparks', start: 0.6, end: 6.8, position: { x: -8.2, y: 1.4, z: -4 }, color: '#ffbb55' },
+      { id: 'standoff-aura', kind: 'anime_aura', start: 2.4, end: 7, position: { x: -1.55, y: 0.9, z: 0.25 }, color: '#ffe36c', anchor: { slotId: 'subject_1', offset: { x: 0, y: 0.9, z: 0 } } },
+    ],
+    sfx: [{ id: 'tension', kind: 'scanline', start: 0.2, end: 7, x: 50, y: 40 }],
+    copy: copy(
+      { title: 'Hangar standoff', description: 'Two figures close the gap inside a hangar until they freeze a few metres apart.', requirements: ['GLB agent (lead)', 'GLB rival', 'Optional crate prop', 'Optional title / soundtrack'] },
+      { title: 'Enfrentamiento en hangar', description: 'Dos figuras cierran distancias en un hangar hasta quedarse a pocos metros.', requirements: ['GLB agente (protagonista)', 'GLB rival', 'Atrezzo de caja opcional', 'Título / banda sonora opcionales'] },
+    ),
+  },
+  'train-roof': {
+    category: 'action', duration: 6, dressing: 'train',
+    light: light([-0.25, -0.7, 0.45], 2.15, '#e8f0ff'),
+    camera: cam('side', [0, 1.4, 5.2], [0, 0.9, 0], 40, {
+      eyeOffset: [6.8, 1.35, 0.8], targetOffset: [0, 0.05, 0],
+    }),
+    slots: [
+      model('subject_1', 'subject_1', [-3.4, 0, 0.35], { rotationY: PI / 2, motion: { to: [4.2, 0, 0.35], faceTravel: true, easing: 'linear' } }),
+      model('subject_2', 'subject_2', [5.6, 0, -0.45], { rotationY: -PI / 2, scale: 0.96, motion: { to: [-1.2, 0, -0.45], faceTravel: true, easing: 'linear' } }),
+      backdrop([0, 1.2, -8], { scale: 11 }),
+    ],
+    aliases: { runner: 'subject_1', blocker: 'subject_2', backdrop: 'background' },
+    texts: [title('train-label', 'KEEP MOVING', 'impact', 78, 16, 9, '#d7e8ff', 5.2)],
+    worldSfx: [
+      { id: 'rail-sparks', kind: 'sparks', start: 0, end: 6, position: { x: 0, y: -2.2, z: 0.7 }, color: '#ffbb55' },
+      { id: 'wind', kind: 'smoke', start: 0.2, end: 6, position: { x: -4, y: 0.4, z: 0 }, color: '#9aa8b8' },
+    ],
+    sfx: [{ id: 'rush', kind: 'speedlines', start: 0.15, end: 6, x: 48, y: 44 }],
+    copy: copy(
+      { title: 'Train roof', description: 'Two fighters close on a moving train roof while the landscape screams past.', requirements: ['GLB lead on the roof', 'GLB opponent', 'Optional countryside plate', 'Optional title / soundtrack'] },
+      { title: 'Techo del tren', description: 'Dos luchadores se cierran en el techo de un tren en marcha mientras el paisaje vuela.', requirements: ['GLB protagonista en el techo', 'GLB oponente', 'Placa de paisaje opcional', 'Título / banda sonora opcionales'] },
+    ),
+  },
+  'desert-convoy': {
+    category: 'action', duration: 8, dressing: 'desert',
+    light: light([-0.55, -0.75, 0.2], 2.7, '#ffe0b0'),
+    camera: cam('follow', [0.4, 2.4, 8.5], [0, 1.0, 0], 48, { eyeOffset: [0.5, 1.15, 8.2], targetOffset: [0, 0.12, 0], orbitRadius: 8.2 }),
+    slots: [
+      model('subject_1', 'subject_1', [-7.4, 0, 0], { rotationY: PI / 2, motion: { to: [8.6, 0, 0], faceTravel: true, easing: 'linear' } }),
+      model('subject_2', 'subject_2', [-10.8, 0, -2.1], { rotationY: PI / 2, scale: 0.95, motion: { to: [5.2, 0, -2.1], faceTravel: true, easing: 'linear' } }),
+      model('prop', 'prop', [-13.6, 0, 1.6], { rotationY: PI / 2, scale: 1.05, motion: { to: [2.4, 0, 1.6], faceTravel: true, easing: 'linear' } }),
+      backdrop([0, 1.4, -16], { scale: 14 }),
+    ],
+    aliases: { lead: 'subject_1', escort: 'subject_2', tanker: 'prop', backdrop: 'background' },
+    texts: [title('convoy-label', 'STAY IN FORMATION', 'typewriter', 50, 84, 7, '#ffe3a0', 6.8)],
+    worldSfx: [
+      { id: 'wake', kind: 'dust', start: 0, end: 8, position: { x: 0, y: 0.04, z: 0 }, scale: 2.2, color: '#c9a06a' },
+      { id: 'heat', kind: 'fog', start: 0, end: 8, position: { x: 0, y: 0.2, z: -6 }, scale: 2.4, color: '#e8c48a' },
+    ],
+    sfx: [{ id: 'glare', kind: 'sparks', start: 1.1, end: 7.2, x: 70, y: 28, size: 30 }],
+    copy: copy(
+      { title: 'Desert convoy', description: 'A follow cam rides three vehicles through a canyon cut in the dunes.', requirements: ['GLB lead vehicle', 'GLB escort', 'GLB tanker or third vehicle (prop)', 'Optional desert plate'] },
+      { title: 'Convoy en el desierto', description: 'Una cámara de seguimiento monta tres vehículos por un cañón entre dunas.', requirements: ['GLB vehículo principal', 'GLB escolta', 'GLB cisterna o tercer vehículo (atrezzo)', 'Placa de desierto opcional'] },
+    ),
+  },
+  'night-rain-pursuit': {
+    category: 'action', duration: 7, dressing: 'chase-street',
+    light: light([0.2, -0.6, -0.45], 1.55, '#c8d8ff'),
+    camera: cam('front', [0, 1.25, 4.2], [0, 1.05, 0], 36, { eyeOffset: [0, -0.05, 4.2], targetOffset: [0, 0.05, 0] }),
+    slots: [
+      model('subject_1', 'subject_1', [0, 0, 7.4], { rotationY: PI, motion: { to: [0, 0, -3.8], faceTravel: true, easing: 'linear' } }),
+      model('subject_2', 'subject_2', [0.85, 0, 9.6], { rotationY: PI, scale: 0.96, motion: { to: [0.7, 0, -1.6], faceTravel: true, easing: 'linear' } }),
+      backdrop([0, 1, -8], { scale: 13 }),
+    ],
+    aliases: { quarry: 'subject_1', hunter: 'subject_2', backdrop: 'background' },
+    texts: [title('rain-label', 'WET STREETS', 'rise', 50, 16, 8, '#b8d4ff', 6.2)],
+    worldSfx: [
+      { id: 'downpour', kind: 'rain', start: 0, end: 7, position: { x: 0, y: 0.05, z: 0 }, scale: 2.4, color: '#88bbff' },
+      { id: 'flash', kind: 'lightning', start: 1.6, end: 2.4, position: { x: 2, y: 8, z: -4 }, targetPosition: { x: 0.4, y: 0.2, z: -2 }, color: '#bbddff' },
+      { id: 'splash-tyre', kind: 'splash', start: 0.4, end: 7, position: { x: 0, y: 0.02, z: 2 }, scale: 1.3, color: '#9ad0ff', anchor: { slotId: 'subject_1', offset: { x: 0, y: 0.05, z: 1.2 } } },
+    ],
+    sfx: [{ id: 'scan', kind: 'scanline', start: 0, end: 7, x: 50, y: 46, color: '#88bbff' }],
+    copy: copy(
+      { title: 'Night rain pursuit', description: 'Head-on pursuit through a flooded street as lightning hits the block.', requirements: ['GLB quarry (lead)', 'GLB hunter', 'Optional wet-street plate', 'Optional title / soundtrack'] },
+      { title: 'Persecución bajo la lluvia', description: 'Persecución de frente por una calle inundada cuando cae el rayo.', requirements: ['GLB objetivo (protagonista)', 'GLB cazador', 'Placa de calle mojada opcional', 'Título / banda sonora opcionales'] },
+    ),
+  },
+  'dock-ambush': {
+    category: 'action', duration: 6, dressing: 'open-sea',
+    light: light([-0.3, -0.82, 0.35], 2.05, '#ffd7c4'),
+    camera: cam('establishment', [9.6, 2.5, 8.4], [7.4, 0.85, 0.2], 44),
+    slots: [
+      model('subject_1', 'subject_1', [4.4, 0, 1.6], { rotationY: PI / 2, motion: { to: [8.1, 0, 0.2], faceTravel: true, easing: 'smooth' } }),
+      model('subject_2', 'subject_2', [10.6, 0, -1.5], { rotationY: -1.9, scale: 0.97, motion: { to: [8.8, 0, 0.15], turnTo: -2.2, easing: 'smooth' } }),
+    ],
+    aliases: { walker: 'subject_1', ambusher: 'subject_2' },
+    texts: [title('dock-label', 'TOO QUIET', 'typewriter', 22, 84, 7, '#ffe3a0', 5.2)],
+    worldSfx: [
+      { id: 'blast', kind: 'explosion', start: 3.1, end: 5.4, position: { x: 9.2, y: 0.45, z: -0.4 }, color: '#ff7040', scale: 1.7, sound: true },
+      { id: 'shock', kind: 'shockwave', start: 3.2, end: 5.6, position: { x: 9.2, y: 0.03, z: -0.4 }, color: '#ff8866', scale: 1.6 },
+      { id: 'spray', kind: 'splash', start: 3.15, end: 6, position: { x: 11.2, y: 0.02, z: 0 }, scale: 1.5, color: '#9ad8ff' },
+    ],
+    sfx: [{ id: 'hit', kind: 'manga_impact', start: 3.05, end: 4.6, x: 58, y: 48 }],
+    copy: copy(
+      { title: 'Dock ambush', description: 'A walk along the pier turns into an explosion as the second figure steps out.', requirements: ['GLB walker (lead)', 'GLB ambusher', 'Optional harbour plate', 'Optional title / soundtrack'] },
+      { title: 'Emboscada en el muelle', description: 'Un paseo por el muelle acaba en explosión cuando sale la segunda figura.', requirements: ['GLB peatón (protagonista)', 'GLB emboscador', 'Placa de puerto opcional', 'Título / banda sonora opcionales'] },
+    ),
+  },
+  'bridge-standoff': {
+    category: 'action', duration: 6, dressing: 'rooftop',
+    light: light([0.15, -0.88, -0.3], 2.25, '#e4ecff'),
+    camera: cam('encounter', [7.6, 2.15, 16], [0, 1.15, 16], 40),
+    slots: [
+      model('subject_1', 'subject_1', [0, 0, 8.4], { rotationY: 0, motion: { to: [0, 0, 14.2], faceTravel: true, easing: 'smooth' } }),
+      model('subject_2', 'subject_2', [0, 0, 22.6], { rotationY: PI, scale: 0.98, motion: { to: [0, 0, 17.6], faceTravel: true, easing: 'smooth' } }),
+      backdrop([0, 1, 32], { scale: 12 }),
+    ],
+    aliases: { west: 'subject_1', east: 'subject_2', backdrop: 'background' },
+    texts: [title('bridge-label', 'ONE STEP', 'rise', 50, 14, 9, '#d7e8ff', 5.4)],
+    worldSfx: [
+      { id: 'wind-fog', kind: 'fog', start: 0, end: 6, position: { x: 0, y: 0.1, z: 16 }, scale: 1.8, color: '#b8c4d4' },
+      { id: 'coat-aura', kind: 'anime_aura', start: 2.6, end: 6, position: { x: 0, y: 0.9, z: 14.2 }, color: '#c9e7ff', anchor: { slotId: 'subject_1', offset: { x: 0, y: 0.9, z: 0 } } },
+    ],
+    sfx: [{ id: 'stars', kind: 'stars', start: 0.4, end: 5.8, x: 50, y: 24 }],
+    copy: copy(
+      { title: 'Bridge standoff', description: 'Two figures walk a skybridge from opposite ends and stop in the middle.', requirements: ['GLB west lead', 'GLB east lead', 'Optional city plate', 'Optional title / soundtrack'] },
+      { title: 'Enfrentamiento en el puente', description: 'Dos figuras recorren un puente aéreo desde extremos opuestos y se detienen en el centro.', requirements: ['GLB protagonista oeste', 'GLB protagonista este', 'Placa de ciudad opcional', 'Título / banda sonora opcionales'] },
+    ),
+  },
+  'cockpit-pursuit': {
+    category: 'action', duration: 5, dressing: 'space-lane',
+    environment: { reflectiveFloor: false, platform: false, bloom: 0.7 },
+    light: light([0.1, -0.2, 0.9], 1.8, '#c8e4ff'),
+    camera: cam('hood', [0, 1.04, -0.85], [0, 0.82, -14], 55),
+    slots: [
+      model('subject_1', 'subject_1', [0.12, 0.42, 0.22], { rotationY: PI, scale: 0.55, motion: { to: [0.08, 0.42, 0.18], easing: 'smooth' } }),
+      model('subject_2', 'subject_2', [0.3, 1.1, -16], { scale: 0.7, motion: { to: [0.15, 0.85, -5.2], faceTravel: true, easing: 'linear' } }),
+    ],
+    aliases: { pilot: 'subject_1', bogey: 'subject_2' },
+    texts: [title('cockpit-label', 'INCOMING', 'impact', 50, 18, 11, '#ff6a5a', 4.2)],
+    worldSfx: [
+      { id: 'tracer', kind: 'laser', start: 0.5, end: 4.8, position: { x: 0.4, y: 0.7, z: -0.4 }, targetPosition: { x: 0.2, y: 0.9, z: -10 }, color: '#66ffbb' },
+      { id: 'lock', kind: 'energy_orb', start: 1.2, end: 4.6, position: { x: 0.15, y: 0.9, z: -8 }, color: '#ff6a5a', anchor: { slotId: 'subject_2', offset: { x: 0, y: 0.4, z: 0 } } },
+    ],
+    sfx: [{ id: 'hud', kind: 'scanline', start: 0, end: 5, x: 50, y: 44, color: '#ff6a5a' }],
+    copy: copy(
+      { title: 'Cockpit pursuit', description: 'A hood view from the cockpit as the enemy ship fills the glass.', requirements: ['GLB pilot (lead)', 'GLB enemy ship ahead', 'Optional starfield plate', 'Optional title / soundtrack'] },
+      { title: 'Persecución desde cabina', description: 'Vista de cabina mientras la nave enemiga llena el cristal.', requirements: ['GLB piloto (protagonista)', 'GLB nave enemiga al frente', 'Placa de estrellas opcional', 'Título / banda sonora opcionales'] },
+    ),
+  },
+  'helicopter-extract': {
+    category: 'action', duration: 8, dressing: 'rooftop',
+    light: light([-0.25, -0.9, 0.35], 2.35, '#ffe6c8'),
+    camera: cam('reveal', [4.8, 8.4, 8.6], [0, 1.4, 0.4], 50),
+    slots: [
+      model('subject_1', 'subject_1', [6.4, 0, 3.2], { rotationY: -2.2, motion: { to: [0.4, 0, 0.7], faceTravel: true, easing: 'smooth' } }),
+      model('prop', 'prop', [0, 5.6, -1.4], { scale: 1.15, motion: { to: [0, 1.8, 0.4], easing: 'smooth' } }),
+      backdrop([0, 1, -12], { scale: 12 }),
+    ],
+    aliases: { extractee: 'subject_1', helicopter: 'prop', backdrop: 'background' },
+    texts: [title('extract-label', 'GO GO GO', 'impact', 50, 80, 10, '#ffe3a0', 6.6)],
+    worldSfx: [
+      { id: 'rotor-dust', kind: 'dust', start: 1.6, end: 8, position: { x: 0, y: 0.04, z: 0.5 }, scale: 2.0, color: '#8a9098' },
+      { id: 'rotor-wash', kind: 'tornado', start: 2.2, end: 8, position: { x: 0, y: 0.05, z: 0.4 }, scale: 1.1, color: '#c5cdd6' },
+      { id: 'flare', kind: 'sparks', start: 3.4, end: 6.2, position: { x: 2.4, y: 0.4, z: 2.2 }, color: '#ffbb55' },
+    ],
+    sfx: [{ id: 'wind', kind: 'speedlines', start: 2, end: 8, x: 50, y: 40 }],
+    copy: copy(
+      { title: 'Helicopter extract', description: 'A crane drops onto the helipad as the lead sprints in for pickup.', requirements: ['GLB extractee (lead)', 'GLB helicopter (prop)', 'Optional skyline plate', 'Optional title / soundtrack'] },
+      { title: 'Extracción en helicóptero', description: 'Una grúa baja al helipuerto mientras el protagonista entra a la carrera.', requirements: ['GLB rescatado (protagonista)', 'GLB helicóptero (atrezzo)', 'Placa de skyline opcional', 'Título / banda sonora opcionales'] },
+    ),
+  },
+  'warehouse-breach': {
+    category: 'action', duration: 5, dressing: 'hangar',
+    light: light([0.35, -0.7, -0.4], 2.4, '#ffd0c0'),
+    camera: cam('establishment', [2.4, 2.5, -8.2], [0, 1.05, 3.4], 46),
+    slots: [
+      model('subject_1', 'subject_1', [-6.8, 0, 0.2], { rotationY: PI / 2, motion: { to: [0.6, 0, 0.15], faceTravel: true, easing: 'smooth' } }),
+      model('subject_2', 'subject_2', [3.4, 0, -2.2], { rotationY: -0.4, scale: 0.97, motion: { to: [4.2, 0, 1.6], turnTo: -1.4, easing: 'smooth' } }),
+      backdrop([0, 1.8, -10], { scale: 10 }),
+    ],
+    aliases: { breacher: 'subject_1', guard: 'subject_2', backdrop: 'background' },
+    texts: [title('breach-label', 'BREACH', 'impact', 50, 18, 12, '#ff6a5a', 3.8)],
+    worldSfx: [
+      { id: 'door-blast', kind: 'explosion', start: 0.35, end: 2.4, position: { x: 0, y: 0.5, z: 10.4 }, color: '#ff7040', scale: 1.9, sound: true },
+      { id: 'ring', kind: 'shockwave', start: 0.4, end: 2.6, position: { x: 0, y: 0.03, z: 9.6 }, color: '#ff8866', scale: 1.8 },
+      { id: 'smoke-bay', kind: 'smoke', start: 0.5, end: 5, position: { x: 0, y: 0.4, z: 8.8 }, color: '#6b5348', scale: 1.6 },
+    ],
+    sfx: [{ id: 'impact', kind: 'manga_impact', start: 0.32, end: 1.8, x: 50, y: 46 }],
+    copy: copy(
+      { title: 'Warehouse breach', description: 'The door blows and the lead charges the bay while a guard dives for cover.', requirements: ['GLB breacher (lead)', 'GLB guard', 'Optional warehouse plate', 'Optional title / soundtrack'] },
+      { title: 'Asalto al almacén', description: 'La puerta salta y el protagonista entra mientras el guardia busca cobertura.', requirements: ['GLB asaltante (protagonista)', 'GLB guardia', 'Placa de almacén opcional', 'Título / banda sonora opcionales'] },
+    ),
+  },
+  'canyon-run': {
+    category: 'action', duration: 7, dressing: 'desert',
+    light: light([-0.4, -0.65, 0.5], 2.5, '#ffd09a'),
+    camera: cam('side', [0, 1.35, 4.2], [0, 0.9, 0], 44, {
+      eyeOffset: [0.25, 0.7, 3.5], targetOffset: [0, 0.12, 0],
+    }),
+    slots: [
+      model('subject_1', 'subject_1', [-8.6, 0, 0], { rotationY: PI / 2, motion: { to: [10.2, 0, 0], faceTravel: true, easing: 'linear' } }),
+      model('subject_2', 'subject_2', [-11.4, 0, -1.6], { rotationY: PI / 2, scale: 0.95, motion: { to: [7.6, 0, -1.6], faceTravel: true, easing: 'linear' } }),
+      backdrop([0, 1.5, -14], { scale: 13 }),
+    ],
+    aliases: { lead: 'subject_1', tail: 'subject_2', backdrop: 'background' },
+    texts: [title('canyon-label', 'NARROW MARGIN', 'impact', 78, 16, 9, '#ffe3a0', 5.8)],
+    worldSfx: [
+      { id: 'sand', kind: 'dust', start: 0, end: 7, position: { x: 0, y: 0.04, z: 0 }, scale: 2.0, color: '#c9a06a' },
+      { id: 'ricochet', kind: 'sparks', start: 1.8, end: 6.2, position: { x: -7.4, y: 1.4, z: -2 }, color: '#ffbb55' },
+      { id: 'near-miss', kind: 'shockwave', start: 4.4, end: 6.4, position: { x: 3.2, y: 0.03, z: 0 }, color: '#e8c48a', scale: 1.3 },
+    ],
+    sfx: [{ id: 'whoosh', kind: 'speedlines', start: 0.2, end: 7, x: 50, y: 48 }],
+    copy: copy(
+      { title: 'Canyon run', description: 'Two vehicles thread a desert canyon with sand exploding off the walls.', requirements: ['GLB lead vehicle', 'GLB tailing vehicle', 'Optional canyon plate', 'Optional title / soundtrack'] },
+      { title: 'Carrera en el cañón', description: 'Dos vehículos se cuelan por un cañón del desierto con la arena saltando de las paredes.', requirements: ['GLB vehículo principal', 'GLB vehículo que sigue', 'Placa de cañón opcional', 'Título / banda sonora opcionales'] },
+    ),
+  },
+}
+
+function uniqueRoles(slots: Scene3DSlot[]): Scene3DSlotId[] {
+  const seen = new Set<Scene3DSlotId>()
+  const roles: Scene3DSlotId[] = []
+  for (const slot of slots) {
+    if (seen.has(slot.slot)) continue
+    seen.add(slot.slot)
+    roles.push(slot.slot)
+  }
+  return roles
+}
+
+export const ACTION_TEMPLATES = ACTION_TEMPLATE_IDS.map(id => ({
+  id,
+  camera: SPECS[id].camera.family,
+  duration: SPECS[id].duration,
+  slots: uniqueRoles(SPECS[id].slots),
+}))
+
+export const ACTION_CATEGORIES = Object.fromEntries(
+  ACTION_TEMPLATE_IDS.map(id => [id, SPECS[id].category]),
+) as Record<ActionTemplateId, 'action'>
+
+function orientCamera(camera: Scene3DCamera, vertical: boolean): Scene3DCamera {
+  const next = structuredClone(camera)
+  if (!vertical) return next
+  next.fov = Math.max(28, next.fov - 8)
+  next.eye = [next.eye[0] * 0.72, next.eye[1] * 1.06, next.eye[2] * 0.82]
+  if (!next.framing) return next
+  next.framing.from = [next.framing.from[0] * 0.86, next.framing.from[1], next.framing.from[2] * 0.86]
+  next.framing.to = [next.framing.to[0] * 0.86, next.framing.to[1], next.framing.to[2] * 0.86]
+  return next
+}
+
+function bindSlot(slot: Scene3DSlot, roles: Partial<Record<string, string>> | undefined, aliases: Record<string, string>): Scene3DSlot {
+  const next = structuredClone(slot)
+  if (!roles) return next
+  const role = Object.keys(aliases).find(name => aliases[name] === slot.id)
+  const url = roles[slot.id] ?? (role ? roles[role] : undefined) ?? roles[slot.slot]
+  if (url) next.sourceUrl = url
+  return next
+}
+
+function chooseTexts(texts: KineticText[], text?: boolean | string) {
+  if (text === false) return undefined
+  if (typeof text !== 'string') return texts.map(cue => ({ ...cue }))
+  return texts.map((cue, index) => (index === 0 ? { ...cue, text } : { ...cue }))
+}
+
+function attachAudio(doc: Scene3DDocument, audio?: Scene3DSourceRef) {
+  if (!audio) return
+  doc.soundtrack = [{ id: 'action-audio', audio, start: 0, offset: 0, gain: 1 }]
+}
+
+function buildDocument(spec: ActionSpec, id: ActionTemplateId, options: ActionApplyOptions): Scene3DDocument {
+  const doc = createDefaultScene3DDocument()
+  const vertical = options.orientation === 'vertical'
+  doc.templateId = id
+  doc.duration = spec.duration
+  doc.width = vertical ? 720 : 1280
+  doc.height = vertical ? 1280 : 720
+  doc.dressing = spec.dressing
+  doc.environment = spec.environment
+  doc.light = { ...spec.light, direction: [...spec.light.direction] as Vec3 }
+  doc.camera = orientCamera(spec.camera, vertical)
+  doc.slots = spec.slots.map(slot => bindSlot(slot, options.roles, spec.aliases))
+  doc.worldSfx = parseWorldSfx(spec.worldSfx)
+  doc.sfx = parseSceneFx(spec.sfx)
+  doc.texts = chooseTexts(spec.texts, options.text)
+  attachAudio(doc, options.audio)
+  return doc
+}
+
+export function applyActionTemplate(id: string, options: ActionApplyOptions = {}): Scene3DDocument | null {
+  if (!isActionTemplateId(id)) return null
+  return buildDocument(SPECS[id], id, options)
+}
+
+export function actionTemplateDocument(id: string): Scene3DDocument | null {
+  return applyActionTemplate(id)
+}
+
+export function parseActionDocument(raw: unknown): Scene3DDocument | null {
+  return parseScene3DDocument(raw)
+}
+
+export function actionCard(id: string, locale: 'en' | 'es' = 'en'): ActionCardCopy | undefined {
+  if (!isActionTemplateId(id)) return undefined
+  return SPECS[id].copy[locale]
+}
+
+export function actionAliases(id: string): Record<string, string> {
+  return isActionTemplateId(id) ? { ...SPECS[id].aliases } : {}
+}

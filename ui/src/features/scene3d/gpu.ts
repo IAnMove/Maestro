@@ -43,6 +43,7 @@ import { paintDrive } from './driveMotion.ts'
 import { applyTypingPose, resetTypingPose } from './typingPose.ts'
 import { paintWorkshop } from './workshopSet.ts'
 import { paintCitadel } from './citadelSet.ts'
+import { paintActionSet } from './actionSets.ts'
 import type { Scene3DClipCatalogEntry, Scene3DDocument, Scene3DLight, Scene3DSlot } from './types.ts'
 import { syncWorldSfx, type WorldSfxGpu } from '../sceneFx/worldRuntime'
 
@@ -380,6 +381,7 @@ export function paintWorld(world: GpuWorld, document: Scene3DDocument, sceneSeco
   applyLoopOffset(world, sceneSeconds)
   paintCitadel(world.dressing, sceneSeconds)
   paintWorkshop(world.dressing, sceneSeconds, document.workshopScreen)
+  paintActionSet(world.dressing, sceneSeconds)
   const bg = document.slots.find(isCylinderBackdrop)
   paintDrive(world, sceneSeconds, bg?.loop?.speed ?? world.driveSpeed)
   for (const slot of posedSlots) paintActor(world, slot, sceneSeconds)
@@ -506,6 +508,7 @@ export function createWorld(host: HTMLDivElement, light: Scene3DLight, fov: numb
     new MeshStandardMaterial({ color: 0x1c222c, roughness: 0.92 }),
   )
   floor.rotation.x = -Math.PI / 2
+  floor.name = 'world-floor'
   scene.add(floor)
   return {
     renderer, scene, camera, dir, floor, dressing: null, dressingReady: true,

@@ -226,6 +226,7 @@
   "cameraHelp": "Camera changes are editable; your objects keep their identity.",
   "category": {
     "cinema": "Cinema",
+    "action": "Action",
     "product": "Product",
     "music": "Music video",
     "space": "Space",
@@ -567,6 +568,70 @@
     "heroic-close": {
       "title": "Heroic close",
       "description": "A low pursuit push lands on the face as the hero steps into a close-up."
+    },
+    "sea-deck": {
+      "title": "Sea deck",
+      "description": "Two leads walk the deck of a boat on open water while spray hits the bow."
+    },
+    "lunar-outpost": {
+      "title": "Lunar outpost",
+      "description": "An astronaut crosses cratered ground toward a habitat with Earth hanging in the sky."
+    },
+    "car-chase": {
+      "title": "Car chase",
+      "description": "A side track sticks to two cars screaming down a city street."
+    },
+    "ship-chase": {
+      "title": "Ship chase",
+      "description": "Two craft tear through an asteroid lane while lasers stitch the dark."
+    },
+    "rooftop-run": {
+      "title": "Rooftop run",
+      "description": "A pursuit camera chases two runners across a city roof toward the helipad."
+    },
+    "alley-motorcycle": {
+      "title": "Alley motorcycle",
+      "description": "A hood-mounted rush down a tight street with the target dead ahead."
+    },
+    "hangar-standoff": {
+      "title": "Hangar standoff",
+      "description": "Two figures close the gap inside a hangar until they freeze a few metres apart."
+    },
+    "train-roof": {
+      "title": "Train roof",
+      "description": "Two fighters close on a moving train roof while the landscape screams past."
+    },
+    "desert-convoy": {
+      "title": "Desert convoy",
+      "description": "A follow cam rides three vehicles through a canyon cut in the dunes."
+    },
+    "night-rain-pursuit": {
+      "title": "Night rain pursuit",
+      "description": "Head-on pursuit through a flooded street as lightning hits the block."
+    },
+    "dock-ambush": {
+      "title": "Dock ambush",
+      "description": "A walk along the pier turns into an explosion as the second figure steps out."
+    },
+    "bridge-standoff": {
+      "title": "Bridge standoff",
+      "description": "Two figures walk a skybridge from opposite ends and stop in the middle."
+    },
+    "cockpit-pursuit": {
+      "title": "Cockpit pursuit",
+      "description": "A hood view from the cockpit as the enemy ship fills the glass."
+    },
+    "helicopter-extract": {
+      "title": "Helicopter extract",
+      "description": "A crane drops onto the helipad as the lead sprints in for pickup."
+    },
+    "warehouse-breach": {
+      "title": "Warehouse breach",
+      "description": "The door blows and the lead charges the bay while a guard dives for cover."
+    },
+    "canyon-run": {
+      "title": "Canyon run",
+      "description": "Two vehicles thread a desert canyon with sand exploding off the walls."
     }
   },
   "gallerySearch": "Search the catalog",

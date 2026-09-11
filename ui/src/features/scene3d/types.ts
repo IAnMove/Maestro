@@ -78,6 +78,22 @@ export const SCENE3D_TEMPLATE_IDS = [
   'product-comparison',
   'topic-travelling',
   'heroic-close',
+  'sea-deck',
+  'lunar-outpost',
+  'car-chase',
+  'ship-chase',
+  'rooftop-run',
+  'alley-motorcycle',
+  'hangar-standoff',
+  'train-roof',
+  'desert-convoy',
+  'night-rain-pursuit',
+  'dock-ambush',
+  'bridge-standoff',
+  'cockpit-pursuit',
+  'helicopter-extract',
+  'warehouse-breach',
+  'canyon-run',
 ] as const
 
 export type Scene3DTemplateId = (typeof SCENE3D_TEMPLATE_IDS)[number]
@@ -108,7 +124,7 @@ export type Scene3DLoop = {
   speed: number
 }
 
-export type Scene3DDressing = 'none' | 'street' | 'space' | 'treadmill' | 'cafe' | 'drive-city' | 'drive-coast' | 'drive-tunnel' | 'citadel' | 'workshop' | 'chase-street' | 'retro-lab' | 'observatory' | 'broadcast-plaza'
+export type Scene3DDressing = 'none' | 'street' | 'space' | 'treadmill' | 'cafe' | 'drive-city' | 'drive-coast' | 'drive-tunnel' | 'citadel' | 'workshop' | 'chase-street' | 'retro-lab' | 'observatory' | 'broadcast-plaza' | 'open-sea' | 'lunar' | 'rooftop' | 'hangar' | 'desert' | 'train' | 'space-lane'
 
 export type Scene3DSourceRef = {
   workspaceId: string
