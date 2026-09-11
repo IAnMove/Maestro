@@ -69,6 +69,58 @@ test('import accepts a pack and wraps a raw shot JSON as a scenario', () => {
   assert.equal(isWorld3DTemplateRaw(shot), false)
 })
 
+const villain = { id: 'villain-1', name: 'Villain', kitRef: { id: 'villain-1', workspace: 'demo' } }
+const hero = { id: 'hero-1', name: 'Hero', kitRef: { id: 'hero-1', workspace: 'demo' } }
+
+test('export without assets strips character identity so keep-objects cannot graft it onto another GLB', () => {
+  const document = applyScene3DTemplate('speech-portrait')
+  document.slots[0].sourceUrl = gallery.url
+  document.slots[0].sourceRef = gallery
+  document.slots[0].character = villain
+  document.slots[0].speech = { version: 1, enabled: true, cues: [], driver: 'imported', start: 0, offset: 0, gain: 1, strength: .85, clean: true, style: 'soft', lip: '#874d47', expression: 'neutral', blink: true, eyes: true }
+  const pack = createUserTemplate({ document, title: 'Talking cafe', includeAssets: false, id: 'user-talk' })
+  assert.ok(pack)
+  assert.equal(pack.document.slots[0].sourceUrl, '')
+  assert.equal(pack.document.slots[0].character, undefined)
+  assert.equal(pack.document.slots[0].speech, undefined)
+
+  const previous = applyScene3DTemplate('speech-portrait')
+  previous.slots[0].sourceUrl = '/api/v1/uploads/current-hero.glb'
+  previous.slots[0].sourceRef = { workspaceId: 'demo', filename: 'current-hero.glb', url: '/api/v1/uploads/current-hero.glb' }
+  previous.slots[0].character = hero
+  previous.slots[0].clip = { index: 0, name: 'Idle' }
+  const kept = remountUserTemplate(pack, previous, true)
+  assert.equal(kept.slots[0].sourceUrl, previous.slots[0].sourceUrl)
+  assert.equal(kept.slots[0].character.id, 'hero-1')
+  assert.equal(kept.slots[0].clip.name, 'Idle')
+
+  const leftover = {
+    kind: WORLD3D_TEMPLATE_KIND, version: 1, id: 'user-leftover', title: 'Leftover villain', includeAssets: false,
+    document: { ...document, clipNumber: undefined, production: undefined },
+  }
+  const imported = parseUserTemplate(leftover)
+  assert.ok(imported)
+  assert.equal(imported.document.slots[0].character, undefined)
+  assert.equal(imported.document.slots[0].sourceUrl, '')
+})
+
+test('keep-objects does not attach the current character or speech onto a template that brought its own GLB', () => {
+  const document = applyScene3DTemplate('speech-portrait')
+  document.slots[0].sourceUrl = gallery.url
+  document.slots[0].sourceRef = gallery
+  document.slots[0].character = villain
+  const pack = createUserTemplate({ document, title: 'Cast cafe', includeAssets: true, id: 'user-cast' })
+  assert.equal(pack.document.slots[0].character.id, 'villain-1')
+  const previous = applyScene3DTemplate('speech-portrait')
+  previous.slots[0].sourceUrl = '/api/v1/uploads/current-hero.glb'
+  previous.slots[0].character = hero
+  previous.slots[0].speech = { version: 1, enabled: true, cues: [], driver: 'imported', start: 0, offset: 0, gain: 1, strength: .85, clean: true, style: 'soft', lip: '#874d47', expression: 'neutral', blink: true, eyes: true }
+  const kept = remountUserTemplate(pack, previous, true)
+  assert.equal(kept.slots[0].sourceUrl, gallery.url)
+  assert.equal(kept.slots[0].character.id, 'villain-1')
+  assert.equal(kept.slots[0].speech, undefined)
+})
+
 test('applying a scenario keeps clip size and can reuse the current GLBs', () => {
   const previous = createDefaultScene3DDocument()
   previous.clipNumber = 8
