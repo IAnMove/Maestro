@@ -30,6 +30,7 @@ from routers.scene_packages import create_scene_packages_router
 from routers.series_assembly import create_series_assembly_router
 from routers.style_library import create_style_library_router
 from routers.system_capabilities import create_system_capabilities_router, require_capability_http
+from routers.user_diagnostics import create_user_diagnostics_router
 from routers.wizard_workflow_executor import create_wizard_workflow_executor_router
 from routers.world3d_export import create_world3d_export_router
 from routers.workspace_collections import create_workspace_collections_router
@@ -71,6 +72,9 @@ api.add_middleware(
 )
 api.include_router(create_lan_auth_router())
 api.include_router(create_system_capabilities_router())
+api.include_router(create_user_diagnostics_router(
+    load_receipt=lambda workspace, intent_id: core_generation_commands.service().receipt(workspace, intent_id),
+))
 api.include_router(create_projects_router(list_workspaces=core.list_workspaces, workspace_dir=core.workspace_dir))
 api.include_router(create_assets_router(
     list_workspaces=core.list_workspaces,

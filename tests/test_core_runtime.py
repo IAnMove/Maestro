@@ -79,6 +79,23 @@ class CoreRuntimeTests(unittest.TestCase):
         missing = self.client.post("/api/v1/video-editor/probe", json={"source": "missing.mp4"})
         self.assertEqual(missing.status_code, 400)
 
+    def test_diagnostics_snapshot_and_report_on_the_core_profile(self):
+        snapshot = self.client.get("/api/v1/diagnostics")
+        self.assertEqual(snapshot.status_code, 200, snapshot.text)
+        body = snapshot.json()
+        self.assertEqual(body["schema"], "hocuspocus.user-diagnostics-report")
+        self.assertIn("platform", body)
+        self.assertIn("capabilities", body)
+        report = self.client.post("/api/v1/diagnostics/report", json={
+            "error": {"message": "MiniMax key missing", "code": "provider_unconfigured"},
+        })
+        self.assertEqual(report.status_code, 200, report.text)
+        packed = report.json()
+        self.assertEqual(packed["schema"], "hocuspocus.user-diagnostics-report")
+        self.assertEqual(packed["error"]["code"], "provider_unconfigured")
+        blob = json.dumps(packed)
+        self.assertNotIn("sk-", blob)
+
     def test_remote_llm_load_is_not_blocked_as_local_engine(self):
         with patch("services.llm_service.load_model"), patch(
             "services.llm_service.get_status", return_value={"loaded": False, "provider": "minimax"},
