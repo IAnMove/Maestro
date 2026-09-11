@@ -23,6 +23,7 @@ import {
   MeshBasicMaterial,
   MeshStandardMaterial,
   Object3D,
+  PCFSoftShadowMap,
   PerspectiveCamera,
   PlaneGeometry,
   RepeatWrapping,
@@ -125,7 +126,10 @@ export function disposeObject(object: Object3D) {
 export function viewSize(host: HTMLElement) {
   const width = host.clientWidth || 640
   const height = host.clientHeight || 360
-  const scale = Math.min(1, MAX_VIEW_WIDTH / width, MAX_VIEW_HEIGHT / height)
+  const portrait = height > width
+  const maxW = portrait ? MAX_VIEW_HEIGHT : MAX_VIEW_WIDTH
+  const maxH = portrait ? MAX_VIEW_WIDTH : MAX_VIEW_HEIGHT
+  const scale = Math.min(1, maxW / width, maxH / height)
   return {
     width: Math.max(1, Math.round(width * scale)),
     height: Math.max(1, Math.round(height * scale)),
@@ -286,6 +290,8 @@ export function placeSlot(
     contactShadow.rotation.x = -Math.PI / 2
     world.scene.add(contactShadow)
   }
+  applyMeshShadows(root, world.renderer.shadowMap.enabled, slot.media === 'model3d')
+  if (contactShadow && world.renderer.shadowMap.enabled) contactShadow.visible = false
   world.slots.set(slot.id, {
     contactShadow,
     sourceUrl: slot.sourceUrl,
@@ -366,6 +372,7 @@ function paintActor(world: GpuWorld, slot: Scene3DSlot, sceneSeconds: number) {
     gpu.appearance.sync(gpu.root, slot.appearance, sceneSeconds)
     if (gpu.contactShadow) gpu.contactShadow.visible = gpu.root.visible
   }
+  if (gpu.contactShadow && world.renderer.shadowMap.enabled) gpu.contactShadow.visible = false
 }
 
 export function paintWorld(world: GpuWorld, document: Scene3DDocument, sceneSeconds: number) {
@@ -440,11 +447,45 @@ export function pruneSlots(world: GpuWorld, slots: readonly Scene3DSlot[]) {
   }
 }
 
+function applyMeshShadows(root: Object3D, enabled: boolean, cast: boolean) {
+  root.traverse((child: Object3D) => {
+    if (!(child instanceof Mesh)) return
+    child.castShadow = enabled && cast
+    child.receiveShadow = enabled
+  })
+}
+
+export function setWorldExportQuality(world: GpuWorld, enabled: boolean) {
+  world.renderer.shadowMap.enabled = enabled
+  world.renderer.shadowMap.type = PCFSoftShadowMap
+  world.dir.castShadow = enabled
+  world.floor.receiveShadow = enabled
+  if (enabled) {
+    world.dir.shadow.mapSize.set(2048, 2048)
+    world.dir.shadow.bias = -0.0006
+    world.dir.shadow.normalBias = 0.02
+    const cam = world.dir.shadow.camera
+    cam.near = 0.4
+    cam.far = 48
+    cam.left = -14
+    cam.right = 14
+    cam.top = 14
+    cam.bottom = -14
+    cam.updateProjectionMatrix()
+  }
+  applyMeshShadows(world.floor, enabled, false)
+  if (world.dressing) applyMeshShadows(world.dressing, enabled, true)
+  for (const gpu of world.slots.values()) {
+    applyMeshShadows(gpu.root, enabled, gpu.kind === 'model')
+    if (gpu.contactShadow) gpu.contactShadow.visible = !enabled
+  }
+}
+
 export function createWorld(host: HTMLDivElement, light: Scene3DLight, fov: number): GpuWorld {
   const renderer = new WebGLRenderer({
     antialias: true,
     alpha: false,
-    powerPreference: 'low-power',
+    powerPreference: 'high-performance',
     preserveDrawingBuffer: true,
   })
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, MAX_PIXEL_RATIO))

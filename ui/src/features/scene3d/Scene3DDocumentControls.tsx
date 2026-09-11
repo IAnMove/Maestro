@@ -3,6 +3,7 @@ import type { ApiOutput } from '../../api/outputs'
 import { useUiTranslation } from '../../i18n'
 import { parseScene3DDocument } from './document.ts'
 import type { Scene3DDocumentRef } from './documentHistory.ts'
+import { applyFrameFormat, scene3dFrameFormat, type Scene3DFrameFormat } from './frameFormat.ts'
 import { reviewClipNumber } from './performance.ts'
 import { Scene3DLibraryControls } from './Scene3DLibraryControls'
 import type { Scene3DDocument } from './types.ts'
@@ -44,6 +45,25 @@ export function Scene3DDocumentControls({ document, disabled, workspace, preview
           const duration = event.target.valueAsNumber
           if (Number.isFinite(duration) && duration >= 0.1 && duration <= 600) onChange({ ...document, duration })
         }} />
+    </label>
+    <label>{t('frameFormat')}
+      <select data-testid="world3d-frame-format" aria-label={t('frameFormat')} disabled={disabled}
+        className="ml-2 min-h-10 rounded-lg border border-border bg-bg-primary px-2"
+        value={scene3dFrameFormat(document.width, document.height)}
+        onChange={event => onChange(applyFrameFormat(document, event.target.value as Scene3DFrameFormat))}>
+        <option value="landscape">{t('frameFormatLandscape')}</option>
+        <option value="portrait">{t('frameFormatPortrait')}</option>
+      </select>
+    </label>
+    <label>{t('frameRate')}
+      <select data-testid="world3d-fps" aria-label={t('frameRate')} disabled={disabled}
+        className="ml-2 min-h-10 rounded-lg border border-border bg-bg-primary px-2"
+        value={document.fps}
+        onChange={event => onChange({ ...document, fps: Number(event.target.value) as 24 | 30 | 60 })}>
+        <option value={24}>24</option>
+        <option value={30}>30</option>
+        <option value={60}>60</option>
+      </select>
     </label>
     <button type="button" disabled={disabled} onClick={save} className="min-h-10 rounded-lg border border-border px-3">{t('saveDocument')}</button>
     <button type="button" disabled={disabled} onClick={() => input.current?.click()} className="min-h-10 rounded-lg border border-border px-3">{t('loadDocument')}</button>

@@ -90,7 +90,7 @@ export async function mixSceneSpeech(document: Scene3DDocument): Promise<AudioBu
   const duration = scene3dOutputDuration(document), speed = scene3dPlaybackSpeed(document.playbackSpeed)
   // Bound memory explicitly; silent scenes retain the existing 600 s export contract.
   if (duration > 180) throw new Error('Voice exports support up to 180 output seconds per scene.')
-  const context = new OfflineAudioContext(1, Math.ceil(duration * 48000), 48000)
+  const context = new OfflineAudioContext(2, Math.ceil(duration * 48000), 48000)
   scheduleFx(context, [...(document.sfx ?? []), ...worldSfxAudioCues(document.worldSfx)], document.duration, speed)
   for (const track of tracks) {
     const buffer = await decodeVoice(track.audio!.url)

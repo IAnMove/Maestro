@@ -1,4 +1,5 @@
 import { createDefaultScene3DDocument, parseScene3DDocument } from './document.ts'
+import { toPortraitCamera } from './frameFormat.ts'
 import { defaultMediaScreen } from './mediaScreen.ts'
 import { parseSceneFx } from '../sceneFx/types.ts'
 import { parseWorldSfx } from '../sceneFx/world.ts'
@@ -278,14 +279,7 @@ export const CAMPAIGN_CATEGORIES = Object.fromEntries(
 ) as Record<CampaignTemplateId, 'cinema' | 'product'>
 
 function orientCamera(camera: Scene3DCamera, vertical: boolean): Scene3DCamera {
-  const next = structuredClone(camera)
-  if (!vertical) return next
-  next.fov = Math.max(28, next.fov - 8)
-  next.eye = [next.eye[0] * 0.72, next.eye[1] * 1.06, next.eye[2] * 0.82]
-  if (!next.framing) return next
-  next.framing.from = [next.framing.from[0] * 0.86, next.framing.from[1], next.framing.from[2] * 0.86]
-  next.framing.to = [next.framing.to[0] * 0.86, next.framing.to[1], next.framing.to[2] * 0.86]
-  return next
+  return vertical ? toPortraitCamera(camera) : structuredClone(camera)
 }
 
 function bindSlot(slot: Scene3DSlot, roles: Partial<Record<string, string>> | undefined, aliases: Record<string, string>): Scene3DSlot {

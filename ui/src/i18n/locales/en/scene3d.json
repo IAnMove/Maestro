@@ -448,9 +448,9 @@
     "fullHdLandscape": "Full HD landscape",
     "fourKLandscape": "4K landscape",
     "square": "Square",
-    "hdPortrait": "HD portrait",
-    "fullHdPortrait": "Full HD portrait",
-    "fourKPortrait": "4K portrait"
+    "hdPortrait": "HD portrait · mobile 9:16",
+    "fullHdPortrait": "Full HD portrait · mobile 9:16",
+    "fourKPortrait": "4K portrait · mobile 9:16"
   },
   "layerTypes": {
     "camera": "camera",
@@ -954,6 +954,10 @@
     "exportProgress": "3D frame {{index}} / {{total}}",
     "exported": "3D MP4 saved in Videos as {{name}}",
     "exportFailed": "Could not export the 3D scene.",
+    "exportCancel": "Cancel 3D export",
+    "exportCancelled": "3D export cancelled. The shot is editable again.",
+    "previewQuality": "Preview · lower resolution, no shadows",
+    "exportQualityHint": "Preview is lighter. Export uses the full frame, shadows, 24/30/60 fps and stereo audio. You can cancel; this shot stays locked until it finishes.",
     "assetsNotReady": "The 3D assets did not finish loading.",
     "stageNotReady": "The 3D stage is not ready to export.",
     "cannotEncode": "This browser cannot encode a deterministic H.264 MP4.",

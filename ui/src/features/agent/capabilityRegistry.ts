@@ -1,4 +1,5 @@
 import type { CommandResult } from '../../lib/commandContract'
+import { canonicalSceneFps } from '../../lib/sceneFps.ts'
 import type {
   AgentAction,
   AgentApply3dRhythmAction,
@@ -1098,8 +1099,8 @@ function sceneWorkflowAction(type: AgentSceneWorkflowAction['type'], raw: Record
   if (raw.confirm !== true) return null
   const sceneName = text(raw.scene_name, 300)
   if (!sceneName) return null
-  if (type === 'create_3d_scene') return { type, sceneName, durationSeconds: boundedNumber(raw.duration_seconds, 1, 300, 5), width: boundedNumber(raw.width, 320, 7680, 1280), height: boundedNumber(raw.height, 240, 4320, 720), fps: raw.fps === 60 ? 60 : 30, confirm: true }
-  if (type === 'set_3d_scene_properties') return { type, sceneName, durationSeconds: raw.duration_seconds === undefined ? undefined : boundedNumber(raw.duration_seconds, 1, 300, 5), width: raw.width === undefined ? undefined : boundedNumber(raw.width, 320, 7680, 1280), height: raw.height === undefined ? undefined : boundedNumber(raw.height, 240, 4320, 720), fps: raw.fps === undefined ? undefined : raw.fps === 60 ? 60 : 30, confirm: true }
+  if (type === 'create_3d_scene') return { type, sceneName, durationSeconds: boundedNumber(raw.duration_seconds, 1, 300, 5), width: boundedNumber(raw.width, 320, 7680, 1280), height: boundedNumber(raw.height, 240, 4320, 720), fps: canonicalSceneFps(raw.fps), confirm: true }
+  if (type === 'set_3d_scene_properties') return { type, sceneName, durationSeconds: raw.duration_seconds === undefined ? undefined : boundedNumber(raw.duration_seconds, 1, 300, 5), width: raw.width === undefined ? undefined : boundedNumber(raw.width, 320, 7680, 1280), height: raw.height === undefined ? undefined : boundedNumber(raw.height, 240, 4320, 720), fps: raw.fps === undefined ? undefined : canonicalSceneFps(raw.fps), confirm: true }
   const layerName = text(raw.layer_name, 300)
   if (type === 'add_3d_scene_layer') {
     const layerType = text(raw.layer_type, 30) as Extract<AgentSceneWorkflowAction, { type: 'add_3d_scene_layer' }>['layerType']

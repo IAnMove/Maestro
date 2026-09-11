@@ -70,8 +70,8 @@ export type AgentSceneControlRequest =
   | { type: 'export_3d_scene'; sceneName: string }
 
 export type AgentSceneWorkflowRequest =
-  | { type: 'create_3d_scene'; sceneName: string; durationSeconds: number; width: number; height: number; fps: 30 | 60; reset?: boolean }
-  | { type: 'set_3d_scene_properties'; sceneName: string; durationSeconds?: number; width?: number; height?: number; fps?: 30 | 60 }
+  | { type: 'create_3d_scene'; sceneName: string; durationSeconds: number; width: number; height: number; fps: 24 | 30 | 60; reset?: boolean }
+  | { type: 'set_3d_scene_properties'; sceneName: string; durationSeconds?: number; width?: number; height?: number; fps?: 24 | 30 | 60 }
   | { type: 'add_3d_scene_layer'; sceneName: string; layerName: string; layerType: 'model3d' | 'image' | 'video' | 'overlay' | 'camera'; outputName?: string }
   | { type: 'update_3d_scene_layer'; sceneName: string; layerName: string; visible?: boolean; locked?: boolean }
   | { type: 'remove_3d_scene_layer'; sceneName: string; layerName: string }
