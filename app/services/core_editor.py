@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import re
 import threading
 import time
 import uuid
@@ -87,8 +88,12 @@ def start_export(body: dict[str, Any]) -> dict[str, Any]:
     folder = core.workspace_dir(workspace)
     os.makedirs(folder, exist_ok=True)
     stamp = time.strftime("%Y-%m-%d-%Hh%Mm%Ss")
-    filename = f"{stamp}_{(str(body.get('name') or 'edit').strip() or 'edit')}.mp4"
-    destination = os.path.join(folder, filename)
+    safe_name = re.sub(r"[^A-Za-z0-9_-]+", "_", str(body.get("name") or "edit")).strip("_")
+    safe_name = safe_name[:60] or "edit"
+    filename = f"{stamp}_{safe_name}.mp4"
+    destination = core.safe_join(folder, filename)
+    if not destination:
+        raise ValueError("Invalid export name")
     job_id = uuid.uuid4().hex
     job = {
         "job_id": job_id,
