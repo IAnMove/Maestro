@@ -367,6 +367,81 @@ class CoreRuntimeTests(unittest.TestCase):
         self.assertEqual(created.status_code, 200)
         self.assertTrue(str(created.json()["id"]).startswith("series_"))
 
+    def test_series_assembly_joins_approved_clips_on_the_core_profile(self):
+        from services.series_library import (
+            create_series_project,
+            empty_series_library,
+            write_series_library,
+        )
+
+        def concatenate(paths, output_path, **_kwargs):
+            Path(output_path).write_bytes(b"".join(Path(path).read_bytes() for path in paths))
+            return True
+
+        folder, previous = self._in_temp_workspace()
+        try:
+            Path("outputs").mkdir()
+            Path("outputs", "one.mp4").write_bytes(b"one")
+            Path("outputs", "two.mp4").write_bytes(b"two")
+            series = create_series_project("default", title="Harbour")
+            season_id = series["seasons"][0]["id"]
+            series["assets"] = {
+                "asset-1": {"id": "asset-1", "kind": "video", "uri": "outputs/one.mp4",
+                            "ownerType": "episode", "ownerId": "episode-1"},
+                "asset-2": {"id": "asset-2", "kind": "video", "uri": "outputs/two.mp4",
+                            "ownerType": "episode", "ownerId": "episode-1"},
+            }
+            series["episodesById"] = {
+                "episode-1": {
+                    "id": "episode-1",
+                    "seasonId": season_id,
+                    "script": [{"id": "scene_1", "beats": [], "dialogue": []}],
+                    "shots": [{
+                        "id": "shot-2", "order": 2, "sceneId": "scene_1",
+                        "approvedAttemptId": "attempt-2",
+                        "attempts": [{"id": "attempt-2", "status": "completed",
+                                      "outputAssetIds": ["asset-2"]}],
+                    }, {
+                        "id": "shot-1", "order": 1, "sceneId": "scene_1",
+                        "approvedAttemptId": "attempt-1",
+                        "attempts": [{"id": "attempt-1", "status": "completed",
+                                      "outputAssetIds": ["asset-1"]}],
+                    }],
+                },
+            }
+            series["seasons"][0]["episodeOrder"] = ["episode-1"]
+            library = empty_series_library("default")
+            library["seriesById"][series["id"]] = series
+            library["seriesOrder"] = [series["id"]]
+            write_series_library(str(Path("outputs")), library, "default")
+            with patch("services.core_series_assembly.concatenate_clips", side_effect=concatenate), patch(
+                "routers.series_assembly.threading.Thread", ImmediateThread,
+            ):
+                missing = self.client.post(
+                    "/api/v1/series/missing/episodes/episode-1/assembly/start",
+                    json={"workspace": "default"},
+                )
+                started = self.client.post(
+                    f"/api/v1/series/{series['id']}/episodes/episode-1/assembly/start",
+                    json={"workspace": "default"},
+                )
+                job = started.json() if started.status_code == 200 else {}
+                status = self.client.get(
+                    f"/api/v1/series/assembly/jobs/{job.get('jobId')}",
+                    params={"workspace": "default"},
+                )
+                listed = self.client.get("/api/v1/series/assembly/recovery", params={"workspace": "default"})
+        finally:
+            self._leave_temp_workspace(folder, previous)
+        self.assertEqual(missing.status_code, 404, missing.text)
+        self.assertEqual(started.status_code, 200, started.text)
+        self.assertEqual(status.status_code, 200, status.text)
+        body = status.json()
+        self.assertEqual(body["status"], "completed", status.text)
+        self.assertTrue(body["assetId"])
+        self.assertTrue(str(body["filename"]).endswith(".mp4"))
+        self.assertEqual(listed.status_code, 200, listed.text)
+
     def test_series_import_copies_story_uploads_into_the_workspace(self):
         folder, previous = self._in_temp_workspace()
         try:

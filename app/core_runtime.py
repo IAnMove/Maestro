@@ -14,6 +14,7 @@ from routers.assets import create_assets_router
 from routers.canonical_tasks import create_canonical_tasks_router
 from routers.character_kit_face import create_character_kit_face_router
 from routers.comics import create_comics_router
+from routers import core_labs as labs
 from routers.core_labs import create_core_labs_router
 from routers.core_mcp import create_core_mcp_router
 from routers.core_remote import create_core_remote_router
@@ -26,6 +27,7 @@ from routers.productions import create_productions_router
 from routers.recipes import create_recipes_router
 from routers.scene_commands import create_scene_commands_router
 from routers.scene_packages import create_scene_packages_router
+from routers.series_assembly import create_series_assembly_router
 from routers.style_library import create_style_library_router
 from routers.system_capabilities import create_system_capabilities_router, require_capability_http
 from routers.wizard_workflow_executor import create_wizard_workflow_executor_router
@@ -38,6 +40,7 @@ from services import (
     core_production,
     core_remote_image,
     core_scene_recording,
+    core_series_assembly,
     core_upload,
     core_workspace as core,
 )
@@ -107,6 +110,19 @@ api.include_router(create_world3d_export_router(World3DExportService(
     app_url=os.environ.get("HOCUS_APP_URL", ""),
 )))
 api.include_router(create_core_labs_router())
+api.include_router(create_series_assembly_router(
+    resolve_workspace=labs._series_workspace,
+    workspace_dir=core.workspace_dir,
+    list_workspaces=core.list_workspaces,
+    library_lock=labs._LOCK,
+    read_library=labs._read_series,
+    write_library=labs._write_series,
+    find_series=labs._series_or_404,
+    asset_local_path=core_series_assembly.asset_local_path,
+    available_filename=core_series_assembly.available_filename,
+    concatenate_clips=lambda *args, **kwargs: core_series_assembly.concatenate_clips(*args, **kwargs),
+    iso_now=labs._iso_now,
+))
 api.include_router(create_core_series_plan_router())
 api.include_router(create_core_remote_router())
 api.include_router(create_core_mcp_router())

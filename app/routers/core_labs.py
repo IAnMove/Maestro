@@ -37,7 +37,7 @@ from services.story_library import (
     read_story_library,
     write_story_library,
 )
-_LOCK = threading.Lock()
+_LOCK = threading.RLock()
 
 
 def _iso_now() -> str:
