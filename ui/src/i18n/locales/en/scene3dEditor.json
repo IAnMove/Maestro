@@ -88,6 +88,32 @@
     "offset": "Trim audio start (s)",
     "gain": "Volume",
     "needsPlacement": "Add lips to this subject before previewing its voice on the model.",
+    "facePack": "Mascot face",
+    "facePackHint": "Bundled faces for a TV-head screen: visemes and expressions. Experimental.",
+    "expressionHold": "Expression while talking",
+    "expressionHoldHint": "Vowels only change the mouth. This expression stays on the whole line unless you add expression cues.",
+    "pack": {
+      "tv": "CRT",
+      "skull": "Skull",
+      "voxel": "Cube",
+      "anime": "Anime",
+      "cubeskull": "Voxel skull",
+      "felt": "Felt",
+      "clay": "Clay",
+      "pixel": "Pixel",
+      "porcelain": "Porcelain",
+      "cat": "Cat",
+      "oni": "Oni",
+      "stencil": "Stencil",
+      "alien": "Alien",
+      "pumpkin": "Pumpkin",
+      "ice": "Ice",
+      "mushroom": "Mushroom",
+      "vector": "Vector",
+      "halftone": "Halftone",
+      "steampunk": "Steampunk",
+      "gummy": "Gummy"
+    },
     "busy": "Preparing voice or kit…",
     "adjust": "Adjust mouth and expressions",
     "adjustHint": "X: left/right; Y: up/down; Z: depth. Face the model forward (+Z), adjust width/height, then Play. The GLB stays intact.",
@@ -178,6 +204,10 @@
   "templates": "Shot library",
   "search": "Search templates",
   "all": "All",
+  "allSettings": "Any set",
+  "filterCategory": "Shot type",
+  "filterSetting": "Set",
+  "filterCount": "{{shown}} / {{total}}",
   "noResults": "No templates match your search.",
   "play": "Play",
   "pause": "Pause",
@@ -226,10 +256,27 @@
   "cameraHelp": "Camera changes are editable; your objects keep their identity.",
   "category": {
     "cinema": "Cinema",
+    "action": "Action",
     "product": "Product",
     "music": "Music video",
     "space": "Space",
     "drive": "Driving"
+  },
+  "setting": {
+    "sea": "Sea",
+    "city": "City",
+    "rooftop": "Rooftop",
+    "hangar": "Hangar",
+    "desert": "Desert",
+    "train": "Train",
+    "moon": "Moon",
+    "space": "Space",
+    "jungle": "Jungle",
+    "snow": "Snow",
+    "casino": "Casino",
+    "studio": "Studio",
+    "street": "Street",
+    "stage": "Stage"
   },
   "template": {
     "speech-portrait": {
@@ -567,6 +614,146 @@
     "heroic-close": {
       "title": "Heroic close",
       "description": "A low pursuit push lands on the face as the hero steps into a close-up."
+    },
+    "sea-deck": {
+      "title": "Sea deck",
+      "description": "Two leads walk the deck of a boat on open water while spray hits the bow."
+    },
+    "lunar-outpost": {
+      "title": "Lunar outpost",
+      "description": "An astronaut crosses cratered ground toward a habitat with Earth hanging in the sky."
+    },
+    "car-chase": {
+      "title": "Car chase",
+      "description": "A side track sticks to two cars screaming down a city street."
+    },
+    "ship-chase": {
+      "title": "Ship chase",
+      "description": "Two craft tear through an asteroid lane while lasers stitch the dark."
+    },
+    "rooftop-run": {
+      "title": "Rooftop run",
+      "description": "A pursuit camera chases two runners across a city roof toward the helipad."
+    },
+    "alley-motorcycle": {
+      "title": "Alley motorcycle",
+      "description": "A hood-mounted rush down a tight street with the target dead ahead."
+    },
+    "hangar-standoff": {
+      "title": "Hangar standoff",
+      "description": "Two figures close the gap inside a hangar until they freeze a few metres apart."
+    },
+    "train-roof": {
+      "title": "Train roof",
+      "description": "Two fighters close on a moving train roof while the landscape screams past."
+    },
+    "desert-convoy": {
+      "title": "Desert convoy",
+      "description": "A follow cam rides three vehicles through a canyon cut in the dunes."
+    },
+    "night-rain-pursuit": {
+      "title": "Night rain pursuit",
+      "description": "Head-on pursuit through a flooded street as lightning hits the block."
+    },
+    "dock-ambush": {
+      "title": "Dock ambush",
+      "description": "A walk along the pier turns into an explosion as the second figure steps out."
+    },
+    "bridge-standoff": {
+      "title": "Bridge standoff",
+      "description": "Two figures walk a skybridge from opposite ends and stop in the middle."
+    },
+    "cockpit-pursuit": {
+      "title": "Cockpit pursuit",
+      "description": "A hood view from the cockpit as the enemy ship fills the glass."
+    },
+    "helicopter-extract": {
+      "title": "Helicopter extract",
+      "description": "A crane drops onto the helipad as the lead sprints in for pickup."
+    },
+    "warehouse-breach": {
+      "title": "Warehouse breach",
+      "description": "The door blows and the lead charges the bay while a guard dives for cover."
+    },
+    "canyon-run": {
+      "title": "Canyon run",
+      "description": "Two vehicles thread a desert canyon with sand exploding off the walls."
+    },
+    "jungle-ambush": {
+      "title": "Jungle ambush",
+      "description": "Two figures close in a ruined clearing while the canopy swallows the light."
+    },
+    "snow-compound": {
+      "title": "Snow compound",
+      "description": "An agent crosses the drift toward a lodge while snow eats the horizon."
+    },
+    "casino-heist": {
+      "title": "Casino heist",
+      "description": "Two players close on a felt table under gold light."
+    },
+    "bank-vault": {
+      "title": "Bank vault",
+      "description": "A crane drops onto the vault as the cracksman steps in with a torch."
+    },
+    "skyscraper-ledge": {
+      "title": "Skyscraper ledge",
+      "description": "A pursuit along the parapet with the city falling away."
+    },
+    "oil-rig": {
+      "title": "Oil rig",
+      "description": "A crane over open water as fire licks the derrick."
+    },
+    "subway-brawl": {
+      "title": "Subway brawl",
+      "description": "Two fighters close in a rocking carriage as the rails spit sparks."
+    },
+    "freeway-overpass": {
+      "title": "Freeway overpass",
+      "description": "A high side track of two vehicles under sodium lamps."
+    },
+    "prison-break": {
+      "title": "Prison break",
+      "description": "The lead sprints the yard while a guard turns too late."
+    },
+    "arctic-chase": {
+      "title": "Arctic chase",
+      "description": "Two vehicles cut a white waste while snow blinds the tail."
+    },
+    "clock-tower": {
+      "title": "Clock tower",
+      "description": "An orbit around a climber on the tower as the city turns below."
+    },
+    "mansion-infil": {
+      "title": "Mansion infil",
+      "description": "The infiltrator crosses a marble hall toward the inner door."
+    },
+    "cargo-hold": {
+      "title": "Cargo hold",
+      "description": "A head-on rush down the bay as the ramp yawns behind."
+    },
+    "jungle-river": {
+      "title": "Jungle river",
+      "description": "A side track of two craft sliding a misty river under the canopy."
+    },
+    "red-carpet": {
+      "title": "Red carpet",
+      "description": "A slow orbit as the star walks the gold floor into a close-up."
+    },
+    "volcano-ridge": {
+      "title": "Volcano ridge",
+      "description": "A crane over two figures on the ridge as the caldera breathes fire."
+    },
+    "hangar-talk": {
+      "title": "Hangar talk",
+      "description": "CRT-head and a basic skull face take turns on synthetic vowels, with visemes and expressions."
+    },
+    "sea-talk": {
+      "title": "Sea talk",
+      "description": "The same CRT-head and skull mascots lipsync on the boat deck with a closer two-shot."
+    },
+    "voxel-talk": {
+      "title": "Voxel talk",
+      "description": "A cube-head and a voxel skull take turns on the roof, anime eyes on blocky faces."
     }
   },
   "gallerySearch": "Search the catalog",

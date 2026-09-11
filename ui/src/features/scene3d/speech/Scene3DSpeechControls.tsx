@@ -7,7 +7,8 @@ import { useUiTranslation } from '../../../i18n'
 import type { Scene3DSlot } from '../types'
 import { sourceRefFromOutput } from '../slotSource'
 import type { PlacementMode } from './calibration'
-import { defaultSpeech, type FacePlacement, type Scene3DSpeech } from './types'
+import { EXPRESSIONS, defaultSpeech, type FacePlacement, type Scene3DSpeech } from './types'
+import { FACE_PACK_GLB, FACE_PACK_IDS, FACE_PACKS, applyBundledFacePack, facePackIdOf, talkingScreen } from './facePackExamples'
 import { amplitudeCues, parseMouthCues } from './track'
 import { decodeVoice, voiceWav } from './audio'
 import { analysisWindow, mapFragmentCues, replaceCueInterval } from './cueEdit'
@@ -79,6 +80,39 @@ export function Scene3DSpeechControls({ slot, workspace, disabled, calibrate, on
     <h3 className="text-sm font-semibold text-text-primary">{t('speech.option')} · {slot.character?.name || sceneT(`stage.slot.${slot.slot}`)}</h3>
     <p className="text-xs leading-5">{t('speech.intro')}</p>
     {!slot.sourceUrl && <p className="text-xs text-text-muted">{t('speech.chooseModel')}</p>}
+    <fieldset disabled={locked} className="space-y-2 disabled:opacity-60">
+      <p className="text-xs font-medium text-text-primary">{t('speech.facePack')}</p>
+      <p className="text-xs leading-5 text-text-muted">{t('speech.facePackHint')}</p>
+      <div className="flex flex-wrap gap-2" role="group" aria-label={t('speech.facePack')}>
+        {FACE_PACK_IDS.map(id => {
+          const selected = facePackIdOf(speech.facePack?.url) === id
+          return <button key={id} type="button" aria-pressed={selected} data-testid={`face-pack-${id}`}
+            className={`overflow-hidden rounded-lg border ${selected ? 'border-cyan-300 bg-cyan-300/15' : 'border-border bg-bg-primary hover:border-cyan-300/50'}`}
+            onClick={() => {
+              const next = applyBundledFacePack(speech, id)
+              onImport({
+                ...(slot.sourceUrl ? {} : { sourceUrl: FACE_PACK_GLB, media: 'model3d' as const }),
+                screen: talkingScreen(id),
+                speech: next,
+              })
+              onChange(next)
+            }}>
+            <img src={FACE_PACKS[id].url} alt="" width={40} height={40} className="h-10 w-10 object-cover object-left-top" />
+            <span className="block px-1.5 pb-1 text-[10px] leading-4 text-text-secondary">{t(`speech.pack.${id}`)}</span>
+          </button>
+        })}
+      </div>
+      <label className="flex items-center gap-2 text-xs">{t('speech.expressionHold')}
+        <select aria-label={t('speech.expressionHold')} className={speechInput} value={speech.expression}
+          onChange={event => {
+            const expression = event.target.value as Scene3DSpeech['expression']
+            onChange({ ...speech, expression, expressionCues: undefined })
+          }}>
+          {EXPRESSIONS.map(expression => <option key={expression} value={expression}>{t(`speech.expression.${expression}`)}</option>)}
+        </select>
+      </label>
+      <p className="text-xs leading-5 text-text-muted">{t('speech.expressionHoldHint')}</p>
+    </fieldset>
     <fieldset disabled={locked} className="space-y-3 disabled:opacity-60">
       <LipsPlacementControls speech={speech} hasModel={Boolean(slot.sourceUrl)} calibrate={calibrate} onChange={onChange} onPick={onPick} />
     </fieldset>

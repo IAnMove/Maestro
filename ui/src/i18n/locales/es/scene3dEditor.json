@@ -88,6 +88,32 @@
     "offset": "Recortar inicio del audio (s)",
     "gain": "Volumen",
     "needsPlacement": "Añade labios a este sujeto antes de visualizar su voz sobre el modelo.",
+    "facePack": "Cara mascota",
+    "facePackHint": "Caras incluidas para una pantalla de cabeza CRT: visemas y expresiones. Experimental.",
+    "expressionHold": "Expresión al hablar",
+    "expressionHoldHint": "Las vocales solo cambian la boca. Esta expresión se mantiene en toda la frase salvo que añadas cues de expresión.",
+    "pack": {
+      "tv": "CRT",
+      "skull": "Cráneo",
+      "voxel": "Cubo",
+      "anime": "Anime",
+      "cubeskull": "Cráneo voxel",
+      "felt": "Felt",
+      "clay": "Arcilla",
+      "pixel": "Pixel",
+      "porcelain": "Porcelana",
+      "cat": "Gato",
+      "oni": "Oni",
+      "stencil": "Stencil",
+      "alien": "Alien",
+      "pumpkin": "Calabaza",
+      "ice": "Hielo",
+      "mushroom": "Seta",
+      "vector": "Vector",
+      "halftone": "Halftone",
+      "steampunk": "Steampunk",
+      "gummy": "Gominola"
+    },
     "busy": "Preparando voz o kit…",
     "adjust": "Ajustar boca y expresiones",
     "adjustHint": "X: izquierda/derecha; Y: arriba/abajo; Z: profundidad. Orienta la cara hacia delante (+Z), ajusta anchura/altura y reproduce. El GLB se conserva.",
@@ -178,6 +204,10 @@
   "templates": "Biblioteca de planos",
   "search": "Buscar plantillas",
   "all": "Todas",
+  "allSettings": "Cualquier decorado",
+  "filterCategory": "Tipo de plano",
+  "filterSetting": "Decorado",
+  "filterCount": "{{shown}} / {{total}}",
   "noResults": "No hay plantillas para esta búsqueda.",
   "play": "Reproducir",
   "pause": "Pausar",
@@ -226,10 +256,27 @@
   "cameraHelp": "Puedes cambiar la cámara; tus objetos conservan su identidad.",
   "category": {
     "cinema": "Cine",
+    "action": "Acción",
     "product": "Producto",
     "music": "Videoclip",
     "space": "Espacio",
     "drive": "Conducción"
+  },
+  "setting": {
+    "sea": "Mar",
+    "city": "Ciudad",
+    "rooftop": "Azotea",
+    "hangar": "Hangar",
+    "desert": "Desierto",
+    "train": "Tren",
+    "moon": "Luna",
+    "space": "Espacio",
+    "jungle": "Selva",
+    "snow": "Nieve",
+    "casino": "Casino",
+    "studio": "Estudio",
+    "street": "Calle",
+    "stage": "Escenario"
   },
   "template": {
     "speech-portrait": {
@@ -567,6 +614,146 @@
     "heroic-close": {
       "title": "Cierre heroico",
       "description": "Un empuje bajo a la cara mientras el héroe entra en primer plano."
+    },
+    "sea-deck": {
+      "title": "Cubierta en el mar",
+      "description": "Dos protagonistas recorren la cubierta de un barco en mar abierto mientras el agua golpea la proa."
+    },
+    "lunar-outpost": {
+      "title": "Puesto lunar",
+      "description": "Un astronauta cruza el regolito hacia el hábitat con la Tierra en el cielo."
+    },
+    "car-chase": {
+      "title": "Persecución en coche",
+      "description": "Un travelling lateral se pega a dos coches a toda velocidad por la ciudad."
+    },
+    "ship-chase": {
+      "title": "Persecución de naves",
+      "description": "Dos naves cruzan un pasillo de asteroides mientras los láseres cortan la oscuridad."
+    },
+    "rooftop-run": {
+      "title": "Carrera en azotea",
+      "description": "La cámara de persecución sigue a dos corredores por la azotea hacia el helipuerto."
+    },
+    "alley-motorcycle": {
+      "title": "Moto en callejón",
+      "description": "Una carrera a ras de faro por una calle estrecha con el objetivo al frente."
+    },
+    "hangar-standoff": {
+      "title": "Enfrentamiento en hangar",
+      "description": "Dos figuras cierran distancias en un hangar hasta quedarse a pocos metros."
+    },
+    "train-roof": {
+      "title": "Techo del tren",
+      "description": "Dos luchadores se cierran en el techo de un tren en marcha mientras el paisaje vuela."
+    },
+    "desert-convoy": {
+      "title": "Convoy en el desierto",
+      "description": "Una cámara de seguimiento monta tres vehículos por un cañón entre dunas."
+    },
+    "night-rain-pursuit": {
+      "title": "Persecución bajo la lluvia",
+      "description": "Persecución de frente por una calle inundada cuando cae el rayo."
+    },
+    "dock-ambush": {
+      "title": "Emboscada en el muelle",
+      "description": "Un paseo por el muelle acaba en explosión cuando sale la segunda figura."
+    },
+    "bridge-standoff": {
+      "title": "Enfrentamiento en el puente",
+      "description": "Dos figuras recorren un puente aéreo desde extremos opuestos y se detienen en el centro."
+    },
+    "cockpit-pursuit": {
+      "title": "Persecución desde cabina",
+      "description": "Vista de cabina mientras la nave enemiga llena el cristal."
+    },
+    "helicopter-extract": {
+      "title": "Extracción en helicóptero",
+      "description": "Una grúa baja al helipuerto mientras el protagonista entra a la carrera."
+    },
+    "warehouse-breach": {
+      "title": "Asalto al almacén",
+      "description": "La puerta salta y el protagonista entra mientras el guardia busca cobertura."
+    },
+    "canyon-run": {
+      "title": "Carrera en el cañón",
+      "description": "Dos vehículos se cuelan por un cañón del desierto con la arena saltando de las paredes."
+    },
+    "jungle-ambush": {
+      "title": "Emboscada en la selva",
+      "description": "Dos figuras se cierran en un claro en ruinas mientras la copa se traga la luz."
+    },
+    "snow-compound": {
+      "title": "Complejo en la nieve",
+      "description": "Un agente cruza el ventisquero hacia el refugio mientras la nieve se come el horizonte."
+    },
+    "casino-heist": {
+      "title": "Atraco al casino",
+      "description": "Dos jugadores se cierran sobre una mesa de tapete bajo luz dorada."
+    },
+    "bank-vault": {
+      "title": "Cámara acorazada",
+      "description": "Una grúa baja a la cámara mientras el ladrón entra con el soplete."
+    },
+    "skyscraper-ledge": {
+      "title": "Cornisa del rascacielos",
+      "description": "Una persecución por el pretil con la ciudad cayendo al vacío."
+    },
+    "oil-rig": {
+      "title": "Plataforma petrolífera",
+      "description": "Una grúa sobre mar abierto mientras el fuego lame la torre."
+    },
+    "subway-brawl": {
+      "title": "Pelea en el metro",
+      "description": "Dos luchadores se cierran en un vagón mientras los raíles echan chispas."
+    },
+    "freeway-overpass": {
+      "title": "Autopista y paso elevado",
+      "description": "Un travelling alto de dos vehículos bajo lámparas de sodio."
+    },
+    "prison-break": {
+      "title": "Fuga de prisión",
+      "description": "El protagonista cruza el patio mientras el guardia gira demasiado tarde."
+    },
+    "arctic-chase": {
+      "title": "Persecución ártica",
+      "description": "Dos vehículos cortan un páramo blanco mientras la nieve ciega al que sigue."
+    },
+    "clock-tower": {
+      "title": "Torre del reloj",
+      "description": "Una órbita alrededor del trepador en la torre mientras la ciudad gira abajo."
+    },
+    "mansion-infil": {
+      "title": "Infiltración en la mansión",
+      "description": "El infiltrado cruza un salón de mármol hacia la puerta interior."
+    },
+    "cargo-hold": {
+      "title": "Bodega de carga",
+      "description": "Una carrera de frente por la bodega mientras la rampa se abre detrás."
+    },
+    "jungle-river": {
+      "title": "Río en la selva",
+      "description": "Un travelling de dos embarcaciones en un río de niebla bajo la copa."
+    },
+    "red-carpet": {
+      "title": "Alfombra roja",
+      "description": "Una órbita lenta mientras la estrella recorre el suelo dorado hasta el primer plano."
+    },
+    "volcano-ridge": {
+      "title": "Cresta del volcán",
+      "description": "Una grúa sobre dos figuras en la cresta mientras la caldera respira fuego."
+    },
+    "hangar-talk": {
+      "title": "Charla en hangar",
+      "description": "Cabeza CRT y un cráneo básico se turnan con vocales sintéticas, visemas y expresiones."
+    },
+    "sea-talk": {
+      "title": "Charla en cubierta",
+      "description": "Los mismos mascotas CRT y cráneo hacen lipsync en la cubierta, en un plano más cerrado."
+    },
+    "voxel-talk": {
+      "title": "Charla voxel",
+      "description": "Una cabeza cubo y un cráneo voxel se turnan en la azotea, ojos anime sobre caras de bloques."
     }
   },
   "gallerySearch": "Buscar en el catálogo",

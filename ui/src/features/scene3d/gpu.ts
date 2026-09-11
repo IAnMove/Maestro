@@ -2,6 +2,7 @@ import { CinematicRuntime } from './cinematicRuntime'
 import { MaterializationRuntime } from './materialization'
 import { framingPose } from './framing'
 import { SpeechFaceRuntime } from './speech/runtime'
+import { FacePackRuntime } from './speech/facePack'
 import { screenGeometry } from './screenGeometry'
 import type { ScreenMediaRuntime } from './screenMediaRuntime'
 import { framingAnchor } from './framingAnchor'
@@ -43,6 +44,7 @@ import { paintDrive } from './driveMotion.ts'
 import { applyTypingPose, resetTypingPose } from './typingPose.ts'
 import { paintWorkshop } from './workshopSet.ts'
 import { paintCitadel } from './citadelSet.ts'
+import { paintActionSet } from './actionSets.ts'
 import type { Scene3DClipCatalogEntry, Scene3DDocument, Scene3DLight, Scene3DSlot } from './types.ts'
 import { syncWorldSfx, type WorldSfxGpu } from '../sceneFx/worldRuntime'
 
@@ -69,6 +71,7 @@ export type SlotGpu = {
   contactShadow?: Mesh
   appearance?: MaterializationRuntime
   speechFace?: SpeechFaceRuntime
+  facePack?: FacePackRuntime
   screen?: ScreenMediaRuntime
   screenAbort?: AbortController
   screenError?: Error
@@ -264,6 +267,7 @@ export function dropSlot(world: GpuWorld, slotId: string) {
   current.mixer?.stopAllAction()
   current.appearance?.clear()
   current.speechFace?.dispose()
+  current.facePack?.dispose()
   current.screenAbort?.abort()
   current.screen?.dispose()
   world.scene.remove(current.root)
@@ -309,20 +313,31 @@ export function placeSlot(
   })
 }
 
+function speechAssetsReady(gpu: SlotGpu | undefined, slot: Scene3DSlot): boolean {
+  if (!slot.speech?.enabled) return true
+  if (!slot.sourceUrl) throw new Error('Choose a 3D model before exporting a speech scene.')
+  if (slot.speech.facePack) {
+    if (gpu?.facePack?.error) throw gpu.facePack.error
+    return Boolean(gpu?.facePack?.ready)
+  }
+  if (!slot.speech.face) throw new Error('Calibrate the face before exporting a speech scene.')
+  if (gpu?.speechFace?.error) throw gpu.speechFace.error
+  return Boolean(gpu?.speechFace?.ready)
+}
+
+function screenAssetsReady(gpu: SlotGpu | undefined, slot: Scene3DSlot): boolean {
+  if (slot.screen && gpu?.mountKey !== slotMountKey(slot)) return false
+  if (gpu?.screenError) throw gpu.screenError
+  if (gpu?.screen?.error) throw gpu.screen.error
+  if (slot.screen?.sourceUrl && !slot.speech?.facePack && !gpu?.screen?.ready) return false
+  return true
+}
+
 export function worldAssetsReady(world: GpuWorld, slots: readonly Scene3DSlot[]): boolean {
   if (!world.dressingReady) return false
   return slots.every(slot => {
-    if (slot.speech?.enabled && !slot.sourceUrl) throw new Error('Choose a 3D model before exporting a speech scene.')
     const gpu = world.slots.get(slot.id)
-    if (slot.speech?.enabled) {
-      if (!slot.speech.face) throw new Error('Calibrate the face before exporting a speech scene.')
-      if (gpu?.speechFace?.error) throw gpu.speechFace.error
-      if (!gpu?.speechFace || !gpu.speechFace.ready) return false
-    }
-    if (slot.screen && gpu?.mountKey !== slotMountKey(slot)) return false
-    if (gpu?.screenError) throw gpu.screenError
-    if (gpu?.screen?.error) throw gpu.screen.error
-    if (slot.screen?.sourceUrl && !gpu?.screen?.ready) return false
+    if (!speechAssetsReady(gpu, slot) || !screenAssetsReady(gpu, slot)) return false
     if (!slot.sourceUrl) return true
     return Boolean(gpu && gpu.mountKey === slotMountKey(slot) && gpu.loaded)
   })
@@ -346,6 +361,19 @@ function groundLoadedSlot(gpu: SlotGpu, slot: Scene3DSlot) {
   }
 }
 
+function syncActorSpeech(world: GpuWorld, gpu: SlotGpu, slot: Scene3DSlot, sceneSeconds: number) {
+  if (gpu.loaded && gpu.kind === 'model' && slot.speech?.face) {
+    gpu.speechFace ??= new SpeechFaceRuntime(() => renderWorld(world))
+    gpu.speechFace.sync(gpu.root, slot.speech, sceneSeconds)
+  } else if (gpu.speechFace && !slot.speech?.face) {
+    gpu.speechFace.sync(gpu.root, undefined, sceneSeconds)
+  }
+  if (gpu.loaded && gpu.kind === 'model' && (slot.speech?.facePack || gpu.facePack)) {
+    gpu.facePack ??= new FacePackRuntime(() => renderWorld(world))
+    gpu.facePack.sync(gpu.root, slot.speech, slot.screen, sceneSeconds)
+  }
+}
+
 function paintActor(world: GpuWorld, slot: Scene3DSlot, sceneSeconds: number) {
   const gpu = world.slots.get(slot.id)
   if (!gpu) return
@@ -363,10 +391,7 @@ function paintActor(world: GpuWorld, slot: Scene3DSlot, sceneSeconds: number) {
   }
   groundLoadedSlot(gpu, slot)
   if (slot.performance === 'typing') applyTypingPose(gpu.root, slot, sceneSeconds)
-  if (gpu.loaded && gpu.kind === 'model' && (slot.speech || gpu.speechFace)) {
-    gpu.speechFace ??= new SpeechFaceRuntime(() => renderWorld(world))
-    gpu.speechFace.sync(gpu.root, slot.speech, sceneSeconds)
-  }
+  syncActorSpeech(world, gpu, slot, sceneSeconds)
   if (slot.appearance || gpu.appearance) {
     gpu.appearance ??= new MaterializationRuntime()
     gpu.appearance.sync(gpu.root, slot.appearance, sceneSeconds)
@@ -380,6 +405,7 @@ export function paintWorld(world: GpuWorld, document: Scene3DDocument, sceneSeco
   applyLoopOffset(world, sceneSeconds)
   paintCitadel(world.dressing, sceneSeconds)
   paintWorkshop(world.dressing, sceneSeconds, document.workshopScreen)
+  paintActionSet(world.dressing, sceneSeconds)
   const bg = document.slots.find(isCylinderBackdrop)
   paintDrive(world, sceneSeconds, bg?.loop?.speed ?? world.driveSpeed)
   for (const slot of posedSlots) paintActor(world, slot, sceneSeconds)
@@ -506,6 +532,7 @@ export function createWorld(host: HTMLDivElement, light: Scene3DLight, fov: numb
     new MeshStandardMaterial({ color: 0x1c222c, roughness: 0.92 }),
   )
   floor.rotation.x = -Math.PI / 2
+  floor.name = 'world-floor'
   scene.add(floor)
   return {
     renderer, scene, camera, dir, floor, dressing: null, dressingReady: true,
