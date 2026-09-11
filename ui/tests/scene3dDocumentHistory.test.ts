@@ -12,7 +12,6 @@ import {
   acknowledgeGallerySave,
   applyHistoryChange,
   applyScene3DGizmoPatch,
-  bindSavedRevision,
   captureSaveTarget,
   createDocumentId,
   createHistory,
@@ -204,8 +203,7 @@ test('full or corrupt storage keeps the last valid draft', () => {
   const storage = memoryStorage()
   const start = sampleDocument()
   const id = identity('keep-valid')
-  let history = applyHistoryChange(createHistory(start, id, 'tab-1'), changeGlb(start, '/kept.glb'))
-  history = persistHistoryDraft(history, storage)
+  persistHistoryDraft(applyHistoryChange(createHistory(start, id, 'tab-1'), changeGlb(start, '/kept.glb')), storage)
   const key = draftStorageKey(id)
   const valid = storage.getItem(key)
   assert.ok(valid)
