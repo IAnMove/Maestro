@@ -1,9 +1,4 @@
-"""Portable Video3D project packages: document + hashed media + repair on import.
-
-A package is not a #328 scenario template. Templates never include GLB/audio.
-This format packs only used media, dedupes by SHA-256, and refuses zip slip,
-symlinks, external URLs, unknown cinema runtimes and bomb-sized archives.
-"""
+"""Portable Video3D packages: hashed media, preflight repair, zip-slip guards."""
 from __future__ import annotations
 
 import base64
@@ -28,7 +23,6 @@ from services.asset_manifest import (
 )
 from services.scene_commands import DocumentInput
 from services.scene_library import save_world3d
-
 
 PACKAGE_KIND = "hocuspocus.scene-package"
 PACKAGE_SCHEMA = "hocuspocus.scene-package"
@@ -83,7 +77,6 @@ CINEMA_FIELD_NAMES = ("cinema", "cinemaExtension", "cinemaRuntime")
 
 STUB_PNG = b"\x89PNG\r\n\x1a\npreview"
 STUB_PREVIEW = "data:image/png;base64," + base64.b64encode(STUB_PNG).decode("ascii")
-
 
 class ScenePackageError(ValueError):
     status = 422
@@ -182,30 +175,35 @@ def unwrap_document(value: Any) -> dict[str, Any]:
     return dict(value)
 
 
-def collect_unknown_fields(raw: Mapping[str, Any], prefix: str = "") -> list[str]:
+def _prefixed(prefix: str, key: str) -> str:
+    return f"{prefix}{key}" if prefix else key
+
+
+def _unknown_keys(record: Mapping[str, Any], known: frozenset[str], prefix: str) -> list[str]:
+    return [_prefixed(prefix, key) for key in record if key not in known]
+
+
+def _unknown_slot_fields(slots: Any, prefix: str) -> list[str]:
     found: list[str] = []
-    wrapper = is_template_wrapper(raw)
-    known = KNOWN_WRAPPER_KEYS if wrapper else KNOWN_DOCUMENT_KEYS
-    body = raw
-    if wrapper:
-        for key in raw:
-            if key not in known:
-                found.append(f"{prefix}{key}" if prefix else key)
-        nested = raw.get("document")
-        if isinstance(nested, Mapping):
-            found.extend(collect_unknown_fields(nested, f"{prefix}document." if prefix else "document."))
+    if not isinstance(slots, list):
         return found
-    for key in body:
-        if key not in known:
-            found.append(f"{prefix}{key}" if prefix else key)
-    slots = body.get("slots")
-    if isinstance(slots, list):
-        for index, slot in enumerate(slots):
-            if not isinstance(slot, Mapping):
-                continue
-            for key in slot:
-                if key not in KNOWN_SLOT_KEYS:
-                    found.append(f"{prefix}slots[{index}].{key}")
+    for index, slot in enumerate(slots):
+        if isinstance(slot, Mapping):
+            found.extend(
+                f"{prefix}slots[{index}].{key}"
+                for key in slot if key not in KNOWN_SLOT_KEYS
+            )
+    return found
+
+
+def collect_unknown_fields(raw: Mapping[str, Any], prefix: str = "") -> list[str]:
+    if not is_template_wrapper(raw):
+        return _unknown_keys(raw, KNOWN_DOCUMENT_KEYS, prefix) + _unknown_slot_fields(raw.get("slots"), prefix)
+    found = _unknown_keys(raw, KNOWN_WRAPPER_KEYS, prefix)
+    nested = raw.get("document")
+    if isinstance(nested, Mapping):
+        nested_prefix = f"{prefix}document." if prefix else "document."
+        found.extend(collect_unknown_fields(nested, nested_prefix))
     return found
 
 
@@ -219,11 +217,35 @@ def safe_export_filename(name: str) -> str:
     return cleaned or "asset"
 
 
+def _url_has_controls(text: str) -> bool:
+    return any(ord(char) <= 32 or char == "\\" for char in text)
+
+
+def _classify_api_path(path: str) -> str | None:
+    if path.startswith("/api/v1/file/"):
+        return "gallery"
+    if path.startswith("/api/v1/uploads/"):
+        return "uploads"
+    return None
+
+
+def _classify_local_path(path: str, text: str) -> str:
+    api = _classify_api_path(path)
+    if api:
+        return api
+    dotted = ".." in Path(path).parts
+    if path.startswith(f"{MEDIA_DIR}/"):
+        return "unsafe" if dotted else "relative"
+    if path.startswith("/") or "://" in text:
+        return "external"
+    return "unsafe" if dotted else "relative"
+
+
 def classify_url(url: str) -> str:
     text = str(url or "").strip()
     if not text:
         return "empty"
-    if any(ord(char) <= 32 or char == "\\" for char in text):
+    if _url_has_controls(text):
         return "unsafe"
     lowered = text.casefold()
     if lowered.startswith(("blob:", "file:", "filesystem:", "javascript:", "data:")):
@@ -231,18 +253,7 @@ def classify_url(url: str) -> str:
     if lowered.startswith(("http://", "https://", "//")):
         return "external"
     parsed = urlparse(text)
-    path = unquote(parsed.path or text.split("?", 1)[0])
-    if path.startswith("/api/v1/file/"):
-        return "gallery"
-    if path.startswith("/api/v1/uploads/"):
-        return "uploads"
-    if path.startswith(f"{MEDIA_DIR}/") and ".." not in Path(path).parts:
-        return "relative"
-    if path.startswith("/") or "://" in text:
-        return "external"
-    if ".." in Path(path).parts:
-        return "unsafe"
-    return "relative"
+    return _classify_local_path(unquote(parsed.path or text.split("?", 1)[0]), text)
 
 
 def parse_media_locator(url: str, fallback_workspace: str | None = None) -> tuple[str | None, str]:
@@ -261,70 +272,95 @@ def parse_media_locator(url: str, fallback_workspace: str | None = None) -> tupl
     return workspace, _basename(path) if "/" in path or path.startswith(MEDIA_DIR) else path
 
 
+def _first_text(value: Mapping[str, Any], *keys: str) -> str:
+    for key in keys:
+        text = str(value.get(key) or "").strip()
+        if text:
+            return text
+    return ""
+
+
+def _resolve_ref_location(
+    value: Mapping[str, Any], url: str, fallback_workspace: str | None,
+) -> tuple[str, str]:
+    filename = _basename(_first_text(value, "filename"))
+    workspace = _first_text(value, "workspaceId", "workspace_id") or fallback_workspace or ""
+    if filename:
+        return workspace, filename
+    parsed_ws, parsed_name = parse_media_locator(url, workspace)
+    return parsed_ws or workspace, parsed_name
+
+
 def _ref_from_mapping(value: Mapping[str, Any], fallback_workspace: str | None) -> dict[str, Any] | None:
-    filename = _basename(str(value.get("filename") or ""))
-    url = str(value.get("url") or value.get("sourceUrl") or "")
-    workspace = str(value.get("workspaceId") or value.get("workspace_id") or "") or fallback_workspace
-    if not filename and url:
-        workspace, filename = parse_media_locator(url, workspace)
+    url = _first_text(value, "url", "sourceUrl")
+    workspace, filename = _resolve_ref_location(value, url, fallback_workspace)
     if not filename and not url:
         return None
-    asset_id = str(value.get("assetId") or value.get("asset_id") or "")
     return {
-        "workspaceId": workspace or "",
+        "workspaceId": workspace,
         "filename": filename or safe_export_filename(url),
         "url": url,
-        "assetId": asset_id,
+        "assetId": _first_text(value, "assetId", "asset_id"),
     }
+
+
+def _ref_from_any(raw: Any, url: str = "") -> dict[str, Any] | None:
+    ref = _ref_from_mapping(raw, None) if isinstance(raw, Mapping) else None
+    if ref is None and isinstance(raw, str) and raw:
+        workspace, filename = parse_media_locator(raw, None)
+        ref = {"workspaceId": workspace or "", "filename": filename, "url": raw, "assetId": ""}
+    if ref is None and url:
+        workspace, filename = parse_media_locator(url, None)
+        ref = {"workspaceId": workspace or "", "filename": filename, "url": url, "assetId": ""}
+    if ref is not None and url and not ref.get("url"):
+        ref["url"] = url
+    return ref
+
+
+def _add_use(uses: list[dict[str, Any]], raw: Any, *, doc_id: str, role: str, kind: str, url: str = "") -> None:
+    ref = _ref_from_any(raw, url)
+    if ref is None:
+        return
+    uses.append({"doc_id": doc_id, "role": role, "kind": kind, **ref})
+
+
+def _uses_from_speech(speech: Mapping[str, Any], index: int, doc_id: str, uses: list[dict[str, Any]]) -> None:
+    _add_use(uses, speech.get("audio"), doc_id=doc_id, role=f"slots[{index}].speech.audio", kind="audio")
+    _add_use(uses, speech.get("atlas"), doc_id=doc_id, role=f"slots[{index}].speech.atlas", kind="image")
+    clips = speech.get("clips")
+    if not isinstance(clips, list):
+        return
+    for clip_index, clip in enumerate(clips):
+        if isinstance(clip, Mapping):
+            _add_use(uses, clip.get("audio"), doc_id=doc_id, role=f"slots[{index}].speech.clips[{clip_index}].audio", kind="audio")
+
+
+def _uses_from_slot(slot: Any, index: int, doc_id: str, uses: list[dict[str, Any]]) -> None:
+    if not isinstance(slot, Mapping):
+        return
+    media = str(slot.get("media") or "model3d")
+    kind = "image" if media in {"image", "screen"} else "model3d"
+    _add_use(uses, slot.get("sourceRef"), doc_id=doc_id, role=f"slots[{index}]", kind=kind, url=str(slot.get("sourceUrl") or ""))
+    screen = slot.get("screen")
+    if isinstance(screen, Mapping):
+        screen_kind = "video" if screen.get("media") == "video" else "image"
+        _add_use(uses, screen.get("sourceRef"), doc_id=doc_id, role=f"slots[{index}].screen", kind=screen_kind,
+                 url=str(screen.get("sourceUrl") or ""))
+    speech = slot.get("speech")
+    if isinstance(speech, Mapping):
+        _uses_from_speech(speech, index, doc_id, uses)
 
 
 def iter_asset_uses(document: Mapping[str, Any], *, doc_id: str = "") -> list[dict[str, Any]]:
     uses: list[dict[str, Any]] = []
-
-    def add(raw: Any, *, role: str, kind: str, url: str = "") -> None:
-        ref = None
-        if isinstance(raw, Mapping):
-            ref = _ref_from_mapping(raw, None)
-        elif isinstance(raw, str) and raw:
-            workspace, filename = parse_media_locator(raw, None)
-            ref = {"workspaceId": workspace or "", "filename": filename, "url": raw, "assetId": ""}
-        if url and ref is not None and not ref.get("url"):
-            ref["url"] = url
-        if ref is None and url:
-            workspace, filename = parse_media_locator(url, None)
-            ref = {"workspaceId": workspace or "", "filename": filename, "url": url, "assetId": ""}
-        if ref is None:
-            return
-        uses.append({"doc_id": doc_id, "role": role, "kind": kind, **ref})
-
     body = unwrap_document(document)
-    slots = body.get("slots")
-    if isinstance(slots, list):
-        for index, slot in enumerate(slots):
-            if not isinstance(slot, Mapping):
-                continue
-            media = str(slot.get("media") or "model3d")
-            kind = "image" if media in {"image", "screen"} else "model3d"
-            add(slot.get("sourceRef"), role=f"slots[{index}]", kind=kind, url=str(slot.get("sourceUrl") or ""))
-            screen = slot.get("screen")
-            if isinstance(screen, Mapping):
-                screen_kind = "video" if screen.get("media") == "video" else "image"
-                add(screen.get("sourceRef"), role=f"slots[{index}].screen", kind=screen_kind,
-                    url=str(screen.get("sourceUrl") or ""))
-            speech = slot.get("speech")
-            if isinstance(speech, Mapping):
-                add(speech.get("audio"), role=f"slots[{index}].speech.audio", kind="audio")
-                add(speech.get("atlas"), role=f"slots[{index}].speech.atlas", kind="image")
-                clips = speech.get("clips")
-                if isinstance(clips, list):
-                    for clip_index, clip in enumerate(clips):
-                        if isinstance(clip, Mapping):
-                            add(clip.get("audio"), role=f"slots[{index}].speech.clips[{clip_index}].audio", kind="audio")
-    tracks = body.get("soundtrack")
-    if isinstance(tracks, list):
-        for index, track in enumerate(tracks):
-            if isinstance(track, Mapping):
-                add(track.get("audio"), role=f"soundtrack[{index}]", kind="audio")
+    slots = body.get("slots") if isinstance(body.get("slots"), list) else []
+    for index, slot in enumerate(slots):
+        _uses_from_slot(slot, index, doc_id, uses)
+    tracks = body.get("soundtrack") if isinstance(body.get("soundtrack"), list) else []
+    for index, track in enumerate(tracks):
+        if isinstance(track, Mapping):
+            _add_use(uses, track.get("audio"), doc_id=doc_id, role=f"soundtrack[{index}]", kind="audio")
     return uses
 
 
@@ -338,72 +374,103 @@ def _rewrite_ref(container: dict[str, Any], key: str, locator: Callable[[dict[st
     container[key] = updated
 
 
+def _source_payload(container: Mapping[str, Any], url_key: str = "sourceUrl", ref_key: str = "sourceRef") -> dict[str, Any]:
+    original = {"workspaceId": "", "filename": "", "url": str(container.get(url_key) or ""), "assetId": ""}
+    ref = container.get(ref_key)
+    if isinstance(ref, Mapping):
+        original.update(ref)
+    return original
+
+
+def _apply_located(
+    target: dict[str, Any],
+    locator: Callable[[dict[str, Any]], dict[str, Any] | None],
+    url_key: str = "sourceUrl",
+    ref_key: str = "sourceRef",
+) -> None:
+    updated = locator(_source_payload(target, url_key, ref_key))
+    if updated is None:
+        return
+    target[ref_key] = updated
+    target[url_key] = updated["url"]
+
+
+def _rewrite_speech(speech: dict[str, Any], locator: Callable[[dict[str, Any]], dict[str, Any] | None]) -> None:
+    _rewrite_ref(speech, "audio", locator)
+    _rewrite_ref(speech, "atlas", locator)
+    clips = speech.get("clips")
+    if not isinstance(clips, list):
+        return
+    for clip in clips:
+        if isinstance(clip, dict):
+            _rewrite_ref(clip, "audio", locator)
+
+
+def _rewrite_slot(slot: Any, locator: Callable[[dict[str, Any]], dict[str, Any] | None]) -> None:
+    if not isinstance(slot, dict):
+        return
+    _apply_located(slot, locator)
+    screen = slot.get("screen")
+    if isinstance(screen, dict):
+        _apply_located(screen, locator)
+    speech = slot.get("speech")
+    if isinstance(speech, dict):
+        _rewrite_speech(speech, locator)
+
+
+def _rewrite_track(track: Any, locator: Callable[[dict[str, Any]], dict[str, Any] | None]) -> None:
+    if isinstance(track, dict):
+        _rewrite_ref(track, "audio", locator)
+
+
+def _rewrite_list(entries: Any, locator: Callable[[dict[str, Any]], dict[str, Any] | None], rewrite_item: Callable) -> None:
+    if not isinstance(entries, list):
+        return
+    for item in entries:
+        rewrite_item(item, locator)
+
+
+def _document_body(packed: dict[str, Any]) -> dict[str, Any]:
+    nested = packed.get("document")
+    if is_template_wrapper(packed) and isinstance(nested, dict):
+        return nested
+    return packed
+
+
 def rewrite_document_refs(
     document: Mapping[str, Any],
     locator: Callable[[dict[str, Any]], dict[str, Any] | None],
 ) -> dict[str, Any]:
     packed = deepcopy(dict(document))
-    body = packed["document"] if is_template_wrapper(packed) and isinstance(packed.get("document"), dict) else packed
-    slots = body.get("slots")
-    if isinstance(slots, list):
-        for slot in slots:
-            if not isinstance(slot, dict):
-                continue
-            original = {
-                "workspaceId": "",
-                "filename": "",
-                "url": str(slot.get("sourceUrl") or ""),
-                "assetId": "",
-            }
-            if isinstance(slot.get("sourceRef"), Mapping):
-                original.update(slot["sourceRef"])
-            updated = locator(original)
-            if updated is not None:
-                slot["sourceRef"] = updated
-                slot["sourceUrl"] = updated["url"]
-            screen = slot.get("screen")
-            if isinstance(screen, dict):
-                screen_ref = {
-                    "workspaceId": "",
-                    "filename": "",
-                    "url": str(screen.get("sourceUrl") or ""),
-                    "assetId": "",
-                }
-                if isinstance(screen.get("sourceRef"), Mapping):
-                    screen_ref.update(screen["sourceRef"])
-                updated_screen = locator(screen_ref)
-                if updated_screen is not None:
-                    screen["sourceRef"] = updated_screen
-                    screen["sourceUrl"] = updated_screen["url"]
-            speech = slot.get("speech")
-            if isinstance(speech, dict):
-                _rewrite_ref(speech, "audio", locator)
-                _rewrite_ref(speech, "atlas", locator)
-                clips = speech.get("clips")
-                if isinstance(clips, list):
-                    for clip in clips:
-                        if isinstance(clip, dict):
-                            _rewrite_ref(clip, "audio", locator)
-    tracks = body.get("soundtrack")
-    if isinstance(tracks, list):
-        for track in tracks:
-            if isinstance(track, dict):
-                _rewrite_ref(track, "audio", locator)
+    body = _document_body(packed)
+    _rewrite_list(body.get("slots"), locator, _rewrite_slot)
+    _rewrite_list(body.get("soundtrack"), locator, _rewrite_track)
     return packed
+
+
+def _is_empty_member(raw: str) -> bool:
+    return not raw or raw.endswith("/")
+
+
+def _escapes_package(raw: str) -> bool:
+    return "\x00" in raw or raw.startswith("/") or raw.startswith("../") or raw == ".."
+
+
+def _is_windows_abs(raw: str) -> bool:
+    drive = raw.split("/", 1)[0]
+    return ":" in drive and raw[:1].isalpha()
+
+
+def _unsafe_member_parts(parts: list[str]) -> bool:
+    return not parts or ".." in parts or any(not _SAFE_SEGMENT.fullmatch(part) for part in parts)
 
 
 def safe_zip_member(name: str) -> str:
     raw = str(name or "").replace("\\", "/")
-    if not raw or raw.endswith("/"):
-        raise ScenePackageSecurity("Package member path is empty")
-    if "\x00" in raw or raw.startswith("/") or raw.startswith("../") or raw == "..":
+    if _is_empty_member(raw) or _escapes_package(raw) or _is_windows_abs(raw):
         raise ScenePackageSecurity("Rejected path traversal in the package")
-    if ":" in raw.split("/", 1)[0] and raw[0].isalpha():
-        raise ScenePackageSecurity("Rejected absolute path in the package")
     parts = [part for part in raw.split("/") if part not in ("", ".")]
-    if not parts or any(part == ".." for part in parts):
-        raise ScenePackageSecurity("Rejected path traversal in the package")
-    if any(not _SAFE_SEGMENT.fullmatch(part) for part in parts):
+    if _unsafe_member_parts(parts):
         raise ScenePackageSecurity("Package member names must be relative and simple")
     return "/".join(parts)
 
@@ -553,6 +620,29 @@ def _packed_locator(workspace: str, assets_by_hash: dict[str, dict[str, Any]], h
     return locate
 
 
+def _skip_empty_use(use: Mapping[str, Any]) -> bool:
+    url = str(use.get("url") or "")
+    return classify_url(url) == "empty" and not use.get("filename")
+
+
+def _encode_packed_document(rewritten: Mapping[str, Any]) -> bytes:
+    encoded = json.dumps(rewritten, ensure_ascii=False, allow_nan=False).encode()
+    if len(encoded) > MAX_DOCUMENT_BYTES:
+        raise ScenePackageTooLarge("Scene document exceeds 2 MB")
+    return encoded
+
+
+def _document_pack_name(rewritten: Mapping[str, Any], index: int) -> tuple[str, str, str | None]:
+    role = "template" if is_template_wrapper(rewritten) else "shot"
+    title = rewritten.get("title") if is_template_wrapper(rewritten) else None
+    production = rewritten.get("production") if isinstance(rewritten.get("production"), Mapping) else {}
+    name = str(title or production.get("title") or rewritten.get("templateId") or f"shot-{index}")[:120]
+    warning = None
+    if role == "template":
+        warning = "Packed a scenario wrapper; media still travels with the package, unlike a template file."
+    return role, name, warning
+
+
 def _pack_document(
     raw: Mapping[str, Any],
     index: int,
@@ -565,32 +655,18 @@ def _pack_document(
     unknown = [f"documents[{index}].{field}" for field in collect_unknown_fields(raw)]
     hash_by_key: dict[tuple[str, str, str], str] = {}
     for use in iter_asset_uses(raw, doc_id=f"shot-{index}"):
-        url = str(use.get("url") or "")
-        if classify_url(url) == "empty" and not use.get("filename"):
+        if _skip_empty_use(use):
             continue
         data, filename = _read_local_asset(reader, use, workspace)
         if data is None:
-            raise ScenePackageError(f"Missing scene asset: {filename or url}")
+            raise ScenePackageError(f"Missing scene asset: {filename or use.get('url')}")
         _register_packed_asset(use, data, filename, workspace, files, assets_by_hash, hash_by_key)
     rewritten = rewrite_document_refs(raw, _packed_locator(workspace, assets_by_hash, hash_by_key))
-    encoded = json.dumps(rewritten, ensure_ascii=False, allow_nan=False).encode()
-    if len(encoded) > MAX_DOCUMENT_BYTES:
-        raise ScenePackageTooLarge("Scene document exceeds 2 MB")
+    encoded = _encode_packed_document(rewritten)
     path = f"{DOCUMENTS_DIR}/shot-{index}.json"
     files[path] = encoded
-    role = "template" if is_template_wrapper(rewritten) else "shot"
-    title = rewritten.get("title") if is_template_wrapper(rewritten) else None
-    production = rewritten.get("production") if isinstance(rewritten.get("production"), Mapping) else {}
-    packed = {
-        "id": f"shot-{index}",
-        "role": role,
-        "path": path,
-        "sha256": sha256_bytes(encoded),
-        "name": str(title or production.get("title") or rewritten.get("templateId") or f"shot-{index}")[:120],
-    }
-    warning = None
-    if role == "template":
-        warning = "Packed a scenario wrapper; media still travels with the package, unlike a template file."
+    role, name, warning = _document_pack_name(rewritten, index)
+    packed = {"id": f"shot-{index}", "role": role, "path": path, "sha256": sha256_bytes(encoded), "name": name}
     return packed, unknown, warning
 
 
@@ -891,6 +967,34 @@ def _write_bytes(path: Path, data: bytes) -> None:
     temporary.replace(path)
 
 
+def _reassign_locator(item: Mapping[str, Any], workspace: str) -> tuple[str, str]:
+    filename = str(item.get("filename") or "")
+    source_workspace = str(item.get("workspace") or item.get("workspaceId") or workspace)
+    url = str(item.get("url") or "")
+    if not url:
+        return filename, source_workspace
+    parsed_ws, parsed_name = parse_media_locator(url, source_workspace)
+    return parsed_name or filename, parsed_ws or source_workspace
+
+
+def _reassign_one(item: Mapping[str, Any], reader: AssetReader, workspace: str) -> tuple[str, dict[str, Any]]:
+    digest = str(item.get("sha256") or "").casefold()
+    if not _SHA256.fullmatch(digest):
+        raise ScenePackageError("Reassignment is missing a content hash")
+    filename, source_workspace = _reassign_locator(item, workspace)
+    data = reader(source_workspace, filename)
+    if data is None:
+        raise ScenePackageError(f"Replacement asset not found: {filename}")
+    return digest, {
+        "data": data,
+        "filename": filename,
+        "workspaceId": source_workspace,
+        "url": gallery_url(source_workspace, filename),
+        "sha256": sha256_bytes(data),
+        "assetId": str(item.get("assetId") or ""),
+    }
+
+
 def apply_reassign(
     packed: Mapping[str, Any],
     reassign: Iterable[Mapping[str, Any]],
@@ -899,29 +1003,9 @@ def apply_reassign(
 ) -> dict[str, dict[str, Any]]:
     replacements: dict[str, dict[str, Any]] = {}
     for item in reassign:
-        if not isinstance(item, Mapping):
-            continue
-        digest = str(item.get("sha256") or "").casefold()
-        if not _SHA256.fullmatch(digest):
-            raise ScenePackageError("Reassignment is missing a content hash")
-        filename = str(item.get("filename") or "")
-        source_workspace = str(item.get("workspace") or item.get("workspaceId") or workspace)
-        url = str(item.get("url") or "")
-        if url:
-            parsed_ws, parsed_name = parse_media_locator(url, source_workspace)
-            source_workspace = parsed_ws or source_workspace
-            filename = parsed_name or filename
-        data = reader(source_workspace, filename)
-        if data is None:
-            raise ScenePackageError(f"Replacement asset not found: {filename}")
-        replacements[digest] = {
-            "data": data,
-            "filename": filename,
-            "workspaceId": source_workspace,
-            "url": gallery_url(source_workspace, filename) if source_workspace != "__uploads__" else gallery_url("__uploads__", filename),
-            "sha256": sha256_bytes(data),
-            "assetId": str(item.get("assetId") or ""),
-        }
+        if isinstance(item, Mapping):
+            digest, payload = _reassign_one(item, reader, workspace)
+            replacements[digest] = payload
     return replacements
 
 

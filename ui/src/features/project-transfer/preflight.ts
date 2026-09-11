@@ -112,24 +112,49 @@ async function inspectDocuments(zip: JSZip, entries: unknown[], issues: PackageI
   }
 }
 
+function recordObject(entry: unknown): Record<string, unknown> {
+  return entry && typeof entry === 'object' ? entry as Record<string, unknown> : {}
+}
+
+function packedStatus(path: string, file: { async: (kind: 'uint8array') => Promise<Uint8Array> } | null, hash?: string, digest = ''): PackedAsset['status'] {
+  if (!path.startsWith(`${MEDIA_DIR}/`) || !file) return 'missing'
+  if (hash && hash !== digest) return 'tampered'
+  return 'ok'
+}
+
+function noteAssetIssue(status: PackedAsset['status'], filename: string, digest: string, path: string, issues: PackageIssue[]) {
+  if (status === 'missing') issues.push(issue('missing_asset', filename || digest, { repair: true, path }))
+  if (status === 'tampered') issues.push(issue('tampered_asset', filename || digest, { repair: true, path }))
+}
+
+async function mediaHash(file: { async: (kind: 'uint8array') => Promise<Uint8Array> } | null, path: string): Promise<string | undefined> {
+  if (!file) return undefined
+  if (!path.startsWith(`${MEDIA_DIR}/`)) return undefined
+  if (!isContentHashName(path)) return undefined
+  return sha256Hex(await file.async('uint8array'))
+}
+
+function noteTraversal(file: object | null, path: string, issues: PackageIssue[]) {
+  if (!file) return
+  if (!path.startsWith(`${MEDIA_DIR}/`)) return
+  if (isContentHashName(path)) return
+  issues.push(issue('traversal', path, { path }))
+}
+
+async function inspectOneAsset(zip: JSZip, entry: unknown, issues: PackageIssue[]): Promise<PackedAsset> {
+  const record = recordObject(entry)
+  const path = String(record.path || '')
+  const digest = String(record.sha256 || '')
+  const filename = String(record.filename || '')
+  const file = zip.file(path)
+  noteTraversal(file, path, issues)
+  const status = packedStatus(path, file, await mediaHash(file, path), digest)
+  noteAssetIssue(status, filename, digest, path, issues)
+  return { sha256: digest, filename, path, kind: String(record.kind || ''), size: Number(record.size || 0), status }
+}
+
 async function inspectAssets(zip: JSZip, entries: unknown[], issues: PackageIssue[], assets: PackedAsset[]) {
-  for (const entry of entries) {
-    const record = entry && typeof entry === 'object' ? entry as Record<string, unknown> : {}
-    const path = String(record.path || '')
-    const digest = String(record.sha256 || '')
-    const filename = String(record.filename || '')
-    let status: PackedAsset['status'] = 'ok'
-    const file = zip.file(path)
-    if (!path.startsWith(`${MEDIA_DIR}/`) || !file) status = 'missing'
-    else if (!isContentHashName(path)) issues.push(issue('traversal', path, { path }))
-    else {
-      const hash = await sha256Hex(await file.async('uint8array'))
-      if (hash !== digest) status = 'tampered'
-    }
-    if (status === 'missing') issues.push(issue('missing_asset', filename || digest, { repair: true, path }))
-    if (status === 'tampered') issues.push(issue('tampered_asset', filename || digest, { repair: true, path }))
-    assets.push({ sha256: digest, filename, path, kind: String(record.kind || ''), size: Number(record.size || 0), status })
-  }
+  for (const entry of entries) assets.push(await inspectOneAsset(zip, entry, issues))
 }
 
 export async function preflightBytes(data: Uint8Array, filename = 'package.zip'): Promise<PreflightReport> {
