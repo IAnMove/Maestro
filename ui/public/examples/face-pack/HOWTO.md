@@ -1,5 +1,8 @@
 # How to make a mascot face pack
 
+Bundled examples in this folder (`*-pack.png`, `*-visemes.png`, `*-talk.mp4`,
+`neutral-vowels.wav`) are **CC0** — free for anyone. See `LICENSE`.
+
 A face pack is a PNG the TV-head screen samples while someone talks.
 **Mouth (viseme) and expression are independent.** Happy + A is still happy;
 only the mouth changes.
