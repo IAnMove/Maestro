@@ -7,7 +7,7 @@ import { useUiTranslation } from '../../../i18n'
 import type { Scene3DSlot } from '../types'
 import { sourceRefFromOutput } from '../slotSource'
 import type { PlacementMode } from './calibration'
-import { defaultSpeech, type FacePlacement, type Scene3DSpeech } from './types'
+import { EXPRESSIONS, defaultSpeech, type FacePlacement, type Scene3DSpeech } from './types'
 import { FACE_PACK_GLB, FACE_PACK_IDS, FACE_PACKS, applyBundledFacePack, facePackIdOf, talkingScreen } from './facePackExamples'
 import { amplitudeCues, parseMouthCues } from './track'
 import { decodeVoice, voiceWav } from './audio'
@@ -102,6 +102,16 @@ export function Scene3DSpeechControls({ slot, workspace, disabled, calibrate, on
           </button>
         })}
       </div>
+      <label className="flex items-center gap-2 text-xs">{t('speech.expressionHold')}
+        <select aria-label={t('speech.expressionHold')} className={speechInput} value={speech.expression}
+          onChange={event => {
+            const expression = event.target.value as Scene3DSpeech['expression']
+            onChange({ ...speech, expression, expressionCues: undefined })
+          }}>
+          {EXPRESSIONS.map(expression => <option key={expression} value={expression}>{t(`speech.expression.${expression}`)}</option>)}
+        </select>
+      </label>
+      <p className="text-xs leading-5 text-text-muted">{t('speech.expressionHoldHint')}</p>
     </fieldset>
     <fieldset disabled={locked} className="space-y-3 disabled:opacity-60">
       <LipsPlacementControls speech={speech} hasModel={Boolean(slot.sourceUrl)} calibrate={calibrate} onChange={onChange} onPick={onPick} />

@@ -90,6 +90,8 @@
     "needsPlacement": "Add lips to this subject before previewing its voice on the model.",
     "facePack": "Mascot face",
     "facePackHint": "Bundled faces for a TV-head screen: visemes and expressions. Experimental.",
+    "expressionHold": "Expression while talking",
+    "expressionHoldHint": "Vowels only change the mouth. This expression stays on the whole line unless you add expression cues.",
     "pack": {
       "tv": "CRT",
       "skull": "Skull",

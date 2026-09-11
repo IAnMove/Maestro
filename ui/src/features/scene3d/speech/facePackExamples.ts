@@ -52,18 +52,17 @@ const REPLY_MOUTH: MouthCue[] = [
   { start: 7.65, end: 8, viseme: 'rest' },
 ]
 
+/** One expression for the whole turn; visemes change underneath. */
 const LEAD_FACE: ExpressionCue[] = [
   { start: 0, end: 0.35, expression: 'neutral' },
-  { start: 0.35, end: 2.25, expression: 'happy' },
-  { start: 2.25, end: 3.65, expression: 'surprised' },
-  { start: 3.65, end: 8, expression: 'sleepy' },
+  { start: 0.35, end: 3.65, expression: 'happy' },
+  { start: 3.65, end: 8, expression: 'neutral' },
 ]
 
 const REPLY_FACE: ExpressionCue[] = [
   { start: 0, end: 4.35, expression: 'neutral' },
-  { start: 4.35, end: 6.25, expression: 'angry' },
-  { start: 6.25, end: 7.65, expression: 'worried' },
-  { start: 7.65, end: 8, expression: 'sleepy' },
+  { start: 4.35, end: 7.65, expression: 'angry' },
+  { start: 7.65, end: 8, expression: 'neutral' },
 ]
 
 export function facePackIdOf(url: string | undefined): FacePackId | undefined {

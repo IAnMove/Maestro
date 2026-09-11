@@ -90,6 +90,8 @@
     "needsPlacement": "Añade labios a este sujeto antes de visualizar su voz sobre el modelo.",
     "facePack": "Cara mascota",
     "facePackHint": "Caras incluidas para una pantalla de cabeza CRT: visemas y expresiones. Experimental.",
+    "expressionHold": "Expresión al hablar",
+    "expressionHoldHint": "Las vocales solo cambian la boca. Esta expresión se mantiene en toda la frase salvo que añadas cues de expresión.",
     "pack": {
       "tv": "CRT",
       "skull": "Cráneo",

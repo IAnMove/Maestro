@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { defaultSpeech } from '../src/features/scene3d/speech/types'
+import { defaultSpeech, VISEMES } from '../src/features/scene3d/speech/types'
 import { cueAt, expressionAt, mouthAt, parseExpressionCues, parseMouthCues, parseSpeech, amplitudeCues, safeMediaUrl } from '../src/features/scene3d/speech/track'
 import { facePackCell, validFacePackSize } from '../src/features/scene3d/speech/facePack'
 import { FACE_PACK_IDS, talkingMascot } from '../src/features/scene3d/speech/facePackExamples'
@@ -103,7 +103,11 @@ test('face packs are 9×6 and talking mascots round-trip on hangar-talk', () => 
   assert.deepEqual(parsed?.slots.map(slot => slot.speech?.facePack?.url), doc.slots.map(slot => slot.speech?.facePack?.url))
   assert.deepEqual(parsed?.slots.map(slot => slot.speech?.expressionCues), doc.slots.map(slot => slot.speech?.expressionCues))
   assert.equal(expressionAt(doc.slots[0].speech!, 1), 'happy')
+  assert.equal(expressionAt(doc.slots[0].speech!, 2.7), 'happy')
+  assert.equal(mouthAt(doc.slots[0].speech!, 2.7).b, VISEMES.indexOf('O'))
   assert.equal(expressionAt(doc.slots[1].speech!, 5), 'angry')
+  assert.equal(expressionAt(doc.slots[1].speech!, 6.7), 'angry')
+  assert.equal(mouthAt(doc.slots[1].speech!, 6.7).b, VISEMES.indexOf('O'))
   assert.equal(mouthAt(doc.slots[0].speech!, 0.5).b, 2)
   assert.equal(FACE_PACK_IDS.length, 5)
   const voxel = applyScene3DTemplate('voxel-talk')

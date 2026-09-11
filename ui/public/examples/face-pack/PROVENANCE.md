@@ -18,5 +18,7 @@ Procedural talking faces for Video 3D. Not a recording or clone of a person.
 - Shots: `hangar-talk` and `sea-talk` (CRT + skull), `voxel-talk` (cube + voxel skull).
   Soundtrack is the WAV; character speech is silent so vowels are not doubled.
 - In Video 3D, Voice and lip-sync exposes the five packs on the selected subject.
+  **Expression while talking** holds one row; vowels only walk the viseme columns.
+- Authoring: `HOWTO.md` (9×6 PNG, independent viseme × expression).
 - Intended use: bundled experimental preview. Using it does not generate audio
   or download a model.
