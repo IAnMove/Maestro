@@ -26,7 +26,7 @@ from routers.scene_commands import create_scene_commands_router
 from routers.style_library import create_style_library_router
 from routers.system_capabilities import create_system_capabilities_router, require_capability_http
 from routers.workspace_collections import create_workspace_collections_router
-from services import core_editor, core_production, core_remote_image, core_workspace as core
+from services import core_editor, core_production, core_remote_image, core_scene_recording, core_workspace as core
 from services.platform_capabilities import platform_capabilities
 from services.scene_commands import SceneCommands
 from services.style_library import StyleLibrary
@@ -434,20 +434,15 @@ def rig_capabilities():
 
 @api.post("/api/v1/scenes/recordings")
 async def save_scene_recording(request: Request):
-    form = await request.form()
-    upload = form.get("file")
-    if upload is None or not hasattr(upload, "read"):
-        raise HTTPException(status_code=400, detail="A recording file is required")
-    folder = core.workspace_dir(str(form.get("workspace") or "") or None)
-    os.makedirs(folder, exist_ok=True)
-    import time
-    import uuid
-    name = getattr(upload, "filename", None) or f"{time.strftime('%Y-%m-%d-%Hh%Mm%Ss')}_{uuid.uuid4().hex[:6]}.mp4"
-    path = os.path.join(folder, os.path.basename(str(name)))
-    data = await upload.read()
-    with open(path, "wb") as handle:
-        handle.write(data)
-    return {"name": os.path.basename(path), "url": f"/api/v1/file/{os.path.basename(path)}"}
+    try:
+        return await core_scene_recording.publish_from_form(await request.form())
+    except HTTPException:
+        raise
+    except Exception as error:
+        raise HTTPException(
+            status_code=core_scene_recording.http_error_status(error),
+            detail=core_scene_recording.http_error_detail(error),
+        ) from error
 
 
 @api.post("/api/v1/scenes")
