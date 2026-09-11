@@ -68,8 +68,8 @@ export interface ResolvedModelCatalog {
   fromApi: boolean
 }
 
-const IMAGE_FAMILIES = new Set(['flux', 'flux2', 'qwen', 'z_image', 'krea2', 'hidream'])
-const IMAGE_ARCH = /^(flux|pi_flux2|qwen_image|z_image|krea2|hidream)/
+const IMAGE_FAMILIES = new Set(['flux', 'flux2', 'qwen', 'z_image', 'krea2', 'hidream', 'minimax'])
+const IMAGE_ARCH = /^(flux|pi_flux2|qwen_image|z_image|krea2|hidream|minimax_image)/
 const MUSIC_ARCH = /^(ace_step|minimax_music|heartmula)/
 const SPEECH_ARCH = /^(chatterbox|qwen3_tts|kugelaudio|index_tts2)/
 const TALKING = /multitalk|infinitetalk|fantasy|avatar|steadydancer|longcat_avatar|animate/
