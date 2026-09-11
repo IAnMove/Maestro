@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict'
+import { readdirSync, readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import test from 'node:test'
+import { fileURLToPath } from 'node:url'
 import React from 'react'
 import { JSDOM } from 'jsdom'
 
@@ -19,6 +22,7 @@ const {
   detectCapability,
   resolveModelCatalog,
   catalogVramGb,
+  catalogRequirementKey,
 } = await import('../src/lib/modelCatalog.ts')
 const { ModelCatalogInfo } = await import('../src/components/Sidebar/ModelCatalogInfo.tsx')
 
@@ -111,9 +115,41 @@ test('non-H3 models show a variant line, a capability line and expandable minima
     assert.match(text, /Video and native audio from a first frame/)
     assert.match(text, /Minimum requirements/)
     assert.match(text, /VRAM ~16 GB/)
-    assert.match(text, /20s with an audio soundtrack/)
     assert.match(text, /not a measured peak/)
+    assert.doesNotMatch(text, /20s with an audio soundtrack/)
   } finally { cleanup() }
+})
+
+test('every downloadable default has mapped minima, not the generic fallback', () => {
+  const defaultsDir = join(dirname(fileURLToPath(import.meta.url)), '../../app/defaults')
+  const files = readdirSync(defaultsDir).filter(name => name.endsWith('.json'))
+  assert.ok(files.length >= 200, `expected the full defaults catalog, got ${files.length}`)
+  const missing: string[] = []
+  for (const file of files) {
+    const parsed = JSON.parse(readFileSync(join(defaultsDir, file), 'utf8')) as {
+      model?: { architecture?: string }
+    }
+    const modelType = file.replace(/\.json$/, '')
+    const architecture = parsed.model?.architecture || ''
+    if (catalogRequirementKey(modelType, architecture) === 'fallback') {
+      missing.push(`${modelType} (${architecture})`)
+    }
+  }
+  assert.deepEqual(missing, [])
+})
+
+test('Hunyuan3D, UniRig and MMAudio extras are mapped', () => {
+  const extras: Array<[string, string]> = [
+    ['hunyuan3d-2mini-turbo', 'hunyuan3d'],
+    ['hunyuan3d-2.1', 'hunyuan3d'],
+    ['trellis2', 'hunyuan3d'],
+    ['pixal3d', 'hunyuan3d'],
+    ['unirig', 'unirig'],
+    ['mmaudio_v2', 'mmaudio'],
+  ]
+  for (const [modelType, architecture] of extras) {
+    assert.notEqual(catalogRequirementKey(modelType, architecture), 'fallback', modelType)
+  }
 })
 
 test('H3 catalog presentation is unchanged when rendered through ModelCatalogInfo', () => {

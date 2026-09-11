@@ -77,7 +77,7 @@ export function ModelSelector() {
       {/* Trigger button */}
       <button
         onClick={() => setOpen(!open)}
-        title={currentModel?.selector_help || currentModel?.description}
+        title={currentModel ? selectorModelHelp(currentModel, t) : undefined}
         className="w-full flex items-center gap-1.5 bg-bg-tertiary border border-border rounded-lg px-2.5 py-2 text-left hover:border-border-light transition-colors"
       >
         <span className="flex-1 min-w-0 truncate text-xs text-text-primary">
@@ -132,7 +132,7 @@ export function ModelSelector() {
                         <span className="flex-1 min-w-0 text-xs truncate"><H3ModelName modelType={model.model_type} fallback={model.name} /></span>
                         {vramGb != null && (
                           <span className="shrink-0 text-[9px] text-text-muted tabular-nums">
-                            ~{vramGb} GB VRAM
+                            {t('modelCatalog.vramBadge', { vram: vramGb })}
                           </span>
                         )}
                         <ModelBadges model={model} />
@@ -159,22 +159,20 @@ export function ModelSelector() {
 }
 
 function selectorModelHelp(model: ModelDef, t: TFunction<'studio'>): string {
-  if (h3CatalogEntry(model.model_type)) {
-    return [model.selector_help, model.description].filter(Boolean).join('\n\n')
+  const h3 = h3CatalogEntry(model.model_type)
+  if (h3) {
+    return [t(`h3Catalog.${h3.variant}Hint`), t('h3Catalog.memory')].join('\n\n')
   }
   const catalog = resolveModelCatalog(model)
   return [
     t(`modelCatalog.${catalog.variant}Hint`),
     t(`modelCatalog.capability.${catalog.capability}`),
-    model.selector_help || model.description || '',
-    [
-      catalog.requirements.vram_gb != null ? t('modelCatalog.vram', { vram: catalog.requirements.vram_gb }) : '',
-      catalog.requirements.ram_gb != null ? t('modelCatalog.ram', { ram: catalog.requirements.ram_gb }) : '',
-      catalog.requirements.storage_gb != null
-        ? t('modelCatalog.storage', { storage: catalog.requirements.storage_gb })
-        : '',
-      model.resource_requirements?.note || '',
-    ].filter(Boolean).join('\n'),
+    catalog.requirements.vram_gb != null ? t('modelCatalog.vram', { vram: catalog.requirements.vram_gb }) : '',
+    catalog.requirements.ram_gb != null ? t('modelCatalog.ram', { ram: catalog.requirements.ram_gb }) : '',
+    catalog.requirements.storage_gb != null
+      ? t('modelCatalog.storage', { storage: catalog.requirements.storage_gb })
+      : '',
+    t('modelCatalog.limit'),
   ].filter(Boolean).join('\n\n')
 }
 

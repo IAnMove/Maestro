@@ -72,9 +72,9 @@ const IMAGE_FAMILIES = new Set(['flux', 'flux2', 'qwen', 'z_image', 'krea2', 'hi
 const IMAGE_ARCH = /^(flux|pi_flux2|qwen_image|z_image|krea2|hidream)/
 const MUSIC_ARCH = /^(ace_step|minimax_music|heartmula)/
 const SPEECH_ARCH = /^(chatterbox|qwen3_tts|kugelaudio|index_tts2)/
-const TALKING = /multitalk|infinitetalk|fantasy|avatar|steadydancer|longcat_avatar/
+const TALKING = /multitalk|infinitetalk|fantasy|avatar|steadydancer|longcat_avatar|animate/
 const VIDEO_EDIT = /lucy_edit|kiwi_edit|chrono_edit|viggle|scail|recast|wanmove/
-const VIDEO_CONTROL = /vace|standin|mocha|phantom|sky_df|recam|fun_inp/
+const VIDEO_CONTROL = /vace|standin|mocha|phantom|sky_df|recam|fun_inp|lynx/
 
 const VARIANT_TOKENS: Array<[ModelVariant, string[]]> = [
   ['legacy', ['legacy']],
@@ -123,6 +123,22 @@ const ARCH_REQUIREMENTS: Array<[string, CatalogRequirements]> = [
   ['k5_lite', { vram_gb: 8, ram_gb: 16 }],
   ['k5_pro', { vram_gb: 12, ram_gb: 24 }],
   ['sensenova', { vram_gb: 10, ram_gb: 16 }],
+  ['chrono_edit', { vram_gb: 8, ram_gb: 16 }],
+  ['kiwi_edit', { vram_gb: 8, ram_gb: 16 }],
+  ['infinitetalk', { vram_gb: 8, ram_gb: 16 }],
+  ['multitalk', { vram_gb: 8, ram_gb: 16 }],
+  ['steadydancer', { vram_gb: 8, ram_gb: 16 }],
+  ['fun_inp', { vram_gb: 10, ram_gb: 24 }],
+  ['phantom', { vram_gb: 10, ram_gb: 24 }],
+  ['sky_df', { vram_gb: 10, ram_gb: 24 }],
+  ['flf2v', { vram_gb: 8, ram_gb: 16 }],
+  ['alpha2', { vram_gb: 8, ram_gb: 16 }],
+  ['alpha', { vram_gb: 8, ram_gb: 16 }],
+  ['animate', { vram_gb: 8, ram_gb: 16 }],
+  ['fantasy', { vram_gb: 8, ram_gb: 16 }],
+  ['lynx', { vram_gb: 10, ram_gb: 24 }],
+  ['mocha', { vram_gb: 10, ram_gb: 24 }],
+  ['standin', { vram_gb: 10, ram_gb: 24 }],
   ['i2v_2_2', { vram_gb: 10, ram_gb: 24 }],
   ['t2v_2_2', { vram_gb: 10, ram_gb: 24 }],
   ['ti2v', { vram_gb: 10, ram_gb: 24 }],
@@ -228,6 +244,15 @@ export function detectCapability(model: ModelCatalogInput): ModelCapability {
 
 function prefixRequirements(modelType: string, architecture: string): CatalogRequirements | undefined {
   return ARCH_REQUIREMENTS.find(([prefix]) => architecture.startsWith(prefix) || modelType.startsWith(prefix))?.[1]
+}
+
+export function catalogRequirementKey(modelType: string, architecture: string): string {
+  if (EXACT_REQUIREMENTS[modelType]) return `exact:${modelType}`
+  if (modelType.startsWith('hunyuan3d-2mini')) return 'hunyuan3d-mini'
+  if (modelType.startsWith('hunyuan3d')) return 'hunyuan3d'
+  if (/1\.3b/i.test(`${modelType} ${architecture}`)) return '1.3b'
+  const prefix = ARCH_REQUIREMENTS.find(([key]) => architecture.startsWith(key) || modelType.startsWith(key))?.[0]
+  return prefix ? `prefix:${prefix}` : 'fallback'
 }
 
 function typicalRequirements(modelType: string, architecture: string): CatalogRequirements {

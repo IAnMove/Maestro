@@ -835,6 +835,7 @@
     "standardHint": "Standard · Pesos por defecto de esta familia. El consumo depende de la configuración.",
     "toolHint": "Herramienta · Pesos auxiliares, no un modelo de generación. Se usa para tareas como el rigging.",
     "requirements": "Requisitos mínimos",
+    "vramBadge": "VRAM ~{{vram}} GB",
     "vram": "VRAM ~{{vram}} GB con un perfil de offload de memoria.",
     "vramComfort": "Unos {{vram}} GB de VRAM resultan más cómodos y rápidos.",
     "ram": "RAM del sistema ~{{ram}} GB.",

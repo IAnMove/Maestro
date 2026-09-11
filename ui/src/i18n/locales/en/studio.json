@@ -835,6 +835,7 @@
     "standardHint": "Standard · Default weights for this family. Memory use depends on settings.",
     "toolHint": "Tool · Helper weights, not a generation model. Used for tasks such as rigging.",
     "requirements": "Minimum requirements",
+    "vramBadge": "~{{vram}} GB VRAM",
     "vram": "VRAM ~{{vram}} GB with a memory-offload profile.",
     "vramComfort": "About {{vram}} GB VRAM is more comfortable and faster.",
     "ram": "System RAM ~{{ram}} GB.",

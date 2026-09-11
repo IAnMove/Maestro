@@ -71,6 +71,7 @@ const MODE_LABELS: { mode: GenerationMode; label: string }[] = [
 const COLLAPSED_FAMILIES_KEY = 'maestro-collapsed-model-families'
 
 function ModelVisibilitySection() {
+  const { t } = useUiTranslation('studio')
   const models = useStore(s => s.models)
   const families = useStore(s => s.families)
   const enabledModels = useStore(s => s.enabledModels)
@@ -417,11 +418,8 @@ function ModelVisibilitySection() {
                             <H3ModelName modelType={m.model_type} fallback={m.name} />
                           </span>
                           {vramGb != null && (
-                            <span
-                              className="shrink-0 text-[9px] text-text-muted tabular-nums"
-                              title={modelRequirementsText(m.resource_requirements) || undefined}
-                            >
-                              ~{vramGb} GB VRAM
+                            <span className="shrink-0 text-[9px] text-text-muted tabular-nums">
+                              {t('modelCatalog.vramBadge', { vram: vramGb })}
                             </span>
                           )}
                         </label>

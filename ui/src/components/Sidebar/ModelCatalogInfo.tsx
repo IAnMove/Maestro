@@ -9,7 +9,6 @@ export function ModelCatalogInfo({ model }: { model: ModelCatalogInput }) {
     return <H3ModelInfo modelType={model.model_type} />
   }
   const entry = resolveModelCatalog(model)
-  const extra = (model.selector_help || model.description || '').trim()
   const { requirements } = entry
   return (
     <div className="mt-1 ml-6 mb-2 text-[11px] text-text-muted leading-snug">
@@ -30,8 +29,6 @@ export function ModelCatalogInfo({ model }: { model: ModelCatalogInput }) {
         {requirements.storage_gb != null && (
           <p>{t('modelCatalog.storage', { storage: requirements.storage_gb })}</p>
         )}
-        {model.resource_requirements?.note && <p>{model.resource_requirements.note}</p>}
-        {extra && <p className="mt-1 whitespace-pre-line">{extra}</p>}
         <p>{t('modelCatalog.limit')}</p>
       </details>
     </div>
