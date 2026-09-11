@@ -171,6 +171,80 @@ class CoreRuntimeTests(unittest.TestCase):
         self.assertNotIn("/", job["filename"])
         self.assertTrue(job["filename"].endswith("_etc_passwd_cut.mp4"))
 
+    def test_video_editor_screenshot_keeps_each_character_sheet_frame(self):
+        from services import core_editor, core_workspace as core
+
+        def fake_extract(source, dest, time_seconds):
+            Path(dest).write_bytes(f"frame-{time_seconds}".encode())
+            return {"time": time_seconds, "width": 8, "height": 8}
+
+        folder, previous = self._in_temp_workspace()
+        try:
+            workspace = core.workspace_dir("default")
+            Path(workspace, "orbit.mp4").write_bytes(b"clip")
+            with patch.object(core_editor, "time") as frozen, patch.object(
+                core_editor, "extract_frame", side_effect=fake_extract,
+            ):
+                frozen.strftime.return_value = "2026-09-11-13h55m00s"
+                first = self.client.post("/api/v1/video-editor/screenshot", json={
+                    "source": "orbit.mp4",
+                    "time": 0.1,
+                    "name": "character_front",
+                    "workspace": "default",
+                })
+                second = self.client.post("/api/v1/video-editor/screenshot", json={
+                    "source": "orbit.mp4",
+                    "time": 0.8,
+                    "name": "character_front",
+                    "workspace": "default",
+                })
+                first_name = first.json()["filename"]
+                second_name = second.json()["filename"]
+                first_bytes = Path(workspace, first_name).read_bytes()
+                second_bytes = Path(workspace, second_name).read_bytes()
+        finally:
+            self._leave_temp_workspace(folder, previous)
+        self.assertEqual(first.status_code, 200, first.text)
+        self.assertEqual(second.status_code, 200, second.text)
+        self.assertEqual(first_name, "2026-09-11-13h55m00s_character_front_frame.png")
+        self.assertEqual(second_name, "2026-09-11-13h55m00s_character_front_frame_2.png")
+        self.assertEqual(first_bytes, b"frame-0.1")
+        self.assertEqual(second_bytes, b"frame-0.8")
+
+    def test_video_editor_export_keeps_a_second_same_second_cut(self):
+        from services import core_editor, core_workspace as core
+
+        def fake_render(clips, destination, **_kwargs):
+            Path(destination).write_bytes(f"export-{len(clips)}".encode())
+            return {"duration": 1}
+
+        folder, previous = self._in_temp_workspace()
+        try:
+            workspace = core.workspace_dir("default")
+            Path(workspace, "clip.mp4").write_bytes(b"clip")
+            with patch.object(core_editor, "time") as frozen, patch(
+                "services.core_editor.threading.Thread", ImmediateThread,
+            ), patch.object(core_editor, "render_project", side_effect=fake_render):
+                frozen.strftime.return_value = "2026-09-11-13h55m00s"
+                first = core_editor.start_export({
+                    "clips": [{"source": "clip.mp4"}],
+                    "name": "Harbour cut",
+                    "workspace": "default",
+                })
+                second = core_editor.start_export({
+                    "clips": [{"source": "clip.mp4"}, {"source": "clip.mp4"}],
+                    "name": "Harbour cut",
+                    "workspace": "default",
+                })
+                first_bytes = Path(workspace, first["filename"]).read_bytes()
+                second_bytes = Path(workspace, second["filename"]).read_bytes()
+        finally:
+            self._leave_temp_workspace(folder, previous)
+        self.assertEqual(first["filename"], "2026-09-11-13h55m00s_Harbour_cut.mp4")
+        self.assertEqual(second["filename"], "2026-09-11-13h55m00s_Harbour_cut_2.mp4")
+        self.assertEqual(first_bytes, b"export-1")
+        self.assertEqual(second_bytes, b"export-2")
+
     def test_production_profile_defaults_to_remote_providers(self):
         listed = self.client.get("/api/v1/production-profile")
         self.assertEqual(listed.status_code, 200)
