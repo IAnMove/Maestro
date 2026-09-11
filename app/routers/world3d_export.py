@@ -1,7 +1,7 @@
 """HTTP and MCP projections for recoverable World3D export.
 
-The router is testable without importing ``_launch_runtime``. Mounting it on
-the live API is a separate runtime-owner change; see ``INTEGRATION_WORLD3D_EXPORT.patch``.
+The router is testable without importing ``_launch_runtime``. The live API
+mounts it from ``_launch_runtime`` after the scene commands router.
 """
 from __future__ import annotations
 
