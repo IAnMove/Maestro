@@ -16,6 +16,7 @@ from routers.comics import create_comics_router
 from routers.core_labs import create_core_labs_router
 from routers.core_mcp import create_core_mcp_router
 from routers.core_remote import create_core_remote_router
+from routers.core_series_plan import create_core_series_plan_router
 from routers.lan_auth import create_lan_auth_router
 from routers.llm import create_llm_router
 from routers.projects import create_projects_router
@@ -25,7 +26,7 @@ from routers.scene_commands import create_scene_commands_router
 from routers.style_library import create_style_library_router
 from routers.system_capabilities import create_system_capabilities_router, require_capability_http
 from routers.workspace_collections import create_workspace_collections_router
-from services import core_editor, core_production, core_workspace as core
+from services import core_editor, core_production, core_remote_image, core_workspace as core
 from services.platform_capabilities import platform_capabilities
 from services.scene_commands import SceneCommands
 from services.style_library import StyleLibrary
@@ -80,6 +81,7 @@ api.include_router(create_comics_router(
 ))
 api.include_router(create_scene_commands_router(SceneCommands(core.workspace_dir)))
 api.include_router(create_core_labs_router())
+api.include_router(create_core_series_plan_router())
 api.include_router(create_core_remote_router())
 api.include_router(create_core_mcp_router())
 api.include_router(create_character_kit_face_router(
@@ -88,7 +90,6 @@ api.include_router(create_character_kit_face_router(
 ))
 
 BLOCKED = (
-    ("POST", "/api/v1/generate", "wangp_local"),
     ("POST", "/api/v1/recast", "wangp_local"),
     ("POST", "/api/v1/tools/upscale", "wangp_local"),
     ("POST", "/api/v1/rig/generate", "unirig_ai"),
@@ -124,7 +125,62 @@ def system_preflight():
 
 @api.get("/api/v1/models")
 def list_models():
-    return {"families": [], "models": []}
+    model = core_remote_image.catalog_entry()
+    return {
+        "families": [{"id": "minimax", "label": "MiniMax", "order": 10}],
+        "models": [model],
+    }
+
+
+@api.get("/api/v1/defaults/{model_type}")
+def get_defaults(model_type: str):
+    if str(model_type).startswith("minimax:"):
+        return core_remote_image.defaults()
+    raise HTTPException(status_code=404, detail=f"Unknown model: {model_type}")
+
+
+@api.get("/api/v1/model-options/{model_type}")
+def get_model_options(model_type: str):
+    if str(model_type).startswith("minimax:"):
+        return core_remote_image.model_options()
+    raise HTTPException(status_code=404, detail=f"Unknown model: {model_type}")
+
+
+@api.post("/api/v1/generate")
+async def generate(request: Request):
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    if not isinstance(body, dict):
+        body = {}
+    if core_remote_image.is_minimax_image_request(body):
+        workspace = str(body.get("workspace") or core.active_workspace() or "default")
+        try:
+            return core_remote_image.start_job(body, workspace=workspace)
+        except Exception as error:
+            from services.minimax_image_service import MiniMaxImageError
+            if isinstance(error, MiniMaxImageError):
+                raise HTTPException(status_code=error.status_code, detail=str(error)) from error
+            raise HTTPException(status_code=400, detail=str(error)) from error
+    require_capability_http("wangp_local")
+    return {"status": "ok"}
+
+
+@api.get("/api/v1/status/{job_id}")
+def get_status(job_id: str):
+    job = core_remote_image.get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return job
+
+
+@api.post("/api/v1/cancel/{job_id}")
+def cancel_job(job_id: str):
+    job = core_remote_image.cancel_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return job
 
 
 @api.get("/api/v1/workspaces")
@@ -205,8 +261,9 @@ async def put_services_config(request: Request):
 
 @api.get("/api/v1/jobs")
 @api.get("/api/v1/jobs/recovery")
-def empty_jobs():
-    return {"jobs": [], "pipelines": [], "total": 0}
+def list_jobs():
+    jobs = core_remote_image.list_active()
+    return {"jobs": jobs, "pipelines": [], "total": len(jobs)}
 
 
 @api.get("/api/v1/system-stats")
@@ -352,7 +409,12 @@ def presets():
 
 @api.get("/api/v1/model-visibility")
 def model_visibility():
-    return {"configured": True, "enabled_models": [], "initialized_mature_models": [], "defaults_version": 0}
+    return {
+        "configured": True,
+        "enabled_models": [core_remote_image.MODEL_ID],
+        "initialized_mature_models": [],
+        "defaults_version": 1,
+    }
 
 
 @api.get("/api/v1/model-selections")

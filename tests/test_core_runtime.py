@@ -43,7 +43,7 @@ class CoreRuntimeTests(unittest.TestCase):
         self.assertEqual(listed.status_code, 200)
         self.assertEqual(listed.json()["profile"], "macos-arm64-core-remote")
         self.assertFalse(listed.json()["ui"]["show_cuda_controls"])
-        self.assertEqual(self.client.get("/api/v1/models").json()["models"], [])
+        self.assertEqual(self.client.get("/api/v1/models").json()["models"][0]["model_type"], "minimax:image-01")
         self.assertIn("workspaces", self.client.get("/api/v1/workspaces").json())
         self.assertEqual(self.client.get("/api/v1/system-config").status_code, 200)
         self.assertEqual(self.client.get("/api/v1/services-config").status_code, 200)
@@ -214,6 +214,60 @@ class CoreRuntimeTests(unittest.TestCase):
         })
         self.assertEqual(denied.status_code, 409)
         self.assertEqual(denied.json()["detail"]["code"], FEATURE_UNAVAILABLE)
+
+    def test_minimax_image_generate_starts_a_studio_job(self):
+        folder, previous = self._in_temp_workspace()
+        try:
+            Path("outputs").mkdir()
+            fake = {"name": "minimax.jpg", "path": "minimax.jpg", "prompt": "a lantern", "aspect_ratio": "1:1"}
+            with patch("services.minimax_image_service.generate_image", return_value=fake), patch(
+                "services.execution_mode.validate_remote_provider",
+            ):
+                response = self.client.post("/api/v1/generate", json={
+                    "model_type": "minimax:image-01",
+                    "generation_mode": "image",
+                    "prompt": "a lantern in the rain",
+                    "workspace": "default",
+                })
+        finally:
+            self._leave_temp_workspace(folder, previous)
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertIn("job_id", response.json())
+        status = self.client.get(f"/api/v1/status/{response.json()['job_id']}")
+        self.assertEqual(status.status_code, 200)
+
+    def test_series_plan_start_uses_the_remote_llm(self):
+        series = {
+            "id": "series_mac", "revision": 1, "provider": {},
+            "episodesById": {"ep1": {"id": "ep1", "premise": "A lantern wakes the harbour.", "updatedAt": "t"}},
+        }
+        library = {"seriesById": {"series_mac": series}}
+
+        class ImmediateThread:
+            def __init__(self, target=None, args=(), kwargs=None, daemon=None, name=None):
+                self._target = target
+                self._args = args
+
+            def start(self):
+                self._target(*self._args)
+
+        folder, previous = self._in_temp_workspace()
+        try:
+            Path("outputs").mkdir()
+            with patch("services.core_series_plan._series_or_404", return_value=(series, library)), patch(
+                "services.core_series_plan._generate_json", return_value={"outline": {"beats": ["The lantern wakes."]}},
+            ), patch("services.core_series_plan._writing_override", return_value=None), patch(
+                "services.core_series_plan.threading.Thread", ImmediateThread,
+            ):
+                started = self.client.post(
+                    "/api/v1/series/series_mac/episodes/ep1/plan/start",
+                    json={"workspace": "default", "scope": "outline"},
+                )
+        finally:
+            os.chdir(previous)
+            folder.cleanup()
+        self.assertEqual(started.status_code, 200, started.text)
+        self.assertTrue(str(started.json()["jobId"]).startswith("series-plan-"))
 
     def test_local_llm_load_is_blocked(self):
         blocked = self.client.post("/api/v1/llm/load", json={"provider": "local"})

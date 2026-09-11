@@ -57,7 +57,8 @@ persist as workspace JSON. The production profile defaults to MiniMax text/image
 and Meshy 3D. MCP `tools/list` omits local generate/recast/upscale.
 The Pinokio Advanced menu hides SAM and UniRig installers on Darwin.
 Settings hides CUDA/VRAM/Triton controls when `show_cuda_controls` is false.
-Studio Generate is disabled with an NVIDIA hint. Video Editor probe/export
+Studio Generate stays available for MiniMax Image-01; video/audio local engines
+stay hidden with an NVIDIA hint. Video Editor probe/export
 and Video3D scene/recording save use FFmpeg/WebCodecs, not CUDA. Comics CRUD
 and remote MiniMax image keys are available.
 

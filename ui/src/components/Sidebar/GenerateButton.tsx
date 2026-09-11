@@ -51,7 +51,13 @@ export function GenerateButton() {
   const schedulerApplies = promptSchedulerEnabled && generationMode === 'video' && imageMode === 0
   const scheduledVideoCount = schedulerApplies ? splitPromptSchedule(prompt).length : 0
   const needsScheduledPrompts = schedulerApplies && scheduledVideoCount === 0
-  const localUnavailable = usePlatformCapabilities()?.capabilities.wangp_local?.state === 'hidden'
+  const modelType = useStore(s => s.params.model_type)
+  const imageProvider = useStore(s => s.productionProfile?.image?.provider)
+  const remoteImage = generationMode === 'image' && (
+    String(modelType || '').startsWith('minimax:')
+    || imageProvider === 'minimax'
+  )
+  const localUnavailable = usePlatformCapabilities()?.capabilities.wangp_local?.state === 'hidden' && !remoteImage
   const blocked = localUnavailable || needsImage || needsReference || needsOutpaintSource || needsOutpaintArea || needsScheduledPrompts
 
   const handleClick = async () => {
