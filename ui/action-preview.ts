@@ -57,7 +57,7 @@ function select(id: typeof ACTION_TEMPLATE_IDS[number]) {
 }
 
 select(startId)
-let started = performance.now()
+const started = performance.now()
 const tick = (now: number) => {
   const seconds = ((now - started) / 1000) % current.duration
   paintWorld(world, current, seconds)
