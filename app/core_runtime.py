@@ -11,8 +11,13 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from routers.assets import create_assets_router
+from routers.character_kit_face import create_character_kit_face_router
 from routers.comics import create_comics_router
+from routers.core_labs import create_core_labs_router
+from routers.core_mcp import create_core_mcp_router
+from routers.core_remote import create_core_remote_router
 from routers.lan_auth import create_lan_auth_router
+from routers.llm import create_llm_router
 from routers.projects import create_projects_router
 from routers.productions import create_productions_router
 from routers.recipes import create_recipes_router
@@ -20,7 +25,7 @@ from routers.scene_commands import create_scene_commands_router
 from routers.style_library import create_style_library_router
 from routers.system_capabilities import create_system_capabilities_router, require_capability_http
 from routers.workspace_collections import create_workspace_collections_router
-from services import core_editor, core_workspace as core
+from services import core_editor, core_production, core_workspace as core
 from services.platform_capabilities import platform_capabilities
 from services.scene_commands import SceneCommands
 from services.style_library import StyleLibrary
@@ -74,16 +79,26 @@ api.include_router(create_comics_router(
     publish_legacy_task=None,
 ))
 api.include_router(create_scene_commands_router(SceneCommands(core.workspace_dir)))
+api.include_router(create_core_labs_router())
+api.include_router(create_core_remote_router())
+api.include_router(create_core_mcp_router())
+api.include_router(create_character_kit_face_router(
+    workspace_dir=core.workspace_dir,
+    uploads_root=core.uploads_dir,
+))
 
 BLOCKED = (
     ("POST", "/api/v1/generate", "wangp_local"),
     ("POST", "/api/v1/recast", "wangp_local"),
     ("POST", "/api/v1/tools/upscale", "wangp_local"),
-    ("POST", "/api/v1/model3d/generate", "hunyuan3d_local"),
     ("POST", "/api/v1/rig/generate", "unirig_ai"),
     ("POST", "/api/v1/tools/remove-background", "sam_inpaint"),
     ("POST", "/api/v1/tools/revoice", "local_audio_ai"),
     ("POST", "/api/v1/retake", "wangp_local"),
+    ("POST", "/api/v1/audio/analyze", "whisper_local"),
+    ("POST", "/api/v1/audio/analyze/jobs", "whisper_local"),
+    ("POST", "/api/v1/director/pipelines/{pid}/clips/{clip_index}/rerun-video", "wangp_local"),
+    ("POST", "/api/v1/director/pipelines/{pid}/repair", "wangp_local"),
 )
 
 
@@ -188,27 +203,10 @@ async def put_services_config(request: Request):
     return core.merge_services(body)
 
 
-@api.get("/api/v1/llm/status")
-def llm_status():
-    from services import llm_service
-    return llm_service.get_status()
-
-
-@api.get("/api/v1/llm/models")
-def llm_models():
-    return {"models": []}
-
-
 @api.get("/api/v1/jobs")
 @api.get("/api/v1/jobs/recovery")
-@api.get("/api/v1/director/pipelines")
 def empty_jobs():
     return {"jobs": [], "pipelines": [], "total": 0}
-
-
-@api.get("/api/v1/director/pipelines/active")
-def empty_active_pipelines():
-    return {"pipelines": []}
 
 
 @api.get("/api/v1/system-stats")
@@ -342,16 +340,6 @@ async def put_wizard_workflows(request: Request):
         raise HTTPException(status_code=500, detail=f"Could not save Wizard workflows: {error}") from error
 
 
-@api.get("/api/v1/stories/library")
-def stories_library():
-    return {"version": 1, "projects": []}
-
-
-@api.get("/api/v1/character-kits/library")
-def character_kits():
-    return {"version": 1, "revision": 0, "activeId": "", "kits": {}}
-
-
 @api.get("/api/v1/resolutions")
 def resolutions():
     return {"resolutions": []}
@@ -360,11 +348,6 @@ def resolutions():
 @api.get("/api/v1/presets")
 def presets():
     return {"presets": []}
-
-
-@api.get("/api/v1/production-profile")
-def production_profile():
-    return {}
 
 
 @api.get("/api/v1/model-visibility")
@@ -382,28 +365,9 @@ def wangp_capabilities():
     return {"processors": []}
 
 
-@api.get("/api/v1/model3d/capabilities")
-def model3d_capabilities():
-    return {"engines": [], "remote": ["meshy"]}
-
-
 @api.get("/api/v1/rig/capabilities")
 def rig_capabilities():
     return {"engines": [{"id": "procedural", "label": "Procedural (fast)"}]}
-
-
-@api.post("/api/v1/wangp/mcp")
-async def wangp_mcp(request: Request):
-    body = await request.json()
-    name = ""
-    if isinstance(body, dict):
-        name = str(body.get("method") or body.get("name") or "")
-        params = body.get("params") if isinstance(body.get("params"), dict) else body
-        if isinstance(params, dict) and params.get("name"):
-            name = str(params.get("name") or name)
-    if name in {"generate", "recast", "upscale"}:
-        require_capability_http("wangp_local")
-    raise HTTPException(status_code=400, detail="Unknown MCP tool")
 
 
 @api.post("/api/v1/scenes/recordings")
@@ -530,6 +494,18 @@ async def llm_load(request: Request):
         api_key=str((body or {}).get("api_key") or ""),
     )
     return {"status": "ok", **llm_service.get_status()}
+
+
+api.include_router(create_llm_router(
+    get_services_config=core.services_raw,
+    effective_llm_routing=core_production.effective_llm_routing,
+    llm_provider_credentials=core_production.llm_provider_credentials,
+    llm_default_device=lambda: "cpu",
+    default_llm_repo="MiniMax-M3",
+    ensure_llm_loaded=core_production.ensure_llm_loaded,
+    comic_writing_llm=core_production.comic_writing_llm,
+    resolve_visual_media=core_production.resolve_visual_media,
+))
 
 
 _app_dir = os.path.dirname(os.path.abspath(__file__))

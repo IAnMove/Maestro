@@ -53,7 +53,8 @@ class CoreRuntimeTests(unittest.TestCase):
         denied = self.client.post("/api/v1/generate")
         self.assertEqual(denied.status_code, 409)
         self.assertEqual(denied.json()["detail"]["code"], FEATURE_UNAVAILABLE)
-        self.assertEqual(self.client.post("/api/v1/model3d/generate").status_code, 409)
+        self.assertEqual(self.client.post("/api/v1/model3d/generate", json={"provider": "local"}).status_code, 409)
+        self.assertEqual(self.client.post("/api/v1/director/pipeline/start").status_code, 409)
         self.assertEqual(self.client.post("/api/v1/rig/generate").status_code, 409)
         mcp = self.client.post("/api/v1/wangp/mcp", json={"params": {"name": "generate"}})
         self.assertEqual(mcp.status_code, 409)
@@ -153,6 +154,71 @@ class CoreRuntimeTests(unittest.TestCase):
         self.assertNotIn("..", job["filename"])
         self.assertNotIn("/", job["filename"])
         self.assertTrue(job["filename"].endswith("_etc_passwd_cut.mp4"))
+
+    def test_production_profile_defaults_to_remote_providers(self):
+        listed = self.client.get("/api/v1/production-profile")
+        self.assertEqual(listed.status_code, 200)
+        profile = listed.json()["profile"]
+        self.assertEqual(profile["text"]["provider"], "minimax")
+        self.assertEqual(profile["image"]["provider"], "minimax")
+        self.assertEqual(profile["music"]["provider"], "minimax")
+        self.assertEqual(profile["model3d"]["provider"], "meshy")
+
+    def test_mcp_lists_read_tools_and_omits_local_generate(self):
+        response = self.client.post("/api/v1/wangp/mcp", json={
+            "jsonrpc": "2.0", "id": 1, "method": "tools/list",
+        })
+        self.assertEqual(response.status_code, 200)
+        names = {tool["name"] for tool in response.json()["result"]["tools"]}
+        self.assertIn("assets", names)
+        self.assertNotIn("generate", names)
+
+    def test_story_and_series_libraries_persist(self):
+        folder, previous = self._in_temp_workspace()
+        try:
+            Path("outputs").mkdir()
+            library = self.client.put("/api/v1/stories/library", json={
+                "workspace": "default",
+                "baseRevision": 0,
+                "library": {"version": 2, "revision": 0, "activeId": "", "projects": {}},
+            })
+            created = self.client.post("/api/v1/series", json={"workspace": "default", "title": "Mac series"})
+        finally:
+            self._leave_temp_workspace(folder, previous)
+        self.assertEqual(library.status_code, 200)
+        self.assertEqual(created.status_code, 200)
+        self.assertTrue(str(created.json()["id"]).startswith("series_"))
+
+    def test_meshy_generate_starts_a_remote_job(self):
+        folder, previous = self._in_temp_workspace()
+        try:
+            Path("outputs").mkdir()
+            fake = {"filename": "meshy-test.glb", "path": "meshy-test.glb", "provider": "meshy"}
+            with patch("services.meshy_3d_service.generate_model", return_value=fake), patch(
+                "services.execution_mode.validate_remote_provider",
+            ):
+                response = self.client.post("/api/v1/model3d/generate", json={
+                    "provider": "meshy", "prompt": "a clay robot", "workspace": "default",
+                })
+        finally:
+            self._leave_temp_workspace(folder, previous)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["provider"], "meshy")
+
+    def test_minimax_music_rejects_local_models(self):
+        denied = self.client.post("/api/v1/stories/music-candidates/jobs", json={
+            "model": "ace_step_v1_5_xl_sft_lm_4b",
+            "prompt": "synthwave",
+            "lyrics": "hello",
+            "workspace": "default",
+        })
+        self.assertEqual(denied.status_code, 409)
+        self.assertEqual(denied.json()["detail"]["code"], FEATURE_UNAVAILABLE)
+
+    def test_local_llm_load_is_blocked(self):
+        blocked = self.client.post("/api/v1/llm/load", json={"provider": "local"})
+        self.assertEqual(blocked.status_code, 409)
+        self.assertEqual(blocked.json()["detail"]["code"], FEATURE_UNAVAILABLE)
 
 
 if __name__ == "__main__":

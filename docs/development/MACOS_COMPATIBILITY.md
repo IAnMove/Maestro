@@ -47,9 +47,14 @@ large working slices, not a contract-only drip.
 (`app/env`, FastAPI/UI, no Torch). WanGP, MiniMax H3, Hunyuan3D, SAM and
 UniRig stay unsupported and are skipped by `installEngines`. `launch.py`
 starts `core_runtime` instead of `_launch_runtime` so the server does not
-import CUDA. `POST /api/v1/generate`, recast, upscale, Hunyuan3D and UniRig return
-`409 feature_unavailable`, including MCP `generate`. Local llama.cpp load is
-blocked; remote MiniMax/OpenAI/Grok/Anthropic loads stay available.
+import CUDA. `POST /api/v1/generate`, recast, upscale, Hunyuan3D, UniRig, Director pipeline
+start and local audio analysis return `409 feature_unavailable`, including MCP
+`generate`. Local llama.cpp load is blocked; remote MiniMax/OpenAI/Grok/Anthropic
+loads, generate and song-writer stay available. Meshy/Hi3D `POST /api/v1/model3d/generate`
+and MiniMax Music `POST /api/v1/stories/music-candidates/jobs` run without CUDA.
+Wizard conversations/workflows, Story library, Character Kits and Series CRUD
+persist as workspace JSON. The production profile defaults to MiniMax text/image/music
+and Meshy 3D. MCP `tools/list` omits local generate/recast/upscale.
 The Pinokio Advanced menu hides SAM and UniRig installers on Darwin.
 Settings hides CUDA/VRAM/Triton controls when `show_cuda_controls` is false.
 Studio Generate is disabled with an NVIDIA hint. Video Editor probe/export
