@@ -31,7 +31,10 @@ export class FacePackRuntime {
   private previous?: Mesh['material']
   private attached = false
   private root?: Object3D
-  constructor(private readonly redraw: () => void = () => {}) {}
+  private readonly redraw: () => void
+  constructor(redraw: () => void = () => {}) {
+    this.redraw = redraw
+  }
 
   private clear() {
     this.revision++

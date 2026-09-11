@@ -313,23 +313,31 @@ export function placeSlot(
   })
 }
 
+function speechAssetsReady(gpu: SlotGpu | undefined, slot: Scene3DSlot): boolean {
+  if (!slot.speech?.enabled) return true
+  if (!slot.sourceUrl) throw new Error('Choose a 3D model before exporting a speech scene.')
+  if (slot.speech.facePack) {
+    if (gpu?.facePack?.error) throw gpu.facePack.error
+    return Boolean(gpu?.facePack?.ready)
+  }
+  if (!slot.speech.face) throw new Error('Calibrate the face before exporting a speech scene.')
+  if (gpu?.speechFace?.error) throw gpu.speechFace.error
+  return Boolean(gpu?.speechFace?.ready)
+}
+
+function screenAssetsReady(gpu: SlotGpu | undefined, slot: Scene3DSlot): boolean {
+  if (slot.screen && gpu?.mountKey !== slotMountKey(slot)) return false
+  if (gpu?.screenError) throw gpu.screenError
+  if (gpu?.screen?.error) throw gpu.screen.error
+  if (slot.screen?.sourceUrl && !slot.speech?.facePack && !gpu?.screen?.ready) return false
+  return true
+}
+
 export function worldAssetsReady(world: GpuWorld, slots: readonly Scene3DSlot[]): boolean {
   if (!world.dressingReady) return false
   return slots.every(slot => {
-    if (slot.speech?.enabled && !slot.sourceUrl) throw new Error('Choose a 3D model before exporting a speech scene.')
     const gpu = world.slots.get(slot.id)
-    if (slot.speech?.enabled && slot.speech.facePack) {
-      if (gpu?.facePack?.error) throw gpu.facePack.error
-      if (!gpu?.facePack || !gpu.facePack.ready) return false
-    } else if (slot.speech?.enabled) {
-      if (!slot.speech.face) throw new Error('Calibrate the face before exporting a speech scene.')
-      if (gpu?.speechFace?.error) throw gpu.speechFace.error
-      if (!gpu?.speechFace || !gpu.speechFace.ready) return false
-    }
-    if (slot.screen && gpu?.mountKey !== slotMountKey(slot)) return false
-    if (gpu?.screenError) throw gpu.screenError
-    if (gpu?.screen?.error) throw gpu.screen.error
-    if (slot.screen?.sourceUrl && !slot.speech?.facePack && !gpu?.screen?.ready) return false
+    if (!speechAssetsReady(gpu, slot) || !screenAssetsReady(gpu, slot)) return false
     if (!slot.sourceUrl) return true
     return Boolean(gpu && gpu.mountKey === slotMountKey(slot) && gpu.loaded)
   })
@@ -353,6 +361,19 @@ function groundLoadedSlot(gpu: SlotGpu, slot: Scene3DSlot) {
   }
 }
 
+function syncActorSpeech(world: GpuWorld, gpu: SlotGpu, slot: Scene3DSlot, sceneSeconds: number) {
+  if (gpu.loaded && gpu.kind === 'model' && slot.speech?.face) {
+    gpu.speechFace ??= new SpeechFaceRuntime(() => renderWorld(world))
+    gpu.speechFace.sync(gpu.root, slot.speech, sceneSeconds)
+  } else if (gpu.speechFace && !slot.speech?.face) {
+    gpu.speechFace.sync(gpu.root, undefined, sceneSeconds)
+  }
+  if (gpu.loaded && gpu.kind === 'model' && (slot.speech?.facePack || gpu.facePack)) {
+    gpu.facePack ??= new FacePackRuntime(() => renderWorld(world))
+    gpu.facePack.sync(gpu.root, slot.speech, slot.screen, sceneSeconds)
+  }
+}
+
 function paintActor(world: GpuWorld, slot: Scene3DSlot, sceneSeconds: number) {
   const gpu = world.slots.get(slot.id)
   if (!gpu) return
@@ -370,16 +391,7 @@ function paintActor(world: GpuWorld, slot: Scene3DSlot, sceneSeconds: number) {
   }
   groundLoadedSlot(gpu, slot)
   if (slot.performance === 'typing') applyTypingPose(gpu.root, slot, sceneSeconds)
-  if (gpu.loaded && gpu.kind === 'model' && slot.speech?.face) {
-    gpu.speechFace ??= new SpeechFaceRuntime(() => renderWorld(world))
-    gpu.speechFace.sync(gpu.root, slot.speech, sceneSeconds)
-  } else if (gpu.speechFace && !slot.speech?.face) {
-    gpu.speechFace.sync(gpu.root, undefined, sceneSeconds)
-  }
-  if (gpu.loaded && gpu.kind === 'model' && (slot.speech?.facePack || gpu.facePack)) {
-    gpu.facePack ??= new FacePackRuntime(() => renderWorld(world))
-    gpu.facePack.sync(gpu.root, slot.speech, slot.screen, sceneSeconds)
-  }
+  syncActorSpeech(world, gpu, slot, sceneSeconds)
   if (slot.appearance || gpu.appearance) {
     gpu.appearance ??= new MaterializationRuntime()
     gpu.appearance.sync(gpu.root, slot.appearance, sceneSeconds)
