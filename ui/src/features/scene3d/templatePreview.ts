@@ -22,6 +22,7 @@ let world: GpuWorld | null | undefined
 let lastDressing: string | undefined
 const watchers = new Set<Watcher>()
 let raf = 0
+let cursor = 0
 
 function visibleSlots(slots: readonly Scene3DSlot[]) {
   return slots.filter(slot => !(slot.media === 'image' && !slot.sourceUrl))
@@ -54,28 +55,29 @@ function ensure(): GpuWorld | null {
 
 function tick(now: number) {
   const pack = ensure()
-  if (!pack || !watchers.size) {
+  const list = [...watchers]
+  if (!pack || !list.length) {
     raf = 0
     return
   }
-  for (const watcher of watchers) {
-    const doc = applyScene3DTemplate(watcher.id)
-    const slots = visibleSlots(doc.slots)
-    const dressingKey = doc.dressing ?? 'none'
-    if (lastDressing !== dressingKey) {
-      syncDressing(pack, doc.dressing)
-      lastDressing = dressingKey
-    }
-    applyLight(pack.dir, doc.light)
-    pruneSlots(pack, slots)
-    for (const slot of slots) {
-      if (!pack.slots.has(slot.id)) placeSlot(pack, slot, placeholderMesh(slot), [], 1, true)
-    }
-    const seconds = (now / 1000) % Math.max(0.5, doc.duration)
-    paintWorld(pack, { ...doc, slots: [...slots] }, seconds)
-    const ctx = watcher.canvas.getContext('2d')
-    if (ctx) ctx.drawImage(pack.renderer.domElement, 0, 0, watcher.canvas.width, watcher.canvas.height)
+  const watcher = list[cursor % list.length]
+  cursor++
+  const doc = applyScene3DTemplate(watcher.id)
+  const slots = visibleSlots(doc.slots)
+  const dressingKey = doc.dressing ?? 'none'
+  if (lastDressing !== dressingKey) {
+    syncDressing(pack, doc.dressing)
+    lastDressing = dressingKey
   }
+  applyLight(pack.dir, doc.light)
+  pruneSlots(pack, slots)
+  for (const slot of slots) {
+    if (!pack.slots.has(slot.id)) placeSlot(pack, slot, placeholderMesh(slot), [], 1, true)
+  }
+  const seconds = (now / 1000) % Math.max(0.5, doc.duration)
+  paintWorld(pack, { ...doc, slots: [...slots] }, seconds)
+  const ctx = watcher.canvas.getContext('2d')
+  if (ctx) ctx.drawImage(pack.renderer.domElement, 0, 0, watcher.canvas.width, watcher.canvas.height)
   raf = requestAnimationFrame(tick)
 }
 
