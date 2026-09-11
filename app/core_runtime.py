@@ -17,6 +17,7 @@ from routers.core_labs import create_core_labs_router
 from routers.core_mcp import create_core_mcp_router
 from routers.core_remote import create_core_remote_router
 from routers.core_series_plan import create_core_series_plan_router
+from routers.image_generation_commands import create_image_generation_commands_router
 from routers.lan_auth import create_lan_auth_router
 from routers.llm import create_llm_router
 from routers.projects import create_projects_router
@@ -26,7 +27,15 @@ from routers.scene_commands import create_scene_commands_router
 from routers.style_library import create_style_library_router
 from routers.system_capabilities import create_system_capabilities_router, require_capability_http
 from routers.workspace_collections import create_workspace_collections_router
-from services import core_editor, core_production, core_remote_image, core_scene_recording, core_upload, core_workspace as core
+from services import (
+    core_editor,
+    core_generation_commands,
+    core_production,
+    core_remote_image,
+    core_scene_recording,
+    core_upload,
+    core_workspace as core,
+)
 from services.platform_capabilities import platform_capabilities
 from services.scene_commands import SceneCommands
 from services.style_library import StyleLibrary
@@ -84,6 +93,7 @@ api.include_router(create_core_labs_router())
 api.include_router(create_core_series_plan_router())
 api.include_router(create_core_remote_router())
 api.include_router(create_core_mcp_router())
+api.include_router(create_image_generation_commands_router(core_generation_commands.service()))
 api.include_router(create_character_kit_face_router(
     workspace_dir=core.workspace_dir,
     uploads_root=core.uploads_dir,
