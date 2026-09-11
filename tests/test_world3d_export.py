@@ -24,12 +24,15 @@ from services.world3d_export import (
     OPERATION,
     World3DExportCancelled,
     World3DExportService,
+    _OWNED_BROWSER_JS,
     command_catalog,
     command_handlers,
     export_capabilities,
+    export_plan,
     freeze_export_command,
     mux_frame_sequence,
     staging_dir,
+    unsupported_capabilities,
     write_png,
 )
 
@@ -146,6 +149,61 @@ def test_voiced_duration_is_an_explicit_preflight_reject():
     with pytest.raises(Exception) as error:
         freeze_export_command(_command(document=document))
     assert error.value.detail["code"] == "unsupported_capability"
+    assert "voiced_duration" in error.value.detail["message"]
+
+
+def test_short_voiced_scene_is_rejected_instead_of_silent_mp4():
+    document = _document(duration=2, sfx=[{"id": "spark", "kind": "sparks", "start": 0, "end": 1,
+                                          "sound": True, "volume": 0.4}])
+    assert "voiced_audio" in unsupported_capabilities(document)
+    with pytest.raises(Exception) as error:
+        freeze_export_command(_command(document=document))
+    assert error.value.status_code == 422
+    assert error.value.detail["code"] == "unsupported_capability"
+    assert "voiced_audio" in error.value.detail["message"]
+    spoken = _document(slots=[{
+        "id": "subject_1", "slot": "subject_1", "position": [0, 0, 0], "rotationY": 0,
+        "scale": 1, "sourceUrl": "", "media": "model3d", "clip": None,
+        "speech": {"enabled": True, "audio": {"url": "/api/v1/file/voice.wav", "filename": "voice.wav"}},
+    }])
+    with pytest.raises(Exception) as error:
+        freeze_export_command(_command(document=spoken))
+    assert error.value.detail["code"] == "unsupported_capability"
+
+
+def test_publish_refuses_a_voiced_snapshot_even_if_preflight_is_bypassed(tmp_path):
+    service = _service(tmp_path, renderer=_paint)
+    snapshot = {
+        "workspace": WORKSPACE,
+        "document": _document(duration=2, soundtrack=[{"id": "bed", "audio": {"url": "/api/v1/file/bed.wav"}}]),
+        "refs": [],
+        "plan": export_plan(_document(duration=2)),
+    }
+    frames = [tmp_path / "frame_000001.png"]
+    write_png(frames[0], 64, 64, (1, 2, 3))
+
+    class _Token:
+        def is_cancelled(self):
+            return False
+
+    with pytest.raises(RuntimeError, match="silent MP4"):
+        service._publish(snapshot, tmp_path, frames, WORKSPACE, service._registry(WORKSPACE), "task", _Token())
+    assert list(Path(service.workspace_dir(WORKSPACE)).glob("*.mp4")) == []
+
+
+def test_owned_browser_script_uses_scene_clock_and_waits_for_assets():
+    assert "scene3dPlaybackSpeed(scene.playbackSpeed)" in _OWNED_BROWSER_JS
+    assert "outputTime * scene3dPlaybackSpeed" in _OWNED_BROWSER_JS
+    assert "window.__world3dStage?.ready?.(slots)" in _OWNED_BROWSER_JS
+    assert "handle.beginExport?.(scene)" in _OWNED_BROWSER_JS
+    assert "handle.setExportSize?.(size.width, size.height)" in _OWNED_BROWSER_JS
+
+
+def test_staging_dir_does_not_treat_dotdot_as_workspace_root(tmp_path):
+    escaped = staging_dir(str(tmp_path), "..")
+    assert escaped.resolve().parent == (tmp_path / ".world3d-export").resolve()
+    assert escaped.name != ".."
+    assert escaped.resolve() != tmp_path.resolve()
 
 
 def test_admit_freezes_snapshot_as_one_canonical_task(tmp_path):
@@ -317,6 +375,7 @@ def test_capabilities_endpoint_matches_worker_preflight(tmp_path):
     assert listed["renderer"] == "world3d-export-flow"
     assert listed["realRender"] in {"ready", "pending"}
     assert listed["ffmpeg"] is export_capabilities()["ffmpeg"]
+    assert listed["maxVoicedDuration"] == 0
 
 
 def test_mux_validates_before_replacing_destination(tmp_path):
