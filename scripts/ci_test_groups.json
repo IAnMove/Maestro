@@ -277,7 +277,8 @@
         "tests/test_wangp_mcp.py",
         "tests/test_wangp_submission.py",
         "tests/test_wizard_workflow_executor.py",
-        "tests/test_workspace_command_failures.py"
+        "tests/test_workspace_command_failures.py",
+        "tests/test_world3d_export.py"
       ]
     }
   ],
