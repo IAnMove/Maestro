@@ -22,6 +22,7 @@ from routers.core_series_plan import create_core_series_plan_router
 from routers.image_generation_commands import create_image_generation_commands_router
 from routers.lan_auth import create_lan_auth_router
 from routers.llm import create_llm_prompt_router, create_llm_router
+from routers.mcp_access import create_mcp_access_router
 from routers.projects import create_projects_router
 from routers.productions import create_productions_router
 from routers.recipes import create_recipes_router
@@ -45,6 +46,7 @@ from services import (
     core_upload,
     core_workspace as core,
 )
+from services.mcp_access import McpAccess
 from services.platform_capabilities import platform_capabilities
 from services.scene_commands import SceneCommands
 from services.style_library import StyleLibrary
@@ -130,6 +132,9 @@ api.include_router(create_series_assembly_router(
 api.include_router(create_core_series_plan_router())
 api.include_router(create_core_remote_router())
 api.include_router(create_core_mcp_router())
+api.include_router(create_mcp_access_router(McpAccess(
+    os.path.join(os.path.dirname(__file__), "settings", "mcp-access.json"),
+)))
 _core_image_commands = core_generation_commands.service()
 api.include_router(create_image_generation_commands_router(_core_image_commands))
 api.include_router(create_wizard_workflow_executor_router(WizardWorkflowExecutor(
