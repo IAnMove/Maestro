@@ -1,0 +1,46 @@
+# Pending mount for H03 server-side image → upscale workflow.
+# Do not apply while mac PR #353 owns app/_launch_runtime.py.
+# This is not a second generation queue: submit_command is
+# _image_generation_commands.submit (generation.image + tools.upscale).
+
+diff --git a/app/_launch_runtime.py b/app/_launch_runtime.py
+--- a/app/_launch_runtime.py
++++ b/app/_launch_runtime.py
+@@
+ _image_generation_commands = create_image_generation_commands(globals())
+ api.include_router(create_image_generation_commands_router(_image_generation_commands))
++from routers.wizard_workflow_executor import create_wizard_workflow_executor_router
++from services.wizard_workflow_executor import WizardWorkflowExecutor, catalog as wizard_workflow_catalog, command_handlers as wizard_workflow_command_handlers
++_wizard_workflow_executor = WizardWorkflowExecutor(
++    workspace_dir=_workspace_dir,
++    submit_command=_image_generation_commands.submit,
++    command_receipt=_image_generation_commands.receipt,
++    get_task=lambda workspace, task_id: _task_registry(workspace).get(task_id),
++)
++api.include_router(create_wizard_workflow_executor_router(_wizard_workflow_executor))
+ api.include_router(create_wangp_mcp_router(
+     token_getter=_mcp_access.token,
+     handlers={"models": lambda args: get_model_options(args['model_type']) if args.get('model_type') else list_models(), "processors": wangp_capabilities, "status": get_status,
+               "generate": generate, "recast": recast_endpoint, "upscale": tools_upscale,
+-              **wangp_agent_handlers(api), **image_command_handlers(_image_generation_commands), **_scene_commands.handlers()},
++              **wangp_agent_handlers(api), **image_command_handlers(_image_generation_commands), **wizard_workflow_command_handlers(_wizard_workflow_executor), **_scene_commands.handlers()},
+     journal_path=os.path.join(os.path.dirname(__file__), "settings", "wangp-mcp-requests.sqlite3"),
+     command_operations=[*scene_command_catalog(), *workspace_command_catalog()["operations"], *image_command_catalog(
+-        adapter.catalog for adapter in _image_generation_commands.operations.values())],
++        adapter.catalog for adapter in _image_generation_commands.operations.values()), *wizard_workflow_catalog()],
+ ))
++
++# After set_job_state_observer(_observe_generation_job_state):
++# def _observe_generation_job_state_with_workflows(record: dict) -> None:
++#     _observe_generation_job_state(record)
++#     workspace = str(record.get("workspace") or "")
++#     if workspace:
++#         threading.Thread(
++#             target=_wizard_workflow_executor.reconcile_blocking,
++#             args=(workspace,),
++#             name="wizard-workflow-reconcile",
++#             daemon=True,
++#         ).start()
++# set_job_state_observer(_observe_generation_job_state_with_workflows)
++# On startup, after routers are mounted:
++# _wizard_workflow_executor.recover_blocking([item["name"] for item in _list_workspaces()])
