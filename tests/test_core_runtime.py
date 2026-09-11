@@ -503,14 +503,16 @@ class CoreRuntimeTests(unittest.TestCase):
         self.assertEqual(response.json()["references"], ["/api/v1/uploads/hero.png"])
 
     def test_wizard_image_upscale_executor_starts_minimax_and_blocks_local_upscale(self):
+        from services import core_generation_commands
+
         folder, previous = self._in_temp_workspace()
         try:
             Path("outputs").mkdir()
             fake = {"name": "minimax.jpg", "path": "minimax.jpg", "prompt": "a lantern", "aspect_ratio": "1:1"}
-            with patch("services.minimax_image_service.generate_image", return_value=fake), patch(
+            catalog = self.client.get("/api/v1/wizard/workflows/executor/commands")
+            with patch("services.core_remote_image.generate_image", return_value=fake), patch(
                 "services.execution_mode.validate_remote_provider",
             ), patch("services.core_remote_image.threading.Thread", ImmediateThread):
-                catalog = self.client.get("/api/v1/wizard/workflows/executor/commands")
                 started = self.client.post("/api/v1/wizard/workflows/executor", json={
                     "workspace": "default",
                     "workflowId": "wf-mac-image",
@@ -524,6 +526,14 @@ class CoreRuntimeTests(unittest.TestCase):
                         "guidance_scale": 1.0,
                     },
                 })
+                self.assertEqual(started.status_code, 200, started.text)
+                workflow = started.json()["workflow"]
+                image_task_id = workflow["steps"][0]["taskId"]
+                synced = core_generation_commands.get_task("default", image_task_id)
+                ticked = self.client.post(
+                    "/api/v1/wizard/workflows/executor/reconcile",
+                    json={"workspace": "default"},
+                )
                 upscale = self.client.post("/api/v1/generation/commands", json={
                     "version": 1,
                     "operation": "tools.upscale",
@@ -535,10 +545,19 @@ class CoreRuntimeTests(unittest.TestCase):
         self.assertEqual(catalog.status_code, 200, catalog.text)
         operations = {item.get("name") for item in catalog.json().get("operations") or []}
         self.assertIn("wizard.image_upscale", operations)
-        self.assertEqual(started.status_code, 200, started.text)
-        workflow = started.json()["workflow"]
         self.assertEqual(workflow["workflowId"], "wf-mac-image")
         self.assertEqual(workflow["steps"][0]["kind"], "generation.image")
+        self.assertEqual(workflow["steps"][0]["state"], "waiting")
+        self.assertTrue(image_task_id)
+        self.assertIsNotNone(synced)
+        self.assertEqual(synced["status"], "completed")
+        self.assertEqual(synced["result_refs"], ["minimax.jpg"])
+        self.assertEqual(ticked.status_code, 200, ticked.text)
+        advanced = ticked.json()["results"][0]["workflow"]
+        self.assertEqual(advanced["steps"][0]["state"], "completed")
+        self.assertEqual(advanced["steps"][0]["outputRefs"], ["minimax.jpg"])
+        self.assertEqual(advanced["state"], "awaiting_input")
+        self.assertEqual(advanced["steps"][1]["state"], "awaiting_input")
         self.assertEqual(upscale.status_code, 409, upscale.text)
         self.assertEqual(upscale.json()["detail"]["code"], FEATURE_UNAVAILABLE)
 
@@ -590,6 +609,45 @@ class CoreRuntimeTests(unittest.TestCase):
         self.assertEqual(images.json()["outputs"][0]["type"], "image")
         self.assertEqual(models.json()["total"], 1)
         self.assertEqual(models.json()["outputs"][0]["type"], "model3d")
+
+    def test_wizard_image_executor_fails_when_minimax_job_fails(self):
+        from services import core_generation_commands
+
+        folder, previous = self._in_temp_workspace()
+        try:
+            Path("outputs").mkdir()
+            with patch("services.core_remote_image.generate_image", side_effect=RuntimeError("minimax down")), patch(
+                "services.execution_mode.validate_remote_provider",
+            ), patch("services.core_remote_image.threading.Thread", ImmediateThread):
+                started = self.client.post("/api/v1/wizard/workflows/executor", json={
+                    "workspace": "default",
+                    "workflowId": "wf-mac-fail",
+                    "userRequest": "Generate a lantern",
+                    "inputSnapshot": {
+                        "model_type": "minimax:image-01",
+                        "prompt": "a lantern in the rain",
+                        "resolution": "1024x1024",
+                        "num_inference_steps": 1,
+                        "seed": 1,
+                        "guidance_scale": 1.0,
+                    },
+                })
+                self.assertEqual(started.status_code, 200, started.text)
+                image_task_id = started.json()["workflow"]["steps"][0]["taskId"]
+                synced = core_generation_commands.get_task("default", image_task_id)
+                ticked = self.client.post(
+                    "/api/v1/wizard/workflows/executor/reconcile",
+                    json={"workspace": "default"},
+                )
+        finally:
+            self._leave_temp_workspace(folder, previous)
+        self.assertIsNotNone(synced)
+        self.assertEqual(synced["status"], "failed")
+        self.assertEqual(ticked.status_code, 200, ticked.text)
+        failed = ticked.json()["results"][0]["workflow"]
+        self.assertEqual(failed["state"], "failed")
+        self.assertEqual(failed["steps"][0]["state"], "failed")
+        self.assertEqual(failed["workflowId"], "wf-mac-fail")
 
     def test_series_plan_start_uses_the_remote_llm(self):
         series = {

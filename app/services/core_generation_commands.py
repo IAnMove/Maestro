@@ -16,8 +16,19 @@ from services import core_remote_image, core_workspace as core, execution_mode
 from services.image_generation_commands import command_error
 from services.image_generation_spec import ImageGenerationSpecError, freeze_image_generation_spec
 from services.task_command_admission import TaskCommandConflict
-from services.task_manager import TaskRegistry
+from services.task_manager import ACTIVE_STATUSES, TERMINAL_STATUSES, TaskRegistry
 from routers.system_capabilities import require_capability_http
+
+_JOB_STATUS = {
+    "queued": "queued",
+    "waiting_resource": "waiting_resource",
+    "running": "running",
+    "cancelling": "running",
+    "completed": "completed",
+    "failed": "failed",
+    "cancelled": "cancelled",
+    "interrupted": "interrupted",
+}
 
 _REGISTRIES: dict[str, TaskRegistry] = {}
 _LOCK = threading.Lock()
@@ -37,10 +48,62 @@ def _registry(workspace: str) -> TaskRegistry:
         return registry
 
 
+def _job_status(value: Any) -> str | None:
+    return _JOB_STATUS.get(str(value or "").strip().lower())
+
+
+def _sync_task_from_job(workspace: str, task: dict[str, Any]) -> dict[str, Any]:
+    """Project the MiniMax in-memory job onto the admitted canonical task.
+
+    ``core_remote_image`` never writes TaskRegistry. The Wizard executor
+    polls ``get_task``, so a completed JPG would otherwise stay ``queued``
+    with empty ``result_refs`` and never advance to upscale.
+    """
+    job_id = str(task.get("backend_job_id") or "").strip()
+    if not job_id:
+        return task
+    job = core_remote_image.get_job(job_id)
+    if not isinstance(job, dict):
+        return task
+    mapped = _job_status(job.get("status"))
+    if mapped is None:
+        return task
+    current = str(task.get("status") or "")
+    if current in TERMINAL_STATUSES and mapped in ACTIVE_STATUSES:
+        return task
+    refs = [str(name).strip() for name in (job.get("output_files") or []) if str(name).strip()]
+    patch: dict[str, Any] = {}
+    if mapped != current:
+        patch["status"] = mapped
+        patch["phase"] = mapped
+    if refs and refs != list(task.get("result_refs") or []):
+        patch["result_refs"] = refs
+    message = str(job.get("message") or "").strip()
+    if message and message != task.get("message"):
+        patch["message"] = message
+    error = job.get("error")
+    if error and mapped in {"failed", "cancelled"} and error != task.get("error"):
+        patch["error"] = str(error)
+    if not patch:
+        return task
+    try:
+        return _registry(workspace).update(
+            str(task["id"]),
+            force=True,
+            event_type="adapter.synced",
+            **patch,
+        )
+    except (KeyError, OSError, sqlite3.Error, ValueError):
+        return {**task, **patch}
+
+
 def get_task(workspace: str, task_id: str) -> dict[str, Any] | None:
     if not str(task_id or "").strip():
         return None
-    return _registry(workspace).get(str(task_id))
+    task = _registry(workspace).get(str(task_id))
+    if task is None:
+        return None
+    return _sync_task_from_job(workspace, task)
 
 
 def _freeze(command: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -138,7 +201,7 @@ class CoreGenerationCommands:
                     404, "receipt_not_found",
                     "No admission exists for this intention in this workspace",
                 )
-            return {"receipt": entry["receipt"], "task": registry.get(entry["task_id"])}
+            return {"receipt": entry["receipt"], "task": get_task(workspace, entry["task_id"])}
         except (OSError, sqlite3.Error) as error:
             raise command_error(503, "storage_unavailable", "Command storage is unavailable") from error
 
