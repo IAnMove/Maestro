@@ -5,7 +5,7 @@ import {
 } from 'lucide-react'
 import { setUiLanguage, useUiTranslation, type UiLanguage } from '../../i18n'
 import {
-  categoryForMediaFilter, DIRECT_GENERATION_MEDIA, hidesDirectGenerationSidebar,
+  categoryForMediaFilter, DIRECT_GENERATION_MEDIA,
   revealDirectorWorkspace, type NavigationCategory, WIZARD_NAVIGATION_EVENT,
 } from '../../lib/navigationCategories'
 import { useStore } from '../../stores/useStore'
@@ -206,7 +206,7 @@ export function TabFilter() {
     const state = useStore.getState()
     state.setSettingsOpen(false)
     state.setDashboardOpen(false)
-    if (hidesDirectGenerationSidebar(filter, state.sidebarMode)) state.setSidebarOpen(false)
+    state.setSidebarOpen(false)
     state.setMediaFilter(filter)
     setActiveCategory(category)
     setExpandedCategory(category)
@@ -220,6 +220,7 @@ export function TabFilter() {
     locallySelectedFilterRef.current = filter
     state.setMediaFilter(filter)
     state.setSidebarMode('studio')
+    state.setSidebarOpen(true)
     window.dispatchEvent(new Event('hocuspocus:studio-open'))
     setActiveCategory('direct-generation')
     setExpandedCategory('direct-generation')

@@ -1,4 +1,11 @@
 {
+  "groups": {
+    "help": "Fill input and instructions, then run. Results stay beside this form when there is room.",
+    "input": "Input and references",
+    "instructions": "Instructions",
+    "model": "Model and options",
+    "run": "Run"
+  },
   "chrome": {
     "uploading": "Uploading…",
     "optional": "Optional",
