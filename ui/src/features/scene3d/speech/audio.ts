@@ -32,9 +32,10 @@ export async function decodeVoice(url: string, signal?: AbortSignal): Promise<Au
 function retainDecodedVoice(url: string): VoiceSlot {
   let slot = decodedVoices.get(url)
   if (!slot || slot.failed) {
-    slot = { url, promise: fetchAndDecode(url), refs: 0, used: 0, failed: false }
-    decodedVoices.set(url, slot)
-    slot.promise.catch(() => { slot.failed = true })
+    const next: VoiceSlot = { url, promise: fetchAndDecode(url), refs: 0, used: 0, failed: false }
+    decodedVoices.set(url, next)
+    next.promise.catch(() => { next.failed = true })
+    slot = next
   }
   slot.refs += 1
   slot.used = Date.now()

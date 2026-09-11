@@ -17,7 +17,9 @@ export function WorldSfxControls({ cues = [], duration, selectedId, disabled, on
   const cuesRef = useRef(cues)
   const upload = useRef(createUploadSession())
   const [mediaError, setMediaError] = useState('')
-  cuesRef.current = cues
+  useEffect(() => {
+    cuesRef.current = cues
+  }, [cues])
   useEffect(() => () => upload.current.abort(), [])
   const update = (id: string, patch: Partial<WorldSfx>) => onChange(parseWorldSfx(cues.map(cue => cue.id === id ? { ...cue, ...patch } : cue)))
   const assignPortalMedia = (id: string, file?: File) => {
