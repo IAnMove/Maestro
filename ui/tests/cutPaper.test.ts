@@ -8,7 +8,9 @@ import {
   CUT_PAPER_PIECES,
   CUT_PAPER_TOWN,
 } from '../src/features/cutPaper/bible.ts'
-import { compileCutPaperPilotScene, CUT_PAPER_PILOT_DURATION, CUT_PAPER_PILOT_SCRIPT } from '../src/features/cutPaper/pilot.ts'
+import { compileCutPaperPilotScene, compileCutPaperShot, CUT_PAPER_PILOT_DURATION, CUT_PAPER_PILOT_SCRIPT } from '../src/features/cutPaper/pilot.ts'
+import { createTijeralStoryProject, TIJERAL_STORY_ID } from '../src/features/cutPaper/storyProject.ts'
+import { normalizeStoryProject } from '../src/features/stories/model.ts'
 import { assertCutPaperKitHasNoPrivateGlb, cutPaperKitManifest, cutPaperPuppetLayers } from '../src/features/cutPaper/puppet.ts'
 import { parseSceneFile, serializeSceneFile } from '../src/lib/sceneFile.ts'
 
@@ -56,4 +58,20 @@ test('pilot scene roundtrips, lasts 78s, talks, slides, and never mounts a GLB',
   assert.equal(restored.layers.length, scene.layers.length)
   assert.equal(restored.dialogueBeats?.length, scene.dialogueBeats?.length)
   assert.ok(restored.layers.every(layer => layer.type !== 'model3d' && !/\.glb/i.test(layer.source)))
+})
+
+test('Story Lab chapter roundtrips and each beat links to Video 2D', () => {
+  const project = normalizeStoryProject(createTijeralStoryProject())
+  assert.equal(project.id, TIJERAL_STORY_ID)
+  assert.equal(project.beats.length, 3)
+  assert.ok(project.beats.every(beat => beat.sceneLink?.editor === 'video2d' && beat.sceneLink.href.includes('/examples/cut-paper/shots/')))
+  assert.equal(project.world.locations.length, 5)
+  assert.equal(project.characters.length, 6)
+  const plaza = compileCutPaperShot('plaza')
+  const talk = compileCutPaperShot('talk')
+  const sticker = compileCutPaperShot('sticker')
+  assert.equal(plaza.duration, 6)
+  assert.ok(talk.dialogueBeats?.length)
+  assert.ok(sticker.layers.some(layer => layer.id === 'puppet-kito'))
+  assert.ok(parseSceneFile(serializeSceneFile(talk)).dialogueBeats?.length)
 })

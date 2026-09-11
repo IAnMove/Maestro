@@ -10,7 +10,8 @@ export {
   cutPaperAssetUrl,
   cutPaperCharacter,
 } from './bible.ts'
-export { compileCutPaperPilotScene, CUT_PAPER_PILOT_DURATION, CUT_PAPER_PILOT_SCRIPT } from './pilot.ts'
+export { compileCutPaperPilotScene, compileCutPaperShot, CUT_PAPER_PILOT_DURATION, CUT_PAPER_PILOT_SCRIPT } from './pilot.ts'
+export { createTijeralStoryProject, TIJERAL_STORY_ID } from './storyProject.ts'
 export {
   applyPuppetSpeech,
   assertCutPaperKitHasNoPrivateGlb,

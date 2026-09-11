@@ -1,0 +1,3523 @@
+{
+  "version": 1,
+  "name": "Tijeral · plano 3 sticker",
+  "width": 1280,
+  "height": 720,
+  "fps": 30,
+  "duration": 26,
+  "layers": [
+    {
+      "id": "camera",
+      "name": "Camera",
+      "type": "camera",
+      "source": "",
+      "visible": true,
+      "locked": false,
+      "z": 100,
+      "transform": {
+        "x": 50,
+        "y": 50,
+        "scale": 1,
+        "opacity": 1,
+        "rotation": 0
+      },
+      "animation": {
+        "start": {
+          "x": 50,
+          "y": 50,
+          "scale": 1,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "end": {
+          "x": 50,
+          "y": 50,
+          "scale": 1.04,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "duration": 26,
+        "curve": "ease",
+        "keyframes": [
+          {
+            "id": "camera-0",
+            "time": 0,
+            "x": 50,
+            "y": 50,
+            "scale": 1,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "ease"
+          },
+          {
+            "id": "camera-26000",
+            "time": 26,
+            "x": 50,
+            "y": 50,
+            "scale": 1.04,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "ease"
+          }
+        ]
+      }
+    },
+    {
+      "id": "location-plaza",
+      "name": "Location plaza",
+      "type": "image",
+      "source": "/examples/cut-paper/locations/plaza.png",
+      "visible": true,
+      "locked": false,
+      "z": 0,
+      "transform": {
+        "x": 50,
+        "y": 50,
+        "scale": 1,
+        "opacity": 1,
+        "rotation": 0
+      },
+      "animation": {
+        "start": {
+          "x": 50,
+          "y": 50,
+          "scale": 1,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "end": {
+          "x": 50,
+          "y": 50,
+          "scale": 1,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "duration": 26,
+        "curve": "hold",
+        "keyframes": [
+          {
+            "id": "location-plaza-0",
+            "time": 0,
+            "x": 50,
+            "y": 50,
+            "scale": 1,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "location-plaza-26000",
+            "time": 26,
+            "x": 50,
+            "y": 50,
+            "scale": 1,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          }
+        ]
+      },
+      "parallax": 0.15
+    },
+    {
+      "id": "puppet-nilo",
+      "name": "Nilo Carda root",
+      "type": "image",
+      "source": "/examples/cut-paper/puppets/nilo-torso.png",
+      "visible": true,
+      "locked": false,
+      "z": 32,
+      "transform": {
+        "x": 36,
+        "y": 62,
+        "scale": 1,
+        "opacity": 0,
+        "rotation": 0
+      },
+      "animation": {
+        "start": {
+          "x": 36,
+          "y": 62,
+          "scale": 1,
+          "opacity": 0,
+          "rotation": 0
+        },
+        "end": {
+          "x": 36,
+          "y": 62,
+          "scale": 1,
+          "opacity": 0,
+          "rotation": 0
+        },
+        "duration": 26,
+        "curve": "hold",
+        "keyframes": [
+          {
+            "id": "puppet-nilo-0",
+            "time": 0,
+            "x": 36,
+            "y": 62,
+            "scale": 1,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-nilo-26000",
+            "time": 26,
+            "x": 36,
+            "y": 62,
+            "scale": 1,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          }
+        ]
+      },
+      "parallax": 1,
+      "effects": {
+        "shadow": 0.35,
+        "blendMode": "normal",
+        "mask": "none",
+        "maskRadius": 12,
+        "blur": 0,
+        "brightness": 1,
+        "contrast": 1,
+        "saturation": 1,
+        "hue": 0,
+        "glow": 0
+      }
+    },
+    {
+      "id": "puppet-nilo-legs",
+      "name": "Nilo Carda legs",
+      "type": "image",
+      "source": "/examples/cut-paper/puppets/nilo-legs.png",
+      "visible": true,
+      "locked": false,
+      "z": 30,
+      "transform": {
+        "x": 36,
+        "y": 72,
+        "scale": 1.0499999999999998,
+        "opacity": 1,
+        "rotation": 0
+      },
+      "animation": {
+        "start": {
+          "x": 36,
+          "y": 72,
+          "scale": 1.0499999999999998,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "end": {
+          "x": 36,
+          "y": 72,
+          "scale": 1.0499999999999998,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "duration": 26,
+        "curve": "hold",
+        "keyframes": [
+          {
+            "id": "puppet-nilo-legs-0",
+            "time": 0,
+            "x": 36,
+            "y": 72,
+            "scale": 1.0499999999999998,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-nilo-legs-26000",
+            "time": 26,
+            "x": 36,
+            "y": 72,
+            "scale": 1.0499999999999998,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          }
+        ]
+      },
+      "relationship": {
+        "type": "parent",
+        "targetLayerId": "puppet-nilo"
+      },
+      "effects": {
+        "shadow": 0.15,
+        "blendMode": "normal",
+        "mask": "none",
+        "maskRadius": 12,
+        "blur": 0,
+        "brightness": 1,
+        "contrast": 1,
+        "saturation": 1,
+        "hue": 0,
+        "glow": 0
+      }
+    },
+    {
+      "id": "puppet-nilo-torso",
+      "name": "Nilo Carda torso",
+      "type": "image",
+      "source": "/examples/cut-paper/puppets/nilo-torso.png",
+      "visible": true,
+      "locked": false,
+      "z": 32,
+      "transform": {
+        "x": 36,
+        "y": 64,
+        "scale": 1,
+        "opacity": 1,
+        "rotation": 0
+      },
+      "animation": {
+        "start": {
+          "x": 36,
+          "y": 64,
+          "scale": 1,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "end": {
+          "x": 36,
+          "y": 64,
+          "scale": 1,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "duration": 26,
+        "curve": "hold",
+        "keyframes": [
+          {
+            "id": "puppet-nilo-torso-0",
+            "time": 0,
+            "x": 36,
+            "y": 64,
+            "scale": 1,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-nilo-torso-26000",
+            "time": 26,
+            "x": 36,
+            "y": 64,
+            "scale": 1,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          }
+        ]
+      },
+      "relationship": {
+        "type": "parent",
+        "targetLayerId": "puppet-nilo"
+      },
+      "effects": {
+        "shadow": 0.4,
+        "blendMode": "normal",
+        "mask": "none",
+        "maskRadius": 12,
+        "blur": 0,
+        "brightness": 1,
+        "contrast": 1,
+        "saturation": 1,
+        "hue": 0,
+        "glow": 0
+      }
+    },
+    {
+      "id": "puppet-nilo-arm-back",
+      "name": "Nilo Carda arm-back",
+      "type": "image",
+      "source": "/examples/cut-paper/puppets/nilo-arm-back.png",
+      "visible": true,
+      "locked": false,
+      "z": 31,
+      "transform": {
+        "x": 29,
+        "y": 63,
+        "scale": 0.7000000000000001,
+        "opacity": 1,
+        "rotation": 0
+      },
+      "animation": {
+        "start": {
+          "x": 29,
+          "y": 63,
+          "scale": 0.7000000000000001,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "end": {
+          "x": 29,
+          "y": 63,
+          "scale": 0.7000000000000001,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "duration": 26,
+        "curve": "hold",
+        "keyframes": [
+          {
+            "id": "puppet-nilo-arm-back-0",
+            "time": 0,
+            "x": 29,
+            "y": 63,
+            "scale": 0.7000000000000001,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-nilo-arm-back-26000",
+            "time": 26,
+            "x": 29,
+            "y": 63,
+            "scale": 0.7000000000000001,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          }
+        ]
+      },
+      "relationship": {
+        "type": "parent",
+        "targetLayerId": "puppet-nilo"
+      },
+      "effects": {
+        "shadow": 0.15,
+        "blendMode": "normal",
+        "mask": "none",
+        "maskRadius": 12,
+        "blur": 0,
+        "brightness": 1,
+        "contrast": 1,
+        "saturation": 1,
+        "hue": 0,
+        "glow": 0
+      }
+    },
+    {
+      "id": "puppet-nilo-arm-front",
+      "name": "Nilo Carda arm-front",
+      "type": "image",
+      "source": "/examples/cut-paper/puppets/nilo-arm-front.png",
+      "visible": true,
+      "locked": false,
+      "z": 34,
+      "transform": {
+        "x": 43,
+        "y": 64,
+        "scale": 0.7000000000000001,
+        "opacity": 1,
+        "rotation": 0
+      },
+      "animation": {
+        "start": {
+          "x": 43,
+          "y": 64,
+          "scale": 0.7000000000000001,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "end": {
+          "x": 43,
+          "y": 64,
+          "scale": 0.7000000000000001,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "duration": 26,
+        "curve": "hold",
+        "keyframes": [
+          {
+            "id": "puppet-nilo-arm-front-0",
+            "time": 0,
+            "x": 43,
+            "y": 64,
+            "scale": 0.7000000000000001,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-nilo-arm-front-26000",
+            "time": 26,
+            "x": 43,
+            "y": 64,
+            "scale": 0.7000000000000001,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          }
+        ]
+      },
+      "relationship": {
+        "type": "parent",
+        "targetLayerId": "puppet-nilo"
+      },
+      "effects": {
+        "shadow": 0.15,
+        "blendMode": "normal",
+        "mask": "none",
+        "maskRadius": 12,
+        "blur": 0,
+        "brightness": 1,
+        "contrast": 1,
+        "saturation": 1,
+        "hue": 0,
+        "glow": 0
+      }
+    },
+    {
+      "id": "puppet-nilo-head",
+      "name": "Nilo Carda head",
+      "type": "image",
+      "source": "/examples/cut-paper/puppets/nilo-head.png",
+      "visible": true,
+      "locked": false,
+      "z": 36,
+      "transform": {
+        "x": 36,
+        "y": 50,
+        "scale": 0.7000000000000001,
+        "opacity": 1,
+        "rotation": 0
+      },
+      "animation": {
+        "start": {
+          "x": 36,
+          "y": 50,
+          "scale": 0.7000000000000001,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "end": {
+          "x": 36,
+          "y": 50,
+          "scale": 0.7000000000000001,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "duration": 26,
+        "curve": "hold",
+        "keyframes": [
+          {
+            "id": "puppet-nilo-head-0",
+            "time": 0,
+            "x": 36,
+            "y": 50,
+            "scale": 0.7000000000000001,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-nilo-head-26000",
+            "time": 26,
+            "x": 36,
+            "y": 50,
+            "scale": 0.7000000000000001,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          }
+        ]
+      },
+      "relationship": {
+        "type": "parent",
+        "targetLayerId": "puppet-nilo"
+      },
+      "effects": {
+        "shadow": 0.15,
+        "blendMode": "normal",
+        "mask": "none",
+        "maskRadius": 12,
+        "blur": 0,
+        "brightness": 1,
+        "contrast": 1,
+        "saturation": 1,
+        "hue": 0,
+        "glow": 0
+      }
+    },
+    {
+      "id": "puppet-nilo-face",
+      "name": "Nilo Carda face",
+      "type": "image",
+      "source": "/examples/cut-paper/puppets/nilo-face.png",
+      "visible": true,
+      "locked": false,
+      "z": 37,
+      "transform": {
+        "x": 36,
+        "y": 50,
+        "scale": 0.5499999999999999,
+        "opacity": 1,
+        "rotation": 0
+      },
+      "animation": {
+        "start": {
+          "x": 36,
+          "y": 50,
+          "scale": 0.5499999999999999,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "end": {
+          "x": 36,
+          "y": 50,
+          "scale": 0.5499999999999999,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "duration": 26,
+        "curve": "hold",
+        "keyframes": [
+          {
+            "id": "puppet-nilo-face-0",
+            "time": 0,
+            "x": 36,
+            "y": 50,
+            "scale": 0.5499999999999999,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-nilo-face-26000",
+            "time": 26,
+            "x": 36,
+            "y": 50,
+            "scale": 0.5499999999999999,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          }
+        ]
+      },
+      "relationship": {
+        "type": "parent",
+        "targetLayerId": "puppet-nilo"
+      },
+      "effects": {
+        "shadow": 0.15,
+        "blendMode": "normal",
+        "mask": "none",
+        "maskRadius": 12,
+        "blur": 0,
+        "brightness": 1,
+        "contrast": 1,
+        "saturation": 1,
+        "hue": 0,
+        "glow": 0
+      }
+    },
+    {
+      "id": "puppet-nilo-hat",
+      "name": "Nilo Carda hat",
+      "type": "image",
+      "source": "/examples/cut-paper/puppets/nilo-hat.png",
+      "visible": true,
+      "locked": false,
+      "z": 38,
+      "transform": {
+        "x": 36,
+        "y": 42,
+        "scale": 0.6,
+        "opacity": 1,
+        "rotation": 0
+      },
+      "animation": {
+        "start": {
+          "x": 36,
+          "y": 42,
+          "scale": 0.6,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "end": {
+          "x": 36,
+          "y": 42,
+          "scale": 0.6,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "duration": 26,
+        "curve": "hold",
+        "keyframes": [
+          {
+            "id": "puppet-nilo-hat-0",
+            "time": 0,
+            "x": 36,
+            "y": 42,
+            "scale": 0.6,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-nilo-hat-26000",
+            "time": 26,
+            "x": 36,
+            "y": 42,
+            "scale": 0.6,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          }
+        ]
+      },
+      "relationship": {
+        "type": "parent",
+        "targetLayerId": "puppet-nilo"
+      },
+      "effects": {
+        "shadow": 0.15,
+        "blendMode": "normal",
+        "mask": "none",
+        "maskRadius": 12,
+        "blur": 0,
+        "brightness": 1,
+        "contrast": 1,
+        "saturation": 1,
+        "hue": 0,
+        "glow": 0
+      }
+    },
+    {
+      "id": "puppet-nilo-brow",
+      "name": "Nilo Carda brow neutral",
+      "type": "image",
+      "source": "/examples/cut-paper/brows/nilo-neutral.png",
+      "visible": true,
+      "locked": false,
+      "z": 39,
+      "transform": {
+        "x": 36,
+        "y": 48,
+        "scale": 0.2,
+        "opacity": 1,
+        "rotation": 0
+      },
+      "animation": {
+        "start": {
+          "x": 36,
+          "y": 48,
+          "scale": 0.2,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "end": {
+          "x": 36,
+          "y": 48,
+          "scale": 0.2,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "duration": 26,
+        "curve": "hold",
+        "keyframes": [
+          {
+            "id": "puppet-nilo-brow-0",
+            "time": 0,
+            "x": 36,
+            "y": 48,
+            "scale": 0.2,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-nilo-brow-26000",
+            "time": 26,
+            "x": 36,
+            "y": 48,
+            "scale": 0.2,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          }
+        ]
+      },
+      "relationship": {
+        "type": "parent",
+        "targetLayerId": "puppet-nilo"
+      }
+    },
+    {
+      "id": "puppet-nilo-mouth-closed",
+      "name": "Nilo Carda mouth closed",
+      "type": "image",
+      "source": "/examples/cut-paper/mouths/nilo-closed.png",
+      "visible": true,
+      "locked": false,
+      "z": 40,
+      "transform": {
+        "x": 36,
+        "y": 52,
+        "scale": 0.12,
+        "opacity": 1,
+        "rotation": 0
+      },
+      "animation": {
+        "start": {
+          "x": 36,
+          "y": 52,
+          "scale": 0.12,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "end": {
+          "x": 36,
+          "y": 52,
+          "scale": 0.12,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "duration": 26,
+        "curve": "hold",
+        "keyframes": [
+          {
+            "id": "puppet-nilo-mouth-closed-0",
+            "time": 0,
+            "x": 36,
+            "y": 52,
+            "scale": 0.12,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-nilo-mouth-closed-26000",
+            "time": 26,
+            "x": 36,
+            "y": 52,
+            "scale": 0.12,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          }
+        ]
+      },
+      "relationship": {
+        "type": "parent",
+        "targetLayerId": "puppet-nilo"
+      },
+      "faceBinding": {
+        "poseLayerId": "puppet-nilo",
+        "role": "mouth",
+        "state": "closed"
+      }
+    },
+    {
+      "id": "puppet-nilo-mouth-small",
+      "name": "Nilo Carda mouth small",
+      "type": "image",
+      "source": "/examples/cut-paper/mouths/nilo-small.png",
+      "visible": true,
+      "locked": false,
+      "z": 40,
+      "transform": {
+        "x": 36,
+        "y": 52,
+        "scale": 0.12,
+        "opacity": 1,
+        "rotation": 0
+      },
+      "animation": {
+        "start": {
+          "x": 36,
+          "y": 52,
+          "scale": 0.12,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "end": {
+          "x": 36,
+          "y": 52,
+          "scale": 0.12,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "duration": 26,
+        "curve": "hold",
+        "keyframes": [
+          {
+            "id": "puppet-nilo-mouth-small-0",
+            "time": 0,
+            "x": 36,
+            "y": 52,
+            "scale": 0.12,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-nilo-mouth-small-26000",
+            "time": 26,
+            "x": 36,
+            "y": 52,
+            "scale": 0.12,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          }
+        ]
+      },
+      "relationship": {
+        "type": "parent",
+        "targetLayerId": "puppet-nilo"
+      },
+      "faceBinding": {
+        "poseLayerId": "puppet-nilo",
+        "role": "mouth",
+        "state": "small"
+      }
+    },
+    {
+      "id": "puppet-nilo-mouth-wide",
+      "name": "Nilo Carda mouth wide",
+      "type": "image",
+      "source": "/examples/cut-paper/mouths/nilo-wide.png",
+      "visible": true,
+      "locked": false,
+      "z": 40,
+      "transform": {
+        "x": 36,
+        "y": 52,
+        "scale": 0.12,
+        "opacity": 1,
+        "rotation": 0
+      },
+      "animation": {
+        "start": {
+          "x": 36,
+          "y": 52,
+          "scale": 0.12,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "end": {
+          "x": 36,
+          "y": 52,
+          "scale": 0.12,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "duration": 26,
+        "curve": "hold",
+        "keyframes": [
+          {
+            "id": "puppet-nilo-mouth-wide-0",
+            "time": 0,
+            "x": 36,
+            "y": 52,
+            "scale": 0.12,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-nilo-mouth-wide-26000",
+            "time": 26,
+            "x": 36,
+            "y": 52,
+            "scale": 0.12,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          }
+        ]
+      },
+      "relationship": {
+        "type": "parent",
+        "targetLayerId": "puppet-nilo"
+      },
+      "faceBinding": {
+        "poseLayerId": "puppet-nilo",
+        "role": "mouth",
+        "state": "wide"
+      }
+    },
+    {
+      "id": "puppet-nilo-mouth-round",
+      "name": "Nilo Carda mouth round",
+      "type": "image",
+      "source": "/examples/cut-paper/mouths/nilo-round.png",
+      "visible": true,
+      "locked": false,
+      "z": 40,
+      "transform": {
+        "x": 36,
+        "y": 52,
+        "scale": 0.12,
+        "opacity": 1,
+        "rotation": 0
+      },
+      "animation": {
+        "start": {
+          "x": 36,
+          "y": 52,
+          "scale": 0.12,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "end": {
+          "x": 36,
+          "y": 52,
+          "scale": 0.12,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "duration": 26,
+        "curve": "hold",
+        "keyframes": [
+          {
+            "id": "puppet-nilo-mouth-round-0",
+            "time": 0,
+            "x": 36,
+            "y": 52,
+            "scale": 0.12,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-nilo-mouth-round-26000",
+            "time": 26,
+            "x": 36,
+            "y": 52,
+            "scale": 0.12,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          }
+        ]
+      },
+      "relationship": {
+        "type": "parent",
+        "targetLayerId": "puppet-nilo"
+      },
+      "faceBinding": {
+        "poseLayerId": "puppet-nilo",
+        "role": "mouth",
+        "state": "round"
+      }
+    },
+    {
+      "id": "puppet-berta",
+      "name": "Berta Miga root",
+      "type": "image",
+      "source": "/examples/cut-paper/puppets/berta-torso.png",
+      "visible": true,
+      "locked": false,
+      "z": 42,
+      "transform": {
+        "x": 62,
+        "y": 64,
+        "scale": 0.95,
+        "opacity": 0,
+        "rotation": 0
+      },
+      "animation": {
+        "start": {
+          "x": 62,
+          "y": 64,
+          "scale": 0.95,
+          "opacity": 0,
+          "rotation": 0
+        },
+        "end": {
+          "x": 62,
+          "y": 64,
+          "scale": 0.95,
+          "opacity": 0,
+          "rotation": 0
+        },
+        "duration": 26,
+        "curve": "hold",
+        "keyframes": [
+          {
+            "id": "puppet-berta-0",
+            "time": 0,
+            "x": 62,
+            "y": 64,
+            "scale": 0.95,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-berta-26000",
+            "time": 26,
+            "x": 62,
+            "y": 64,
+            "scale": 0.95,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          }
+        ]
+      },
+      "parallax": 1,
+      "effects": {
+        "shadow": 0.35,
+        "blendMode": "normal",
+        "mask": "none",
+        "maskRadius": 12,
+        "blur": 0,
+        "brightness": 1,
+        "contrast": 1,
+        "saturation": 1,
+        "hue": 0,
+        "glow": 0
+      }
+    },
+    {
+      "id": "puppet-berta-legs",
+      "name": "Berta Miga legs",
+      "type": "image",
+      "source": "/examples/cut-paper/puppets/berta-legs.png",
+      "visible": true,
+      "locked": false,
+      "z": 40,
+      "transform": {
+        "x": 62,
+        "y": 73.5,
+        "scale": 0.9974999999999998,
+        "opacity": 1,
+        "rotation": 0
+      },
+      "animation": {
+        "start": {
+          "x": 62,
+          "y": 73.5,
+          "scale": 0.9974999999999998,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "end": {
+          "x": 62,
+          "y": 73.5,
+          "scale": 0.9974999999999998,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "duration": 26,
+        "curve": "hold",
+        "keyframes": [
+          {
+            "id": "puppet-berta-legs-0",
+            "time": 0,
+            "x": 62,
+            "y": 73.5,
+            "scale": 0.9974999999999998,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-berta-legs-26000",
+            "time": 26,
+            "x": 62,
+            "y": 73.5,
+            "scale": 0.9974999999999998,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          }
+        ]
+      },
+      "relationship": {
+        "type": "parent",
+        "targetLayerId": "puppet-berta"
+      },
+      "effects": {
+        "shadow": 0.15,
+        "blendMode": "normal",
+        "mask": "none",
+        "maskRadius": 12,
+        "blur": 0,
+        "brightness": 1,
+        "contrast": 1,
+        "saturation": 1,
+        "hue": 0,
+        "glow": 0
+      }
+    },
+    {
+      "id": "puppet-berta-torso",
+      "name": "Berta Miga torso",
+      "type": "image",
+      "source": "/examples/cut-paper/puppets/berta-torso.png",
+      "visible": true,
+      "locked": false,
+      "z": 42,
+      "transform": {
+        "x": 62,
+        "y": 65.9,
+        "scale": 0.95,
+        "opacity": 1,
+        "rotation": 0
+      },
+      "animation": {
+        "start": {
+          "x": 62,
+          "y": 65.9,
+          "scale": 0.95,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "end": {
+          "x": 62,
+          "y": 65.9,
+          "scale": 0.95,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "duration": 26,
+        "curve": "hold",
+        "keyframes": [
+          {
+            "id": "puppet-berta-torso-0",
+            "time": 0,
+            "x": 62,
+            "y": 65.9,
+            "scale": 0.95,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-berta-torso-26000",
+            "time": 26,
+            "x": 62,
+            "y": 65.9,
+            "scale": 0.95,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          }
+        ]
+      },
+      "relationship": {
+        "type": "parent",
+        "targetLayerId": "puppet-berta"
+      },
+      "effects": {
+        "shadow": 0.4,
+        "blendMode": "normal",
+        "mask": "none",
+        "maskRadius": 12,
+        "blur": 0,
+        "brightness": 1,
+        "contrast": 1,
+        "saturation": 1,
+        "hue": 0,
+        "glow": 0
+      }
+    },
+    {
+      "id": "puppet-berta-arm-back",
+      "name": "Berta Miga arm-back",
+      "type": "image",
+      "source": "/examples/cut-paper/puppets/berta-arm-back.png",
+      "visible": true,
+      "locked": false,
+      "z": 41,
+      "transform": {
+        "x": 55.35,
+        "y": 64.95,
+        "scale": 0.665,
+        "opacity": 1,
+        "rotation": 0
+      },
+      "animation": {
+        "start": {
+          "x": 55.35,
+          "y": 64.95,
+          "scale": 0.665,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "end": {
+          "x": 55.35,
+          "y": 64.95,
+          "scale": 0.665,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "duration": 26,
+        "curve": "hold",
+        "keyframes": [
+          {
+            "id": "puppet-berta-arm-back-0",
+            "time": 0,
+            "x": 55.35,
+            "y": 64.95,
+            "scale": 0.665,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-berta-arm-back-26000",
+            "time": 26,
+            "x": 55.35,
+            "y": 64.95,
+            "scale": 0.665,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          }
+        ]
+      },
+      "relationship": {
+        "type": "parent",
+        "targetLayerId": "puppet-berta"
+      },
+      "effects": {
+        "shadow": 0.15,
+        "blendMode": "normal",
+        "mask": "none",
+        "maskRadius": 12,
+        "blur": 0,
+        "brightness": 1,
+        "contrast": 1,
+        "saturation": 1,
+        "hue": 0,
+        "glow": 0
+      }
+    },
+    {
+      "id": "puppet-berta-arm-front",
+      "name": "Berta Miga arm-front",
+      "type": "image",
+      "source": "/examples/cut-paper/puppets/berta-arm-front.png",
+      "visible": true,
+      "locked": false,
+      "z": 44,
+      "transform": {
+        "x": 68.65,
+        "y": 65.9,
+        "scale": 0.665,
+        "opacity": 1,
+        "rotation": 0
+      },
+      "animation": {
+        "start": {
+          "x": 68.65,
+          "y": 65.9,
+          "scale": 0.665,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "end": {
+          "x": 68.65,
+          "y": 65.9,
+          "scale": 0.665,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "duration": 26,
+        "curve": "hold",
+        "keyframes": [
+          {
+            "id": "puppet-berta-arm-front-0",
+            "time": 0,
+            "x": 68.65,
+            "y": 65.9,
+            "scale": 0.665,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-berta-arm-front-26000",
+            "time": 26,
+            "x": 68.65,
+            "y": 65.9,
+            "scale": 0.665,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          }
+        ]
+      },
+      "relationship": {
+        "type": "parent",
+        "targetLayerId": "puppet-berta"
+      },
+      "effects": {
+        "shadow": 0.15,
+        "blendMode": "normal",
+        "mask": "none",
+        "maskRadius": 12,
+        "blur": 0,
+        "brightness": 1,
+        "contrast": 1,
+        "saturation": 1,
+        "hue": 0,
+        "glow": 0
+      }
+    },
+    {
+      "id": "puppet-berta-head",
+      "name": "Berta Miga head",
+      "type": "image",
+      "source": "/examples/cut-paper/puppets/berta-head.png",
+      "visible": true,
+      "locked": false,
+      "z": 46,
+      "transform": {
+        "x": 62,
+        "y": 52.6,
+        "scale": 0.665,
+        "opacity": 1,
+        "rotation": 0
+      },
+      "animation": {
+        "start": {
+          "x": 62,
+          "y": 52.6,
+          "scale": 0.665,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "end": {
+          "x": 62,
+          "y": 52.6,
+          "scale": 0.665,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "duration": 26,
+        "curve": "hold",
+        "keyframes": [
+          {
+            "id": "puppet-berta-head-0",
+            "time": 0,
+            "x": 62,
+            "y": 52.6,
+            "scale": 0.665,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-berta-head-26000",
+            "time": 26,
+            "x": 62,
+            "y": 52.6,
+            "scale": 0.665,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          }
+        ]
+      },
+      "relationship": {
+        "type": "parent",
+        "targetLayerId": "puppet-berta"
+      },
+      "effects": {
+        "shadow": 0.15,
+        "blendMode": "normal",
+        "mask": "none",
+        "maskRadius": 12,
+        "blur": 0,
+        "brightness": 1,
+        "contrast": 1,
+        "saturation": 1,
+        "hue": 0,
+        "glow": 0
+      }
+    },
+    {
+      "id": "puppet-berta-face",
+      "name": "Berta Miga face",
+      "type": "image",
+      "source": "/examples/cut-paper/puppets/berta-face.png",
+      "visible": true,
+      "locked": false,
+      "z": 47,
+      "transform": {
+        "x": 62,
+        "y": 52.6,
+        "scale": 0.5225,
+        "opacity": 1,
+        "rotation": 0
+      },
+      "animation": {
+        "start": {
+          "x": 62,
+          "y": 52.6,
+          "scale": 0.5225,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "end": {
+          "x": 62,
+          "y": 52.6,
+          "scale": 0.5225,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "duration": 26,
+        "curve": "hold",
+        "keyframes": [
+          {
+            "id": "puppet-berta-face-0",
+            "time": 0,
+            "x": 62,
+            "y": 52.6,
+            "scale": 0.5225,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-berta-face-26000",
+            "time": 26,
+            "x": 62,
+            "y": 52.6,
+            "scale": 0.5225,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          }
+        ]
+      },
+      "relationship": {
+        "type": "parent",
+        "targetLayerId": "puppet-berta"
+      },
+      "effects": {
+        "shadow": 0.15,
+        "blendMode": "normal",
+        "mask": "none",
+        "maskRadius": 12,
+        "blur": 0,
+        "brightness": 1,
+        "contrast": 1,
+        "saturation": 1,
+        "hue": 0,
+        "glow": 0
+      }
+    },
+    {
+      "id": "puppet-berta-hat",
+      "name": "Berta Miga hat",
+      "type": "image",
+      "source": "/examples/cut-paper/puppets/berta-hat.png",
+      "visible": true,
+      "locked": false,
+      "z": 48,
+      "transform": {
+        "x": 62,
+        "y": 45,
+        "scale": 0.57,
+        "opacity": 1,
+        "rotation": 0
+      },
+      "animation": {
+        "start": {
+          "x": 62,
+          "y": 45,
+          "scale": 0.57,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "end": {
+          "x": 62,
+          "y": 45,
+          "scale": 0.57,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "duration": 26,
+        "curve": "hold",
+        "keyframes": [
+          {
+            "id": "puppet-berta-hat-0",
+            "time": 0,
+            "x": 62,
+            "y": 45,
+            "scale": 0.57,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-berta-hat-26000",
+            "time": 26,
+            "x": 62,
+            "y": 45,
+            "scale": 0.57,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          }
+        ]
+      },
+      "relationship": {
+        "type": "parent",
+        "targetLayerId": "puppet-berta"
+      },
+      "effects": {
+        "shadow": 0.15,
+        "blendMode": "normal",
+        "mask": "none",
+        "maskRadius": 12,
+        "blur": 0,
+        "brightness": 1,
+        "contrast": 1,
+        "saturation": 1,
+        "hue": 0,
+        "glow": 0
+      }
+    },
+    {
+      "id": "puppet-berta-brow",
+      "name": "Berta Miga brow neutral",
+      "type": "image",
+      "source": "/examples/cut-paper/brows/berta-neutral.png",
+      "visible": true,
+      "locked": false,
+      "z": 49,
+      "transform": {
+        "x": 62,
+        "y": 50.7,
+        "scale": 0.19,
+        "opacity": 1,
+        "rotation": 0
+      },
+      "animation": {
+        "start": {
+          "x": 62,
+          "y": 50.7,
+          "scale": 0.19,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "end": {
+          "x": 62,
+          "y": 50.7,
+          "scale": 0.19,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "duration": 26,
+        "curve": "hold",
+        "keyframes": [
+          {
+            "id": "puppet-berta-brow-0",
+            "time": 0,
+            "x": 62,
+            "y": 50.7,
+            "scale": 0.19,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-berta-brow-26000",
+            "time": 26,
+            "x": 62,
+            "y": 50.7,
+            "scale": 0.19,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          }
+        ]
+      },
+      "relationship": {
+        "type": "parent",
+        "targetLayerId": "puppet-berta"
+      }
+    },
+    {
+      "id": "puppet-berta-mouth-closed",
+      "name": "Berta Miga mouth closed",
+      "type": "image",
+      "source": "/examples/cut-paper/mouths/berta-closed.png",
+      "visible": true,
+      "locked": false,
+      "z": 50,
+      "transform": {
+        "x": 62,
+        "y": 54.5,
+        "scale": 0.11399999999999999,
+        "opacity": 1,
+        "rotation": 0
+      },
+      "animation": {
+        "start": {
+          "x": 62,
+          "y": 54.5,
+          "scale": 0.11399999999999999,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "end": {
+          "x": 62,
+          "y": 54.5,
+          "scale": 0.11399999999999999,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "duration": 26,
+        "curve": "hold",
+        "keyframes": [
+          {
+            "id": "puppet-berta-mouth-closed-0",
+            "time": 0,
+            "x": 62,
+            "y": 54.5,
+            "scale": 0.11399999999999999,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-berta-mouth-closed-26000",
+            "time": 26,
+            "x": 62,
+            "y": 54.5,
+            "scale": 0.11399999999999999,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          }
+        ]
+      },
+      "relationship": {
+        "type": "parent",
+        "targetLayerId": "puppet-berta"
+      },
+      "faceBinding": {
+        "poseLayerId": "puppet-berta",
+        "role": "mouth",
+        "state": "closed"
+      }
+    },
+    {
+      "id": "puppet-berta-mouth-small",
+      "name": "Berta Miga mouth small",
+      "type": "image",
+      "source": "/examples/cut-paper/mouths/berta-small.png",
+      "visible": true,
+      "locked": false,
+      "z": 50,
+      "transform": {
+        "x": 62,
+        "y": 54.5,
+        "scale": 0.11399999999999999,
+        "opacity": 1,
+        "rotation": 0
+      },
+      "animation": {
+        "start": {
+          "x": 62,
+          "y": 54.5,
+          "scale": 0.11399999999999999,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "end": {
+          "x": 62,
+          "y": 54.5,
+          "scale": 0.11399999999999999,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "duration": 26,
+        "curve": "hold",
+        "keyframes": [
+          {
+            "id": "puppet-berta-mouth-small-0",
+            "time": 0,
+            "x": 62,
+            "y": 54.5,
+            "scale": 0.11399999999999999,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-berta-mouth-small-26000",
+            "time": 26,
+            "x": 62,
+            "y": 54.5,
+            "scale": 0.11399999999999999,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          }
+        ]
+      },
+      "relationship": {
+        "type": "parent",
+        "targetLayerId": "puppet-berta"
+      },
+      "faceBinding": {
+        "poseLayerId": "puppet-berta",
+        "role": "mouth",
+        "state": "small"
+      }
+    },
+    {
+      "id": "puppet-berta-mouth-wide",
+      "name": "Berta Miga mouth wide",
+      "type": "image",
+      "source": "/examples/cut-paper/mouths/berta-wide.png",
+      "visible": true,
+      "locked": false,
+      "z": 50,
+      "transform": {
+        "x": 62,
+        "y": 54.5,
+        "scale": 0.11399999999999999,
+        "opacity": 1,
+        "rotation": 0
+      },
+      "animation": {
+        "start": {
+          "x": 62,
+          "y": 54.5,
+          "scale": 0.11399999999999999,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "end": {
+          "x": 62,
+          "y": 54.5,
+          "scale": 0.11399999999999999,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "duration": 26,
+        "curve": "hold",
+        "keyframes": [
+          {
+            "id": "puppet-berta-mouth-wide-0",
+            "time": 0,
+            "x": 62,
+            "y": 54.5,
+            "scale": 0.11399999999999999,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-berta-mouth-wide-26000",
+            "time": 26,
+            "x": 62,
+            "y": 54.5,
+            "scale": 0.11399999999999999,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          }
+        ]
+      },
+      "relationship": {
+        "type": "parent",
+        "targetLayerId": "puppet-berta"
+      },
+      "faceBinding": {
+        "poseLayerId": "puppet-berta",
+        "role": "mouth",
+        "state": "wide"
+      }
+    },
+    {
+      "id": "puppet-berta-mouth-round",
+      "name": "Berta Miga mouth round",
+      "type": "image",
+      "source": "/examples/cut-paper/mouths/berta-round.png",
+      "visible": true,
+      "locked": false,
+      "z": 50,
+      "transform": {
+        "x": 62,
+        "y": 54.5,
+        "scale": 0.11399999999999999,
+        "opacity": 1,
+        "rotation": 0
+      },
+      "animation": {
+        "start": {
+          "x": 62,
+          "y": 54.5,
+          "scale": 0.11399999999999999,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "end": {
+          "x": 62,
+          "y": 54.5,
+          "scale": 0.11399999999999999,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "duration": 26,
+        "curve": "hold",
+        "keyframes": [
+          {
+            "id": "puppet-berta-mouth-round-0",
+            "time": 0,
+            "x": 62,
+            "y": 54.5,
+            "scale": 0.11399999999999999,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-berta-mouth-round-26000",
+            "time": 26,
+            "x": 62,
+            "y": 54.5,
+            "scale": 0.11399999999999999,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          }
+        ]
+      },
+      "relationship": {
+        "type": "parent",
+        "targetLayerId": "puppet-berta"
+      },
+      "faceBinding": {
+        "poseLayerId": "puppet-berta",
+        "role": "mouth",
+        "state": "round"
+      }
+    },
+    {
+      "id": "puppet-kito",
+      "name": "Kito Veleta root",
+      "type": "image",
+      "source": "/examples/cut-paper/puppets/kito-torso.png",
+      "visible": true,
+      "locked": false,
+      "z": 52,
+      "transform": {
+        "x": 118,
+        "y": 70,
+        "scale": 0.7,
+        "opacity": 0,
+        "rotation": 0
+      },
+      "animation": {
+        "start": {
+          "x": 118,
+          "y": 70,
+          "scale": 0.7,
+          "opacity": 0
+        },
+        "end": {
+          "x": 52,
+          "y": 70,
+          "scale": 0.7,
+          "opacity": 0
+        },
+        "duration": 26,
+        "curve": "ease",
+        "keyframes": [
+          {
+            "id": "puppet-kito-0",
+            "time": 0,
+            "x": 118,
+            "y": 70,
+            "scale": 0.7,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-2000",
+            "time": 2,
+            "x": 118,
+            "y": 70,
+            "scale": 0.7,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "ease"
+          },
+          {
+            "id": "puppet-kito-9000",
+            "time": 9,
+            "x": 52,
+            "y": 70,
+            "scale": 0.7,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "ease"
+          },
+          {
+            "id": "puppet-kito-26000",
+            "time": 26,
+            "x": 52,
+            "y": 70,
+            "scale": 0.7,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          }
+        ]
+      },
+      "parallax": 1,
+      "effects": {
+        "shadow": 0.35,
+        "blendMode": "normal",
+        "mask": "none",
+        "maskRadius": 12,
+        "blur": 0,
+        "brightness": 1,
+        "contrast": 1,
+        "saturation": 1,
+        "hue": 0,
+        "glow": 0
+      }
+    },
+    {
+      "id": "puppet-kito-legs",
+      "name": "Kito Veleta legs",
+      "type": "image",
+      "source": "/examples/cut-paper/puppets/kito-legs.png",
+      "visible": true,
+      "locked": false,
+      "z": 50,
+      "transform": {
+        "x": 118,
+        "y": 77,
+        "scale": 0.7349999999999999,
+        "opacity": 1,
+        "rotation": 0
+      },
+      "animation": {
+        "start": {
+          "x": 118,
+          "y": 77,
+          "scale": 0.7349999999999999,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "end": {
+          "x": 118,
+          "y": 77,
+          "scale": 0.7349999999999999,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "duration": 26,
+        "curve": "hold",
+        "keyframes": [
+          {
+            "id": "puppet-kito-legs-0",
+            "time": 0,
+            "x": 118,
+            "y": 77,
+            "scale": 0.7349999999999999,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-legs-26000",
+            "time": 26,
+            "x": 118,
+            "y": 77,
+            "scale": 0.7349999999999999,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          }
+        ]
+      },
+      "relationship": {
+        "type": "parent",
+        "targetLayerId": "puppet-kito"
+      },
+      "effects": {
+        "shadow": 0.15,
+        "blendMode": "normal",
+        "mask": "none",
+        "maskRadius": 12,
+        "blur": 0,
+        "brightness": 1,
+        "contrast": 1,
+        "saturation": 1,
+        "hue": 0,
+        "glow": 0
+      }
+    },
+    {
+      "id": "puppet-kito-torso",
+      "name": "Kito Veleta torso",
+      "type": "image",
+      "source": "/examples/cut-paper/puppets/kito-torso.png",
+      "visible": true,
+      "locked": false,
+      "z": 52,
+      "transform": {
+        "x": 118,
+        "y": 71.4,
+        "scale": 0.6999999999999998,
+        "opacity": 1,
+        "rotation": 0
+      },
+      "animation": {
+        "start": {
+          "x": 118,
+          "y": 71.4,
+          "scale": 0.6999999999999998,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "end": {
+          "x": 118,
+          "y": 71.4,
+          "scale": 0.6999999999999998,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "duration": 26,
+        "curve": "hold",
+        "keyframes": [
+          {
+            "id": "puppet-kito-torso-0",
+            "time": 0,
+            "x": 118,
+            "y": 71.4,
+            "scale": 0.6999999999999998,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-torso-26000",
+            "time": 26,
+            "x": 118,
+            "y": 71.4,
+            "scale": 0.6999999999999998,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          }
+        ]
+      },
+      "relationship": {
+        "type": "parent",
+        "targetLayerId": "puppet-kito"
+      },
+      "effects": {
+        "shadow": 0.4,
+        "blendMode": "normal",
+        "mask": "none",
+        "maskRadius": 12,
+        "blur": 0,
+        "brightness": 1,
+        "contrast": 1,
+        "saturation": 1,
+        "hue": 0,
+        "glow": 0
+      }
+    },
+    {
+      "id": "puppet-kito-arm-back",
+      "name": "Kito Veleta arm-back",
+      "type": "image",
+      "source": "/examples/cut-paper/puppets/kito-arm-back.png",
+      "visible": true,
+      "locked": false,
+      "z": 51,
+      "transform": {
+        "x": 113.1,
+        "y": 70.7,
+        "scale": 0.49,
+        "opacity": 1,
+        "rotation": 0
+      },
+      "animation": {
+        "start": {
+          "x": 113.1,
+          "y": 70.7,
+          "scale": 0.49,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "end": {
+          "x": 113.1,
+          "y": 70.7,
+          "scale": 0.49,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "duration": 26,
+        "curve": "hold",
+        "keyframes": [
+          {
+            "id": "puppet-kito-arm-back-0",
+            "time": 0,
+            "x": 113.1,
+            "y": 70.7,
+            "scale": 0.49,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-arm-back-26000",
+            "time": 26,
+            "x": 113.1,
+            "y": 70.7,
+            "scale": 0.49,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          }
+        ]
+      },
+      "relationship": {
+        "type": "parent",
+        "targetLayerId": "puppet-kito"
+      },
+      "effects": {
+        "shadow": 0.15,
+        "blendMode": "normal",
+        "mask": "none",
+        "maskRadius": 12,
+        "blur": 0,
+        "brightness": 1,
+        "contrast": 1,
+        "saturation": 1,
+        "hue": 0,
+        "glow": 0
+      }
+    },
+    {
+      "id": "puppet-kito-arm-front",
+      "name": "Kito Veleta arm-front",
+      "type": "image",
+      "source": "/examples/cut-paper/puppets/kito-arm-front.png",
+      "visible": true,
+      "locked": false,
+      "z": 54,
+      "transform": {
+        "x": 122.9,
+        "y": 71.4,
+        "scale": 0.49,
+        "opacity": 1,
+        "rotation": 0
+      },
+      "animation": {
+        "start": {
+          "x": 122.9,
+          "y": 71.4,
+          "scale": 0.49,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "end": {
+          "x": 122.9,
+          "y": 71.4,
+          "scale": 0.49,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "duration": 26,
+        "curve": "hold",
+        "keyframes": [
+          {
+            "id": "puppet-kito-arm-front-0",
+            "time": 0,
+            "x": 122.9,
+            "y": 71.4,
+            "scale": 0.49,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-arm-front-26000",
+            "time": 26,
+            "x": 122.9,
+            "y": 71.4,
+            "scale": 0.49,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          }
+        ]
+      },
+      "relationship": {
+        "type": "parent",
+        "targetLayerId": "puppet-kito"
+      },
+      "effects": {
+        "shadow": 0.15,
+        "blendMode": "normal",
+        "mask": "none",
+        "maskRadius": 12,
+        "blur": 0,
+        "brightness": 1,
+        "contrast": 1,
+        "saturation": 1,
+        "hue": 0,
+        "glow": 0
+      }
+    },
+    {
+      "id": "puppet-kito-head",
+      "name": "Kito Veleta head",
+      "type": "image",
+      "source": "/examples/cut-paper/puppets/kito-head.png",
+      "visible": true,
+      "locked": false,
+      "z": 56,
+      "transform": {
+        "x": 118,
+        "y": 61.6,
+        "scale": 0.49,
+        "opacity": 1,
+        "rotation": 0
+      },
+      "animation": {
+        "start": {
+          "x": 118,
+          "y": 61.6,
+          "scale": 0.49,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "end": {
+          "x": 118,
+          "y": 61.6,
+          "scale": 0.49,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "duration": 26,
+        "curve": "hold",
+        "keyframes": [
+          {
+            "id": "puppet-kito-head-0",
+            "time": 0,
+            "x": 118,
+            "y": 61.6,
+            "scale": 0.49,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-head-26000",
+            "time": 26,
+            "x": 118,
+            "y": 61.6,
+            "scale": 0.49,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          }
+        ]
+      },
+      "relationship": {
+        "type": "parent",
+        "targetLayerId": "puppet-kito"
+      },
+      "effects": {
+        "shadow": 0.15,
+        "blendMode": "normal",
+        "mask": "none",
+        "maskRadius": 12,
+        "blur": 0,
+        "brightness": 1,
+        "contrast": 1,
+        "saturation": 1,
+        "hue": 0,
+        "glow": 0
+      }
+    },
+    {
+      "id": "puppet-kito-face",
+      "name": "Kito Veleta face",
+      "type": "image",
+      "source": "/examples/cut-paper/puppets/kito-face.png",
+      "visible": true,
+      "locked": false,
+      "z": 57,
+      "transform": {
+        "x": 118,
+        "y": 61.6,
+        "scale": 0.38499999999999995,
+        "opacity": 1,
+        "rotation": 0
+      },
+      "animation": {
+        "start": {
+          "x": 118,
+          "y": 61.6,
+          "scale": 0.38499999999999995,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "end": {
+          "x": 118,
+          "y": 61.6,
+          "scale": 0.38499999999999995,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "duration": 26,
+        "curve": "hold",
+        "keyframes": [
+          {
+            "id": "puppet-kito-face-0",
+            "time": 0,
+            "x": 118,
+            "y": 61.6,
+            "scale": 0.38499999999999995,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-face-26000",
+            "time": 26,
+            "x": 118,
+            "y": 61.6,
+            "scale": 0.38499999999999995,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          }
+        ]
+      },
+      "relationship": {
+        "type": "parent",
+        "targetLayerId": "puppet-kito"
+      },
+      "effects": {
+        "shadow": 0.15,
+        "blendMode": "normal",
+        "mask": "none",
+        "maskRadius": 12,
+        "blur": 0,
+        "brightness": 1,
+        "contrast": 1,
+        "saturation": 1,
+        "hue": 0,
+        "glow": 0
+      }
+    },
+    {
+      "id": "puppet-kito-hat",
+      "name": "Kito Veleta hat",
+      "type": "image",
+      "source": "/examples/cut-paper/puppets/kito-hat.png",
+      "visible": true,
+      "locked": false,
+      "z": 58,
+      "transform": {
+        "x": 118,
+        "y": 56,
+        "scale": 0.41999999999999993,
+        "opacity": 1,
+        "rotation": 0
+      },
+      "animation": {
+        "start": {
+          "x": 118,
+          "y": 56,
+          "scale": 0.41999999999999993,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "end": {
+          "x": 118,
+          "y": 56,
+          "scale": 0.41999999999999993,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "duration": 26,
+        "curve": "hold",
+        "keyframes": [
+          {
+            "id": "puppet-kito-hat-0",
+            "time": 0,
+            "x": 118,
+            "y": 56,
+            "scale": 0.41999999999999993,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-hat-26000",
+            "time": 26,
+            "x": 118,
+            "y": 56,
+            "scale": 0.41999999999999993,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          }
+        ]
+      },
+      "relationship": {
+        "type": "parent",
+        "targetLayerId": "puppet-kito"
+      },
+      "effects": {
+        "shadow": 0.15,
+        "blendMode": "normal",
+        "mask": "none",
+        "maskRadius": 12,
+        "blur": 0,
+        "brightness": 1,
+        "contrast": 1,
+        "saturation": 1,
+        "hue": 0,
+        "glow": 0
+      }
+    },
+    {
+      "id": "puppet-kito-brow",
+      "name": "Kito Veleta brow neutral",
+      "type": "image",
+      "source": "/examples/cut-paper/brows/kito-neutral.png",
+      "visible": true,
+      "locked": false,
+      "z": 59,
+      "transform": {
+        "x": 118,
+        "y": 60.2,
+        "scale": 0.13999999999999999,
+        "opacity": 1,
+        "rotation": 0
+      },
+      "animation": {
+        "start": {
+          "x": 118,
+          "y": 60.2,
+          "scale": 0.13999999999999999,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "end": {
+          "x": 118,
+          "y": 60.2,
+          "scale": 0.13999999999999999,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "duration": 26,
+        "curve": "hold",
+        "keyframes": [
+          {
+            "id": "puppet-kito-brow-0",
+            "time": 0,
+            "x": 118,
+            "y": 60.2,
+            "scale": 0.13999999999999999,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-brow-26000",
+            "time": 26,
+            "x": 118,
+            "y": 60.2,
+            "scale": 0.13999999999999999,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          }
+        ]
+      },
+      "relationship": {
+        "type": "parent",
+        "targetLayerId": "puppet-kito"
+      }
+    },
+    {
+      "id": "puppet-kito-mouth-closed",
+      "name": "Kito Veleta mouth closed",
+      "type": "image",
+      "source": "/examples/cut-paper/mouths/kito-closed.png",
+      "visible": true,
+      "locked": false,
+      "z": 60,
+      "transform": {
+        "x": 118,
+        "y": 63,
+        "scale": 0.08399999999999999,
+        "opacity": 1,
+        "rotation": 0
+      },
+      "animation": {
+        "start": {
+          "x": 118,
+          "y": 63,
+          "scale": 0.08399999999999999,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "end": {
+          "x": 118,
+          "y": 63,
+          "scale": 0.08399999999999999,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "duration": 26,
+        "curve": "hold",
+        "keyframes": [
+          {
+            "id": "puppet-kito-mouth-closed-dialogue-10000",
+            "time": 10,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-closed-dialogue-10375",
+            "time": 10.375,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-closed-dialogue-10750",
+            "time": 10.75,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-closed-dialogue-11125",
+            "time": 11.125,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-closed-dialogue-11500",
+            "time": 11.5,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-closed-dialogue-11875",
+            "time": 11.875,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-closed-dialogue-12250",
+            "time": 12.25,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-closed-dialogue-12625",
+            "time": 12.625,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-closed-dialogue-13000",
+            "time": 13,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-closed-dialogue-13375",
+            "time": 13.375,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-closed-dialogue-13750",
+            "time": 13.75,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-closed-dialogue-14125",
+            "time": 14.125,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-closed-dialogue-14500",
+            "time": 14.5,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-closed-dialogue-14875",
+            "time": 14.875,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-closed-dialogue-15250",
+            "time": 15.25,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-closed-dialogue-15625",
+            "time": 15.625,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-closed-dialogue-16000",
+            "time": 16,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          }
+        ]
+      },
+      "relationship": {
+        "type": "parent",
+        "targetLayerId": "puppet-kito"
+      },
+      "faceBinding": {
+        "poseLayerId": "puppet-kito",
+        "role": "mouth",
+        "state": "closed"
+      }
+    },
+    {
+      "id": "puppet-kito-mouth-small",
+      "name": "Kito Veleta mouth small",
+      "type": "image",
+      "source": "/examples/cut-paper/mouths/kito-small.png",
+      "visible": true,
+      "locked": false,
+      "z": 60,
+      "transform": {
+        "x": 118,
+        "y": 63,
+        "scale": 0.08399999999999999,
+        "opacity": 1,
+        "rotation": 0
+      },
+      "animation": {
+        "start": {
+          "x": 118,
+          "y": 63,
+          "scale": 0.08399999999999999,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "end": {
+          "x": 118,
+          "y": 63,
+          "scale": 0.08399999999999999,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "duration": 26,
+        "curve": "hold",
+        "keyframes": [
+          {
+            "id": "puppet-kito-mouth-small-dialogue-10000",
+            "time": 10,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-small-dialogue-10375",
+            "time": 10.375,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-small-dialogue-10750",
+            "time": 10.75,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-small-dialogue-11125",
+            "time": 11.125,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-small-dialogue-11500",
+            "time": 11.5,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-small-dialogue-11875",
+            "time": 11.875,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-small-dialogue-12250",
+            "time": 12.25,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-small-dialogue-12625",
+            "time": 12.625,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-small-dialogue-13000",
+            "time": 13,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-small-dialogue-13375",
+            "time": 13.375,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-small-dialogue-13750",
+            "time": 13.75,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-small-dialogue-14125",
+            "time": 14.125,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-small-dialogue-14500",
+            "time": 14.5,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-small-dialogue-14875",
+            "time": 14.875,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-small-dialogue-15250",
+            "time": 15.25,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-small-dialogue-15625",
+            "time": 15.625,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-small-dialogue-16000",
+            "time": 16,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          }
+        ]
+      },
+      "relationship": {
+        "type": "parent",
+        "targetLayerId": "puppet-kito"
+      },
+      "faceBinding": {
+        "poseLayerId": "puppet-kito",
+        "role": "mouth",
+        "state": "small"
+      }
+    },
+    {
+      "id": "puppet-kito-mouth-wide",
+      "name": "Kito Veleta mouth wide",
+      "type": "image",
+      "source": "/examples/cut-paper/mouths/kito-wide.png",
+      "visible": true,
+      "locked": false,
+      "z": 60,
+      "transform": {
+        "x": 118,
+        "y": 63,
+        "scale": 0.08399999999999999,
+        "opacity": 1,
+        "rotation": 0
+      },
+      "animation": {
+        "start": {
+          "x": 118,
+          "y": 63,
+          "scale": 0.08399999999999999,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "end": {
+          "x": 118,
+          "y": 63,
+          "scale": 0.08399999999999999,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "duration": 26,
+        "curve": "hold",
+        "keyframes": [
+          {
+            "id": "puppet-kito-mouth-wide-dialogue-10000",
+            "time": 10,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-wide-dialogue-10375",
+            "time": 10.375,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-wide-dialogue-10750",
+            "time": 10.75,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-wide-dialogue-11125",
+            "time": 11.125,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-wide-dialogue-11500",
+            "time": 11.5,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-wide-dialogue-11875",
+            "time": 11.875,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-wide-dialogue-12250",
+            "time": 12.25,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-wide-dialogue-12625",
+            "time": 12.625,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-wide-dialogue-13000",
+            "time": 13,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-wide-dialogue-13375",
+            "time": 13.375,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-wide-dialogue-13750",
+            "time": 13.75,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-wide-dialogue-14125",
+            "time": 14.125,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-wide-dialogue-14500",
+            "time": 14.5,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-wide-dialogue-14875",
+            "time": 14.875,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-wide-dialogue-15250",
+            "time": 15.25,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-wide-dialogue-15625",
+            "time": 15.625,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-wide-dialogue-16000",
+            "time": 16,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          }
+        ]
+      },
+      "relationship": {
+        "type": "parent",
+        "targetLayerId": "puppet-kito"
+      },
+      "faceBinding": {
+        "poseLayerId": "puppet-kito",
+        "role": "mouth",
+        "state": "wide"
+      }
+    },
+    {
+      "id": "puppet-kito-mouth-round",
+      "name": "Kito Veleta mouth round",
+      "type": "image",
+      "source": "/examples/cut-paper/mouths/kito-round.png",
+      "visible": true,
+      "locked": false,
+      "z": 60,
+      "transform": {
+        "x": 118,
+        "y": 63,
+        "scale": 0.08399999999999999,
+        "opacity": 1,
+        "rotation": 0
+      },
+      "animation": {
+        "start": {
+          "x": 118,
+          "y": 63,
+          "scale": 0.08399999999999999,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "end": {
+          "x": 118,
+          "y": 63,
+          "scale": 0.08399999999999999,
+          "opacity": 1,
+          "rotation": 0
+        },
+        "duration": 26,
+        "curve": "hold",
+        "keyframes": [
+          {
+            "id": "puppet-kito-mouth-round-dialogue-10000",
+            "time": 10,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-round-dialogue-10375",
+            "time": 10.375,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-round-dialogue-10750",
+            "time": 10.75,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-round-dialogue-11125",
+            "time": 11.125,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-round-dialogue-11500",
+            "time": 11.5,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-round-dialogue-11875",
+            "time": 11.875,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-round-dialogue-12250",
+            "time": 12.25,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-round-dialogue-12625",
+            "time": 12.625,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-round-dialogue-13000",
+            "time": 13,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-round-dialogue-13375",
+            "time": 13.375,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-round-dialogue-13750",
+            "time": 13.75,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-round-dialogue-14125",
+            "time": 14.125,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-round-dialogue-14500",
+            "time": 14.5,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-round-dialogue-14875",
+            "time": 14.875,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-round-dialogue-15250",
+            "time": 15.25,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-round-dialogue-15625",
+            "time": 15.625,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
+            "id": "puppet-kito-mouth-round-dialogue-16000",
+            "time": 16,
+            "x": 118,
+            "y": 63,
+            "scale": 0.08399999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          }
+        ]
+      },
+      "relationship": {
+        "type": "parent",
+        "targetLayerId": "puppet-kito"
+      },
+      "faceBinding": {
+        "poseLayerId": "puppet-kito",
+        "role": "mouth",
+        "state": "round"
+      }
+    },
+    {
+      "id": "sticker-ice",
+      "name": "Papel cebolla",
+      "type": "image",
+      "source": "/examples/cut-paper/props/onion-paper.png",
+      "visible": true,
+      "locked": false,
+      "z": 8,
+      "transform": {
+        "x": 50,
+        "y": 58,
+        "scale": 0.22,
+        "opacity": 1,
+        "rotation": -6
+      },
+      "animation": {
+        "start": {
+          "x": 50,
+          "y": 58,
+          "scale": 0.22,
+          "opacity": 1,
+          "rotation": -6
+        },
+        "end": {
+          "x": 78,
+          "y": 82,
+          "scale": 0.18,
+          "opacity": 0,
+          "rotation": 18
+        },
+        "duration": 26,
+        "curve": "ease",
+        "keyframes": [
+          {
+            "id": "ice-0",
+            "time": 0,
+            "x": 50,
+            "y": 58,
+            "scale": 0.22,
+            "opacity": 1,
+            "rotation": -6,
+            "curve": "hold"
+          },
+          {
+            "id": "ice-1",
+            "time": 2,
+            "x": 50,
+            "y": 58,
+            "scale": 0.22,
+            "opacity": 1,
+            "rotation": -6,
+            "curve": "ease"
+          },
+          {
+            "id": "ice-2",
+            "time": 9,
+            "x": 78,
+            "y": 82,
+            "scale": 0.18,
+            "opacity": 0,
+            "rotation": 18,
+            "curve": "ease"
+          },
+          {
+            "id": "ice-3",
+            "time": 26,
+            "x": 78,
+            "y": 82,
+            "scale": 0.18,
+            "opacity": 0,
+            "rotation": 18,
+            "curve": "hold"
+          }
+        ]
+      },
+      "parallax": 0.4
+    }
+  ],
+  "generationPolicy": "provided_only",
+  "dialogueBeats": [
+    {
+      "id": "kito-1",
+      "text": "¡Era un sticker!",
+      "start": 10,
+      "end": 16,
+      "mouthLayerIds": [
+        "puppet-kito-mouth-closed",
+        "puppet-kito-mouth-small",
+        "puppet-kito-mouth-wide",
+        "puppet-kito-mouth-round"
+      ],
+      "confidence": "known-text"
+    }
+  ],
+  "audioTracks": [
+    {
+      "id": "vo-kito-1",
+      "filename": "vo-kito-kito-1.wav",
+      "name": "kito · sticker",
+      "kind": "speech",
+      "startTime": 10,
+      "volume": 1
+    }
+  ]
+}

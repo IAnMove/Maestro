@@ -94,6 +94,9 @@
     "moveUp": "Subir beat",
     "moveDown": "Bajar beat",
     "newStage": "Nuevo beat",
+    "openVideo2d": "Abrir en Video 2D",
+    "openVideo3d": "Abrir en Video 3D",
+    "sceneOpenFailed": "No se pudo abrir la escena del beat.",
     "fields": {
       "stage": "Etapa",
       "title": "Título",
@@ -811,6 +814,8 @@
   },
   "library": {
     "title": "Story Lab",
+    "tijeral": "Cargar ejemplo recortable Tijeral",
+    "tijeralTitle": "Abre el capítulo de pueblo de papel. Cada beat enlaza a Video 2D para editar el plano.",
     "foundations": "fundamentos",
     "requirements": "requisitos",
     "revisionProgress": "v{{revision}} · {{progress}}/{{total}} {{unit}}",
