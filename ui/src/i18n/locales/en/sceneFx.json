@@ -56,6 +56,7 @@
   },
   "worldMedia": "Other side (photo or video)",
   "worldMediaHelp": "URL or file — seen through the portal",
+  "worldMediaFailed": "Could not upload the portal photo or video.",
   "rotation": "Rotation (°)",
   "animeShowcase": "Apply magic and anime demo",
   "worldTitle": "World SFX (3D)",

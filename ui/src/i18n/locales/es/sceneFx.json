@@ -56,6 +56,7 @@
   },
   "worldMedia": "Al otro lado (foto o vídeo)",
   "worldMediaHelp": "URL o archivo — se ve a través del portal",
+  "worldMediaFailed": "No se pudo subir la foto o el vídeo del portal.",
   "rotation": "Rotación (°)",
   "animeShowcase": "Aplicar demo magia y anime",
   "worldTitle": "SFX en el mundo 3D",
