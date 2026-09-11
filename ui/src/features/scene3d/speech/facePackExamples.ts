@@ -4,7 +4,11 @@ import { defaultSpeech, type ExpressionCue, type MouthCue, type Scene3DSpeech, t
 
 export const FACE_PACK_GLB = '/examples/tv-head-humanoid.glb'
 export const FACE_PACK_AUDIO_URL = '/examples/face-pack/neutral-vowels.wav'
-export const FACE_PACK_IDS = ['tv', 'skull', 'voxel', 'anime', 'cubeskull'] as const
+export const FACE_PACK_IDS = [
+  'tv', 'skull', 'voxel', 'anime', 'cubeskull',
+  'felt', 'clay', 'pixel', 'porcelain', 'cat', 'oni', 'stencil', 'alien',
+  'pumpkin', 'ice', 'mushroom', 'vector', 'halftone', 'steampunk', 'gummy',
+] as const
 export type FacePackId = typeof FACE_PACK_IDS[number]
 
 const bundled = (filename: string, url: string): Scene3DSourceRef => (
@@ -16,13 +20,13 @@ export const FACE_PACK_SOUNDTRACK: Scene3DSoundtrack[] = [
   { id: 'neutral-vowels', audio: FACE_PACK_AUDIO, start: 0, offset: 0, gain: 0.9, end: 8 },
 ]
 
-export const FACE_PACKS: Record<FacePackId, { id: FacePackId; url: string; source: Scene3DSourceRef; visemes: string }> = {
-  tv: { id: 'tv', url: '/examples/face-pack/tv-pack.png', source: bundled('tv-pack.png', '/examples/face-pack/tv-pack.png'), visemes: '/examples/face-pack/tv-visemes.png' },
-  skull: { id: 'skull', url: '/examples/face-pack/skull-pack.png', source: bundled('skull-pack.png', '/examples/face-pack/skull-pack.png'), visemes: '/examples/face-pack/skull-visemes.png' },
-  voxel: { id: 'voxel', url: '/examples/face-pack/voxel-pack.png', source: bundled('voxel-pack.png', '/examples/face-pack/voxel-pack.png'), visemes: '/examples/face-pack/voxel-visemes.png' },
-  anime: { id: 'anime', url: '/examples/face-pack/anime-pack.png', source: bundled('anime-pack.png', '/examples/face-pack/anime-pack.png'), visemes: '/examples/face-pack/anime-visemes.png' },
-  cubeskull: { id: 'cubeskull', url: '/examples/face-pack/cubeskull-pack.png', source: bundled('cubeskull-pack.png', '/examples/face-pack/cubeskull-pack.png'), visemes: '/examples/face-pack/cubeskull-visemes.png' },
-}
+export const FACE_PACKS: Record<FacePackId, { id: FacePackId; url: string; source: Scene3DSourceRef; visemes: string }> = Object.fromEntries(
+  FACE_PACK_IDS.map(id => {
+    const file = `${id}-pack.png`
+    const vis = `${id}-visemes.png`
+    return [id, { id, url: `/examples/face-pack/${file}`, source: bundled(file, `/examples/face-pack/${file}`), visemes: `/examples/face-pack/${vis}` }]
+  }),
+) as Record<FacePackId, { id: FacePackId; url: string; source: Scene3DSourceRef; visemes: string }>
 
 const LEAD_MOUTH: MouthCue[] = [
   { start: 0, end: 0.35, viseme: 'rest' },

@@ -109,7 +109,7 @@ test('face packs are 9×6 and talking mascots round-trip on hangar-talk', () => 
   assert.equal(expressionAt(doc.slots[1].speech!, 6.7), 'angry')
   assert.equal(mouthAt(doc.slots[1].speech!, 6.7).b, VISEMES.indexOf('O'))
   assert.equal(mouthAt(doc.slots[0].speech!, 0.5).b, 2)
-  assert.equal(FACE_PACK_IDS.length, 5)
+  assert.equal(FACE_PACK_IDS.length, 20)
   const voxel = applyScene3DTemplate('voxel-talk')
   assert.equal(voxel.slots[0].speech?.facePack?.url, '/examples/face-pack/voxel-pack.png')
   assert.equal(voxel.slots[1].speech?.facePack?.url, '/examples/face-pack/cubeskull-pack.png')

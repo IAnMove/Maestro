@@ -28,6 +28,24 @@ ANIME_VISEMES = {'rest': 33, 'M': 35, 'A': 36, 'E': 44, 'I': 44, 'O': 45, 'U': 4
 ANIME_EXPR = {'neutral': 33, 'happy': 51, 'angry': 50, 'worried': 59, 'surprised': 56, 'sleepy': 52}
 CUBE_VISEMES = {'rest': 31, 'M': 37, 'A': 38, 'E': 40, 'I': 40, 'O': 42, 'U': 42, 'F': 37, 'L': 38}
 CUBE_EXPR = {'neutral': 31, 'happy': 46, 'angry': 47, 'worried': 60, 'surprised': 57, 'sleepy': 54}
+FELT_VISEMES = {'rest': 111, 'M': 134, 'A': 133, 'E': 132, 'I': 132, 'O': 131, 'U': 137, 'F': 134, 'L': 133}
+FELT_EXPR = {'neutral': 111, 'happy': 135, 'angry': 139, 'worried': 136, 'surprised': 138, 'sleepy': 140}
+PLANE_KITS = {
+    'clay': ({'rest': 115, 'M': 115, 'A': 142, 'E': 142, 'I': 142, 'O': 152, 'U': 152, 'F': 115, 'L': 142}, {'neutral': 115, 'happy': 167, 'angry': 185, 'worried': 115, 'surprised': 200, 'sleepy': 115}),
+    'pixel': ({'rest': 116, 'M': 116, 'A': 143, 'E': 143, 'I': 143, 'O': 170, 'U': 170, 'F': 116, 'L': 143}, {'neutral': 116, 'happy': 209, 'angry': 197, 'worried': 116, 'surprised': 183, 'sleepy': 116}),
+    'porcelain': ({'rest': 118, 'M': 118, 'A': 144, 'E': 144, 'I': 144, 'O': 172, 'U': 172, 'F': 118, 'L': 144}, {'neutral': 118, 'happy': 181, 'angry': 196, 'worried': 118, 'surprised': 157, 'sleepy': 118}),
+    'cat': ({'rest': 119, 'M': 119, 'A': 141, 'E': 141, 'I': 141, 'O': 160, 'U': 160, 'F': 119, 'L': 141}, {'neutral': 119, 'happy': 171, 'angry': 188, 'worried': 119, 'surprised': 119, 'sleepy': 119}),
+    'oni': ({'rest': 120, 'M': 120, 'A': 147, 'E': 147, 'I': 147, 'O': 201, 'U': 201, 'F': 120, 'L': 147}, {'neutral': 120, 'happy': 182, 'angry': 186, 'worried': 120, 'surprised': 174, 'sleepy': 120}),
+    'stencil': ({'rest': 121, 'M': 121, 'A': 150, 'E': 150, 'I': 150, 'O': 175, 'U': 175, 'F': 121, 'L': 150}, {'neutral': 121, 'happy': 189, 'angry': 161, 'worried': 121, 'surprised': 203, 'sleepy': 121}),
+    'alien': ({'rest': 122, 'M': 122, 'A': 146, 'E': 146, 'I': 146, 'O': 163, 'U': 163, 'F': 122, 'L': 146}, {'neutral': 122, 'happy': 177, 'angry': 202, 'worried': 122, 'surprised': 187, 'sleepy': 122}),
+    'pumpkin': ({'rest': 123, 'M': 123, 'A': 199, 'E': 199, 'I': 199, 'O': 159, 'U': 159, 'F': 123, 'L': 199}, {'neutral': 123, 'happy': 173, 'angry': 190, 'worried': 123, 'surprised': 145, 'sleepy': 123}),
+    'ice': ({'rest': 124, 'M': 124, 'A': 148, 'E': 148, 'I': 148, 'O': 205, 'U': 205, 'F': 124, 'L': 148}, {'neutral': 124, 'happy': 178, 'angry': 193, 'worried': 124, 'surprised': 162, 'sleepy': 124}),
+    'mushroom': ({'rest': 126, 'M': 126, 'A': 149, 'E': 149, 'I': 149, 'O': 192, 'U': 192, 'F': 126, 'L': 149}, {'neutral': 126, 'happy': 176, 'angry': 165, 'worried': 126, 'surprised': 126, 'sleepy': 126}),
+    'vector': ({'rest': 127, 'M': 127, 'A': 151, 'E': 151, 'I': 151, 'O': 164, 'U': 164, 'F': 127, 'L': 151}, {'neutral': 127, 'happy': 191, 'angry': 179, 'worried': 127, 'surprised': 127, 'sleepy': 127}),
+    'halftone': ({'rest': 128, 'M': 128, 'A': 153, 'E': 153, 'I': 153, 'O': 180, 'U': 180, 'F': 128, 'L': 153}, {'neutral': 128, 'happy': 204, 'angry': 210, 'worried': 128, 'surprised': 194, 'sleepy': 128}),
+    'steampunk': ({'rest': 129, 'M': 129, 'A': 154, 'E': 154, 'I': 154, 'O': 169, 'U': 169, 'F': 129, 'L': 154}, {'neutral': 129, 'happy': 184, 'angry': 206, 'worried': 129, 'surprised': 195, 'sleepy': 129}),
+    'gummy': ({'rest': 130, 'M': 130, 'A': 207, 'E': 207, 'I': 207, 'O': 198, 'U': 198, 'F': 130, 'L': 207}, {'neutral': 130, 'happy': 168, 'angry': 155, 'worried': 130, 'surprised': 130, 'sleepy': 130}),
+}
 
 
 def run(cmd: list[str]) -> None:
@@ -44,6 +62,46 @@ def load_tile(index: int, crop: str) -> bytes:
     if len(proc.stdout) != TILE * TILE * 3:
         raise RuntimeError(f'{src} decoded to {len(proc.stdout)} bytes')
     return proc.stdout
+
+
+def _luma(r: int, g: int, b: int) -> float:
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+
+def _border_mean(rgb: bytes) -> tuple[float, float, float]:
+    sr = sg = sb = n = 0
+    for y in range(TILE):
+        for x in range(TILE):
+            if 10 <= x < TILE - 10 and 10 <= y < TILE - 10:
+                continue
+            i = (y * TILE + x) * 3
+            r, g, b = rgb[i], rgb[i + 1], rgb[i + 2]
+            if _luma(r, g, b) < 28:
+                continue
+            sr += r
+            sg += g
+            sb += b
+            n += 1
+    if n < 16:
+        return (1.0, 1.0, 1.0)
+    return (sr / n, sg / n, sb / n)
+
+
+def match_skin(tile: bytes, ref: bytes) -> bytes:
+    tr, tg, tb = _border_mean(tile)
+    rr, rg, rb = _border_mean(ref)
+    if tr < 1 or tg < 1 or tb < 1:
+        return tile
+    kr, kg, kb = rr / tr, rg / tg, rb / tb
+    out = bytearray(tile)
+    for i in range(0, len(out), 3):
+        r, g, b = out[i], out[i + 1], out[i + 2]
+        if _luma(r, g, b) < 28:
+            continue
+        out[i] = max(0, min(255, int(r * kr)))
+        out[i + 1] = max(0, min(255, int(g * kg)))
+        out[i + 2] = max(0, min(255, int(b * kb)))
+    return bytes(out)
 
 
 def paste_mouth(base: bytes, viseme: bytes, cx: float, cy: float, rx: float, ry: float) -> bytes:
@@ -78,13 +136,16 @@ def write_png(path: Path, width: int, height: int, rgb: bytes) -> None:
 def assemble(name: str, visemes: dict[str, int], expressions: dict[str, int], crop: str, mouth: tuple[float, float, float, float]) -> None:
     vis_tiles = {key: load_tile(index, crop) for key, index in visemes.items()}
     expr_tiles = {key: load_tile(index, crop) for key, index in expressions.items()}
+    rest = vis_tiles['rest']
+    vis_tiles = {key: match_skin(tile, rest) for key, tile in vis_tiles.items()}
+    expr_tiles = {key: match_skin(tile, rest) for key, tile in expr_tiles.items()}
     width, height = TILE * COLS, TILE * ROWS
     canvas = bytearray(width * height * 3)
     cx, cy, rx, ry = mouth
     for row, expression in enumerate(EXPRESSIONS):
         base = expr_tiles[expression]
         for col, viseme in enumerate(VISEMES):
-            tile = vis_tiles[viseme] if expression == 'neutral' or viseme == 'rest' else paste_mouth(base, vis_tiles[viseme], cx, cy, rx, ry)
+            tile = base if viseme == 'rest' else paste_mouth(base, vis_tiles[viseme], cx, cy, rx, ry)
             for y in range(TILE):
                 dst = ((row * TILE + y) * width + col * TILE) * 3
                 src = y * TILE * 3
@@ -92,7 +153,7 @@ def assemble(name: str, visemes: dict[str, int], expressions: dict[str, int], cr
     write_png(OUT / f'{name}-pack.png', width, height, bytes(canvas))
     rest_row = bytearray(TILE * COLS * TILE * 3)
     for col, viseme in enumerate(VISEMES):
-        tile = vis_tiles[viseme]
+        tile = rest if viseme == 'rest' else paste_mouth(rest, vis_tiles[viseme], cx, cy, rx, ry)
         for y in range(TILE):
             dst = (y * TILE * COLS + col * TILE) * 3
             src = y * TILE * 3
@@ -142,6 +203,7 @@ def main() -> int:
     assemble('voxel', VOXEL_VISEMES, VOXEL_EXPR, crop='crop=iw*0.78:ih*0.78:(iw-iw*0.78)/2:(ih-ih*0.78)/2', mouth=(72, 88, 34, 22))
     assemble('anime', ANIME_VISEMES, ANIME_EXPR, crop='crop=iw*0.86:ih*0.86:(iw-iw*0.86)/2:(ih-ih*0.86)/2', mouth=(64, 92, 34, 18))
     assemble('cubeskull', CUBE_VISEMES, CUBE_EXPR, crop='crop=iw*0.72:ih*0.72:(iw-iw*0.72)/2:(ih-ih*0.72)/2', mouth=(64, 92, 42, 30))
+    assemble('felt', FELT_VISEMES, FELT_EXPR, crop='', mouth=(64, 92, 30, 18))
     if not (OUT / 'neutral-vowels.wav').is_file():
         synth_vowels(OUT / 'neutral-vowels.wav')
     for name in (
