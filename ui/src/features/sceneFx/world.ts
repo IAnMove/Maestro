@@ -5,6 +5,7 @@ export const WORLD_SFX_KINDS = [
   'portal', 'magic_circle', 'summoning_gate',
   'lightning', 'energy_beam', 'laser',
   'energy_orb', 'anime_aura', 'arcane_missiles', 'shockwave',
+  'smoke', 'sparks',
 ] as const
 export type WorldSfxKind = (typeof WORLD_SFX_KINDS)[number]
 export const WORLD_BEAM_KINDS = new Set<WorldSfxKind>(['lightning', 'energy_beam', 'laser', 'arcane_missiles'])

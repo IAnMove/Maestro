@@ -167,3 +167,16 @@ def test_default_2d_showcase_has_no_longer_background_tail(service, collection, 
     preserved = service.execute({'version': 1, 'operation': 'scenes.effects.showcase',
                                  'input': {'document': scene, 'collection': collection}})['result']['document']
     assert preserved['layers'] == scene['layers']
+
+
+@pytest.mark.parametrize('kind', ['smoke', 'sparks'])
+def test_soft_spatial_effects_roundtrip_through_commands(service, kind):
+    doc = showcase(service)
+    doc['environment'] = {'reflectiveFloor': True, 'platform': True, 'bloom': .48}
+    doc['slots'][0]['appearance'] = {'start': 1, 'duration': .8, 'color': '#83e8ff'}
+    cue = {'id': kind, 'kind': kind, 'start': 0, 'end': 3}
+    result = service.execute({'version': 1, 'operation': 'scenes.effects.apply',
+                              'input': {'document': doc, 'worldCues': [cue]}})['result']['document']
+    assert result['environment'] == doc['environment']
+    assert result['slots'][0]['appearance'] == doc['slots'][0]['appearance']
+    assert result['worldSfx'][0]['kind'] == kind

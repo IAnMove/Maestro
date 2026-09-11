@@ -60,7 +60,7 @@ test('world SFX stay in meters and do not rewrite screen overlays', () => {
   assert.equal(reopened?.worldSfx?.[0].kind, 'portal')
   assert.equal(reopened?.worldSfx?.[0].position.z, -1.55)
   assert.equal(reopened?.sfx?.[0].kind, 'speedlines')
-  assert.equal(parseWorldSfx([{ kind: 'sparks', start: 0, end: 1 }]).length, 0)
+  assert.equal(parseWorldSfx([{ kind: 'rain', start: 0, end: 1 }]).length, 0)
   assert.equal(parseWorldSfx([{ id: 'a', kind: 'portal', start: 3, end: 2 }]).length, 0)
   const audio = worldSfxAudioCues(demo.worldSfx)
   assert.equal(audio.every(cue => (WORLD_SFX_KINDS as readonly string[]).includes(cue.kind)), true)

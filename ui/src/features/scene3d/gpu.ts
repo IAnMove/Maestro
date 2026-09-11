@@ -1,3 +1,5 @@
+import { CinematicRuntime } from './cinematicRuntime'
+import { MaterializationRuntime } from './materialization'
 import { framingPose } from './framing'
 import { SpeechFaceRuntime } from './speech/runtime'
 import { screenGeometry } from './screenGeometry'
@@ -64,6 +66,7 @@ export type SlotGpu = {
   looping: boolean
   loaded: boolean
   contactShadow?: Mesh
+  appearance?: MaterializationRuntime
   speechFace?: SpeechFaceRuntime
   screen?: ScreenMediaRuntime
   screenAbort?: AbortController
@@ -71,6 +74,7 @@ export type SlotGpu = {
 }
 
 export type GpuWorld = {
+  cinema?: CinematicRuntime
   renderer: WebGLRenderer
   scene: Scene
   camera: PerspectiveCamera
@@ -160,13 +164,13 @@ export function makeStripeTexture(): Texture {
 }
 
 export function imageBackdropMesh(slot: Scene3DSlot, texture: Texture | null): Mesh {
-  if (texture && slot.surface) {
+  if (texture && slot.surface && slot.surface !== 'environment') {
     texture.wrapT = RepeatWrapping
     const repeat = slot.textureRepeat ?? (slot.surface === 'floor' ? 4 : 2)
     texture.repeat.set(repeat, repeat)
     texture.needsUpdate = true
   }
-  const MaterialType = slot.surface ? MeshStandardMaterial : MeshBasicMaterial
+  const MaterialType = slot.surface && slot.surface !== 'environment' ? MeshStandardMaterial : MeshBasicMaterial
   const material = new MaterialType({
     map: texture,
     color: texture ? 0xffffff : 0x243044,
@@ -254,6 +258,7 @@ export function dropSlot(world: GpuWorld, slotId: string) {
   const current = world.slots.get(slotId)
   if (!current) return
   current.mixer?.stopAllAction()
+  current.appearance?.clear()
   current.speechFace?.dispose()
   current.screenAbort?.abort()
   current.screen?.dispose()
@@ -335,6 +340,34 @@ function groundLoadedSlot(gpu: SlotGpu, slot: Scene3DSlot) {
   }
 }
 
+function paintActor(world: GpuWorld, slot: Scene3DSlot, sceneSeconds: number) {
+  const gpu = world.slots.get(slot.id)
+  if (!gpu) return
+  if (gpu.screen && slot.screen) void gpu.screen.seek(sceneSeconds, slot.screen).catch(() => {})
+  poseLoadedSlot(gpu, slot)
+  resetTypingPose(gpu.root)
+  const clip = gpu.animations.find((_clip: { duration?: number }, index: number) => clipMatches(gpu, index))
+  const local = performanceClipTime(slot.performance === 'idle' ? 0 : sceneSeconds, clip?.duration ?? null, slot.clipPlayback)
+  if (local != null && clip && gpu.mixer) seekBoundMixer(gpu.mixer, clip, local)
+  if (slot.performance === 'idle' && clip && gpu.mixer) {
+    gpu.root.updateMatrixWorld(true)
+    const center = new Box3().setFromObject(gpu.root, true).getCenter(new Vector3())
+    gpu.root.position.x += slot.position[0] - center.x; gpu.root.position.z += slot.position[2] - center.z
+    gpu.root.rotation.y += Math.sin(sceneSeconds * .8) * .025
+  }
+  groundLoadedSlot(gpu, slot)
+  if (slot.performance === 'typing') applyTypingPose(gpu.root, slot, sceneSeconds)
+  if (gpu.loaded && gpu.kind === 'model' && (slot.speech || gpu.speechFace)) {
+    gpu.speechFace ??= new SpeechFaceRuntime(() => renderWorld(world))
+    gpu.speechFace.sync(gpu.root, slot.speech, sceneSeconds)
+  }
+  if (slot.appearance || gpu.appearance) {
+    gpu.appearance ??= new MaterializationRuntime()
+    gpu.appearance.sync(gpu.root, slot.appearance, sceneSeconds)
+    if (gpu.contactShadow) gpu.contactShadow.visible = gpu.root.visible
+  }
+}
+
 export function paintWorld(world: GpuWorld, document: Scene3DDocument, sceneSeconds: number) {
   const posedSlots = document.slots.map(slot => ({ ...slot, ...slotPoseAtTime(slot, sceneSeconds, document.duration) }))
   applyLoopOffset(world, sceneSeconds)
@@ -342,22 +375,7 @@ export function paintWorld(world: GpuWorld, document: Scene3DDocument, sceneSeco
   paintWorkshop(world.dressing, sceneSeconds, document.workshopScreen)
   const bg = document.slots.find(isCylinderBackdrop)
   paintDrive(world, sceneSeconds, bg?.loop?.speed ?? world.driveSpeed)
-  for (const slot of posedSlots) {
-    const gpu = world.slots.get(slot.id)
-    if (!gpu) continue
-    if (gpu.screen && slot.screen) void gpu.screen.seek(sceneSeconds, slot.screen).catch(() => {})
-    poseLoadedSlot(gpu, slot)
-    resetTypingPose(gpu.root)
-    const clip = gpu.animations.find((_clip: { duration?: number }, index: number) => clipMatches(gpu, index))
-    const local = performanceClipTime(sceneSeconds, clip?.duration ?? null, slot.clipPlayback)
-    if (local != null && clip && gpu.mixer) seekBoundMixer(gpu.mixer, clip, local)
-    groundLoadedSlot(gpu, slot)
-    if (slot.performance === 'typing') applyTypingPose(gpu.root, slot, sceneSeconds)
-    if (gpu.loaded && gpu.kind === 'model' && (slot.speech || gpu.speechFace)) {
-      gpu.speechFace ??= new SpeechFaceRuntime(() => world.renderer.render(world.scene, world.camera))
-      gpu.speechFace.sync(gpu.root, slot.speech, sceneSeconds)
-    }
-  }
+  for (const slot of posedSlots) paintActor(world, slot, sceneSeconds)
   const framing = document.camera.framing
   const target = posedSlots.find(slot => slot.id === framing?.targetSlot)
   const root = target && world.slots.get(target.id)?.root
@@ -379,7 +397,11 @@ export function paintWorld(world: GpuWorld, document: Scene3DDocument, sceneSeco
       root: world.slots.get(slot.id)?.root,
     })))
   }
-  world.renderer.render(world.scene, world.camera)
+  if (world.cinema || document.environment || document.worldSfx?.length || document.slots.some(s => s.surface === 'environment')) {
+    world.cinema ??= new CinematicRuntime(world)
+    world.cinema.sync(document, sceneSeconds)
+    world.cinema.render(document)
+  } else world.renderer.render(world.scene, world.camera)
 }
 
 export function setWorldSize(world: GpuWorld, width: number, height: number) {
@@ -453,6 +475,7 @@ export function createWorld(host: HTMLDivElement, light: Scene3DLight, fov: numb
 }
 
 export function disposeWorld(world: GpuWorld) {
+  world.cinema?.dispose()
   for (const id of [...world.slots.keys()]) dropSlot(world, id)
   if (world.scene && world.worldSfx) syncWorldSfx(world.scene, world.worldSfx, [], 0, [])
   disposeObject(world.scene)
@@ -493,4 +516,10 @@ export function poseLoadedSlot(current: SlotGpu, slot: Scene3DSlot) {
   current.root.position.set(slot.position[0], slot.position[1], slot.position[2])
   current.root.rotation.y = slot.rotationY
   current.root.scale.setScalar(current.baseScale * slot.scale)
+}
+
+/** All interaction/media redraws share preview and export postprocessing. */
+export function renderWorld(world: GpuWorld) {
+  if (world.cinema) world.cinema.render()
+  else world.renderer.render(world.scene, world.camera)
 }
