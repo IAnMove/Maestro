@@ -10,6 +10,8 @@ import type { PlacementMode } from './calibration'
 import { defaultSpeech, type FacePlacement, type Scene3DSpeech } from './types'
 import { amplitudeCues, parseMouthCues } from './track'
 import { decodeVoice, voiceWav } from './audio'
+import { analysisWindow, mapFragmentCues, replaceCueInterval } from './cueEdit'
+import { CueTimeline } from './CueTimeline'
 import { importSpeechKit } from './kit'
 import { SpeechNumber, speechInput } from './FaceControls'
 import { LipsPlacementControls } from './LipsPlacementControls'
@@ -42,8 +44,8 @@ export function Scene3DSpeechControls({ slot, workspace, disabled, calibrate, on
   useEffect(() => {
     let alive = true
     void fetchOutputs(200, 0, { mediaType: 'audio', workspace }).then(result => { if (alive) setItems(result.outputs.filter(item => item.type === 'audio')) }).catch(() => {})
-    return () => { alive = false; jobs.serial++; jobs.controller?.abort() }
-  }, [workspace, jobs])
+    return () => { alive = false; jobs.serial++; jobs.controller?.abort(); setBusy(false) }
+  }, [workspace, slot.id, slot.sourceUrl, jobs])
   const run = async (task: (signal: AbortSignal) => Promise<() => void>) => {
     const generation = ++jobs.serial
     jobs.controller?.abort(); jobs.controller = new AbortController()
@@ -83,7 +85,14 @@ export function Scene3DSpeechControls({ slot, workspace, disabled, calibrate, on
         const voice = await recordedVoice(blob, workspace, signal)
         return () => { const { duration, ...patch } = voice; onChange({ ...speech, ...patch, offset: 0 }); onFit(speech.start + duration) }
       })} />
+    {typeof window !== 'undefined' && !window.isSecureContext && <p role="note" className="text-xs text-amber-200">{t('speech.microphoneUnavailable')}</p>}
     {speech.audio && <VoicePreview url={speech.audio.url} disabled={locked} label={t('speech.voicePreview')} />}
+    {(speech.audio || speech.cues.length > 0) && <CueTimeline speech={speech} disabled={locked} analyzing={busy}
+      onChange={onChange} onReanalyze={(from, to) => void run(async signal => {
+        const buffer = await decodeVoice(speech.audio!.url)
+        const next = await analyzedSpeech(speech, buffer, from, to, signal, isolateVocals)
+        return () => onChange(next)
+      })} />}
     <fieldset disabled={locked} className="space-y-3 disabled:opacity-60">
       <AssetInput label={t('speech.voice')} placeholder={t('speech.pickVoice')} items={items} value={audioValue} optional
         disabled={voiceDisabled} workspaceId={workspace} accept="audio/*" constraints={{ kinds: ['audio'], maxCount: 1, optional: true }} onChoose={chooseVoice} />
@@ -91,9 +100,8 @@ export function Scene3DSpeechControls({ slot, workspace, disabled, calibrate, on
         <button type="button" className={speechInput} disabled={!speech.audio} onClick={() => void run(async signal => {
           const buffer = await decodeVoice(speech.audio!.url)
           const duration = Math.min(buffer.duration - speech.offset, (speech.end ?? speech.start + buffer.duration - speech.offset) - speech.start)
-          const localCues = await analyzeSceneSpeech(await voiceWav(buffer, speech.offset, duration), signal, isolateVocals)
-          const cues = localCues.map(cue => ({ ...cue, start: cue.start + speech.offset, end: cue.end + speech.offset }))
-          return () => onChange({ ...speech, cues, driver: isolateVocals ? 'rhubarb-vocals' : 'rhubarb' })
+          const next = await analyzedSpeech(speech, buffer, speech.offset, speech.offset + duration, signal, isolateVocals)
+          return () => onChange(next)
         })}>{t('speech.analyze')}</button>
         <button type="button" className={speechInput} disabled={!speech.cues.length} onClick={() => onFit(Math.max(.1, speech.start + (speech.cues.at(-1)?.end ?? 0) - speech.offset))}>{t('speech.fit')}</button>
       </div>
@@ -132,6 +140,14 @@ export function Scene3DSpeechControls({ slot, workspace, disabled, calibrate, on
     {busy && <p role="status" className="text-xs">{t('speech.busy')}</p>}
     {error && <p role="alert" className="text-xs text-red-300">{error}</p>}
   </section>
+}
+
+async function analyzedSpeech(speech: Scene3DSpeech, buffer: AudioBuffer, from: number, to: number, signal: AbortSignal, isolateVocals: boolean): Promise<Scene3DSpeech> {
+  const fragment = analysisWindow(from, to, buffer.duration)
+  const localCues = await analyzeSceneSpeech(await voiceWav(buffer, fragment.start, fragment.duration), signal, isolateVocals)
+  const mapped = mapFragmentCues(localCues, fragment.start)
+  return { ...speech, cues: replaceCueInterval(speech.cues, fragment.start, fragment.start + fragment.duration, mapped),
+    driver: isolateVocals ? 'rhubarb-vocals' : 'rhubarb' }
 }
 
 function speechAudioOutput(speech: Scene3DSpeech): ApiOutput | undefined {
