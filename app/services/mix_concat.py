@@ -28,9 +28,11 @@ def should_use_hold_crossfade(
     """Soft joins add hold+crossfade time and must not change a locked timeline.
 
     Recast / Repaint / Outpaint pass ``audio_duration_sec`` (and often
-    ``pad_audio``) so the assembled shot count stays exact. Those callers
-    then reject any frame-count drift and delete the mix. Free-form Director
-    and Series joins omit that lock and still get the freeze-tail dissolve.
+    ``pad_audio``) so the assembled shot count stays exact. Comic movies
+    pass the planned duration for the same reason (hard cuts only). Those
+    callers then reject any frame-count drift and delete the mix. Free-form
+    Director and Series joins omit that lock and still get the freeze-tail
+    dissolve.
     """
     if int(clip_count) < 2:
         return False
