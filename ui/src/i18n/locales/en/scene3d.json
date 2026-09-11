@@ -360,16 +360,46 @@
     "camera-dolly": "Dolly reveal"
   },
   "photoPresets": {
-    "photo-documentary-push": { "label": "Documentary push-in", "description": "A restrained slow move toward the subject." },
-    "photo-ken-burns-left": { "label": "Ken Burns · left", "description": "Classic archival pan from right to left." },
-    "photo-ken-burns-right": { "label": "Ken Burns · right", "description": "Classic archival pan from left to right." },
-    "photo-portrait-rise": { "label": "Portrait rise", "description": "Starts low and slowly discovers the face." },
-    "photo-reveal-pullback": { "label": "Reveal pull-back", "description": "Opens from a detail into the full photograph." },
-    "photo-diagonal-discovery": { "label": "Diagonal discovery", "description": "Elegant diagonal travel for landscapes and art." },
-    "photo-intimate-closeup": { "label": "Intimate close-up", "description": "A gentle asymmetric move for emotional beats." },
-    "photo-dutch-tension": { "label": "Dutch tension", "description": "Slow roll and push for mystery or conflict." },
-    "photo-handheld-memory": { "label": "Memory drift", "description": "Subtle smooth drift for memories and reportage." },
-    "photo-rostrum-scan": { "label": "Rostrum scan", "description": "A measured top-to-bottom move for documents and maps." }
+    "photo-documentary-push": {
+      "label": "Documentary push-in",
+      "description": "A restrained slow move toward the subject."
+    },
+    "photo-ken-burns-left": {
+      "label": "Ken Burns · left",
+      "description": "Classic archival pan from right to left."
+    },
+    "photo-ken-burns-right": {
+      "label": "Ken Burns · right",
+      "description": "Classic archival pan from left to right."
+    },
+    "photo-portrait-rise": {
+      "label": "Portrait rise",
+      "description": "Starts low and slowly discovers the face."
+    },
+    "photo-reveal-pullback": {
+      "label": "Reveal pull-back",
+      "description": "Opens from a detail into the full photograph."
+    },
+    "photo-diagonal-discovery": {
+      "label": "Diagonal discovery",
+      "description": "Elegant diagonal travel for landscapes and art."
+    },
+    "photo-intimate-closeup": {
+      "label": "Intimate close-up",
+      "description": "A gentle asymmetric move for emotional beats."
+    },
+    "photo-dutch-tension": {
+      "label": "Dutch tension",
+      "description": "Slow roll and push for mystery or conflict."
+    },
+    "photo-handheld-memory": {
+      "label": "Memory drift",
+      "description": "Subtle smooth drift for memories and reportage."
+    },
+    "photo-rostrum-scan": {
+      "label": "Rostrum scan",
+      "description": "A measured top-to-bottom move for documents and maps."
+    }
   },
   "motionPresets": {
     "turntable": "Product turntable",
@@ -1133,21 +1163,21 @@
     "showPreview": "Show preview",
     "hidePreview": "Hide preview",
     "empty": "Select an object to inspect it.",
-    "position": "Position",
-    "yaw": "Rotation Y (°)",
-    "scale": "Scale",
-    "source": "GLB or media URL",
+    "position": "Inspector position",
+    "yaw": "Inspector rotation Y (°)",
+    "scale": "Inspector scale",
+    "source": "Inspector GLB or media URL",
     "mouth": "Inspector mouth",
-    "addLips": "Add lips",
+    "addLips": "Add lips in inspector",
     "addScreen": "Add object screen",
-    "addSfx": "Add SFX",
+    "addSfx": "Add inspector SFX",
     "advanced": "Advanced",
     "advancedHint": "Screen, light and environment details stay folded until you need them.",
     "screenEmpty": "No screen media yet.",
     "camera": "Camera",
-    "cameraEye": "Camera position",
-    "cameraLook": "Look at",
-    "fov": "Field of view",
+    "cameraEye": "Inspector camera position",
+    "cameraLook": "Inspector look at",
+    "fov": "Inspector field of view",
     "environment": "Cinematic environment",
     "floor": "Reflective floor",
     "platform": "Platform",
