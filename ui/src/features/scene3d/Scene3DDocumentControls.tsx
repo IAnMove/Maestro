@@ -43,7 +43,7 @@ export function Scene3DDocumentControls({ document, disabled, workspace, preview
     </label>
     <button type="button" disabled={disabled} onClick={save} className="min-h-10 rounded-lg border border-border px-3">{t('saveDocument')}</button>
     <button type="button" disabled={disabled} onClick={() => input.current?.click()} className="min-h-10 rounded-lg border border-border px-3">{t('loadDocument')}</button>
-    <input ref={input} type="file" accept=".json,application/json" aria-label={t('loadDocument')} disabled={disabled} className="hidden"
+    <input ref={input} type="file" accept=".json,application/json" data-testid="world3d-load-shot" aria-label={t('loadDocument')} disabled={disabled} className="hidden"
       onChange={async event => {
         const file = event.target.files?.[0]
         event.target.value = ''
