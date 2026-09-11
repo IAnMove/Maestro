@@ -46,6 +46,16 @@ test('two shots sharing GLB and audio produce one unique media key each', () => 
   assert.equal(unique.filter(item => item.filename === 'voice.wav').length, 1)
   assert.ok(uses.some(item => item.role.includes('speech.audio')))
   assert.ok(uses.some(item => item.role.includes('screen')))
+  const withPortal = {
+    ...shot('Portal'),
+    worldSfx: [
+      { id: 'tv', kind: 'media_portal', start: 0, end: 3, sourceUrl: '/api/v1/uploads/portal.png' },
+      { id: 'stock', kind: 'media_portal', start: 0, end: 3, sourceUrl: '/examples/tv-head-face.png' },
+    ],
+  }
+  const portalUses = collectAssetUses(withPortal, 'shot-portal')
+  assert.ok(portalUses.some(item => item.role === 'worldSfx[0]' && item.filename === 'portal.png'))
+  assert.ok(!portalUses.some(item => item.role === 'worldSfx[1]'))
   assert.equal(classifyUrl('https://evil.example/a.glb'), 'external')
   assert.equal(classifyUrl('blob:temp'), 'transient')
   assert.equal(classifyUrl('/api/v1/file/hero.glb?workspace=film'), 'gallery')
