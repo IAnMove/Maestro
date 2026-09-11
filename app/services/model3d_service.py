@@ -20,6 +20,9 @@ import threading
 import time
 import uuid
 from pathlib import Path
+
+from services.runtime_environment import isolated_environment, python_path as managed_python_path
+from services.runtime_profiles import managed_ready
 from typing import Any
 
 from . import execution_mode, resource_scheduler, model3d_external
@@ -269,8 +272,8 @@ _MAX_CHUNKS_AT_OCTREE_512 = 16000
 
 
 def _python_path() -> Path | None:
-    candidates = [ENV_DIR / "python.exe", ENV_DIR / "bin" / "python"]
-    return next((path for path in candidates if path.is_file()), None)
+    candidates = [managed_python_path(ENV_DIR)]
+    return next((path for path in candidates if path.is_file() and managed_ready("hunyuan3d")), None)
 
 
 def installation_status() -> dict[str, Any]:
@@ -1103,7 +1106,7 @@ def _run_job_serialized(job_id: str, output_dir: str) -> None:
     command = [str(python_path), str(worker_path), "--request", str(request_path), "--output", str(output_path)]
     if model_id in model3d_external.EXTERNAL_IDS:
         command.extend(["--root", str(worker_cwd)])
-    env = os.environ.copy()
+    env = isolated_environment(Path(python_path))
     # Built-in Hunyuan3D models are public. Do not inherit Pinokio's global HF
     # credentials: some Hub/proxy combinations omit X-Repo-Commit from
     # authenticated HEAD responses, which makes huggingface_hub incorrectly

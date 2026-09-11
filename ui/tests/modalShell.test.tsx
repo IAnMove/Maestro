@@ -81,3 +81,35 @@ test('ModalShell restores focus when its open state closes', { concurrency: fals
     opener.remove()
   }
 })
+
+test('a nested modal escapes its clipped parent and Escape closes only the child', { concurrency: false }, async () => {
+  const { render, screen, fireEvent, cleanup } = await import('@testing-library/react')
+  const { ModalShell } = await import('../src/components/common/ModalShell.tsx')
+  let parentCloses = 0
+  let windowEscapes = 0
+  const onWindow = () => { windowEscapes += 1 }
+  window.addEventListener('keydown', onWindow)
+  function Example() {
+    const [open, setOpen] = React.useState(false)
+    return <div style={{ transform: 'translateX(0)', overflow: 'hidden', width: 300 }}>
+      <ModalShell open title="Parent" onClose={() => { parentCloses += 1 }}>
+        <button onClick={() => setOpen(true)}>Open child</button>
+        <ModalShell open={open} title="Child" onClose={() => setOpen(false)}><button>Choose</button></ModalShell>
+      </ModalShell>
+    </div>
+  }
+  try {
+    render(<Example />)
+    fireEvent.click(screen.getByText('Open child'))
+    const child = screen.getByRole('dialog', { name: 'Child' })
+    assert.equal(child.parentElement === document.body, true)
+    fireEvent.keyDown(document, { key: 'Escape', bubbles: true })
+    assert.equal(screen.queryByRole('dialog', { name: 'Child' }), null)
+    assert.equal(parentCloses, 0)
+    assert.equal(windowEscapes, 0)
+    assert.equal(document.activeElement === screen.getByText('Open child'), true)
+  } finally {
+    cleanup()
+    window.removeEventListener('keydown', onWindow)
+  }
+})

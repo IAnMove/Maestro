@@ -25,28 +25,24 @@ for (const [name, vendor] of Object.entries(vendors)) {
   check(vendor.path.startsWith("app/"), `${name}: checkout path must be relative under app/`)
 }
 
-for (const [name, source] of [
-  ["hunyuan3d2", install],
-  ["hunyuan3d21", install],
-  ["sam3", samInstall],
-  ["unirig", rigInstall]
-]) {
-  check(source.includes(`vendors.${name}`), `${name}: install script does not use manifest`)
-  check(source.includes(`${name}.revision`), `${name}: install does not reference revision`)
-  check(source.includes(`${name}.marker`), `${name}: marker is not written by install`)
-  check(source.includes("fetch --depth 1 origin"), `${name}: install lacks explicit fetch`)
-  check(source.includes("checkout --detach"), `${name}: install lacks detached checkout`)
+const runtime = require(path.join(root, "runtime_install.js"))
+const setup = require(path.join(root, "runtime_setup.js"))
+const plans = runtime.installEngines(Object.keys(runtime.catalog.engines))
+for (const [name, vendor] of Object.entries(vendors)) {
+  const steps = runtime.vendorSteps(name)
+  const source = JSON.stringify(steps)
+  check(source.includes(`fetch --depth 1 origin ${vendor.revision}`), `${name}: explicit revision fetch missing`)
+  check(source.includes(`checkout --detach ${vendor.revision}`), `${name}: detached checkout missing`)
+  check(!source.includes('git pull'), `${name}: vendor must not follow branch HEAD`)
+  check(plans.some(s => s.method === 'fs.write' && s.params.path === vendor.marker), `${name}: verified marker missing`)
 }
-
-check(update.includes("hunyuan3d2.revision") && update.includes("hunyuan3d21.revision"), "update: Hunyuan revisions missing")
-check(update.includes("sam3.marker") && update.includes("unirig.marker"), "update: optional vendor markers missing")
-check(install.includes(".maestro_hunyuan3d_v1.installed"), "install: operational Hunyuan marker missing")
-check(update.includes(".maestro_hunyuan3d_v1.installed"), "update: operational Hunyuan marker missing")
-check(rigInstall.includes(".maestro_rigging_v1.installed"), "UniRig: operational service marker missing")
-check(update.includes('uri: "sam_install.js"'), "update: SAM refresh is not wired")
-check(update.includes('uri: "rigging_install.js"'), "update: UniRig refresh is not wired")
-check(update.includes("git checkout --detach"), "update: detached checkout missing")
-check(!/path:[^\n]*vendor[^\n]*[\s\S]{0,180}?git pull/.test(update), "update: vendor update still uses git pull")
+for (const source of [install, update]) {
+  check(source.includes('runtime_setup.js'), 'Install/Update must share setup')
+}
+for (const [engine, source] of [['sam', samInstall], ['rigging', rigInstall]]) {
+  check(source.includes(`installEngines(['${engine}'])`), `${engine}: installer bypasses profile builder`)
+  check(setup.run.some(s => s.method === 'script.start' && s.params.uri === `${engine === 'sam' ? 'sam' : 'rigging'}_install.js`), `${engine}: optional update missing`)
+}
 check(start.includes('"event": "/(http:\\/\\/[0-9.:]+)/"'), "start: URL capture block changed")
 check(start.includes('url: "{{input.event[1]}}"'), "start: captured URL is not input.event[1]")
 

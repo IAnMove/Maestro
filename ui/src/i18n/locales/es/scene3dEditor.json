@@ -51,20 +51,25 @@
     "twoSpeakers": "Usa uno o dos personajes por plano. Divide las intervenciones si necesitas más.",
     "openProduction": "Preparar plano en Vídeo 3D",
     "productionReady": "Audio y personajes proceden de tu producción. Revisa la boca y los tiempos antes de exportar; el original no se ha sustituido.",
-    "kind": { "song": "Canción", "dialogue": "Diálogo", "episode": "Capítulo", "trailer": "Tráiler" },
+    "kind": {
+      "song": "Canción",
+      "dialogue": "Diálogo",
+      "episode": "Capítulo",
+      "trailer": "Tráiler"
+    },
     "title": "Voz y lip-sync 3D",
-    "intro": "Añade voz al personaje de este plano. La boca, los ojos y el audio se guardan y exportan con tu vídeo 3D.",
+    "intro": "Edita solo este sujeto: añade labios, elige una voz y pulsa Reproducir.",
     "option": "Voz y lip-sync",
     "character": "Personaje",
     "selectCharacter": "Selecciona un personaje",
     "chooseModel": "Primero elige un modelo GLB en la tarjeta de este personaje, debajo del visor.",
     "advancedImport": "Importar ajustes existentes (opcional)",
     "importKit": "Importar kit de Taberna (.zip)",
-    "enabled": "Activar cara animada",
+    "enabled": "Activar labios",
     "profile": "Perfil de colocación",
     "generic": "Humanoide genérico",
-    "calibrate": "Colocar boca y ojos",
-    "noFace": "No se encontró un humanoide compatible o aún está cargando. Importa un kit calibrado.",
+    "calibrate": "Aplicar referencia",
+    "noFace": "Espera a que cargue el GLB y reintenta. La boca necesita una malla con un único material estándar.",
     "voice": "Voz del personaje",
     "pickVoice": "Elige audio (máx. 10 min / 32 MB); analiza fragmentos de hasta 90 s",
     "analyze": "Calcular gestos con Rhubarb (local)",
@@ -75,16 +80,17 @@
     "driver": {
       "imported": "Gestos importados",
       "rhubarb": "Gestos fonéticos · Rhubarb",
-      "amplitude": "Movimiento por volumen"
+      "amplitude": "Movimiento por volumen",
+      "rhubarb-vocals": "Rhubarb · voz aislada"
     },
     "amplitudeHint": "El volumen solo abre/cierra la boca: no reconoce fonemas. Calcula gestos con Rhubarb para mejorar el resultado.",
     "start": "Inicio en escena (s)",
     "offset": "Recortar inicio del audio (s)",
     "gain": "Volumen",
-    "needsPlacement": "Coloca la boca y revisa su encaje en el modelo antes de activar la cara y exportar.",
+    "needsPlacement": "Añade labios a este sujeto antes de visualizar su voz sobre el modelo.",
     "busy": "Preparando voz o kit…",
     "adjust": "Ajustar boca y expresiones",
-    "adjustHint": "Las coordenadas siguen la piel del modelo. Cambiar modelo borra su calibración; no se modifica el GLB original.",
+    "adjustHint": "X: izquierda/derecha; Y: arriba/abajo; Z: profundidad. Orienta la cara hacia delante (+Z), ajusta anchura/altura y reproduce. El GLB se conserva.",
     "mouth": "Boca",
     "width": "Anchura",
     "height": "Altura",
@@ -112,7 +118,60 @@
     "eyeSpacing": "Separación de ojos",
     "eyeWidth": "Anchura de ojos",
     "eyeHeight": "Altura de párpados",
-    "audioBlocked": "No se pudo reproducir la voz. Comprueba el archivo y pulsa Pausar y Reproducir; la exportación avisa si el audio falla."
+    "audioBlocked": "No se pudo reproducir la voz. Comprueba el archivo y pulsa Pausar y Reproducir; la exportación avisa si el audio falla.",
+    "addLips": "Añadir labios",
+    "editLips": "Editar labios",
+    "reviewPlacement": "Revisa la posición y el tamaño de la boca sobre este modelo.",
+    "manualPlacement": "No se reconoce la cabeza. Ajusta esta posición inicial con Boca X/Y/Z y Anchura/Altura.",
+    "placementReferences": "Referencias de colocación avanzadas",
+    "referencesHint": "Aplica la colocación a este sujeto. Revisa el encaje si usas la referencia de otro personaje.",
+    "characterLibraryAdvanced": "Avanzado: personajes reutilizables y voz preferida",
+    "recordVoice": "Grabar con micrófono",
+    "stopRecording": "Detener grabación",
+    "cancelRecording": "Cancelar grabación",
+    "exampleVoice": "Usar ejemplo en inglés",
+    "recording": "Grabando… Se detiene a los 90 segundos.",
+    "microphonePermission": "Esperando permiso para el micrófono…",
+    "microphoneUnavailable": "Para grabar necesitas HTTPS o localhost y un navegador compatible. Aquí puedes usar el ejemplo o subir un audio.",
+    "microphoneDenied": "Se ha denegado el acceso al micrófono. Permítelo en el navegador y reintenta.",
+    "recordingFailed": "Ha fallado la grabación. Comprueba el micrófono y reintenta.",
+    "recordingPreview": "Escuchar grabación",
+    "useRecording": "Usar grabación para este sujeto",
+    "discardRecording": "Descartar grabación",
+    "voicePreview": "Escuchar la voz de este sujeto",
+    "pickLips": "Colocar con un clic sobre la cara",
+    "pickHint": "Haz clic en la boca del sujeto seleccionado. Escape cancela.",
+    "pickMissed": "Haz clic en la cara del modelo seleccionado, no en el fondo.",
+    "cancelPlacement": "Cancelar colocación",
+    "timeline": {
+      "title": "Línea de gestos",
+      "clocks": "El tiempo de fuente es el archivo de audio. El recorte salta su inicio. El tiempo de escena es inicio + fuente − recorte.",
+      "sourceTime": "Fuente {{seconds}} s",
+      "sceneTime": "Escena {{seconds}} s",
+      "offsetTime": "Recorte de voz {{seconds}} s",
+      "zoom": "Zoom",
+      "loop": "Repetir selección",
+      "reanalyze": "Recalcular selección",
+      "addSilence": "Añadir silencio",
+      "viseme": "Visema",
+      "cueStart": "Inicio del gesto (fuente s)",
+      "cueEnd": "Fin del gesto (fuente s)",
+      "selectStart": "Inicio de selección (fuente s)",
+      "selectEnd": "Fin de selección (fuente s)",
+      "selection": "Selección {{start}}–{{end}} s",
+      "manual": "Manual",
+      "waveform": "Forma de onda",
+      "playback": "Reproducción de la línea de gestos",
+      "noAudio": "Añade una voz para ver la forma de onda. Los gestos importados se pueden editar igual."
+    },
+    "isolation": {
+      "label": "Aislar voz antes de calcular labios",
+      "loading": "Comprobando el modelo local opcional…",
+      "ready": "BS-RoFormer instalado · CPU. Separa la voz solo para analizar los labios; conserva el audio original al reproducir. Hasta 90 segundos; puede tardar varios minutos. Sin descargas ni servicios externos.",
+      "missing": "Modelo opcional no disponible. Necesita audio-separator instalado y el checkpoint BS-RoFormer con su YAML en app/ckpts/roformer. No se descarga nada automáticamente.",
+      "error": "No se pudo comprobar el modelo opcional.",
+      "retry": "Comprobar de nuevo"
+    }
   },
   "title": "Estudio de escenas 3D",
   "subtitle": "Elige un plano, coloca tus objetos y pulsa Reproducir.",
@@ -143,6 +202,27 @@
   "position": "Posición (m)",
   "yaw": "Giro Y (°)",
   "keepAssets": "Conservar mis objetos al cambiar de plano",
+  "userTemplates": {
+    "title": "Mis escenarios",
+    "help": "Exporta un tipo de escenario (cámara, decorado, disposición, recorrido) como JSON intercambiable. Impórtalo aquí para reutilizarlo. No es el JSON de un plano y no empaqueta los GLB.",
+    "name": "Nombre del escenario",
+    "description": "Descripción (opcional)",
+    "includeAssets": "Incluir URL duraderas de la galería (nunca archivos blob:)",
+    "export": "Exportar plantilla de escenario",
+    "import": "Importar plantilla de escenario",
+    "chooseFile": "Archivo JSON de plantilla de escenario",
+    "exported": "Escenario guardado en este navegador y descargado como archivo .world3d.template.json.",
+    "imported": "Escenario añadido a Mis escenarios. Púlsalo para aplicarlo a este plano.",
+    "removed": "Escenario eliminado de este navegador.",
+    "empty": "Aún no hay escenarios importados. Exporta el plano actual o importa un archivo .world3d.template.json.",
+    "noDescription": "Cámara, decorado y disposición de objetos de un escenario compartido.",
+    "remove": "Quitar",
+    "needTitle": "Pon un nombre al escenario antes de exportarlo.",
+    "invalid": "No se pudo importar: el archivo no es una plantilla de escenario de Video 3D.",
+    "tooLarge": "El archivo de plantilla supera 1,5 MB.",
+    "saveFailed": "No se pudo guardar el escenario en este navegador (almacenamiento lleno o bloqueado).",
+    "openAsShot": "Este archivo es una plantilla de escenario. Impórtalo desde Mis escenarios, no como JSON de plano."
+  },
   "cameraHelp": "Puedes cambiar la cámara; tus objetos conservan su identidad.",
   "category": {
     "cinema": "Cine",
@@ -152,9 +232,18 @@
     "drive": "Conducción"
   },
   "template": {
-    "speech-portrait": {"title":"Retrato hablando","description":"Primer plano con voz, boca integrada y expresiones."},
-    "speech-dialogue": {"title":"Diálogo con lip-sync","description":"Dos personajes, cada uno con su voz e inicio ajustable."},
-    "speech-presenter": {"title":"Presentador con voz","description":"Plano medio para narración y animación corporal con lip-sync."},
+    "speech-portrait": {
+      "title": "Retrato hablando",
+      "description": "Primer plano con voz, boca integrada y expresiones."
+    },
+    "speech-dialogue": {
+      "title": "Diálogo con lip-sync",
+      "description": "Dos personajes, cada uno con su voz e inicio ajustable."
+    },
+    "speech-presenter": {
+      "title": "Presentador con voz",
+      "description": "Plano medio para narración y animación corporal con lip-sync."
+    },
     "two-shot": {
       "title": "Plano de dos",
       "description": "Encuadre equilibrado de dos sujetos con aproximación suave."
@@ -430,6 +519,54 @@
     "product-finale": {
       "title": "Final de producto",
       "description": "Presentación amplia con protagonista y tres pantallas."
+    },
+    "tv-head-walk": {
+      "title": "Caminata cabeza CRT",
+      "description": "Humanoide generado (piernas, cuerpo, brazos) con un televisor CRT antiguo de cabeza. El plano de la cara va en el hueso headfront."
+    },
+    "reflective-stage": {
+      "title": "Escenario reflectante",
+      "description": "Suelo metálico, portal de energía y niebla suave."
+    },
+    "character-materialization": {
+      "title": "Materialización de personaje",
+      "description": "Fotos detrás, rayo y personaje animado centrado sobre una tarima."
+    },
+    "blast-stage": {
+      "title": "Explosión en suelo",
+      "description": "Explosión cinematográfica sobre el metal: destello, bola de fuego, onda, escombros y humo."
+    },
+    "server-inspection": {
+      "title": "Inspección de servidor",
+      "description": "Una grúa baja hacia el rack mientras el inspector entra por el pasillo."
+    },
+    "coding-desk": {
+      "title": "Mesa de código",
+      "description": "El programador se sienta en el taller; el monitor es una pantalla intercambiable."
+    },
+    "tracking-chase": {
+      "title": "Persecución en travelling",
+      "description": "Un travelling lateral sigue a dos corredores; entran por la izquierda y salen por la derecha."
+    },
+    "character-presentation": {
+      "title": "Presentación de personaje",
+      "description": "Una órbita alrededor del héroe que materializa sobre una tarima reflectante."
+    },
+    "screen-alert": {
+      "title": "Alerta en pantalla",
+      "description": "El operador corre hacia el mural de alerta cuando el rayo golpea el cristal."
+    },
+    "product-comparison": {
+      "title": "Comparación de producto",
+      "description": "Dos productos entran desde lados opuestos mientras la cámara orbita el par."
+    },
+    "topic-travelling": {
+      "title": "Travelling temático",
+      "description": "La guía recorre un pasillo de plaza junto a pantallas de tema intercambiables."
+    },
+    "heroic-close": {
+      "title": "Cierre heroico",
+      "description": "Un empuje bajo a la cara mientras el héroe entra en primer plano."
     }
   },
   "gallerySearch": "Buscar en el catálogo",
@@ -448,6 +585,10 @@
   "animationFitHint": "Reproduce una vez la animación restante durante la duración actual del plano (velocidad 0,1–4×). Aplícalo de nuevo si cambias la duración o el inicio.",
   "clipNumber": "Número de clip",
   "duration": "Duración (s)",
+  "frameFormat": "Formato de encuadre",
+  "frameFormatLandscape": "Horizontal 16:9 (1280×720)",
+  "frameFormatPortrait": "Móvil 9:16 (720×1280)",
+  "frameRate": "Cadencia (fps)",
   "saveDocument": "Guardar plano JSON",
   "loadDocument": "Abrir plano JSON",
   "invalidDocument": "No se pudo abrir: el archivo no es un plano 3D válido.",
@@ -493,7 +634,18 @@
   "screens": {
     "add": "Añadir pantalla",
     "title": "Pantalla multimedia",
-    "attach": "Usar una malla como pantalla",
+    "attach": "Poner cara / pantalla en este personaje",
+    "mode": "Cómo anclar",
+    "modePlane": "Anclar un plano (cabeza-tele, sprites)",
+    "modeMesh": "Pintar una malla existente",
+    "anchor": "Hueso o nodo",
+    "chooseAnchor": "Elige un hueso o nodo",
+    "offsetX": "Desfase X",
+    "offsetY": "Desfase Y",
+    "offsetZ": "Desfase Z",
+    "yaw": "Yaw (°)",
+    "pitch": "Inclinación (°)",
+    "roll": "Giro (°)",
     "mesh": "Malla de la pantalla",
     "chooseMesh": "Elige una malla",
     "content": "Imagen o vídeo en la pantalla",
@@ -514,5 +666,30 @@
     "clockHelp": "El vídeo sigue el tiempo de la escena. Su audio está silenciado.",
     "remove": "Quitar pantalla",
     "failed": "No se pudo cargar la pantalla. Comprueba la malla y el archivo."
+  },
+  "library": {
+    "name": "Nombre de la escena",
+    "save": "Guardar escena en galería",
+    "open": "Abrir escena",
+    "help": "Elige una escena de Vídeo 3D guardada. Al elegir reemplazas el plano actual; guárdalo antes para conservar tus cambios. También puedes importar y exportar JSON.",
+    "saved": "Escena guardada en esta carpeta. Usa Abrir escena para recuperarla.",
+    "changed": "La escena cambió mientras se cargaba. Vuelve a elegirla para reemplazar la actual.",
+    "previewUnavailable": "Espera a que cargue la vista 3D antes de guardar.",
+    "saveFailed": "No se pudo guardar la escena.",
+    "cancelLoad": "Cancelar carga"
+  },
+  "cinematic": {
+    "title": "Entorno cinematográfico",
+    "floor": "Suelo metálico reflectante",
+    "platform": "Tarima de materialización",
+    "bloom": "Resplandor",
+    "help": "Elige una imagen de fondo y selecciona Fondo de escena completo en su control Superficie. La imagen llena el encuadre; es un fondo ilustrado, no arquitectura 3D.",
+    "appearance": "Materializar personaje",
+    "start": "Inicio (s)",
+    "duration": "Aparición (s)",
+    "color": "Color de energía",
+    "idle": "Mantener una pose viva",
+    "idleHelp": "Usa la animación elegida en su punto de inicio con un movimiento corporal sutil. Elige un fotograma relajado de reposo o de andar; no se transfieren animaciones entre rigs.",
+    "background": "Fondo de escena completo"
   }
 }

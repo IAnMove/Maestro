@@ -1,13 +1,14 @@
 import { lazy, Suspense, useRef, useCallback, useState, useEffect, useLayoutEffect, useMemo, type JSX } from 'react'
 import { Film, Play, Square, Loader2, X, BookMarked, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react'
 import { TabFilter } from './TabFilter'
+import { visibleWorkspaceSurface } from '../../lib/navigationCategories'
 import { ThumbnailGallery } from './ThumbnailGallery'
 import { GalleryViewSwitcher } from './GalleryViewSwitcher'
 import { MediaFeedItem } from './MediaFeedItem'
 import { useStore } from '../../stores/useStore'
 import { jobFitsGalleryFilter } from '../../lib/galleryListQuery'
 import type { GenerationJob } from '../../types'
-import { stageSceneForEditor } from '../../lib/sceneOutput'
+import { openSceneOutput } from '../../lib/sceneOutput'
 import {
   clearVideoEditorReplacementTarget,
   readVideoEditorReplacementTarget,
@@ -23,6 +24,8 @@ import {
 } from './mediaFeedSizing'
 
 const GalleryLayouts = lazy(() => import('./GalleryLayouts'))
+const DirectGenerationWorkspace = lazy(() => import('../Sidebar/Sidebar').then(module => ({ default: module.DirectGenerationWorkspace })))
+const DirectorWorkspace = lazy(() => import('../Sidebar/DirectorChat').then(module => ({ default: module.DirectorChat })))
 const SceneAnimatorPanel = lazy(() => import('../Sidebar/SceneAnimatorPanel')
   .then(module => ({ default: module.SceneAnimatorPanel })))
 const Scene3DEditorPanel = lazy(() => import('../../features/scene3d/Scene3DEditorPanel')
@@ -302,6 +305,11 @@ export function MainContent() {
   const selectedOutput = useStore(s => s.selectedOutput)
   const setMediaFilter = useStore(s => s.setMediaFilter)
   const mediaFilter = useStore(s => s.mediaFilter)
+  const sidebarMode = useStore(s => s.sidebarMode)
+  const sidebarOpen = useStore(s => s.sidebarOpen)
+  const settingsOpen = useStore(s => s.settingsOpen)
+  const dashboardOpen = useStore(s => s.dashboardOpen)
+  const workspaceSurface = visibleWorkspaceSurface({ mediaFilter, sidebarMode, sidebarOpen, settingsOpen, dashboardOpen })
   const developerMode = useStore(s => s.developerMode)
   const setGalleryFeedAtTop = useStore(s => s.setGalleryFeedAtTop)
   const visibleJobs = jobs.filter(job => jobFitsGalleryFilter(job, mediaFilter))
@@ -447,8 +455,7 @@ export function MainContent() {
   const handleThumbnailClick = useCallback((index: number) => {
     const file = outputs[index]
     if (file?.type === 'scene') {
-      void stageSceneForEditor(file)
-        .then(() => setMediaFilter('scene3d'))
+      void openSceneOutput(file)
         .catch(error => console.error('Failed to open scene:', error))
       return
     }
@@ -524,7 +531,7 @@ export function MainContent() {
       }
     }
     requestAnimationFrame(align)
-  }, [getItemHeight, outputs, placeholderTotalHeight, setMediaFilter, setSelectedOutput])
+  }, [getItemHeight, outputs, placeholderTotalHeight, setSelectedOutput])
 
   // Infinite scroll: load more when near the bottom
   const loadingMore = useRef(false)
@@ -607,9 +614,18 @@ export function MainContent() {
       </div>
 
       {/* Content area: feed + thumbnails */}
-      <div className="flex-1 flex flex-row gap-0 overflow-hidden relative">
+      <div className={`flex-1 flex min-h-0 overflow-hidden relative ${workspaceSurface === 'generate' ? 'flex-col xl:flex-row' : 'flex-row'}`}>
         <Suspense fallback={<PanelLoadingFallback />}>
-        {mediaFilter === 'assets' ? (
+        {workspaceSurface === 'generate' && (
+          <div className="flex min-h-0 w-full shrink-0 flex-col border-b border-border xl:h-full xl:max-w-xl xl:border-b-0 xl:border-r 2xl:max-w-2xl">
+            <DirectGenerationWorkspace />
+          </div>
+        )}
+        {workspaceSurface === 'director' ? (
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+            <DirectorWorkspace />
+          </div>
+        ) : mediaFilter === 'assets' ? (
           <AssetsPanel />
         ) : mediaFilter === 'projects' ? (
           <ProjectsPanel />

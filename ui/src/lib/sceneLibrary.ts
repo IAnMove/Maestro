@@ -1,4 +1,6 @@
 import type { ApiOutput } from '../api/client'
+import { parseScene3DDocument } from '../features/scene3d/document'
+import type { Scene3DDocument } from '../features/scene3d/types'
 import type { Scene } from '../types'
 import { parseSceneFile } from './sceneFile'
 
@@ -37,7 +39,35 @@ export const sceneOutputMatchesName = (file: Pick<ApiOutput, 'name'>, requestedN
   )
 }
 
+function libraryParams(payload: unknown): Record<string, unknown> | null {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null
+  const record = payload as Record<string, unknown>
+  const params = record.params
+  if (params && typeof params === 'object' && !Array.isArray(params)) return params as Record<string, unknown>
+  return record
+}
+
+function libraryRecipe(payload: unknown): Record<string, unknown> | null {
+  const params = libraryParams(payload)
+  if (!params) return null
+  const recipe = params.scene_recipe ?? params.recipe
+  return recipe && typeof recipe === 'object' && !Array.isArray(recipe)
+    ? recipe as Record<string, unknown>
+    : null
+}
+
+/** Video3D MP4 sidecars store the real document in the recipe and an empty 2D stub in `scene`. */
+export const isWorld3DLibraryRecipe = (payload: unknown): boolean => libraryRecipe(payload)?.engine === 'world3d'
+
+export const world3dDocumentFromLibraryPayload = (payload: unknown): Scene3DDocument | null => {
+  const recipe = libraryRecipe(payload)
+  return recipe?.engine === 'world3d' ? parseScene3DDocument(recipe.document) : null
+}
+
 export const sceneFromLibraryPayload = (payload: unknown): Scene => {
+  if (isWorld3DLibraryRecipe(payload)) {
+    throw new Error('This output is a Video3D export. Open it in Video 3D.')
+  }
   if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
     const record = payload as Record<string, unknown>
     if (record.version === 1 && Array.isArray(record.layers)) return parseSceneFile(JSON.stringify(record))

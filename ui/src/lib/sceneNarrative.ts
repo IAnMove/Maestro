@@ -1,3 +1,4 @@
+import { sceneFxFields } from '../features/sceneFx/types'
 import { kineticTextFields } from './kineticText'
 import type { Scene, SceneCurve, SceneKeyframe, SceneLayer, SceneLayerType } from '../types'
 import { suggestSeamOccluderKind } from './seamOccluder'
@@ -74,7 +75,7 @@ export type NarrativeTemplateInput = {
   foreground?: { source: string; type?: Extract<SceneLayerType, 'model3d' | 'image' | 'video'>; name?: string }
   width?: number
   height?: number
-  fps?: 30 | 60
+  fps?: 24 | 30 | 60
   duration?: number
   controls?: NarrativeSceneControls
 }
@@ -304,6 +305,7 @@ export const getNarrativeTemplate = (id: NarrativeSceneId) => NARRATIVE_SCENE_TE
  */
 export const carrySceneSidecars = <T extends Scene>(previous: T, next: T): T => ({
   ...next,
+  ...sceneFxFields(previous.sfx),
   ...kineticTextFields(previous.texts),
   ...(previous.audioTracks?.length ? { audioTracks: previous.audioTracks } : {}),
   ...(previous.copilotAudit?.length ? { copilotAudit: previous.copilotAudit } : {}),

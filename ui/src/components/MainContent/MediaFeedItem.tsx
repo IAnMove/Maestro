@@ -8,7 +8,7 @@ import { getStoredAssetUrl, fetchOutputMetadata, getFileUrl, moveOutput, uploadI
 import type { OutputFile, OutputMetadata } from '../../types'
 import { modelDisplayName } from '../../lib/modelDisplay'
 import { getOutputReference } from '../../lib/outputReference'
-import { stageSceneForEditor } from '../../lib/sceneOutput'
+import { openSceneOutput } from '../../lib/sceneOutput'
 import { formatGenerationBreakdown, formatGenerationDuration } from '../../lib/generationTiming'
 import { formatAppAction, formatAppTimestamp } from '../../lib/locale'
 import { useComicStore } from '../../features/comics/store'
@@ -275,8 +275,7 @@ export function MediaFeedItem({ file, index, isActive, onVisible, onMeasured, ma
 
   const handleSelect = useCallback(() => {
     if (isScene) {
-      void stageSceneForEditor(file)
-        .then(() => setMediaFilter('scene3d'))
+      void openSceneOutput(file)
         .catch(error => console.error('Failed to open scene:', error))
       return
     }

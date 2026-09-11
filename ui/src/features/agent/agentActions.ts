@@ -478,8 +478,8 @@ export interface AgentCreateRhythmic3dVideoAction extends AgentLanguageAwareActi
 }
 
 export type AgentSceneWorkflowAction =
-  | { type: 'create_3d_scene'; sceneName: string; durationSeconds: number; width: number; height: number; fps: 30 | 60; confirm: true }
-  | { type: 'set_3d_scene_properties'; sceneName: string; durationSeconds?: number; width?: number; height?: number; fps?: 30 | 60; confirm: true }
+  | { type: 'create_3d_scene'; sceneName: string; durationSeconds: number; width: number; height: number; fps: 24 | 30 | 60; confirm: true }
+  | { type: 'set_3d_scene_properties'; sceneName: string; durationSeconds?: number; width?: number; height?: number; fps?: 24 | 30 | 60; confirm: true }
   | { type: 'add_3d_scene_layer'; sceneName: string; layerName: string; layerType: 'model3d' | 'image' | 'video' | 'overlay' | 'camera'; outputName: string; confirm: true }
   | { type: 'update_3d_scene_layer'; sceneName: string; layerName: string; visible?: boolean; locked?: boolean; confirm: true }
   | { type: 'remove_3d_scene_layer'; sceneName: string; layerName: string; confirm: true }
@@ -1830,10 +1830,35 @@ const EXPLICIT_CANCEL_REQUESTS = [
 ]
 const NEGATED_CANCEL_REQUEST = /\b(?:no|sin|don['’]?t|do\s+not)\b[^.!?\n]{0,24}\b(?:cancel|cancela|canceles|pares|detengas|stop|abort)\b/i
 
+function requestLooksLikeStudioGeneration(text: string): boolean {
+  // Quoted cancel/retry language inside a generate command is scene text,
+  // not permission to kill or relaunch the active GPU job.
+  return isExplicitVideoGenerationRequest(text)
+    || isExplicitImageGenerationRequest(text)
+    || isExplicitAudioGenerationRequest(text)
+    || isExplicit3dGenerationRequest(text)
+    || isExplicitSfxGenerationRequest(text)
+}
+
+function hasTaskControlOutsideSceneText(text: string, patterns: RegExp[]): boolean {
+  // Only the derived classifier input is masked. Never edit the submitted prompt.
+  const unquoted = text.replace(/"(?:\\.|[^"\\])*"|“[^”]*”|«[^»]*»|(?<!\w)'[^']*'(?!\w)|‘[^’]*’/gu, ' ')
+  const controlText = requestLooksLikeStudioGeneration(unquoted) ? unquoted : text
+  return controlText.split(/[.!?;\n]+/).some(part => {
+    const clause = part.trim()
+    return patterns.some(pattern => {
+      const match = pattern.exec(clause)
+      // A leading task command, or one in a later sentence, keeps authority.
+      // Within a generation clause, later task words describe the scene.
+      return match !== null && !requestLooksLikeStudioGeneration(clause.slice(0, match.index))
+    })
+  })
+}
+
 export function isExplicitCancelRequest(request: string): boolean {
   const text = request.trim()
   if (!text || NEGATED_CANCEL_REQUEST.test(text) || isHowToGenerateQuestion(text)) return false
-  return EXPLICIT_CANCEL_REQUESTS.some(pattern => pattern.test(text))
+  return hasTaskControlOutsideSceneText(text, EXPLICIT_CANCEL_REQUESTS)
 }
 
 const EXPLICIT_RETRY_REQUESTS = [
@@ -1845,7 +1870,7 @@ const NEGATED_RETRY_REQUEST = /\b(?:no|sin|don['’]?t|do\s+not)\b[^.!?\n]{0,24}
 export function isExplicitRetryRequest(request: string): boolean {
   const text = request.trim()
   if (!text || NEGATED_RETRY_REQUEST.test(text) || isHowToGenerateQuestion(text)) return false
-  return EXPLICIT_RETRY_REQUESTS.some(pattern => pattern.test(text))
+  return hasTaskControlOutsideSceneText(text, EXPLICIT_RETRY_REQUESTS)
 }
 
 export function isExplicitVideoGenerationRequest(request: string): boolean {
@@ -2001,12 +2026,19 @@ const HOW_TO_GENERATE = [
   /\bhow\s+to\s+(?:stop|cancel|abort)\b/i,
   /\bwhen\s+(?:should|do|can|would)\s+(?:i|we|you)\s+(?:stop|cancel|abort)\b/i,
   /\bshould\s+(?:i|we)\s+(?:stop|cancel|abort)\b/i,
+  // Capability questions cover cancel and retry. "Can you cancel" stays a command.
+  // Anchor these additions to the request opening, not a caption inside a prompt.
+  /^(?:can|could|may)\s+(?:i|we)\s+(?:please\s+)?(?:stop|cancel|abort|retry|try\s+again)\b/i,
+  /^where\s+(?:do|can|should|would)\s+(?:i|we|you)\s+(?:stop|cancel|abort|retry|try\s+again)\b/i,
+  /^is\s+there\s+a\s+(?:way|button|option|control)\s+to\s+(?:stop|cancel|abort|retry|try\s+again)\b/i,
   /\b(?:what|why)\b[^.!?\n]{0,80}\b(?:stop|cancel|abort)\b/i,
   /\b(?:explain|describe|tell\s+me)\b[^.!?\n]{0,96}\b(?:stop|cancel|abort)\b/i,
   /\b(?:c[oó]mo(?:\s+(?:lo|la|las|los|puedo|se))?\s+(?:paro|parar|cancelo|cancelar|detengo|detener))\b/i,
   /\b(?:cu[aá]ndo|por\s+qu[eé]|qu[eé]\s+pasa)\b[^.!?\n]{0,80}\b(?:paro|parar|cancelo|cancelar|detengo|detener|stop|cancel)\b/i,
   /\b(?:puedo|podemos|podr[ií]a)\s+(?:cancelar|parar|detener)\b/i,
   /\b(?:debo|deber[ií]a)\s+(?:cancelar|parar|detener)\b/i,
+  /^(?:¿\s*)?d[oó]nde\b[^.!?\n]{0,80}\b(?:paro|parar|cancelo|cancelar|detengo|detener|reintento|reintentar|repite|repetir|stop|cancel|retry)\b/i,
+  /^(?:¿\s*)?(?:hay|existe)\s+(?:(?:alguna?|un|una)\s+)?(?:forma|manera|modo|bot[oó]n|opci[oó]n)\s+(?:de|para)\s+(?:cancelar|parar|detener|reintentar|repetir)\b/i,
   // Educational retry questions must not relaunch a failed GPU job.
   /\bhow\s+(?:can|do|would|should)\s+(?:i|we|you)\s+(?:retry|try\s+again)\b/i,
   /\bhow\s+to\s+(?:retry|try\s+again)\b/i,
@@ -2020,10 +2052,32 @@ const HOW_TO_GENERATE = [
   /\b(?:debo|deber[ií]a)\s+(?:reintentar|repetir)\b/i,
   // UI-label questions mention "generate video" without being a launch command.
   /\bwhat\s+does\b[^.!?\n]{0,80}\b(?:the\s+)?(?:generate|genera|launch|start)\b/i,
+  /^how\s+does\b[^.!?\n]{0,80}\b(?:the\s+)?(?:generate|genera|launch|start)\b/i,
+  /^what\s+is\b[^.!?\n]{0,80}\b(?:the\s+)?(?:generate\s+video|generate\s+button|video\s+generation|generation\s+workflow)\b/i,
   /\btell\s+me\s+about\b[^.!?\n]{0,64}\b(?:the\s+)?(?:generate\s+video|video\s+generation|generation\s+workflow)\b/i,
   /\bexpli(?:ca|came)\b[^.!?\n]{0,80}\b(?:qu[eé]\s+)?(?:significa|hace)\b[^.!?\n]{0,48}\b(?:genera|generate)\b/i,
   /\bqu[eé]\s+hace\b[^.!?\n]{0,80}\b(?:el\s+)?(?:bot[oó]n\s+)?(?:genera|generate)\b/i,
+  /^(?:¿\s*)?qu[eé]\s+(?:es|significa)\b[^.!?\n]{0,80}\b(?:el\s+)?(?:bot[oó]n\s+)?(?:genera|generate)\b/i,
+  /^(?:¿\s*)?c[oó]mo\s+funciona\b[^.!?\n]{0,80}\b(?:el\s+)?(?:bot[oó]n\s+)?(?:genera|generate)\b/i,
 ]
+
+// A real launch clause: verb plus a Studio medium in the same sentence.
+// Bare start/create/make must not disable how-to for a later question
+// ("Start over. How do I generate a video?").
+const OPENS_WITH_GENERATION_COMMAND = /^(?:¿\s*)?(?:(?:por favor|please)[, ]+)?(?:haz(?:me)?|haced(?:me)?|genera(?:me|d)?|gen[eé]rame|crea(?:me|d)?|cr[eé]ame|lanza(?:d)?|encola(?:d)?|renderiza(?:d)?|make|create|generate|render|launch|start|queue)\b[^.!?\n]{0,200}\b(?:v[ií]deos?|clips?|imagen(?:es)?|fotos?|retratos?|ilustraci[oó]n(?:es)?|images?|pictures?|photos?|portraits?|illustrations?|audio|canciones?|canci[oó]n|m[uú]sica|songs?|music|voices?|speech|tracks?|voz(?:es)?|3d)\b/i
+
+// Spoken filler before a real how-to. Do not unanchor the ^ patterns:
+// a caption inside the same generate sentence must stay a launch command.
+const HOW_TO_SPOKEN_PREFIX = /^(?:¿\s*)?(?:(?:hey|hi|hello|wait|ok|okay|so|um+|please|por\s+favor|oye|bueno|mira)[,.]?\s+)+/i
+
+function howToQuestionClauses(text: string): string[] {
+  const window = text.slice(0, 240)
+  // Only clause windows: the raw 240-character span would let unanchored
+  // "how to make" inside a later generate sentence classify the whole turn
+  // as educational ("Start over. Generate a video about how to make pasta").
+  // Do not split on newlines: a caption can wrap without becoming a new request.
+  return window.split(/[.!?]+/).map(clause => clause.replace(HOW_TO_SPOKEN_PREFIX, '').trim()).filter(Boolean)
+}
 
 export function isHowToGenerateQuestion(request: string): boolean {
   const text = request.trim()
@@ -2031,7 +2085,14 @@ export function isHowToGenerateQuestion(request: string): boolean {
   // Classify from the opening window so a long explanation after
   // "how do I generate a video?" stays educational. A later command
   // after 240 characters is treated as a separate request.
-  return HOW_TO_GENERATE.some(pattern => pattern.test(text.slice(0, 240)))
+  const clauses = howToQuestionClauses(text)
+  // The first clause is the user intent. If it is already a generate
+  // command, later !/? fragments are scene text, not a product question.
+  if (clauses[0] && OPENS_WITH_GENERATION_COMMAND.test(clauses[0])) return false
+  return clauses.some(part => {
+    if (OPENS_WITH_GENERATION_COMMAND.test(part)) return false
+    return HOW_TO_GENERATE.some(pattern => pattern.test(part))
+  })
 }
 
 const LABS_INVENTORY = /(?:¿\s*)?(?:qu[eé]\s+puedes\s+hacer|what\s+can\s+you\s+do)(?:\s+(?:en|in|con|with))?\s+(?:el\s+)?(?:series\s+lab|story\s+lab)/i
@@ -2694,7 +2755,7 @@ export const HOCUSPOCUS_AGENT_RESPONSE_SCHEMA: Record<string, unknown> = mergeRe
           output_name: { type: 'string', maxLength: 300 },
           width: { type: 'integer', minimum: 320, maximum: 7680 },
           height: { type: 'integer', minimum: 240, maximum: 4320 },
-          fps: { type: 'integer', enum: [30, 60] },
+          fps: { type: 'integer', enum: [24, 30, 60] },
           visible: { type: 'boolean' },
           locked: { type: 'boolean' },
           confirm: { type: 'boolean' },

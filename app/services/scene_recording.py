@@ -85,6 +85,7 @@ def build_scene_recording_command(
     fps: int,
     audio_tracks: Iterable[Mapping[str, object]] = (),
     duration: float | None = None,
+    embedded_audio: bool = False,
 ) -> list[str]:
     """Build a broadly playable H.264/yuv420p MP4 transcode command."""
 
@@ -114,9 +115,12 @@ def build_scene_recording_command(
         "-pix_fmt",
         "yuv420p",
     ]
-    if tracks:
+    if tracks or embedded_audio:
         filters = []
         labels = []
+        if embedded_audio:
+            filters.append('[0:a]aresample=48000[embedded_audio]')
+            labels.append('[embedded_audio]')
         for index, track in enumerate(tracks, start=1):
             start_ms = max(0, round(float(track.get("start_time", 0)) * 1000))
             volume = max(0, min(2, float(track.get("volume", 1))))
@@ -144,6 +148,7 @@ def transcode_scene_recording(
     audio_tracks: Iterable[Mapping[str, object]] = (),
     duration: float | None = None,
     timeout: float = 1800,
+    embedded_audio: bool = False,
 ) -> None:
     """Transcode atomically, exposing the MP4 only after FFmpeg succeeds."""
 
@@ -162,6 +167,7 @@ def transcode_scene_recording(
                 fps=fps,
                 audio_tracks=tracks,
                 duration=duration,
+                embedded_audio=embedded_audio,
             ),
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -180,7 +186,7 @@ def transcode_scene_recording(
             temporary_path,
             expected_duration=duration,
             expected_fps=fps,
-            expected_audio=bool(tracks),
+            expected_audio=bool(tracks) or embedded_audio,
         )
         os.replace(temporary_path, destination_path)
     except subprocess.TimeoutExpired as error:

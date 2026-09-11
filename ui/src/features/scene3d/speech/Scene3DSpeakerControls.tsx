@@ -37,10 +37,9 @@ export function Scene3DSpeakerControls(props: SpeechControlsProps) {
     commit({ ...stored, ...faceSettings(next), enabled: next.enabled, clips: clips.map((item, i) => i === index ? updated : item) })
   }
   return <div className="space-y-2">
-    <CharacterDefinitionEditor workspace={props.workspace} slot={props.slot} disabled={isLocked('definition')}
-      onApply={props.onImport} onBusyChange={setDefinitionBusy} />
-    <section className="space-y-2 rounded-lg border border-border bg-bg-secondary p-3">
-      <h3 className="text-xs font-semibold">{t('speech.interventions')}</h3>
+    <Scene3DSpeechControls key={clip?.id ?? 'voice'} {...props} onBusyChange={setChildBusy} disabled={isLocked('controls')} slot={{ ...props.slot, speech: editing }} onChange={change} />
+    <details open={stored.clips ? true : undefined} className="space-y-2 rounded-lg border border-border bg-bg-secondary p-3">
+      <summary className="cursor-pointer text-xs font-semibold">{t('speech.interventions')}</summary>
       {stored.clips && <select className={speechInput + ' w-full'} aria-label={t('speech.intervention')} value={index}
         disabled={locked} onChange={event => setSelected(Number(event.target.value))}>
         {clips.map((item, i) => <option key={item.id} value={i}>{i + 1} · {item.start.toFixed(2)}–{item.end?.toFixed(2) ?? '…'} s · {item.text || item.audio?.filename || t('speech.voice')}</option>)}
@@ -58,8 +57,8 @@ export function Scene3DSpeakerControls(props: SpeechControlsProps) {
       {stored.clips && clip && <GenerateCharacterLine key={clip.id} clip={clip} voice={props.slot.character?.voice} workspace={props.workspace}
         disabled={isLocked('voice')} onBusyChange={setVoiceBusy}
         onChange={next => { commit({ ...stored, clips: clips.map((item, i) => i === index ? next : item) }); props.onFit(next.end!) }} />}
-    </section>
-    <Scene3DSpeechControls key={clip?.id ?? 'voice'} {...props} onBusyChange={setChildBusy} disabled={isLocked('controls')} slot={{ ...props.slot, speech: editing }} onChange={change} />
+    </details>
+
     <fieldset disabled={locked} className="space-y-2 rounded-lg border border-border p-3 text-xs">
       <SpeechNumber label={t('speech.end')} value={interventionEnd(editing)}
         min={editing.start + .01} max={600} step={.1} onChange={end => { if (!locked) change({ ...editing, end }) }} />
@@ -86,6 +85,10 @@ export function Scene3DSpeakerControls(props: SpeechControlsProps) {
       }}>{t('speech.loadProfile')}</button>
       {notice && <p role="status">{notice}</p>}
     </fieldset>
+    <details className="rounded border border-border p-2"><summary className="cursor-pointer text-xs">{t('speech.characterLibraryAdvanced')}</summary>
+    <CharacterDefinitionEditor workspace={props.workspace} slot={props.slot} disabled={isLocked('definition')}
+      onApply={props.onImport} onBusyChange={setDefinitionBusy} />
+    </details>
   </div>
 }
 

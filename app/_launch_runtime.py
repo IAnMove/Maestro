@@ -7013,6 +7013,13 @@ def get_active_downloads():
     return {"downloads": _get()}
 
 
+@api.get("/api/v1/runtime-capabilities")
+def get_runtime_capabilities():
+    """Installation recipes and detected hardware, without loading AI models."""
+    from services.runtime_profiles import detect_profiles
+    return detect_profiles()
+
+
 @api.get("/api/v1/system-detect")
 def get_system_detect():
     """Return current hardware + the auto-tune recommendation for it.
@@ -9036,6 +9043,7 @@ _AUDIO_ANALYSIS_STEPS = {
     "extracting_vocals": 5,
     "loading_transcription_model": 5,
     "transcribing": 6,
+    "aligning_lyrics": 7,
     "loading_diarization_model": 7,
     "identifying_speakers": 8,
     "finalizing": 9,
@@ -9504,6 +9512,16 @@ async def director_classify_sections(request: Request):
         return {"sections": sections, "method": "heuristic"}
 
     try:
+        timed_structure = audio_analysis.structure_from_aligned_lyrics(
+            analysis.get("lyric_timeline") or []
+        )
+        if timed_structure:
+            updated = audio_analysis.replace_sections_with_structure(analysis, timed_structure)
+            return {
+                "sections": updated["sections"],
+                "song_structure": timed_structure,
+                "method": "lyrics_timeline",
+            }
         tagged_structure = llm_service.structure_from_tagged_lyrics(lyrics_hint, duration)
         if tagged_structure:
             updated = audio_analysis.replace_sections_with_structure(analysis, tagged_structure)
@@ -26626,6 +26644,7 @@ def _write_scene_recording_sidecar(output_path, sidecar, workspace_id):
 async def save_scene_recording(
     file: UploadFile = File(...),
     metadata: str = Form("{}"),
+    audio: UploadFile | None = File(None),
 ):
     """Convert a browser WebM capture to MP4 and publish it in Videos.
 
@@ -26704,11 +26723,15 @@ async def save_scene_recording(
     output_name = f"{stamp}_{safe_name}_3d_{uuid.uuid4().hex[:6]}.mp4"
     output_path = os.path.join(out_dir, output_name)
     upload_path = os.path.join(out_dir, f".{uuid.uuid4().hex}.scene-recording.webm")
+    upload_audio_path = os.path.join(out_dir, f".{uuid.uuid4().hex}.scene-audio.wav")
     fps = 60 if scene.get("fps") == 60 else 30
     started_at = time.time()
 
     try:
         await _stream_upload(file, upload_path, max_bytes=MAX_IMAGE_UPLOAD_BYTES)
+        if audio is not None:
+            await _stream_upload(audio, upload_audio_path, max_bytes=32 * 1024 * 1024)
+            audio_tracks.append({"path": upload_audio_path, "start_time": 0, "volume": 1})
         async with _UPLOAD_TRANSCODE_SLOTS:
             await asyncio.to_thread(
                 transcode_scene_recording,
@@ -26717,6 +26740,7 @@ async def save_scene_recording(
                 fps=fps,
                 audio_tracks=audio_tracks,
                 duration=float(scene.get("duration") or 0),
+                embedded_audio=details.get("embeddedAudio") is True,
             )
     except UploadTooLargeError as error:
         raise HTTPException(status_code=413, detail="Recording is too large (max 500 MB)") from error
@@ -26725,6 +26749,11 @@ async def save_scene_recording(
     except Exception as error:
         raise HTTPException(status_code=500, detail=f"Could not save MP4 recording: {error}") from error
     finally:
+        try:
+            if os.path.isfile(upload_audio_path):
+                os.remove(upload_audio_path)
+        except OSError:
+            pass
         try:
             if os.path.isfile(upload_path):
                 os.remove(upload_path)
@@ -36891,16 +36920,50 @@ from routers.image_generation_commands import (
 )
 from services.workspace_commands import catalog as workspace_command_catalog
 
+from services.scene_commands import SceneCommands, command_catalog as scene_command_catalog
+from routers.scene_commands import create_scene_commands_router
+_scene_commands = SceneCommands(_workspace_dir)
+api.include_router(create_scene_commands_router(_scene_commands))
+from routers.world3d_export import create_world3d_export_router
+from services.world3d_export import World3DExportService, command_catalog as world3d_export_catalog, command_handlers as world3d_export_handlers
+_world3d_export = World3DExportService(
+    workspace_dir=_workspace_dir,
+    registry_for=_task_registry,
+    app_url=os.environ.get("HOCUS_APP_URL", ""),
+)
+api.include_router(create_world3d_export_router(_world3d_export))
+
+from services.mcp_access import McpAccess
+from routers.mcp_access import create_mcp_access_router
+_mcp_access = McpAccess(os.path.join(os.path.dirname(__file__), 'settings', 'mcp-access.json'))
+api.include_router(create_mcp_access_router(_mcp_access))
+
 _image_generation_commands = create_image_generation_commands(globals())
 api.include_router(create_image_generation_commands_router(_image_generation_commands))
+from routers.wizard_workflow_executor import create_wizard_workflow_executor_router
+from services.wizard_workflow_executor import WizardWorkflowExecutor, catalog as wizard_workflow_catalog, command_handlers as wizard_workflow_command_handlers
+_wizard_workflow_executor = WizardWorkflowExecutor(
+    workspace_dir=_workspace_dir,
+    submit_command=_image_generation_commands.submit,
+    command_receipt=_image_generation_commands.receipt,
+    get_task=lambda workspace, task_id: _task_registry(workspace).get(task_id),
+)
+api.include_router(create_wizard_workflow_executor_router(_wizard_workflow_executor))
 api.include_router(create_wangp_mcp_router(
+    token_getter=_mcp_access.token,
     handlers={"models": lambda args: get_model_options(args['model_type']) if args.get('model_type') else list_models(), "processors": wangp_capabilities, "status": get_status,
               "generate": generate, "recast": recast_endpoint, "upscale": tools_upscale,
-              **wangp_agent_handlers(api), **image_command_handlers(_image_generation_commands)},
+              **wangp_agent_handlers(api), **image_command_handlers(_image_generation_commands), **wizard_workflow_command_handlers(_wizard_workflow_executor), **world3d_export_handlers(_world3d_export), **_scene_commands.handlers()},
     journal_path=os.path.join(os.path.dirname(__file__), "settings", "wangp-mcp-requests.sqlite3"),
-    command_operations=[*workspace_command_catalog()["operations"], *image_command_catalog(
-        adapter.catalog for adapter in _image_generation_commands.operations.values())],
+    command_operations=[*scene_command_catalog(), *workspace_command_catalog()["operations"], *image_command_catalog(
+        adapter.catalog for adapter in _image_generation_commands.operations.values()), *wizard_workflow_catalog(), *world3d_export_catalog()],
 ))
+from routers.system_capabilities import create_system_capabilities_router
+api.include_router(create_system_capabilities_router())
+
+# Optional production renderer: pass a callable that drives the existing
+# Video 3D exportFlow through a process-owned headless browser. Closing a
+# user tab must not join or kill that worker.
 
 # ============================================================================
 # Serve React build at /
@@ -36921,14 +36984,17 @@ _mimetypes.add_type("text/css", ".css")
 _mimetypes.add_type("image/svg+xml", ".svg")
 
 _ui_dist = os.path.normpath(os.path.join(_app_dir, "..", "ui", "dist"))
-if os.path.isdir(_ui_dist):
+from services.ui_distribution import build_status as _ui_build_status, recovery_html as _ui_recovery_html
+_ui_ready = _ui_build_status()["ready"]
+if _ui_ready:
     api.mount("/", StaticFiles(directory=_ui_dist, html=True))
     print(f"[HocusPocus Lab] React UI serving from {_ui_dist}")
 else:
     @api.get("/")
     def index():
-        return {"message": "React UI not built. Run: cd ui && npm install && npm run build"}
-    print(f"[HocusPocus Lab] React UI not found at {_ui_dist} - serving API only")
+        from fastapi.responses import HTMLResponse
+        return HTMLResponse(_ui_recovery_html(), status_code=503, headers={"Cache-Control": "no-store"})
+    print(f"[HocusPocus Lab] React UI missing or incomplete at {_ui_dist}. Use Repair Web UI, then restart. Serving API only.")
 
 
 # ============================================================================
@@ -37013,7 +37079,7 @@ def run_server():
     display_host = "127.0.0.1" if host == "0.0.0.0" else host
 
     print(f"\n{'='*50}")
-    print(f"  HocusPocus Lab UI: http://{display_host}:{port}/")
+    print(f"  {'HocusPocus Lab UI:' if _ui_ready else 'Web UI repair page (API only):'} http://{display_host}:{port}/")
     # Trailing slash required: the Gradio submount 404s the bare path.
     print(f"  Classic UI:    http://{display_host}:{port}/classic/")
     print(f"  API docs:      http://{display_host}:{port}/docs")

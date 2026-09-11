@@ -12425,10 +12425,15 @@ def _run_comic_renderer_pipeline(
         "concatenate_multi_clip_videos",
         None,
     )
+    # Comic assembly is hard-cut only (see comic_edit_transition forced to
+    # "none" below). Recast/repaint/outpaint pass audio_duration_sec so
+    # concatenate() skips freeze-tail + crossfade. Without that lock, two
+    # shots become hold+xfade and the timeline is longer than the storyboard.
     if not callable(concatenate) or not concatenate(
         clip_paths,
         final_path,
         None,
+        audio_duration_sec=sum(durations),
     ):
         raise RuntimeError(
             "All comic shots passed validation, but final hard-cut assembly "

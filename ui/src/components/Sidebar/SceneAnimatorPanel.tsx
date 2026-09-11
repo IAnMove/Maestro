@@ -1,3 +1,13 @@
+import { sceneAudioWav, supportsSceneAac } from '../../features/sceneFx/audioExport'
+import { paintSceneFx } from '../../features/sceneFx/paint'
+import { mixFxAudio } from '../../features/sceneFx/mix'
+import { encodeSpeechAudio } from '../../features/scene3d/speech/encodeAudio'
+import { presentSceneDocument, useSceneDocumentHandoff } from '../../features/sceneFx/handoff'
+import { galleryWorkspaceEpoch, galleryWorkspaceName } from '../../stores/gallerySlice'
+import { SceneFxControls } from '../../features/sceneFx/SceneFxControls'
+import { SceneFxOverlay } from '../../features/sceneFx/SceneFxOverlay'
+import { isRetroLook } from '../../features/sceneFx/retroPaint'
+import { adoptPreparedSceneDocument, withFxShowcase } from '../../features/sceneFx/showcase'
 import { KineticTextControls } from '../common/KineticTextControls'
 import { KineticTextOverlay } from '../common/KineticTextOverlay'
 import { paintKineticTexts, parseKineticTexts } from '../../lib/kineticText'
@@ -34,13 +44,14 @@ import { sceneToRecipe } from '../../lib/sceneToRecipe'
 import { parseSceneFile, sceneFileName, serializeSceneFile } from '../../lib/sceneFile'
 import { SceneLibraryDialog } from './SceneLibraryDialog'
 import { PENDING_SCENE_KEY } from '../../lib/sceneOutput'
-import { normalizeSceneLookupName, sceneFromLibraryPayload, sceneLibraryTitle, sceneOutputMatchesName } from '../../lib/sceneLibrary'
+import { loadAgentLibraryScene } from '../../lib/agentSceneOpen'
+import { normalizeSceneLookupName } from '../../lib/sceneLibrary'
 import { assessNarrativeAsset } from '../../lib/assetSuitability'
 import { getSceneClipTime } from '../../lib/sceneClip'
 import { sanitizeSceneMotion } from '../../lib/sceneMotion'
 import { applySceneRhythmToLayer, buildSceneRhythmMap, type SceneRhythmCueSource, type SceneRhythmProfile } from '../../lib/sceneRhythm'
 import { applyCutoutDialogue, bindCutoutFaceToPose, ensureCutoutFacePlayback, findCutoutMouthLayers, isCutoutFaceLayer, normalizeFaceBinding, planCutoutDialogue, rebuildCutoutDialogueLayers, type SceneDialogueBeat } from '../../lib/cutoutDialogue'
-import { captureCharacterFaceAnchor, characterKitAssetFromLayer, createCharacterKit, emptyCharacterKitLibrary, mountCharacterKitLayers, syncMountedCharacterKitLayers, syncSceneCharacterKits, type CharacterKit, type CharacterKitAlphaStatus, type CharacterMouthState } from '../../lib/characterKit'
+import { captureCharacterFaceAnchor, characterKitAssetFromLayer, claimUnusedCharacterKitId, createCharacterKit, emptyCharacterKitLibrary, mountCharacterKitLayers, syncMountedCharacterKitLayers, syncSceneCharacterKits, type CharacterKit, type CharacterKitAlphaStatus, type CharacterMouthState } from '../../lib/characterKit'
 import { consumeFaceRigHandoff, FACE_RIG_HANDOFF_EVENT, kitFromFaceRigHandoff } from '../../lib/characterKitHandoff'
 import { rememberCharacterKitLibrary, rememberVideo3dScene } from '../../features/agent/wizardLabSession'
 import { carrySceneSidecars, createNarrativeScene, getNarrativeTemplate, type NarrativeSceneId, type NarrativeTemplateInput } from '../../lib/sceneNarrative'
@@ -48,6 +59,7 @@ import { applySceneCopilotProposal, buildSceneCopilotSystemPrompt, buildSceneSco
 import { evaluateSceneLayer, getSceneEvents, getSceneKeyframes, getSceneLayerTiming, mapSceneAnimationPoints, normalizeSceneEvents, normalizeSceneKeyframes, sceneLayerMotionProgress, sceneProgressFromSeconds, sceneTimeToLayerTime, withNormalizedSceneTiming, withSceneKeyframes } from '../../lib/sceneTimeline'
 import { normalizeSeamOccluder, paintSeamOccluder, seamOccluderDataUri, type SeamOccluderKind } from '../../lib/seamOccluder'
 import type { AudioAnalysisResult, Scene, SceneAnimationEvent, SceneAtmosphereKind, SceneBlendMode, SceneCurve, SceneFrameRate, SceneKeyframe, SceneLayer, SceneLayerType, SceneMask } from '../../types'
+import { canonicalSceneFps } from '../../lib/sceneFps.ts'
 import { SceneTimeline } from './SceneTimeline'
 import { CylinderPanoramaComparison } from './CylinderPanoramaComparison'
 import { CharacterKitLibraryPanel } from '../../features/characters/CharacterKitLibraryPanel'
@@ -501,6 +513,7 @@ export function SceneAnimatorPanel() {
   const workspace = useStore(s => s.activeWorkspace)
   const setGenerationMode = useStore(s => s.setGenerationMode)
   const setSidebarMode = useStore(s => s.setSidebarMode)
+  const setMediaFilter = useStore(s => s.setMediaFilter)
   const setSidebarOpen = useStore(s => s.setSidebarOpen)
   const selectedSpeechModel = useStore(s => s.selectedModelPerAudioSubMode.speech ?? 'kugelaudio_0_open')
   const [scene, setScene] = useState<AnimatorScene>(blankScene)
@@ -595,6 +608,7 @@ export function SceneAnimatorPanel() {
   const [clipDurationsByLayer, setClipDurationsByLayer] = useState<Record<string, number>>({})
 
   const canvasRef = useRef<HTMLDivElement>(null)
+  const retroCanvasRef = useRef<HTMLCanvasElement>(null)
   const animationRef = useRef<number | null>(null)
   const recordingAnimationRef = useRef<number | null>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
@@ -634,7 +648,7 @@ export function SceneAnimatorPanel() {
     return [t('animator.suggestionDefault1'), t('animator.suggestionDefault2')]
   })() : []
   const composition = { ...DEFAULT_COMPOSITION, ...scene.composition }
-  const fps: SceneFrameRate = scene.fps === 60 ? 60 : 30
+  const fps: SceneFrameRate = canonicalSceneFps(scene.fps)
   const snapCoordinate = (value: number) => composition.snap ? Math.round(value / Math.max(1, composition.gridSize)) * Math.max(1, composition.gridSize) : value
   const generatedModels = outputs.filter(output => output.type === 'model3d' && /\.glb$/i.test(output.name))
   const generatedMedia = outputs.filter(output => output.type === 'image' || output.type === 'video')
@@ -1770,7 +1784,7 @@ export function SceneAnimatorPanel() {
       const previousObjectUrls = new Set(sceneRef.current.layers.flatMap(layer => [layer.source, layer.thumbnail].filter((value): value is string => Boolean(value?.startsWith('blob:')))))
       previousObjectUrls.forEach(url => URL.revokeObjectURL(url))
       const missingAssets = layers.filter(layer => layer.type !== 'camera' && layer.missingAsset).length
-      generationRef.current += 1; pendingBindRef.current = null; localFilesRef.current = {}; pastScenesRef.current = []; futureScenesRef.current = []; lastHistoryAtRef.current = 0; replaceScene({ ...blankScene(), ...incoming, texts: parseKineticTexts(incoming.texts), name: typeof incoming.name === 'string' && incoming.name.trim() ? incoming.name : 'Imported scene', width, height, fps: incoming.fps === 60 ? 60 : 30, duration, layers, composition }); setHistoryRevision(value => value + 1); setSelectedId(layers[0]?.id ?? null); setSelectedKeyframeId(null); setSelectedEventId(null); setProgress(0); setMessage(successMessage ?? `${t('animator.imported', { count: layers.length })}${missingAssets ? t('animator.reassignMissing', { count: missingAssets }) : ''}`); setJsonOpen(false)
+      generationRef.current += 1; pendingBindRef.current = null; localFilesRef.current = {}; pastScenesRef.current = []; futureScenesRef.current = []; lastHistoryAtRef.current = 0; replaceScene({ ...blankScene(), ...incoming, texts: parseKineticTexts(incoming.texts), name: typeof incoming.name === 'string' && incoming.name.trim() ? incoming.name : 'Imported scene', width, height, fps: canonicalSceneFps(incoming.fps), duration, layers, composition }); setHistoryRevision(value => value + 1); setSelectedId(layers[0]?.id ?? null); setSelectedKeyframeId(null); setSelectedEventId(null); setProgress(0); setMessage(successMessage ?? `${t('animator.imported', { count: layers.length })}${missingAssets ? t('animator.reassignMissing', { count: missingAssets }) : ''}`); setJsonOpen(false)
       return true
     } catch (error) { setMessage(error instanceof Error ? error.message : t('animator.invalidSceneJson')); return false }
   }
@@ -1892,9 +1906,20 @@ export function SceneAnimatorPanel() {
           context.restore()
         })
       })
+    paintSceneFx(context, canvas.width, canvas.height, sceneSeconds, current.sfx)
     paintKineticTexts(context, canvas.width, canvas.height, sceneSeconds, current.texts)
     return true
   }
+  const sceneSecondsNow = progress * scene.duration
+  const retroLive = (scene.sfx ?? []).some(cue => isRetroLook(cue.kind) && sceneSecondsNow >= cue.start && sceneSecondsNow < cue.end)
+  useEffect(() => {
+    if (!retroLive) return
+    const canvas = retroCanvasRef.current
+    if (!canvas) return
+    canvas.width = scene.width
+    canvas.height = scene.height
+    paintScene(canvas, progress)
+  })
   // Compatibility fallback for browsers without WebCodecs. Chromium uses the
   // deterministic MP4 path below so slow WebGL frames never change timing.
   const recordCompatibilityWebm = (): Promise<Blob> => new Promise((resolve, reject) => {
@@ -1902,8 +1927,8 @@ export function SceneAnimatorPanel() {
     if (playing) { const error = new Error(t('animator.waitPreview')); setMessage(error.message); reject(error); return }
     prepareFacePlayback()
     const current = sceneRef.current
-    const currentFps: SceneFrameRate = current.fps === 60 ? 60 : 30
-    if (!current.layers.some(layer => layer.visible && isVisualLayer(layer))) { const error = new Error(t('animator.addVisibleLayer')); setMessage(error.message); reject(error); return }
+    const currentFps: SceneFrameRate = canonicalSceneFps(current.fps)
+    if (!current.sfx?.length && !current.layers.some(layer => layer.visible && isVisualLayer(layer))) { const error = new Error(t('animator.addVisibleLayer')); setMessage(error.message); reject(error); return }
     if (!('MediaRecorder' in window)) { const error = new Error(t('animator.cannotRecord')); setMessage(error.message); reject(error); return }
     const canvas = document.createElement('canvas'); canvas.width = current.width; canvas.height = current.height; const context = canvas.getContext('2d'); if (!context) { reject(new Error('Could not create a recording canvas.')); return }
     if (!('filter' in context) && current.layers.some(layer => isVisualLayer(layer) && hasCanvasFilterEffects(normalizedEffects(layer.effects)))) { const error = new Error(t('animator.filterCapture')); setMessage(error.message); reject(error); return }
@@ -2107,8 +2132,8 @@ export function SceneAnimatorPanel() {
       return recordCompatibilityWebm()
     }
     const current = sceneRef.current
-    const fps: SceneFrameRate = current.fps === 60 ? 60 : 30
-    if (!current.layers.some(layer => layer.visible && isVisualLayer(layer))) throw new Error(t('animator.addVisibleLayer'))
+    const fps: SceneFrameRate = canonicalSceneFps(current.fps)
+    if (!current.sfx?.length && !current.layers.some(layer => layer.visible && isVisualLayer(layer))) throw new Error(t('animator.addVisibleLayer'))
     const canvas = document.createElement('canvas')
     canvas.width = current.width
     canvas.height = current.height
@@ -2126,9 +2151,12 @@ export function SceneAnimatorPanel() {
       throw new Error('This browser cannot encode a deterministic H.264 MP4 at the selected resolution.')
     }
 
+    const mixedFx = await mixFxAudio(current.sfx, current.duration)
+    const fxAudio = mixedFx && (await supportsSceneAac(mixedFx.numberOfChannels >= 2 ? 2 : 1)) ? mixedFx : undefined
     const target = new ArrayBufferTarget()
     const muxer = new Muxer({
       target,
+      ...(fxAudio ? { audio: { codec: 'aac' as const, sampleRate: fxAudio.sampleRate, numberOfChannels: Math.min(2, Math.max(1, fxAudio.numberOfChannels || 1)) } } : {}),
       video: { codec: 'avc', width: current.width, height: current.height, frameRate: fps },
       fastStart: 'in-memory',
       firstTimestampBehavior: 'strict',
@@ -2160,6 +2188,7 @@ export function SceneAnimatorPanel() {
       }
       await encoder.flush()
       if (encoderError) throw encoderError
+      if (fxAudio) await encodeSpeechAudio(muxer, fxAudio)
       muxer.finalize()
       return new Blob([target.buffer], { type: 'video/mp4' })
     } finally {
@@ -2170,21 +2199,37 @@ export function SceneAnimatorPanel() {
     }
   }
 
+  useSceneDocumentHandoff('2d', raw => {
+    if (playing || recording || publishing) throw new Error('Stop playback/export before replacing the scene.')
+    const incoming = raw as AnimatorScene
+    const adopted = adoptPreparedSceneDocument(sceneRef.current, incoming)
+    if (adopted.mode === 'retain') {
+      updateScene(() => adopted.document)
+      return
+    }
+    sessionStorage.setItem('hocuspocus:scene-before-command:' + Date.now(), JSON.stringify(sceneRef.current))
+    if (!importScene(JSON.stringify(adopted.document))) throw new Error('The prepared 2D scene could not be opened.')
+  })
   const publishRecording = async (blob: Blob, current: Scene) => {
     const context = recipeContextRef.current
+    const mixedPublish = await mixFxAudio(current.sfx, current.duration)
+    const buffer = mixedPublish && !(await supportsSceneAac(mixedPublish.numberOfChannels >= 2 ? 2 : 1)) ? mixedPublish : undefined
+    const serverAudio = buffer ? sceneAudioWav(buffer) : undefined
     const saved = await saveSceneRecording(blob, {
       scene: current,
+      embeddedAudio: !serverAudio && Boolean(current.sfx?.some(cue => cue.sound && cue.volume)),
       prompt: context?.prompt ?? '',
       // A user can change every frame-affecting field after mounting the LLM
       // recipe. Persist the current scene as the recipe, rather than calling
       // the stale planning JSON a reproduction of the rendered MP4.
       recipe: sceneToRecipe(current) as unknown as Record<string, unknown>,
       workspace,
-    })
+    }, serverAudio)
     await loadOutputs()
     setMessage(t('animator.mp4Saved', { name: saved.name }))
     return saved
   }
+  const emptyScene = !scene.layers.length && !scene.sfx?.length
   const record = () => {
     if (publishing) return
     setPublishing(true)
@@ -2250,7 +2295,7 @@ export function SceneAnimatorPanel() {
   }
   const persistScene = async (): Promise<string | null> => {
     const current = sceneRef.current
-    if (!current.layers.length) { setMessage(t('animator.addLayerBeforeSave')); return null }
+    if (!current.layers.length && !current.sfx?.length) { setMessage(t('animator.addLayerBeforeSave')); return null }
     setSaving(true); setMessage(null)
     try {
       const preview = document.createElement('canvas')
@@ -2284,7 +2329,11 @@ export function SceneAnimatorPanel() {
   const createKitFromSelected = () => {
     try {
       const asset = kitAssetFromSelected()
-      const next = createCharacterKit(characterKitName || selected?.name || 'Untitled character')
+      const next = createCharacterKit(
+        characterKitName || selected?.name || 'Untitled character',
+        'cutout',
+        Object.keys(characterKitLibraryRef.current.kits),
+      )
       next.base = { ...asset, kind: 'image' }
       next.identityReference = { ...asset, id: `${asset.id}-identity`, kind: 'image' }
       next.provenance = [{ method: 'scene-layer-assignment', sourceLayerId: selected?.id, workspace }]
@@ -2333,7 +2382,10 @@ export function SceneAnimatorPanel() {
   }
   const persistCharacterKitDraft = async (kit: CharacterKit, announce = false) => {
     try {
-      const next = { ...kit, updatedAt: new Date().toISOString() }
+      const next = {
+        ...claimUnusedCharacterKitId(kit, characterKitLibraryRef.current),
+        updatedAt: new Date().toISOString(),
+      }
       const library = await saveCharacterKit(workspace, characterKitLibraryRef.current, next)
       setCharacterKitLibrary(library)
       const saved = library.kits[next.id]
@@ -2417,7 +2469,7 @@ export function SceneAnimatorPanel() {
   const sendImageToPanoramaLoop = () => {
     if (!selected || selected.type !== 'image' || !selected.source) return
     window.sessionStorage.setItem('hocuspocus:panorama-loop-source', JSON.stringify({ url: selected.source, name: selected.name }))
-    setGenerationMode('image'); setSidebarMode('studio'); setSidebarOpen(true)
+    setGenerationMode('image'); setSidebarMode('studio'); setMediaFilter('images'); setSidebarOpen(true)
   }
   const attachSceneAudio = (filename: string, name = filename, kind: 'speech' | 'music' | 'sfx' | 'audio' = 'audio', prompt?: string, model?: string) => {
     if (!filename) return
@@ -2613,7 +2665,7 @@ export function SceneAnimatorPanel() {
     }
     if (request.type === 'export_3d_scene') {
       const current = assertScene()
-      if (!current.layers.some(layer => layer.visible && isVisualLayer(layer))) throw new Error(t('agent.needVisibleLayer'))
+      if (!current.sfx?.length && !current.layers.some(layer => layer.visible && isVisualLayer(layer))) throw new Error(t('agent.needVisibleLayer'))
       await waitForModelViewersRef.current()
       const saved = await publishRecordingRef.current(await recordToBlobRef.current(), sceneRef.current)
       return { message: t('agent.publishedMp4', { name: saved.name }), sceneId: current.name, outputNames: [saved.name] }
@@ -2635,7 +2687,7 @@ export function SceneAnimatorPanel() {
       if (request.sceneName && normalizeSceneLookupName(request.sceneName) !== normalizeSceneLookupName(current.name)) {
         throw new Error(t('agent.sceneMismatchExport', { open: current.name, requested: request.sceneName }))
       }
-      if (!current.layers.some(layer => layer.visible && isVisualLayer(layer))) {
+      if (!current.sfx?.length && !current.layers.some(layer => layer.visible && isVisualLayer(layer))) {
         throw new Error(t('agent.addVisibleLayer'))
       }
       setPublishing(true); setMessage(null)
@@ -2652,24 +2704,34 @@ export function SceneAnimatorPanel() {
       }
     }
 
-    const library = await fetchOutputs(0, 0, { mediaType: 'scene', workspace })
-    const matches = library.outputs.filter(file => sceneOutputMatchesName(file, request.sceneName))
-    if (!matches.length) {
-      const available = library.outputs.slice(0, 8).map(file => `“${sceneLibraryTitle(file.name)}”`).join(', ')
-      throw new Error(available
-        ? t('agent.sceneMissingAvailable', { name: request.sceneName, available })
-        : t('agent.sceneMissing', { name: request.sceneName }))
+    const source = {
+      epoch: galleryWorkspaceEpoch(),
+      workspace: galleryWorkspaceName(useStore.getState()),
+      generation: generationRef.current,
     }
-    if (matches.length > 1) throw new Error(t('agent.sceneAmbiguous', { name: request.sceneName }))
-    const response = await fetch(matches[0].url)
-    if (!response.ok) throw new Error(t('agent.sceneLoadFailed', { name: request.sceneName }))
-    const next = sceneFromLibraryPayload(await response.json()) as AnimatorScene
+    const stillCurrent = () => source.epoch === galleryWorkspaceEpoch()
+      && source.workspace === galleryWorkspaceName(useStore.getState())
+      && source.generation === generationRef.current
+    const loaded = await loadAgentLibraryScene(request.sceneName, source.workspace, stillCurrent)
+    if (!loaded.ok) {
+      if (loaded.reason === 'stale') throw new Error(t('agent.workspaceChangedOpen'))
+      if (loaded.reason === 'missing') {
+        const available = loaded.availableTitles.map(name => `“${name}”`).join(', ')
+        throw new Error(available
+          ? t('agent.sceneMissingAvailable', { name: request.sceneName, available })
+          : t('agent.sceneMissing', { name: request.sceneName }))
+      }
+      if (loaded.reason === 'ambiguous') throw new Error(t('agent.sceneAmbiguous', { name: request.sceneName }))
+      throw new Error(t('agent.sceneLoadFailed', { name: request.sceneName }))
+    }
+    const next = loaded.scene as AnimatorScene
     const layerMatches = request.layerName
       ? next.layers.filter(layer => normalizeSceneLookupName(layer.name) === normalizeSceneLookupName(request.layerName))
       : []
     if (layerMatches.length > 1) throw new Error(t('agent.layersAmbiguousWizard', { name: request.layerName }))
     if (request.layerName && !layerMatches.length) throw new Error(t('agent.layerMissingInScene', { scene: next.name, name: request.layerName }))
-    if (!importSceneRef.current(JSON.stringify(next), t('animator.openedLabel', { label: sceneLibraryTitle(matches[0].name) }))) {
+    if (!stillCurrent()) throw new Error(t('agent.workspaceChangedOpen'))
+    if (!importSceneRef.current(JSON.stringify(next), t('animator.openedLabel', { label: loaded.label }))) {
       throw new Error(t('agent.sceneOpenFailed', { name: request.sceneName }))
     }
     const target = layerMatches[0] ?? next.layers[0]
@@ -3010,9 +3072,9 @@ export function SceneAnimatorPanel() {
 
   return <div className="flex min-h-[620px] flex-col overflow-hidden rounded-xl border border-border bg-bg-tertiary xl:flex-row">
     <section className="flex min-w-0 flex-1 flex-col p-3 md:p-4">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div className="flex items-center gap-1.5 text-xs font-medium"><Film size={15} className="text-accent-blue" /><input value={scene.name} onChange={event => updateScene(current => ({ ...current, name: event.target.value }))} aria-label={t('animator.sceneNameAria')} className="w-44 rounded border border-transparent bg-transparent px-1 py-0.5 text-xs font-medium hover:border-border focus:border-accent-blue focus:outline-none" /><span className="text-[10px] font-normal text-text-muted">{scene.width}×{scene.height}</span></div><div className="flex flex-wrap gap-2"><button type="button" onClick={() => setLibraryOpen(true)} disabled={playing || recording || publishing} className="rounded border border-border bg-bg-primary px-2.5 py-1.5 text-[10px] flex items-center gap-1 disabled:opacity-50"><FolderOpen size={12} /> {t('animator.openScene')}</button><button type="button" onClick={() => void persistScene()} disabled={saving || !scene.layers.length || playing || recording || publishing} className="rounded border border-accent-blue/40 bg-accent-blue/10 px-2.5 py-1.5 text-[10px] text-accent-blue flex items-center gap-1 disabled:opacity-50">{saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}{saving ? t('animator.saving') : t('animator.saveScene')}</button><button onClick={play} disabled={!scene.layers.length || playing || recording || publishing} className="min-h-12 min-w-36 rounded-lg bg-cyan-300 px-5 py-3 text-sm font-bold text-slate-950 shadow-lg flex items-center justify-center gap-2 hover:bg-cyan-200 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan-200 disabled:opacity-50"><Play size={22} fill="currentColor" /> {t('animator.preview')}</button><button onClick={record} disabled={recording || playing || publishing} className="rounded bg-cta px-2.5 py-1.5 text-[10px] text-white flex items-center gap-1 disabled:opacity-50">{recording || publishing ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}{recording ? t('animator.recording') : publishing ? t('animator.savingMp4') : t('animator.exportMp4')}</button></div></div>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div className="flex items-center gap-1.5 text-xs font-medium"><Film size={15} className="text-accent-blue" /><input value={scene.name} onChange={event => updateScene(current => ({ ...current, name: event.target.value }))} aria-label={t('animator.sceneNameAria')} className="w-44 rounded border border-transparent bg-transparent px-1 py-0.5 text-xs font-medium hover:border-border focus:border-accent-blue focus:outline-none" /><span className="text-[10px] font-normal text-text-muted">{scene.width}×{scene.height}</span></div><div className="flex flex-wrap gap-2"><button type="button" onClick={() => setLibraryOpen(true)} disabled={playing || recording || publishing} className="rounded border border-border bg-bg-primary px-2.5 py-1.5 text-[10px] flex items-center gap-1 disabled:opacity-50"><FolderOpen size={12} /> {t('animator.openScene')}</button><button type="button" onClick={() => void persistScene()} disabled={saving || emptyScene || playing || recording || publishing} className="rounded border border-accent-blue/40 bg-accent-blue/10 px-2.5 py-1.5 text-[10px] text-accent-blue flex items-center gap-1 disabled:opacity-50">{saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}{saving ? t('animator.saving') : t('animator.saveScene')}</button><button onClick={play} disabled={emptyScene || playing || recording || publishing} className="min-h-12 min-w-36 rounded-lg bg-cyan-300 px-5 py-3 text-sm font-bold text-slate-950 shadow-lg flex items-center justify-center gap-2 hover:bg-cyan-200 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan-200 disabled:opacity-50"><Play size={22} fill="currentColor" /> {t('animator.preview')}</button><button onClick={record} disabled={recording || playing || publishing} className="rounded bg-cta px-2.5 py-1.5 text-[10px] text-white flex items-center gap-1 disabled:opacity-50">{recording || publishing ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}{recording ? t('animator.recording') : publishing ? t('animator.savingMp4') : t('animator.exportMp4')}</button></div></div>
       <div className="mb-2 flex items-center justify-end gap-1.5"><button type="button" onClick={undoScene} disabled={!canUndo} title={t('animator.undoTitle')} className="rounded border border-border bg-bg-primary p-1.5 disabled:opacity-30"><Undo2 size={12} /></button><button type="button" onClick={redoScene} disabled={!canRedo} title={t('animator.redoTitle')} className="rounded border border-border bg-bg-primary p-1.5 disabled:opacity-30"><Redo2 size={12} /></button><span className="ml-1 text-[8px] text-text-muted">{lastAutosaveAt ? t('animator.autosaved', { time: new Date(lastAutosaveAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }) : t('animator.autosaveWaiting')}</span></div>
-      <div className="mb-3 flex flex-wrap items-center gap-1">{RESOLUTIONS.map(([label, width, height]) => <button key={label} disabled={playing || recording} onClick={() => updateScene(current => ({ ...current, width, height }))} className={`rounded border px-1.5 py-1 text-[9px] disabled:opacity-40 ${scene.width === width && scene.height === height ? 'border-accent-blue bg-accent-blue/15 text-accent-blue' : 'border-border bg-bg-primary text-text-muted'}`}>{t(`resolutions.${label === 'HD landscape' ? 'hdLandscape' : label === 'Full HD landscape' ? 'fullHdLandscape' : label === '4K landscape' ? 'fourKLandscape' : label === 'Square' ? 'square' : label === 'HD portrait' ? 'hdPortrait' : label === 'Full HD portrait' ? 'fullHdPortrait' : 'fourKPortrait'}`)}</button>)}<span className="ml-auto flex items-center gap-1 pl-2 text-[8px] text-text-muted">{t('animator.frameRate')}{([30, 60] as SceneFrameRate[]).map(rate => <button key={rate} type="button" disabled={playing || recording} onClick={() => updateScene(current => ({ ...current, fps: rate }))} className={`rounded border px-1.5 py-1 text-[9px] disabled:opacity-40 ${fps === rate ? 'border-purple-300 bg-purple-400/10 text-purple-200' : 'border-border bg-bg-primary text-text-muted'}`}>{t('animator.fps', { rate })}</button>)}</span></div>
+      <div className="mb-3 flex flex-wrap items-center gap-1">{RESOLUTIONS.map(([label, width, height]) => <button key={label} disabled={playing || recording} onClick={() => updateScene(current => ({ ...current, width, height }))} className={`rounded border px-1.5 py-1 text-[9px] disabled:opacity-40 ${scene.width === width && scene.height === height ? 'border-accent-blue bg-accent-blue/15 text-accent-blue' : 'border-border bg-bg-primary text-text-muted'}`}>{t(`resolutions.${label === 'HD landscape' ? 'hdLandscape' : label === 'Full HD landscape' ? 'fullHdLandscape' : label === '4K landscape' ? 'fourKLandscape' : label === 'Square' ? 'square' : label === 'HD portrait' ? 'hdPortrait' : label === 'Full HD portrait' ? 'fullHdPortrait' : 'fourKPortrait'}`)}</button>)}<span className="ml-auto flex items-center gap-1 pl-2 text-[8px] text-text-muted">{t('animator.frameRate')}{([24, 30, 60] as SceneFrameRate[]).map(rate => <button key={rate} type="button" disabled={playing || recording} onClick={() => updateScene(current => ({ ...current, fps: rate }))} className={`rounded border px-1.5 py-1 text-[9px] disabled:opacity-40 ${fps === rate ? 'border-purple-300 bg-purple-400/10 text-purple-200' : 'border-border bg-bg-primary text-text-muted'}`}>{t('animator.fps', { rate })}</button>)}</span></div>
       <div className="mb-3 flex flex-wrap items-center gap-1.5 rounded border border-border bg-bg-secondary p-1.5">
         <button type="button" onClick={() => updateScene(current => ({ ...current, composition: { ...composition, showGrid: !composition.showGrid } }))} className={`flex items-center gap-1 rounded border px-1.5 py-1 text-[9px] ${composition.showGrid ? 'border-accent-blue bg-accent-blue/10 text-accent-blue' : 'border-border text-text-muted'}`}><Grid3X3 size={10} /> {t('animator.grid')}</button>
         <button type="button" onClick={() => updateScene(current => ({ ...current, composition: { ...composition, snap: !composition.snap } }))} className={`flex items-center gap-1 rounded border px-1.5 py-1 text-[9px] ${composition.snap ? 'border-purple-300 bg-purple-400/10 text-purple-200' : 'border-border text-text-muted'}`}><Magnet size={10} /> {t('animator.snap')}</button>
@@ -3029,7 +3091,9 @@ export function SceneAnimatorPanel() {
         {(composition.safeArea === 'action' || composition.safeArea === 'all') && <div className="pointer-events-none absolute inset-[5%] z-[991] border border-dashed border-emerald-300/80"><span className="absolute left-1 top-1 rounded bg-black/55 px-1 text-[7px] text-emerald-200">{t('animator.actionSafeBadge')}</span></div>}
         {(composition.safeArea === 'title' || composition.safeArea === 'all') && <div className="pointer-events-none absolute inset-[10%] z-[992] border border-dashed border-amber-300/80"><span className="absolute right-1 top-1 rounded bg-black/55 px-1 text-[7px] text-amber-200">{t('animator.titleSafeBadge')}</span></div>}
         {(composition.safeArea === 'vertical' || composition.safeArea === 'all') && <div className="pointer-events-none absolute inset-y-0 left-1/2 z-[993] -translate-x-1/2 border-x border-dashed border-fuchsia-300/90 bg-fuchsia-400/[.03]" style={{ width: `${verticalSafeWidth}%` }}><span className="absolute left-1 top-1 rounded bg-black/55 px-1 text-[7px] text-fuchsia-200">{t('animator.verticalBadge')}</span></div>}
-        <KineticTextOverlay cues={scene.texts} seconds={progress * scene.duration} width={scene.width} height={scene.height} />
+        {retroLive && <canvas ref={retroCanvasRef} data-testid="scene-retro-look" className="pointer-events-none absolute inset-0 z-[896] h-full w-full" aria-hidden="true" />}
+        {!retroLive && <SceneFxOverlay cues={scene.sfx} seconds={progress * scene.duration} width={scene.width} height={scene.height} duration={scene.duration} playing={playing} />}
+        {!retroLive && <KineticTextOverlay cues={scene.texts} seconds={progress * scene.duration} width={scene.width} height={scene.height} />}
         {activeCamera && <div className="pointer-events-none absolute left-2 top-2 z-[997] flex items-center gap-1 rounded bg-black/55 px-1.5 py-1 text-[8px] text-cyan-200"><Camera size={10} /> {activeCamera.name}</div>}
         {orbitPivot && <div className="pointer-events-none absolute z-[998] h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border border-cyan-300 bg-cyan-400/20 shadow-[0_0_8px_rgba(103,232,249,.9)]" style={{ left: `${orbitPivot.x}%`, top: `${orbitPivot.y}%` }}><span className="absolute left-1/2 top-[-5px] h-6 w-px -translate-x-1/2 bg-cyan-300/80" /><span className="absolute left-[-5px] top-1/2 h-px w-6 -translate-y-1/2 bg-cyan-300/80" /></div>}
         {flash && <div className="pointer-events-none absolute z-[999]" style={{ left: `${flash.x}%`, top: `${flash.y}%` }}><span className="absolute -left-6 -top-6 h-12 w-12 rounded-full border-2 border-white/90 animate-ping" /><span className="absolute -left-1.5 -top-1.5 h-3 w-3 rounded-full bg-white shadow-[0_0_20px_8px_rgba(96,165,250,.9)]" /></div>}
@@ -3037,6 +3101,7 @@ export function SceneAnimatorPanel() {
       </div>
       </div>
       <p className="mt-2 text-[9px] text-text-muted">{t('animator.canvasHelp')}</p>
+      <SceneFxControls cues={scene.sfx} duration={scene.duration} disabled={playing || recording || publishing} onChange={sfx => updateScene(current => ({ ...current, sfx }))} onShowcase={collection => updateScene(current => withFxShowcase(current, collection))} />
       <KineticTextControls cues={scene.texts} duration={scene.duration} disabled={playing || recording || publishing} onChange={texts => updateScene(current => ({ ...current, texts }))} />
       <SceneTimeline
         layers={scene.layers}
@@ -3318,6 +3383,14 @@ export function SceneAnimatorPanel() {
       onOpenScene={(next, label) => {
         importScene(JSON.stringify(next), t('animator.openedLabel', { label }))
         setLibraryOpen(false)
+      }}
+      onOpenWorld3D={(document) => {
+        const source = { epoch: galleryWorkspaceEpoch(), workspace: galleryWorkspaceName(useStore.getState()) }
+        const current = () => source.epoch === galleryWorkspaceEpoch()
+          && source.workspace === galleryWorkspaceName(useStore.getState())
+        setLibraryOpen(false)
+        useStore.getState().setMediaFilter('world3d')
+        void presentSceneDocument('3d', document, current)
       }}
     />
   </div>

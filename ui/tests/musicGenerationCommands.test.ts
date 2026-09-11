@@ -184,6 +184,14 @@ test('music builder retains inactive sentinels but rejects active modes, TTS and
     /_tts_speaker_name1/,
   )
   assert.throws(
+    () => command('music-orphan-selector', { audio_prompt_type: 'A', audio_guide: null }),
+    /audio_guide requires/,
+  )
+  assert.throws(
+    () => command('music-active-tts-count', { _tts_voice_count: 1 }),
+    /_tts_voice_count/,
+  )
+  assert.throws(
     () => command('music-host-path', { audio_guide: '/tmp/guide.wav', audio_prompt_type: 'A' }),
     /canonical audio URL or asset ID/,
   )

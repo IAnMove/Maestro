@@ -4,6 +4,7 @@ import { gotoApp } from './gotoApp'
 import { speechTestGlb, speechTestWav } from './speechAssets'
 import type { Scene3DDocument } from '../../src/features/scene3d/types'
 import { emptyCharacterKitLibrary, type CharacterKitLibrary } from '../../src/lib/characterKit'
+import { finalizeSpeechRecording } from './finalizeSpeechRecording'
 
 export async function speechApp(page: Page) {
   // Observe real audio elements without changing their playback behavior.
@@ -24,6 +25,7 @@ export async function speechApp(page: Page) {
     }
     await route.fulfill({ json: library })
   })
+  await page.route('**/api/v1/character-kits/speech/digest*', route => route.fulfill({ json: { digest: '0'.repeat(64), bytes: 12 } }))
   await page.route('**/api/v1/character-kits/speech/profiles/**', route => route.fulfill({ status: 404, json: {} }))
   await page.route('**/api/v1/file/speech-test.glb*', route => route.fulfill({ contentType: 'model/gltf-binary', body: glb }))
   await page.route('**/api/v1/file/speech-test.wav*', route => route.fulfill({ contentType: 'audio/wav', body: wav }))
@@ -48,7 +50,12 @@ export async function speechApp(page: Page) {
     return route.fulfill({ json: { job_id: 'speech-test-job', status: 'queued' } })
   })
   await page.route('**/api/v1/status/speech-test-job', route => route.fulfill({ json: { status: 'completed', output_files: ['tts-test.wav'] } }))
-  await page.route('**/api/v1/scenes/recordings', route => route.fulfill({ json: { name: 'speech-export.mp4', url: '/api/v1/file/speech-export.mp4', type: 'video', size: 1000, created_at: 0 } }))
+  let exported: Buffer | undefined
+  await page.route('**/api/v1/scenes/recordings', async route => {
+    exported = await finalizeSpeechRecording(route.request())
+    await route.fulfill({ json: { name: 'speech-export.mp4', url: '/api/v1/file/speech-export.mp4', type: 'video', size: exported.length, created_at: 0 } })
+  })
+  await page.route('**/api/v1/file/speech-export.mp4*', route => route.fulfill({ contentType: 'video/mp4', body: exported! }))
   await page.getByRole('tab', { name: 'Video 3D', exact: true }).click()
   await page.getByRole('button', { name: 'Close Ask to the Wizard' }).click()
   await page.getByRole('button', { name: 'Expand editor', exact: true }).click()
@@ -75,28 +82,12 @@ export async function exportSpeech(page: Page, info: TestInfo) {
   const aac = await page.evaluate(async () => typeof AudioEncoder !== 'undefined' && (await AudioEncoder.isConfigSupported({
     codec: 'mp4a.40.2', sampleRate: 48000, numberOfChannels: 1, bitrate: 128000,
   })).supported)
-  // Linux Chrome can decode AAC without providing an AAC encoder. A separate
-  // required Windows job must exercise the real MP4 path, never this fallback.
+  // Keep Windows testing native AAC; Linux now validates server PCM finalization.
   if (process.env.HOCUSPOCUS_REQUIRE_SPEECH_AAC === '1' || process.platform === 'win32') expect(aac, 'The real-export runner must provide AAC encoding').toBe(true)
-  if (!aac) {
-    let publications = 0
-    const observe = (request: import('@playwright/test').Request) => {
-      if (request.url().endsWith('/scenes/recordings') && request.method() === 'POST') publications++
-    }
-    page.on('request', observe)
-    try {
-      await page.getByTestId('world3d-export').click()
-      await expect(page.getByTestId('world3d-export-note')).toContainText('AAC audio')
-      await expect(page.getByTestId('world3d-export')).toBeEnabled()
-      await expect(page.getByTestId('scene3d-roundtrip')).toHaveText('ok')
-      expect(publications, 'Never silently publish a muted speech scene').toBe(0)
-      await info.attach('aac-unavailable.png', { body: await page.screenshot(), contentType: 'image/png' })
-      return { encoded: false as const }
-    } finally { page.off('request', observe) }
-  }
   const response = page.waitForResponse(r => r.url().endsWith('/scenes/recordings') && r.request().method() === 'POST', { timeout: 90000 })
   await page.getByTestId('world3d-export').click()
   expect((await response).ok()).toBeTruthy()
+  await expect(page.getByTestId('world3d-export')).toBeEnabled()
   const proof = await page.evaluate(async () => {
     const blob = (window as Window & { __world3dLastMp4?: Blob }).__world3dLastMp4!
     const decoded = await new OfflineAudioContext(1, 1, 48000).decodeAudioData(await blob.arrayBuffer())

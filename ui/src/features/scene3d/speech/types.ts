@@ -2,7 +2,7 @@ import type { Scene3DSourceRef, Vec3 } from '../types'
 
 export const VISEMES = ['rest', 'M', 'A', 'E', 'I', 'O', 'U', 'F', 'L'] as const
 export type Viseme = typeof VISEMES[number]
-export type MouthCue = { start: number; end: number; viseme: Viseme }
+export type MouthCue = { start: number; end: number; viseme: Viseme; manual?: true }
 export const EXPRESSIONS = ['neutral', 'happy', 'angry', 'worried', 'surprised', 'sleepy'] as const
 export type Expression = typeof EXPRESSIONS[number]
 /** Coordinates belong to the ORIGINAL mesh position attribute, before skinning. */
@@ -24,7 +24,7 @@ export type Scene3DSpeech = {
   audio?: Scene3DSourceRef
   atlas?: Scene3DSourceRef
   cues: MouthCue[]
-  driver: 'rhubarb' | 'amplitude' | 'imported'
+  driver: 'rhubarb' | 'rhubarb-vocals' | 'amplitude' | 'imported'
   start: number
   offset: number
   gain: number

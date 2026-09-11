@@ -1,3 +1,4 @@
+import { DirectorModelPicker } from '../../components/Sidebar/DirectorModelPicker'
 import { ChevronRight, Film, Loader2, Sparkles } from 'lucide-react'
 import { MINIMAX_IMAGE_API_LABEL, MINIMAX_IMAGE_API_MODEL } from '../../lib/externalModels'
 import { useUiTranslation } from '../../i18n'
@@ -12,8 +13,8 @@ export function StoryFilmProductionCard(props: StoryProductionsTabProps) {
     project, patch, workspace, productionBusy, filmDirection, setFilmDirection, filmDuration, setFilmDuration,
     filmPreserveVisualStyle, setFilmPreserveVisualStyle, stageFilm, directVideo, directReferenceVideo,
     approvedVisualReferenceCount, directReferenceVideoReady, directReferenceVideoSupported, filmGenerationImageReady,
-    filmImageReady, filmImageModel, filmVideoModel, selectableImageModels, selectableVideoModels,
-    selectedFilmImageModel, selectedFilmVideoModel, selectDirectorImageModel, selectStoryVideoModel, storyVideoOptionsReady,
+    filmImageReady, filmImageModel, filmVideoModel, selectableImageModels,
+    selectedFilmImageModel, selectDirectorImageModel, selectStoryVideoModel, storyVideoOptionsReady,
     storyVideoConfigurationReady, storyVideoResolution, storyVideoAspectRatio, storyVideoOptions, storyVideoAdjusted,
     setStoryVideoFormat, productionIssues,
   } = props
@@ -89,18 +90,7 @@ export function StoryFilmProductionCard(props: StoryProductionsTabProps) {
         </span>
       </label>
       <label className="block text-[10px] text-text-muted">{t('productions.videoModel')}
-        <select className={`${input} mt-1`} value={filmVideoModel}
-          disabled={project.provider.useGlobalProfile || !storyVideoOptionsReady}
-          onChange={event => selectStoryVideoModel(event.target.value)}>
-          {!selectableVideoModels.some(model => model.model_type === filmVideoModel) && (
-            <option value={filmVideoModel}>{selectedFilmVideoModel?.name || filmVideoModel}</option>
-          )}
-          {selectableVideoModels.map(model => (
-            <option key={model.model_type} value={model.model_type}>
-              {model.name}{model.is_downloaded === false ? t('productions.downloadsOnFirstUse') : ''}
-            </option>
-          ))}
-        </select>
+        <DirectorModelPicker mode="video" value={filmVideoModel} onChange={selectStoryVideoModel} pipeline="short_film_story" allowSeamless={false} preserveSelection showModeLabel={false} />
         <span className="mt-1 block text-[9px] leading-relaxed text-text-muted">
           {!storyVideoOptionsReady
             ? t('productions.checkingFormats')

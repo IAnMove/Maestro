@@ -1,3 +1,4 @@
+import { DirectorModelPicker } from '../../components/Sidebar/DirectorModelPicker'
 import { MINIMAX_IMAGE_API_LABEL, MINIMAX_IMAGE_API_MODEL } from '../../lib/externalModels'
 import { useUiTranslation } from '../../i18n'
 import { input } from './storyLabChrome'
@@ -9,8 +10,8 @@ export function StoryMusicProductionModels(props: StoryProductionsTabProps & { r
   const { t } = useUiTranslation('storyLab')
   const {
     project, patchMusicWritingProvider, setMusicWritingProvider, directMusicVideo, directReferenceVideo,
-    filmImageModel, filmVideoModel, selectableImageModels, selectableVideoModels, selectedFilmImageModel,
-    selectedFilmVideoModel, selectDirectorImageModel, selectStoryVideoModel, storyVideoOptionsReady,
+    filmImageModel, filmVideoModel, selectableImageModels, selectedFilmImageModel,
+    selectDirectorImageModel, selectStoryVideoModel, storyVideoOptionsReady,
     storyVideoResolution, storyVideoAspectRatio, storyVideoOptions, storyVideoAdjusted, setStoryVideoFormat,
     ready, writerLabel, videoLabel, approvedVisualReferenceCount, musicWritingReady, directVideoMasterReady,
     directReferenceVideoReady, directReferenceVideoSupported,
@@ -73,18 +74,7 @@ export function StoryMusicProductionModels(props: StoryProductionsTabProps & { r
           </label>
         )}
         <label className="block text-[10px] text-text-muted">{t('trailer.videoModel')}
-          <select className={`${input} mt-1`} value={filmVideoModel}
-            disabled={project.provider.useGlobalProfile || !storyVideoOptionsReady}
-            onChange={event => selectStoryVideoModel(event.target.value)}>
-            {!selectableVideoModels.some(model => model.model_type === filmVideoModel) && (
-              <option value={filmVideoModel}>{selectedFilmVideoModel?.name || filmVideoModel}</option>
-            )}
-            {selectableVideoModels.map(model => (
-              <option key={model.model_type} value={model.model_type}>
-                {model.name}{model.is_downloaded === false ? t('productions.downloadsOnFirstUse') : ''}
-              </option>
-            ))}
-          </select>
+          <DirectorModelPicker mode="video" value={filmVideoModel} onChange={selectStoryVideoModel} pipeline="music_video" allowSeamless={false} preserveSelection showModeLabel={false} />
           <span className="mt-1 block text-[9px] leading-relaxed text-text-muted">
             {!storyVideoOptionsReady
               ? t('productions.checkingFormats')

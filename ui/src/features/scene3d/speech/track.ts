@@ -15,7 +15,8 @@ export function parseMouthCues(raw: unknown): MouthCue[] {
     const shape = cue.value ?? cue.shape
     const viseme = (typeof shape === 'string' ? RHUBARB[shape] : undefined) ?? cue.viseme
     if (!VISEMES.includes(viseme as Viseme) || !finite(cue.start, 0, 600) || !finite(cue.end, 0, 600) || cue.end <= cue.start) throw new Error('Invalid mouth cue.')
-    return { start: cue.start, end: cue.end, viseme: viseme as Viseme }
+    if (cue.manual !== undefined && cue.manual !== true) throw new Error('Invalid mouth cue.')
+    return { start: cue.start, end: cue.end, viseme: viseme as Viseme, ...(cue.manual === true ? { manual: true as const } : {}) }
   }).sort((a, b) => a.start - b.start)
   if (cues.some((cue, index) => index > 0 && cue.start < cues[index - 1].end - 1e-6)) throw new Error('Overlapping mouth cues.')
   return cues
@@ -30,7 +31,7 @@ export function validFace(value: unknown): value is FacePlacement {
 function speechAppearance(data: Record<string, unknown>, defaults: Scene3DSpeech) {
   return { clean: data.clean !== false,
     style: data.style === 'toon' || data.style === 'pixel' ? data.style : 'soft',
-    driver: data.driver === 'rhubarb' || data.driver === 'amplitude' ? data.driver : 'imported',
+    driver: data.driver === 'rhubarb' || data.driver === 'rhubarb-vocals' || data.driver === 'amplitude' ? data.driver : 'imported',
     lip: typeof data.lip === 'string' && /^#[0-9a-f]{6}$/i.test(data.lip) ? data.lip : defaults.lip,
     expression: EXPRESSIONS.includes(data.expression as typeof EXPRESSIONS[number]) ? data.expression as typeof EXPRESSIONS[number] : 'neutral',
     blink: data.blink !== false, eyes: data.eyes !== false } as Pick<Scene3DSpeech, 'clean' | 'style' | 'driver' | 'lip' | 'expression' | 'blink' | 'eyes'>

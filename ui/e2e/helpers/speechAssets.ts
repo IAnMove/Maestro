@@ -4,7 +4,7 @@ import { buildSpeechProduction } from '../../src/features/scene3d/speech/product
 import { defaultSpeech, type FacePlacement } from '../../src/features/scene3d/speech/types'
 
 /** Original procedural test geometry, no downloaded or private character assets. */
-export function speechTestGlb() {
+export function speechTestGlb(headName = 'Head') {
   const chunks: Buffer[] = [], views: object[] = [], accessors: object[] = []
   let offset = 0
   const accessor = (bytes: Buffer, componentType: number, count: number, type: string, bounds = {}) => {
@@ -27,7 +27,7 @@ export function speechTestGlb() {
     return { primitives: [{ attributes: attrs, indices, material }] }
   })
   const gltf = { asset: { version: '2.0', generator: 'HocusPocus procedural speech test' }, scene: 0,
-    scenes: [{ nodes: [0, 1] }], nodes: [{ mesh: 0, name: 'Head' }, { mesh: 1, name: 'Body' }], meshes,
+    scenes: [{ nodes: [0, 1] }], nodes: [{ mesh: 0, name: headName }, { mesh: 1, name: 'Body' }], meshes,
     materials: [{ pbrMetallicRoughness: { baseColorFactor: [.72, .48, .32, 1], metallicFactor: 0, roughnessFactor: .8 } },
       { pbrMetallicRoughness: { baseColorFactor: [.08, .25, .5, 1], metallicFactor: 0, roughnessFactor: .8 } }],
     buffers: [{ byteLength: offset }], bufferViews: views, accessors }

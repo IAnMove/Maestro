@@ -1,0 +1,11 @@
+# Runtime ABI constraints; generated from app/runtime/profiles.json.
+diffusers==0.36.0
+mmgp==3.7.6
+numpy==2.1.2
+tokenizers==0.22.1
+torch==2.7.0+cu128
+torchaudio==2.7.0+cu128
+torchcodec==0.5
+torchvision==0.22.0+cu128
+transformers==4.57.1
+xformers==0.0.30

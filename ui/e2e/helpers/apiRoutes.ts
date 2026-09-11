@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test'
+import type { WizardConversationPayload } from '../../src/api/wizard'
 
 export const RUNTIME_IDENTITY = {
   instance_id: 'e2e-instance',
@@ -130,7 +131,7 @@ const EMPTY_STORY_LIBRARY = {
   projects: {},
 }
 
-const EMPTY_WIZARD_CONVERSATION = {
+const EMPTY_WIZARD_CONVERSATION: WizardConversationPayload = {
   version: 1,
   revision: 0,
   messages: [],
@@ -350,6 +351,10 @@ function exactCatalog(): Record<string, ReturnType<typeof json> | { sse: true }>
       active: 'default',
     }),
     'GET /api/v1/outputs': json({ outputs: [], total: 0 }),
+    'GET /api/v1/character-kits/speech/capabilities': json({ rhubarb: true,
+      vocalIsolation: { available: false, model: 'BS-RoFormer', device: 'cpu', downloads: false, maxSeconds: 90, reason: 'optional_model_missing' },
+    }),
+    'GET /api/v1/character-kits/speech/digest': json({ digest: '0'.repeat(64), bytes: 12 }),
     'GET /api/v1/system-config': json(SYSTEM_CONFIG),
     'GET /api/v1/services-config': json(SERVICES_CONFIG),
     'GET /api/v1/llm/status': json({
@@ -365,13 +370,19 @@ function exactCatalog(): Record<string, ReturnType<typeof json> | { sse: true }>
     'GET /api/v1/director/pipelines': json({ pipelines: [], total: 0 }),
     'GET /api/v1/director/pipelines/active': json({ pipelines: [] }),
     'GET /api/v1/system/preflight': json({ ok: true, checks: [] }),
+    'GET /api/v1/system/capabilities': json({
+      platform: 'linux',
+      arch: 'x86_64',
+      profile: 'linux-nvidia-local',
+      accelerators: { cuda: true, mps: false, metal: false },
+      ui: { mode: 'nvidiaLocal', show_cuda_controls: true },
+      capabilities: {},
+    }),
     'GET /api/v1/system-stats': json(SYSTEM_STATS),
     'GET /api/v1/downloads/active': json({ downloads: [] }),
     'GET /api/v1/loras/installed': json({ loras: [], manifest_last_check_at: null }),
     'GET /api/v1/tasks': json({ workspace: 'default', tasks: [], latest_event_id: 0 }),
     'GET /api/v1/tasks/events': { sse: true },
-    'GET /api/v1/wizard/conversations': json(EMPTY_WIZARD_CONVERSATION),
-    'PUT /api/v1/wizard/conversations': json(EMPTY_WIZARD_CONVERSATION),
     'GET /api/v1/wizard/workflows': json(EMPTY_WIZARD_WORKFLOWS),
     'PUT /api/v1/wizard/workflows': json(EMPTY_WIZARD_WORKFLOWS),
     'GET /api/v1/stories/library': json(EMPTY_STORY_LIBRARY),
@@ -453,6 +464,7 @@ function patternedResponse(method: string, pathname: string): ReturnType<typeof 
 export async function installApiRoutes(page: Page, options: ApiRouteOptions = {}): Promise<ApiRouteSession> {
   const session: ApiRouteSession = { unhandled: [] }
   const catalog = exactCatalog()
+  const conversations = new Map<string, WizardConversationPayload>()
   const discover = process.env.E2E_DISCOVER === '1'
   const backgroundRemovalMode = options.backgroundRemovalMode || 'complete'
   let backgroundRemovalSubmitted = false
@@ -518,6 +530,22 @@ export async function installApiRoutes(page: Page, options: ApiRouteOptions = {}
     const method = request.method().toUpperCase()
     const pathname = url.pathname
 
+    // A save must acknowledge the captured messages, otherwise the real UI
+    // endlessly rebases and resubmits against an artificial empty receipt.
+    if (pathname === '/api/v1/wizard/conversations' && (method === 'GET' || method === 'PUT')) {
+      const body = method === 'PUT' ? request.postDataJSON() : null
+      const workspace = String(body?.workspace ?? url.searchParams.get('workspace') ?? 'default')
+      const current = conversations.get(workspace) ?? EMPTY_WIZARD_CONVERSATION
+      if (body) {
+        if (body.baseRevision !== current.revision) {
+          await route.fulfill({ status: 409, json: { detail: 'Conversation revision conflict' } })
+          return
+        }
+        conversations.set(workspace, { ...body.conversation, revision: current.revision + 1 })
+      }
+      await route.fulfill(json(conversations.get(workspace) ?? current))
+      return
+    }
     if (method === 'GET' && pathname === '/api/v1/assets') {
       await route.fulfill(json({ assets: toolAssets(), total: toolAssets().length }))
       return

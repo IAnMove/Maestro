@@ -26,7 +26,9 @@ export function formatCreatedDate(createdAt: number | null, locale?: string): st
   return new Date(createdAt * 1000).toLocaleString(locale)
 }
 
-export function displayAssetTitle(kind: AssetKind, createdAt: number | null): string {
+export function displayAssetTitle(kind: AssetKind, createdAt: number | null, filename?: string): string {
+  const sceneName = kind === 'scene' && filename?.match(/^(.+)-[a-f0-9]{32}\.world3d\.scene\.json$/)?.[1]
+  if (sceneName) return sceneName.replace(/-+/g, ' ')
   const type = String(i18n.t(TYPE_KEYS[kind] ?? 'explorer.typeImage', { ns: 'common' }))
   if (createdAt == null) return String(i18n.t('picker.titleUnknownDate', { ns: 'common', type }))
   return String(i18n.t('picker.titleWithDate', { ns: 'common', type, date: formatCreatedDate(createdAt) }))

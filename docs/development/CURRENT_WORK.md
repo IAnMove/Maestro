@@ -4,6 +4,26 @@ Verificado el 7 de septiembre de 2026 contra `origin/development` **`ef5b0871`**
 Es una fotografía con evidencia, no un sustituto de Git. Antes de reservar trabajo:
 `git fetch origin development`, consultar PR abiertos y comprobar sus archivos.
 
+## SFX, habla y MCP — 10 septiembre 2026
+
+PR **#299** (draft hacia development), base integrada `729f784c`. Contrato:
+[SCENE_EFFECTS_AND_MCP](SCENE_EFFECTS_AND_MCP.md). 30 efectos compartidos y
+plantillas 2D/3D, galería de escenas nativas, voces con Rhubarb y separación
+local opcional mediante BS-RoFormer instalado. Configuración MCP y operaciones compartidas.
+Tres MP4 reales validados; la preparación MCP no equivale a render en servidor.
+Ampliación de labios: controles por sujeto, colocación mediante clic, micrófono
+y ejemplo inglés. Corregida conversión de coordenadas de piel animada. Contrato
+[VIDEO3D_SPEECH](VIDEO3D_SPEECH.md).
+Consultar el HEAD y sus checks en el PR antes de integrar. No es una publicación.
+
+## Timeline de letra desde el audio — 11 septiembre 2026
+
+La rama de trabajo de fidelidad musical conserva la letra escrita, la alinea con
+palabras detectadas en el audio, genera SRT dentro de la aplicación y entrega al
+Director offsets exactos para apariciones y acciones. Contrato y límites:
+[SOURCE_AUDIO_LYRIC_TIMELINE](SOURCE_AUDIO_LYRIC_TIMELINE.md). Consultar PR y HEAD
+vigentes antes de integrar; la evidencia local no equivale a publicación.
+
 ## Lectura mínima
 
 Lee este documento y el contrato del dominio que vas a modificar. Para contribuir,
@@ -105,6 +125,7 @@ priorización en [SLICE_QUEUE](SLICE_QUEUE.md).
 
 | Tarea | Referencia |
 |---|---|
+| Instalación Windows/Linux y aislamiento de motores | [RUNTIME_PROFILES](RUNTIME_PROFILES.md) |
 | Capas y dependencias | [ARCHITECTURE_FOUNDATION](ARCHITECTURE_FOUNDATION.md), [ARCHITECTURE_MAP](ARCHITECTURE_MAP.md) |
 | Planos Video 3D, animaciones y revisión | [VIDEO3D_SHOT_REVIEW](VIDEO3D_SHOT_REVIEW.md) |
 | Identidad y procedencia | [DOMAIN_MODEL_AND_ASSET_PROVENANCE](DOMAIN_MODEL_AND_ASSET_PROVENANCE.md), [GENERATION_RECORD](GENERATION_RECORD.md) |

@@ -1,0 +1,216 @@
+{
+  "version": 1,
+  "revision": "runtime-profiles-v1-macos-core",
+  "platforms": [
+    "linux",
+    "win32"
+  ],
+  "architectures": [
+    "x64"
+  ],
+  "accelerators": [
+    "nvidia"
+  ],
+  "driverMinimum": {
+    "12.8": {
+      "linux": "525.60.13",
+      "win32": "528.33"
+    },
+    "13.0": {
+      "linux": "580.0",
+      "win32": "580.0"
+    }
+  },
+  "driverRecommended": {
+    "12.8": {
+      "linux": "570.26",
+      "win32": "570.65"
+    },
+    "13.0": {
+      "linux": "580.65.06",
+      "win32": "580.88"
+    }
+  },
+  "engines": {
+    "core": {
+      "label": "HocusPocus core",
+      "env": "app/env",
+      "environment": "venv",
+      "python": "3.10",
+      "required": true,
+      "platforms": [
+        "darwin"
+      ],
+      "requirements": "app/runtime/requirements-core.txt",
+      "constraints": {
+        "fastapi": "0.141.1",
+        "psutil": "7.2.2",
+        "pydantic": "2.10.6",
+        "pillow": "11.3.0",
+        "python-multipart": "0.0.32",
+        "requests": "2.34.2",
+        "starlette": "0.52.1",
+        "uvicorn": "0.52.4"
+      },
+      "defaultInstall": true
+    },
+    "wangp": {
+      "label": "HocusPocus / WanGP",
+      "env": "app/env",
+      "environment": "venv",
+      "python": "3.10",
+      "required": true,
+      "platforms": [
+        "linux",
+        "win32"
+      ],
+      "cuda": "12.8",
+      "torch": "2.7.0",
+      "torchvision": "0.22.0",
+      "torchaudio": "2.7.0",
+      "requirements": "app/requirements.txt",
+      "constraints": {
+        "numpy": "2.1.2",
+        "transformers": "4.57.1",
+        "tokenizers": "0.22.1",
+        "diffusers": "0.36.0",
+        "mmgp": "3.7.6",
+        "torchcodec": "0.5",
+        "xformers": "0.0.30"
+      },
+      "windows": {
+        "torch": "2.7.1",
+        "torchvision": "0.22.1",
+        "torchaudio": "2.7.1",
+        "constraints": {
+          "torchcodec": null,
+          "triton-windows": "3.3.1.post19",
+          "xformers": "0.0.31"
+        },
+        "acceleratorPackages": [
+          "xformers==0.0.31",
+          "triton-windows==3.3.1.post19",
+          "https://github.com/woct0rdho/SageAttention/releases/download/v2.2.0-windows/sageattention-2.2.0+cu128torch2.7.1-cp310-cp310-win_amd64.whl",
+          "https://huggingface.co/cocktailpeanut/wheels/resolve/main/flash_attn-2.8.2%2Bcu128torch2.7-cp310-cp310-win_amd64.whl"
+        ]
+      },
+      "defaultInstall": true,
+      "acceleratorPackages": [
+        "xformers==0.0.30",
+        "https://huggingface.co/MonsterMMORPG/SECourses_Premium_Flash_Attention/resolve/main/sageattention-2.1.1-cp310-cp310-linux_x86_64.whl",
+        "https://github.com/mjun0812/flash-attention-prebuild-wheels/releases/download/v0.7.16/flash_attn-2.7.4+cu128torch2.7-cp310-cp310-linux_x86_64.whl"
+      ]
+    },
+    "hunyuan3d": {
+      "label": "Hunyuan3D",
+      "env": "app/services/hunyuan3d/env",
+      "environment": "conda",
+      "python": "3.10",
+      "required": false,
+      "platforms": [
+        "linux",
+        "win32"
+      ],
+      "cuda": "12.8",
+      "torch": "2.7.0",
+      "torchvision": "0.22.0",
+      "torchaudio": "2.7.0",
+      "requirements": "app/services/hunyuan3d/requirements.txt",
+      "constraints": {
+        "numpy": "1.26.4",
+        "transformers": "4.46.3",
+        "diffusers": "0.30.3",
+        "huggingface-hub": "0.30.2"
+      },
+      "vendors": [
+        "hunyuan3d2",
+        "hunyuan3d21"
+      ],
+      "defaultInstall": true
+    },
+    "minimax_h3": {
+      "label": "MiniMax H3 Legacy / ComfyUI",
+      "env": "app/services/minimax_h3/env",
+      "environment": "conda",
+      "python": "3.11",
+      "required": false,
+      "platforms": [
+        "linux",
+        "win32"
+      ],
+      "cuda": "13.0",
+      "torch": "2.10.0",
+      "torchvision": "0.25.0",
+      "torchaudio": "2.10.0",
+      "requirements": "app/services/minimax_h3/vendor/ComfyUI/requirements.txt",
+      "constraints": {
+        "numpy": "2.2.6",
+        "transformers": "4.57.1",
+        "tokenizers": "0.22.1"
+      },
+      "windows": {
+        "constraints": {
+          "triton-windows": "3.6.0.post26"
+        }
+      },
+      "vendors": [
+        "minimax_h3"
+      ],
+      "defaultInstall": true
+    },
+    "sam": {
+      "label": "SAM 3.1",
+      "env": "app/services/sam/env",
+      "environment": "conda",
+      "python": "3.12",
+      "required": false,
+      "platforms": [
+        "linux",
+        "win32"
+      ],
+      "cuda": "12.8",
+      "torch": "2.7.0",
+      "torchvision": "0.22.0",
+      "requirements": "app/services/sam/requirements.txt",
+      "constraints": {
+        "numpy": "1.26.4",
+        "xformers": "0.0.30",
+        "triton": "3.3.0"
+      },
+      "windows": {
+        "constraints": {
+          "triton": null,
+          "triton-windows": "3.3.1.post19"
+        }
+      },
+      "vendors": [
+        "sam3"
+      ],
+      "defaultInstall": false
+    },
+    "rigging": {
+      "label": "UniRig",
+      "env": "app/services/rigging/env",
+      "environment": "conda",
+      "python": "3.11",
+      "required": false,
+      "platforms": [
+        "linux"
+      ],
+      "unsupportedReason": "The UniRig CUDA extension recipe is currently available on Linux x64 only. Procedural rigging remains separate.",
+      "cuda": "12.8",
+      "torch": "2.7.0",
+      "torchvision": "0.22.0",
+      "requirements": "app/services/rigging/requirements.txt",
+      "constraints": {
+        "numpy": "1.26.4",
+        "transformers": "4.51.3",
+        "flash-attn": "2.7.4.post1"
+      },
+      "vendors": [
+        "unirig"
+      ],
+      "defaultInstall": false
+    }
+  }
+}

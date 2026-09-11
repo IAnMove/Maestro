@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { appliedCharacterFaceTransform, captureCharacterFaceAnchor, characterKitInventory, characterKitRecipeInventory, createCharacterKit, emptyCharacterKitLibrary, mountCharacterKitLayers, parseCharacterKitPoseLayerId, syncMountedCharacterKitLayers, syncSceneCharacterKits } from '../src/lib/characterKit.ts'
+import { appliedCharacterFaceTransform, captureCharacterFaceAnchor, characterKitInventory, characterKitRecipeInventory, claimUnusedCharacterKitId, createCharacterKit, emptyCharacterKitLibrary, mountCharacterKitLayers, nextCharacterKitId, parseCharacterKitPoseLayerId, syncMountedCharacterKitLayers, syncSceneCharacterKits } from '../src/lib/characterKit.ts'
 
 const asset = (id, reviewState = 'approved') => ({ id, name: id, source: `${id}.png`, kind: 'overlay', alphaStatus: 'transparent', reviewState })
 
@@ -171,6 +171,35 @@ test('capture then mount keeps pose-local mouth offset at two scene scales', () 
   assert.equal(smallMouth.transform.y, 60 + (-12) * .5)
   assert.equal(largeMouth.transform.y, 60 + (-12) * 1)
   assert.notEqual(smallMouth.transform.y, largeMouth.transform.y)
+})
+
+test('new kits keep a name slug until that library id is taken', () => {
+  assert.equal(nextCharacterKitId('Luma'), 'luma')
+  assert.equal(createCharacterKit('Luma').id, 'luma')
+  const taken = createCharacterKit('Luma', 'cutout', ['luma'])
+  assert.notEqual(taken.id, 'luma')
+  assert.match(taken.id, /^luma-[0-9a-f]{16}$/)
+  const existing = {
+    ...createCharacterKit('Luma'),
+    speech3d: { model: { kind: 'glb', source: 'luma.glb' }, digest: 'abc' },
+    base: { ...asset('luma-base'), kind: 'image', source: '/api/v1/file/luma-front.png' },
+  }
+  const library = { ...emptyCharacterKitLibrary(), kits: { luma: existing }, activeId: 'luma', revision: 3 }
+  const draft = {
+    ...createCharacterKit('Luma'),
+    base: { ...asset('luma-other'), kind: 'image', source: '/api/v1/file/other.png' },
+    identityReference: { ...asset('luma-other-id'), kind: 'image', source: '/api/v1/file/other.png' },
+    provenance: [{ method: 'scene-layer-assignment', sourceLayerId: 'layer-1' }],
+  }
+  const isolated = claimUnusedCharacterKitId(draft, library)
+  assert.notEqual(isolated.id, 'luma')
+  assert.equal(library.kits.luma.speech3d.digest, 'abc')
+  const opened = claimUnusedCharacterKitId({
+    ...existing,
+    provenance: [{ method: 'scene-layer-assignment' }],
+    updatedAt: new Date().toISOString(),
+  }, library)
+  assert.equal(opened.id, 'luma')
 })
 
 test('inventory exposes only reviewed performance pieces to the LLM', () => {

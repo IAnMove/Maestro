@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { defaultMediaScreen, mediaScreenTime, mediaScreenRect, parseMediaScreen } from '../src/features/scene3d/mediaScreen.ts'
-import { applyScene3DTemplate, remountScene3DTemplate } from '../src/features/scene3d/templates.ts'
+import { applyScene3DTemplate, remountScene3DTemplate, SCENE3D_TEMPLATES } from '../src/features/scene3d/templates.ts'
 import { parseScene3DDocument } from '../src/features/scene3d/document.ts'
 import { MEDIA_TEMPLATE_IDS } from '../src/features/scene3d/mediaTemplateIds.ts'
 import { slotMountKey } from '../src/features/scene3d/backdrop.ts'
@@ -33,7 +33,8 @@ test('screen source identity, mesh, video trim and style survive JSON reopening'
 test('transient screen uploads cannot masquerade as durable restored assets', () => {
   const parsed = parseMediaScreen({ sourceUrl: 'blob:expired', sourceRef: { workspaceId: 'promo', filename: 'lost.png', url: 'blob:expired' }, width: Infinity, height: -20, speed: NaN })
   assert.equal(parsed.sourceUrl, ''); assert.equal(parsed.sourceRef, undefined)
-  assert.equal(parsed.width, 4); assert.equal(parsed.height, .1); assert.equal(parsed.speed, 1)
+  assert.equal(parsed.width, 4); assert.equal(parsed.height, .02); assert.equal(parsed.speed, 1)
+  assert.equal(parsed.mode, 'mesh')
 })
 
 test('all product templates reopen and keep unique world objects; corridor travels', () => {
@@ -45,6 +46,14 @@ test('all product templates reopen and keep unique world objects; corridor trave
   }
   const lead = applyScene3DTemplate('screen-corridor').slots[0]
   assert.notDeepEqual(lead.position, lead.motion.to)
+  const tv = applyScene3DTemplate('tv-head-walk')
+  assert.equal(tv.slots[0].sourceUrl, '/examples/tv-head-humanoid.glb')
+  assert.equal(tv.slots[0].screen.mode, 'plane')
+  assert.equal(tv.slots[0].screen.anchor, 'headfront')
+  assert.equal(tv.slots[0].clip.name, 'Walking')
+  const catalog = SCENE3D_TEMPLATES.find(item => item.id === tv.templateId)
+  assert.equal(catalog.duration, tv.duration)
+  assert.deepEqual(catalog.slots, tv.slots.map(slot => slot.slot))
 })
 
 test('changing template can retain selected screen content without copying its geometry', () => {
@@ -54,6 +63,23 @@ test('changing template can retain selected screen content without copying its g
   assert.equal(next.slots[1].screen.sourceUrl, screen.screen.sourceUrl)
   assert.equal(next.slots[1].screen.style, 'billboard')
   assert.equal(next.slots[1].screen.media, 'video')
+})
+
+test('keep-objects assigns each control-room wall once when IDs change', () => {
+  const room = applyScene3DTemplate('control-room')
+  const walls = room.slots.filter(slot => slot.media === 'screen')
+  walls.forEach((slot, index) => {
+    slot.screen.sourceUrl = `/api/v1/uploads/wall-${index}.mp4`
+    slot.screen.media = 'video'
+  })
+  const next = remountScene3DTemplate('topic-travelling', room)
+  const kept = next.slots.filter(slot => slot.media === 'screen').map(slot => slot.screen.sourceUrl)
+  assert.deepEqual(kept, [
+    '/api/v1/uploads/wall-0.mp4',
+    '/api/v1/uploads/wall-1.mp4',
+    '/api/v1/uploads/wall-2.mp4',
+  ])
+  assert.equal(new Set(kept).size, 3)
 })
 
 test('export readiness rejects pending, stale and failed screen bindings', () => {

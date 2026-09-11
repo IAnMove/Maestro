@@ -1,0 +1,278 @@
+[
+  {
+    "id": "sparks",
+    "color": "#ffbb55",
+    "sound": "crackle",
+    "collection": "classic"
+  },
+  {
+    "id": "explosion",
+    "color": "#ff7040",
+    "sound": "impact",
+    "collection": "classic"
+  },
+  {
+    "id": "fireworks",
+    "color": "#ff88dd",
+    "sound": "impact",
+    "collection": "classic"
+  },
+  {
+    "id": "confetti",
+    "color": "#66ddff",
+    "sound": "pop",
+    "collection": "classic"
+  },
+  {
+    "id": "rain",
+    "color": "#88bbff",
+    "sound": "rain",
+    "collection": "classic"
+  },
+  {
+    "id": "snow",
+    "color": "#e0f4ff",
+    "sound": "wind",
+    "collection": "classic"
+  },
+  {
+    "id": "embers",
+    "color": "#ff9955",
+    "sound": "crackle",
+    "collection": "classic"
+  },
+  {
+    "id": "smoke",
+    "color": "#b1a4bd",
+    "sound": "wind",
+    "collection": "classic"
+  },
+  {
+    "id": "fog",
+    "color": "#aabbcc",
+    "sound": "wind",
+    "collection": "classic"
+  },
+  {
+    "id": "bubbles",
+    "color": "#88eeff",
+    "sound": "pop",
+    "collection": "classic"
+  },
+  {
+    "id": "stars",
+    "color": "#fff1aa",
+    "sound": "chime",
+    "collection": "classic"
+  },
+  {
+    "id": "portal",
+    "color": "#bb77ff",
+    "sound": "rise",
+    "collection": "classic"
+  },
+  {
+    "id": "shockwave",
+    "color": "#77ddff",
+    "sound": "impact",
+    "collection": "classic"
+  },
+  {
+    "id": "lightning",
+    "color": "#bbddff",
+    "sound": "crackle",
+    "collection": "classic"
+  },
+  {
+    "id": "speedlines",
+    "color": "#99ddff",
+    "sound": "whoosh",
+    "collection": "classic"
+  },
+  {
+    "id": "scanline",
+    "color": "#66ffbb",
+    "sound": "scan",
+    "collection": "classic"
+  },
+  {
+    "id": "aurora",
+    "color": "#66ffcc",
+    "sound": "rise",
+    "collection": "classic"
+  },
+  {
+    "id": "laser",
+    "color": "#ff5577",
+    "sound": "laser",
+    "collection": "classic"
+  },
+  {
+    "id": "magic_circle",
+    "color": "#ffc96b",
+    "sound": "magic",
+    "collection": "anime"
+  },
+  {
+    "id": "arcane_missiles",
+    "color": "#c794ff",
+    "sound": "magic",
+    "collection": "anime"
+  },
+  {
+    "id": "summoning_gate",
+    "color": "#ba88ff",
+    "sound": "power",
+    "collection": "anime"
+  },
+  {
+    "id": "black_hole",
+    "color": "#bc77ff",
+    "sound": "power",
+    "collection": "anime"
+  },
+  {
+    "id": "ice_burst",
+    "color": "#99eeff",
+    "sound": "slash",
+    "collection": "anime"
+  },
+  {
+    "id": "meteor_shower",
+    "color": "#ff9548",
+    "sound": "thunder",
+    "collection": "anime"
+  },
+  {
+    "id": "lightning_storm",
+    "color": "#99ccff",
+    "sound": "thunder",
+    "collection": "anime"
+  },
+  {
+    "id": "anime_aura",
+    "color": "#ffe36c",
+    "sound": "power",
+    "collection": "anime"
+  },
+  {
+    "id": "energy_orb",
+    "color": "#65e9ff",
+    "sound": "power",
+    "collection": "anime"
+  },
+  {
+    "id": "energy_beam",
+    "color": "#70dcff",
+    "sound": "power",
+    "collection": "anime"
+  },
+  {
+    "id": "sword_slash",
+    "color": "#ff98dc",
+    "sound": "slash",
+    "collection": "anime"
+  },
+  {
+    "id": "manga_impact",
+    "color": "#ffec77",
+    "sound": "impact",
+    "collection": "anime"
+  },
+  {
+    "id": "fire",
+    "color": "#ff6a22",
+    "sound": "crackle",
+    "collection": "classic"
+  },
+  {
+    "id": "shield",
+    "color": "#66ddff",
+    "sound": "power",
+    "collection": "classic"
+  },
+  {
+    "id": "tornado",
+    "color": "#c5d4e0",
+    "sound": "wind",
+    "collection": "classic"
+  },
+  {
+    "id": "splash",
+    "color": "#7ad4ff",
+    "sound": "impact",
+    "collection": "classic"
+  },
+  {
+    "id": "dust",
+    "color": "#c4a574",
+    "sound": "wind",
+    "collection": "classic"
+  },
+  {
+    "id": "media_portal",
+    "color": "#3da5ff",
+    "sound": "rise",
+    "collection": "classic"
+  },
+  {
+    "id": "psx",
+    "color": "#c4c4a8",
+    "sound": "scan",
+    "collection": "retro"
+  },
+  {
+    "id": "n64",
+    "color": "#7aa3c4",
+    "sound": "wind",
+    "collection": "retro"
+  },
+  {
+    "id": "nes",
+    "color": "#e84c3d",
+    "sound": "pop",
+    "collection": "retro"
+  },
+  {
+    "id": "snes",
+    "color": "#7b68c4",
+    "sound": "chime",
+    "collection": "retro"
+  },
+  {
+    "id": "gameboy",
+    "color": "#8bac0f",
+    "sound": "scan",
+    "collection": "retro"
+  },
+  {
+    "id": "gameboy_color",
+    "color": "#ff9ec8",
+    "sound": "chime",
+    "collection": "retro"
+  },
+  {
+    "id": "genesis",
+    "color": "#3d5cff",
+    "sound": "crackle",
+    "collection": "retro"
+  },
+  {
+    "id": "vhs",
+    "color": "#c9a227",
+    "sound": "crackle",
+    "collection": "retro"
+  },
+  {
+    "id": "crt",
+    "color": "#88ff88",
+    "sound": "scan",
+    "collection": "retro"
+  },
+  {
+    "id": "c64",
+    "color": "#887ecb",
+    "sound": "pop",
+    "collection": "retro"
+  }
+]

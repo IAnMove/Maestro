@@ -1,4 +1,6 @@
+import { sceneFxFields } from '../features/sceneFx/types'
 import { kineticTextFields } from './kineticText'
+import { canonicalSceneFps } from './sceneFps.ts'
 import type { Scene, SceneLayer } from '../types'
 import type { SceneRecipe, SceneRecipeAsset, SceneRecipeLayer } from './sceneRecipe'
 import { sceneGenerationPolicyFields } from './sceneGenerationPolicy'
@@ -106,10 +108,11 @@ export function sceneToRecipe(scene: Scene): SceneRecipe {
     })),
     dialogueBeats: scene.dialogueBeats?.map(beat => ({ ...beat, mouthLayerIds: [...beat.mouthLayerIds] })),
     scene: {
+      ...sceneFxFields(scene.sfx),
       ...kineticTextFields(scene.texts),
       width: scene.width,
       height: scene.height,
-      fps: scene.fps === 60 ? 60 : 30,
+      fps: canonicalSceneFps(scene.fps),
       duration: scene.duration,
       layers: recipeLayers as SceneRecipeLayer[],
     },

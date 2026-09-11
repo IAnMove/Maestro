@@ -62,9 +62,10 @@ export function faceMaterial(mesh: THREE.Mesh<THREE.BufferGeometry, THREE.MeshSt
       uniform float cleanSkin, faceEnabled, mouthA, mouthB, mouthMix, mouthStrength, paintMouth;
       uniform sampler2D mouthAtlas;
       ${EYE_DECLARATIONS}
-    `).replace('#include <map_fragment>',`#include <map_fragment>
+    `).replace('#include <color_fragment>',`#include <color_fragment>
       vec2 mouthPoint=(mouthRest.xy-faceCenter.xy)/faceSize;
-      float front=smoothstep(faceCenter.z-0.035,faceCenter.z-0.012,mouthRest.z);
+      float faceDepth=max(faceSize.x,faceSize.y);
+      float front=smoothstep(faceCenter.z-faceDepth*0.22,faceCenter.z-faceDepth*0.06,mouthRest.z);
       float erase=(1.0-smoothstep(0.24,0.52,length(mouthPoint*vec2(1.0,1.5))))*front*cleanSkin*faceEnabled;
       diffuseColor.rgb=mix(diffuseColor.rgb,skinColor,erase);
       float mouthInk=0.0; vec3 mouthTint=vec3(0.0);
@@ -93,7 +94,7 @@ export function faceMaterial(mesh: THREE.Mesh<THREE.BufferGeometry, THREE.MeshSt
       totalEmissiveRadiance=mix(totalEmissiveRadiance,eyeRP.rgb*emissive,eyeRP.a);
     `);
   };
-  material.customProgramCacheKey=()=>`taberna-face-v5-eyes-${withMouth}`;
+  material.customProgramCacheKey=()=>`taberna-face-v7-eyes-${withMouth}`;
   mesh.material=material;
   return {material,uniforms};
 }

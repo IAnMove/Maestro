@@ -1,4 +1,7 @@
+import { createPortal } from 'react-dom'
 import { useEffect, useId, useRef, type ReactNode } from 'react'
+
+const openDialogs: HTMLElement[] = []
 
 const FOCUSABLE_SELECTOR = [
   'a[href]',
@@ -56,15 +59,17 @@ export function ModalShell({
       : null
 
     const dialog = dialogRef.current
+    if (dialog) openDialogs.push(dialog)
     const first = dialog ? focusableElements(dialog)[0] : undefined
     ;(first ?? dialog)?.focus()
 
     const handleKeyDown = (event: KeyboardEvent) => {
       const currentDialog = dialogRef.current
-      if (!currentDialog) return
+      if (!currentDialog || openDialogs.at(-1) !== currentDialog) return
 
       if (event.key === 'Escape') {
         event.preventDefault()
+        event.stopPropagation()
         onCloseRef.current()
         return
       }
@@ -93,6 +98,7 @@ export function ModalShell({
     document.addEventListener('keydown', handleKeyDown)
     return () => {
       document.removeEventListener('keydown', handleKeyDown)
+      if (dialog) openDialogs.splice(openDialogs.indexOf(dialog), 1)
       restoreFocusRef.current?.focus()
       restoreFocusRef.current = null
     }
@@ -100,7 +106,7 @@ export function ModalShell({
 
   if (!open) return null
 
-  return (
+  return createPortal(
     <div
       ref={dialogRef}
       id={titleId}
@@ -112,6 +118,7 @@ export function ModalShell({
       onMouseDown={onMouseDown}
     >
       {children}
-    </div>
+    </div>,
+    document.body,
   )
 }

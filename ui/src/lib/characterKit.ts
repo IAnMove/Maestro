@@ -75,15 +75,65 @@ export const emptyCharacterKitLibrary = (): CharacterKitLibrary => ({ version: 1
 const cleanId = (value: string) => value.trim().toLocaleLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 120)
 
 // getRandomValues is also available on plain-HTTP LAN sessions; randomUUID is not.
-function wipedAssetId(parentId: string): string {
-  const bytes = globalThis.crypto.getRandomValues(new Uint8Array(16))
-  const suffix = Array.from(bytes, value => value.toString(16).padStart(2, '0')).join('')
-  return `${parentId.slice(0, 70)}-wiped-${suffix}`
+function randomIdSuffix(): string {
+  const bytes = globalThis.crypto.getRandomValues(new Uint8Array(8))
+  return Array.from(bytes, value => value.toString(16).padStart(2, '0')).join('')
 }
 
-export function createCharacterKit(name: string, style: CharacterKitStyle = 'cutout'): CharacterKit {
+function wipedAssetId(parentId: string): string {
+  return `${parentId.slice(0, 70)}-wiped-${randomIdSuffix()}${randomIdSuffix()}`
+}
+
+/** Prefer a stable slug from the display name. Never reuse a taken library id. */
+export function nextCharacterKitId(name: string, takenIds: Iterable<string> = []): string {
+  const base = cleanId(name) || `character-${Date.now().toString(36)}`
+  const used = new Set([...takenIds].filter(Boolean))
+  if (!used.has(base)) return base
+  let candidate = `${base.slice(0, 100)}-${randomIdSuffix()}`
+  while (used.has(candidate)) candidate = `${base.slice(0, 100)}-${randomIdSuffix()}`
+  return candidate
+}
+
+function retargetKitIdentity(kit: CharacterKit, nextId: string): CharacterKit {
+  if (kit.id === nextId) return kit
+  const rewrite = (asset?: CharacterKitAsset) => {
+    if (!asset) return asset
+    return { ...asset, id: asset.id.startsWith(`${kit.id}-`) ? `${nextId}${asset.id.slice(kit.id.length)}` : asset.id }
+  }
+  return {
+    ...kit,
+    id: nextId,
+    identityReference: rewrite(kit.identityReference),
+    base: rewrite(kit.base),
+    poses: Object.fromEntries(Object.entries(kit.poses).map(([key, asset]) => [key, rewrite(asset)!])),
+    mouth: Object.fromEntries(Object.entries(kit.mouth).map(([key, asset]) => [key, rewrite(asset)!])),
+    eyes: Object.fromEntries(Object.entries(kit.eyes).map(([key, asset]) => [key, rewrite(asset)!])),
+    updatedAt: new Date().toISOString(),
+  }
+}
+
+/**
+ * A brand-new Scene Animator / Face Rig draft that collided on the name slug
+ * must not PATCH over an existing actor. Editing the opened kit keeps its id.
+ */
+export function claimUnusedCharacterKitId(kit: CharacterKit, library: CharacterKitLibrary): CharacterKit {
+  const existing = library.kits[kit.id]
+  if (!existing) return kit
+  const method = typeof kit.provenance[0]?.method === 'string' ? kit.provenance[0].method : ''
+  const freshDraft = method === 'scene-layer-assignment' || method === 'character-creator-handoff'
+  if (!freshDraft) return kit
+  if (existing.base?.source && existing.base.source === kit.base?.source) return kit
+  if (existing.identityReference?.source && existing.identityReference.source === kit.identityReference?.source) return kit
+  return retargetKitIdentity(kit, nextCharacterKitId(kit.name, Object.keys(library.kits)))
+}
+
+export function createCharacterKit(
+  name: string,
+  style: CharacterKitStyle = 'cutout',
+  takenIds: Iterable<string> = [],
+): CharacterKit {
   const now = new Date().toISOString()
-  const id = cleanId(name) || `character-${Date.now().toString(36)}`
+  const id = nextCharacterKitId(name, takenIds)
   return { version: 1, id, name: name.trim() || 'Untitled character', style, poses: {}, mouth: {}, eyes: {}, anchors: {}, provenance: [], createdAt: now, updatedAt: now }
 }
 

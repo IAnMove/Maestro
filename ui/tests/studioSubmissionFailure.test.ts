@@ -22,26 +22,70 @@ test('a missing image chunk produces a failed submission for the existing job er
   assert.equal(requests, 0)
 })
 
-for (const mode of ['audio', 'video']) {
-  test(`${mode} submits through its native API without loading image code`, async () => {
-    const params = { prompt: 'literal\nsecond line', generation_mode: mode, workspace: 'command-qa' }
-    const before = state(mode, params)
-    let loads = 0
-    let sent: unknown
-    globalThis.fetch = async (_url, options) => {
-      sent = JSON.parse(String(options?.body))
-      return new Response(JSON.stringify({ job_id: 'native-job', status: 'queued' }), { status: 200 })
+test('video submits through its native API without loading image code', async () => {
+  const params = { prompt: 'literal\nsecond line', generation_mode: 'video', workspace: 'command-qa' }
+  const before = state('video', params)
+  let loads = 0
+  let sent: unknown
+  globalThis.fetch = async (_url, options) => {
+    sent = JSON.parse(String(options?.body))
+    return new Response(JSON.stringify({ job_id: 'native-job', status: 'queued' }), { status: 200 })
+  }
+  const submission = await prepareStudioSubmission(params, before, () => before, undefined, [], async () => {
+    loads += 1
+    throw new Error('Image chunk unavailable')
+  })
+  const result = await submission.submit()
+  assert.equal(result.job_id, 'native-job')
+  assert.equal(loads, 0)
+  assert.deepEqual(sent, params)
+})
+
+function audioState(subMode: string, params: Record<string, unknown>) {
+  return { ...state('audio', params), audioSubMode: subMode } as Parameters<typeof prepareStudioSubmission>[1]
+}
+
+for (const subMode of ['mixer', '', undefined]) {
+  test(`audio ${subMode === undefined ? 'without a sub-mode' : `tab ${JSON.stringify(subMode)}`} does not fall back to the legacy GPU endpoint`, async () => {
+    const params = {
+      prompt: 'leftover speech lyrics',
+      model_type: 'kugelaudio_0_open',
+      generation_mode: 'audio',
+      workspace: 'command-qa',
+      _audio_sub_mode: subMode ?? 'mixer',
     }
-    const submission = await prepareStudioSubmission(params, before, () => before, undefined, [], async () => {
-      loads += 1
-      throw new Error('Image chunk unavailable')
-    })
-    const result = await submission.submit()
-    assert.equal(result.job_id, 'native-job')
-    assert.equal(loads, 0)
-    assert.deepEqual(sent, params)
+    const before = subMode === undefined ? state('audio', params) : audioState(subMode, params)
+    let requests = 0
+    globalThis.fetch = async () => { requests += 1; throw new Error('Unexpected POST') }
+    const submission = await prepareStudioSubmission(params, before, () => before)
+    await assert.rejects(submission.submit, /does not start a generation|no inicia una generación/)
+    assert.equal(requests, 0)
   })
 }
+
+test('startGeneration refuses Mixer before creating a job or POSTing', { concurrency: false }, async () => {
+  const { useStore } = await import('../src/stores/useStore.ts')
+  const before = useStore.getState()
+  let requests = 0
+  globalThis.fetch = async () => { requests += 1; throw new Error('Unexpected POST') }
+  useStore.setState({
+    generationMode: 'audio',
+    audioSubMode: 'mixer',
+    params: { ...before.params, model_type: 'kugelaudio_0_open', prompt: 'leftover speech lyrics' },
+    jobs: [],
+    llmStatus: { ...before.llmStatus, loaded: false },
+  })
+  try {
+    await assert.rejects(
+      () => useStore.getState().startGeneration(),
+      /does not start a generation|no inicia una generación/,
+    )
+    assert.equal(useStore.getState().jobs.length, 0)
+    assert.equal(requests, 0)
+  } finally {
+    useStore.setState(before)
+  }
+})
 
 test('legacy image control and mask fields are translated in the detached V2 snapshot', async () => {
   const params = { workspace: 'command-qa', prompt: 'Use this control image literally', model_type: 'pi_flux2',

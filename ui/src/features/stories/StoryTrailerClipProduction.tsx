@@ -1,3 +1,4 @@
+import { DirectorModelPicker } from '../../components/Sidebar/DirectorModelPicker'
 import { ChevronRight, Loader2, Sparkles } from 'lucide-react'
 import { MINIMAX_IMAGE_API_LABEL, MINIMAX_IMAGE_API_MODEL } from '../../lib/externalModels'
 import { useUiTranslation } from '../../i18n'
@@ -10,8 +11,8 @@ export function StoryTrailerClipProduction(props: StoryTrailerTabProps) {
   const {
     project, patch, trailerTitleCards, trailerPreserveVisualStyle, setTrailerPreserveVisualStyle, markTrailerTouched,
     directVideo, directReferenceVideo, approvedVisualReferenceCount, directReferenceVideoReady, directReferenceVideoSupported,
-    directVideoMasterReady, filmImageModel, filmVideoModel, selectableImageModels, selectableVideoModels,
-    selectedFilmImageModel, selectedFilmVideoModel, selectDirectorImageModel, selectStoryVideoModel, storyVideoOptionsReady,
+    directVideoMasterReady, filmImageModel, filmVideoModel, selectableImageModels,
+    selectedFilmImageModel, selectDirectorImageModel, selectStoryVideoModel, storyVideoOptionsReady,
     storyVideoConfigurationReady, storyVideoResolution, storyVideoAspectRatio, storyVideoOptions, storyVideoAdjusted,
     setStoryVideoFormat, trailerProductionIssues, productionBusy, filmGenerationImageReady, stageTrailer,
   } = props
@@ -58,10 +59,7 @@ export function StoryTrailerClipProduction(props: StoryTrailerTabProps) {
             </select>
           </label>
           <label className="block text-[10px] text-text-muted">{t('trailer.videoModel')}
-            <select className={`${input} mt-1`} value={filmVideoModel} disabled={project.provider.useGlobalProfile || !storyVideoOptionsReady} onChange={event => selectStoryVideoModel(event.target.value)}>
-              {!selectableVideoModels.some(model => model.model_type === filmVideoModel) && <option value={filmVideoModel}>{selectedFilmVideoModel?.name || filmVideoModel}</option>}
-              {selectableVideoModels.map(model => <option key={model.model_type} value={model.model_type}>{model.name}{model.is_downloaded === false ? t('trailer.downloadsOnFirstUse') : ''}</option>)}
-            </select>
+            <DirectorModelPicker mode="video" value={filmVideoModel} onChange={selectStoryVideoModel} pipeline="short_film_story" allowSeamless={false} preserveSelection showModeLabel={false} />
           </label>
         </div>
       </div>

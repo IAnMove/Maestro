@@ -1,0 +1,112 @@
+{
+  "2d": {
+    "version": 1,
+    "name": "SFX showcase",
+    "width": 1280,
+    "height": 720,
+    "fps": 30,
+    "duration": 4,
+    "layers": [
+      {
+        "id": "sfx-backdrop",
+        "name": "SFX stage",
+        "type": "image",
+        "source": "/templates/sfx-stage.svg",
+        "visible": true,
+        "z": 0,
+        "fill": true,
+        "transform": {
+          "x": 50,
+          "y": 50,
+          "scale": 1,
+          "opacity": 1,
+          "rotation": 0,
+          "rotationX": 75,
+          "rotationY": 0
+        },
+        "animation": {
+          "start": {
+            "x": 50,
+            "y": 50,
+            "scale": 1,
+            "opacity": 1,
+            "rotation": 0
+          },
+          "end": {
+            "x": 50,
+            "y": 50,
+            "scale": 1,
+            "opacity": 1,
+            "rotation": 0
+          },
+          "duration": 4,
+          "curve": "linear"
+        }
+      }
+    ]
+  },
+  "3d": {
+    "version": 1,
+    "units": "meters",
+    "up": "y",
+    "width": 1280,
+    "height": 720,
+    "fps": 30,
+    "duration": 4,
+    "templateId": "two-shot",
+    "camera": {
+      "family": "establishment",
+      "eye": [
+        0,
+        1.6,
+        4.2
+      ],
+      "look": [
+        0,
+        1,
+        0
+      ],
+      "fov": 50
+    },
+    "light": {
+      "kind": "directional",
+      "direction": [
+        -0.35,
+        -1,
+        -0.25
+      ],
+      "intensity": 1.15,
+      "color": "#fff4e5"
+    },
+    "slots": [
+      {
+        "id": "subject_1",
+        "slot": "subject_1",
+        "position": [
+          -0.85,
+          0,
+          0
+        ],
+        "rotationY": 0.35,
+        "scale": 1,
+        "sourceUrl": "",
+        "media": "model3d",
+        "clip": null
+      },
+      {
+        "id": "subject_2",
+        "slot": "subject_2",
+        "position": [
+          0.85,
+          0,
+          0
+        ],
+        "rotationY": -0.35,
+        "scale": 1,
+        "sourceUrl": "",
+        "media": "model3d",
+        "clip": null
+      }
+    ]
+  }
+}

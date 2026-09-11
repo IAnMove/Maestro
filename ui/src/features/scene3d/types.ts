@@ -67,6 +67,17 @@ export const SCENE3D_TEMPLATE_IDS = [
   'clone-chase',
   ...CINEMATIC_TEMPLATE_IDS,
   ...MEDIA_TEMPLATE_IDS,
+  'reflective-stage',
+  'character-materialization',
+  'blast-stage',
+  'server-inspection',
+  'coding-desk',
+  'tracking-chase',
+  'character-presentation',
+  'screen-alert',
+  'product-comparison',
+  'topic-travelling',
+  'heroic-close',
 ] as const
 
 export type Scene3DTemplateId = (typeof SCENE3D_TEMPLATE_IDS)[number]
@@ -119,9 +130,10 @@ export type Scene3DSlot = {
   speech?: Scene3DSpeech
   media: Scene3DSlotMedia
   screen?: import('./mediaScreen').MediaScreen
-  surface?: 'wall' | 'floor'
+  surface?: 'wall' | 'floor' | 'environment'
+  appearance?: { start: number; duration: number; color: string }
   textureRepeat?: number
-  performance?: 'typing'
+  performance?: 'typing' | 'idle'
   grounded?: boolean
   clip: Scene3DClipRef | null
   clipPlayback?: Scene3DClipPlayback
@@ -140,6 +152,8 @@ export type Scene3DCamera = {
   targetOffset?: Vec3
   eyeOffset?: Vec3
   framing?: Scene3DFraming
+  /** Authored cameras are landscape; portrait shots store the adapted camera. */
+  frameFormat?: 'landscape' | 'portrait'
 }
 
 export type Scene3DFraming = {
@@ -174,12 +188,16 @@ export type Scene3DDocument = {
   duration: number
   /** Stable review number, baked into exported frames when present. */
   clipNumber?: number
+  sfx?: import('../sceneFx/types').SceneFx[]
+  /** Spatial effects in world meters. Screen overlays stay on `sfx`. */
+  worldSfx?: import('../sceneFx/world').WorldSfx[]
   texts?: import('../../lib/kineticText').KineticText[]
   /** Timeline rate; exported duration is duration / playbackSpeed. */
   playbackSpeed?: number
   templateId: Scene3DTemplateId
   camera: Scene3DCamera
   light: Scene3DLight
+  environment?: { reflectiveFloor: boolean; platform: boolean; bloom: number }
   dressing?: Scene3DDressing
   workshopScreen?: 'code' | 'error' | 'success'
   slots: Scene3DSlot[]

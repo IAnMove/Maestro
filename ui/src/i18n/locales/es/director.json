@@ -1,4 +1,14 @@
 {
+  "modelPicker": {
+    "image": "Imagen",
+    "video": "Vídeo",
+    "externalApi": "API externa",
+    "empty": "No hay modelos compatibles habilitados",
+    "about": "Acerca de {{name}}",
+    "imageHint": "Se muestran los modelos que pueden crear una imagen inicial y editar fotogramas a partir de referencias.",
+    "storyHint": "Se muestran los modelos que pueden generar los planos de Director con audio nativo sincronizado.",
+    "soundtrackHint": "Se muestran los modelos que pueden seguir la canción o los diálogos cargados."
+  },
   "queueRecovery": {
     "titleBusy": "Hay restos antiguos además de la generación actual",
     "titleIdle": "Hay una cola de generación por recuperar",

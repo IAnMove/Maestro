@@ -40,6 +40,10 @@ import {
 import { storyDirectorSubmissionProvenance } from '../features/stories/provenance'
 import type { GenerationReceiptLike } from '../api/generationCommandClient'
 import { prepareStudioSubmission, studioUploadReference } from '../features/studio/studioSubmission'
+import {
+  startStudioImageGenerationFromStore,
+  type StudioImageStoreHost,
+} from '../features/studio/startGeneration'
 import { audioReferenceParams, restoreAudioReferences, stashAudioReferences, type AudioReferenceStash } from '../features/studio/audioReferenceState'
 import { beginOutputSettingsRestore, type OutputSettingsSource } from '../features/studio/outputSettingsRestore'
 
@@ -662,6 +666,7 @@ const familyModeMap: Record<string, GenerationMode> = {
   z_image: 'image',
   krea2: 'image',
   hidream: 'image',
+  minimax: 'image',
   wan: 'video',
   wan2_2: 'video',
   hunyuan: 'video',
@@ -4092,11 +4097,13 @@ export const useStore = create<AppState>((set, get) => {
     state.setSidebarMode('studio')
     state.setSidebarOpen(true)
     state.setGenerationMode('tools')
+    state.setMediaFilter('videos')
     await get().runTool()
   },
   sendClipToTools: (name, url, tool) => {
     set({ toolsTool: tool, toolsSourcePath: name, toolsSourceName: name, toolsSourceUrl: url, toolsSourceAssetId: null, toolsSourceWorkspace: null, toolsSourceKind: 'video' })
     get().setGenerationMode('tools')
+    get().setMediaFilter('all')
   },
 
   // Director-mode post-processing (separate image/video)
@@ -4120,7 +4127,17 @@ export const useStore = create<AppState>((set, get) => {
   jobs: [],
   isGenerating: false,
   startGeneration: async (scheduledPrompt, submissionContext) => {
+    if (get().generationMode === 'image') {
+      return startStudioImageGenerationFromStore(
+        { get, set } as unknown as StudioImageStoreHost,
+        scheduledPrompt,
+        submissionContext,
+      )
+    }
     const initialState = get()
+    if (initialState.generationMode === 'audio' && initialState.audioSubMode === 'mixer') {
+      throw new Error(i18n.t('studio:commands.audioNotGenerative'))
+    }
 
     // Studio Prompt Scheduler: each non-empty line becomes its own normal
     // generation request. Submitting the requests one at a time preserves the
