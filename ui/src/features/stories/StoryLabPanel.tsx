@@ -315,6 +315,7 @@ export function StoryLabPanel() {
   const loadWorkspace = useStoryStore(state => state.loadWorkspace)
   const openProject = useStoryStore(state => state.openProject)
   const duplicateProject = useStoryStore(state => state.duplicateProject)
+  const loadTijeralExample = useStoryStore(state => state.loadTijeralExample)
   const deleteProject = useStoryStore(state => state.deleteProject)
   const patch = useStoryStore(state => state.patchProject)
   const update = useStoryStore(state => state.updateProject)
@@ -3871,6 +3872,7 @@ export function StoryLabPanel() {
         onNewProject={newProject}
         onDuplicate={() => duplicateProject()}
         onDelete={() => deleteProject(project.id)}
+        onLoadTijeralExample={loadTijeralExample}
       />
 
       {notice && (

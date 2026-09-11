@@ -94,6 +94,9 @@
     "moveUp": "Move beat up",
     "moveDown": "Move beat down",
     "newStage": "New beat",
+    "openVideo2d": "Open in Video 2D",
+    "openVideo3d": "Open in Video 3D",
+    "sceneOpenFailed": "Could not open the beat scene.",
     "fields": {
       "stage": "Stage",
       "title": "Title",
@@ -811,6 +814,8 @@
   },
   "library": {
     "title": "Story Lab",
+    "tijeral": "Load Tijeral cut-paper example",
+    "tijeralTitle": "Opens the bundled paper-village chapter. Each beat links to Video 2D so you can edit the shot.",
     "foundations": "foundations",
     "requirements": "requirements",
     "revisionProgress": "v{{revision}} · {{progress}}/{{total}} {{unit}}",
