@@ -76,15 +76,19 @@ class DevelopmentBranchPolicyTests(unittest.TestCase):
     def test_ci_required_aggregates_existing_job_names(self):
         text = (ROOT / '.github/workflows/ci.yml').read_text(encoding='utf-8')
         self.assertIn('name: Clean-repo guard + Python checks', text)
+        self.assertIn('name: Python tests A', text)
+        self.assertIn('name: Python tests B', text)
         self.assertIn('name: UI tests + lint + type-check + build', text)
         self.assertIn('name: UI E2E boot (Chromium + simulated API)', text)
         self.assertIn('name: CI required', text)
         self.assertIn('if: always()', text)
-        dependencies = 'needs: [guard, ui-check, ui-e2e, ui-speech-windows]'
+        dependencies = 'needs: [guard, python-tests-a, python-tests-b, ui-check, ui-e2e, ui-speech-windows]'
         self.assertIn(dependencies, text)
         self.assertNotIn('code-health-comment', text.split(dependencies, 1)[1][:200])
         self.assertNotIn('independent-qa', text.split(dependencies, 1)[1][:200])
         self.assertNotIn('Independent QA', text.split(dependencies, 1)[1][:400])
+        self.assertIn('Python tests A=${{ needs.python-tests-a.result }}', text)
+        self.assertIn('Python tests B=${{ needs.python-tests-b.result }}', text)
         self.assertIn('Speech E2E Windows (real H.264 + AAC)=${{ needs.ui-speech-windows.result }}', text)
         windows = text.split('  ui-speech-windows:', 1)[1].split('  code-health-comment:', 1)[0]
         self.assertIn('HOCUSPOCUS_REQUIRE_SPEECH_AAC: "1"', windows)
