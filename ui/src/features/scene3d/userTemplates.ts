@@ -33,6 +33,7 @@ function stripSlot(slot: Scene3DSlot, includeAssets: boolean): Scene3DSlot {
     clip: keep ? slot.clip : null,
     clipPlayback: keep ? slot.clipPlayback : undefined,
     speech: keep ? slot.speech : undefined,
+    character: keep ? slot.character : undefined,
     screen: stripScreen(slot.screen, includeAssets),
   }
 }
@@ -78,7 +79,10 @@ export function parseUserTemplate(raw: unknown): World3DUserTemplate | undefined
   const value = raw as Record<string, unknown>
   if (value.kind === WORLD3D_TEMPLATE_KIND) {
     if (value.version !== 1 || typeof value.id !== 'string' || typeof value.title !== 'string') return undefined
-    const document = parseScene3DDocument(value.document)
+    const parsed = parseScene3DDocument(value.document)
+    if (!parsed) return undefined
+    const includeAssets = value.includeAssets === true
+    const document = parseScene3DDocument(scenarioDocumentFromShot(parsed, includeAssets))
     if (!document) return undefined
     const title = value.title.trim().slice(0, 80)
     if (!title) return undefined
@@ -88,7 +92,7 @@ export function parseUserTemplate(raw: unknown): World3DUserTemplate | undefined
       id: value.id.slice(0, 80) || newTemplateId(),
       title,
       description: typeof value.description === 'string' ? value.description.trim().slice(0, 240) : '',
-      includeAssets: value.includeAssets === true,
+      includeAssets,
       createdAt: typeof value.createdAt === 'string' ? value.createdAt : new Date().toISOString(),
       document,
     }
@@ -113,14 +117,15 @@ function mergeKeptSlot(slot: Scene3DSlot, previous: Scene3DDocument): Scene3DSlo
   const screen = slot.screen
     ? { ...slot.screen, sourceUrl: slot.screen.sourceUrl || old.screen?.sourceUrl || '', sourceRef: slot.screen.sourceRef || old.screen?.sourceRef, media: slot.screen.media || old.screen?.media || slot.screen.media }
     : slot.screen
+  if (slot.sourceUrl) return { ...slot, screen }
   return {
     ...slot,
-    character: slot.character || old.character,
-    sourceUrl: slot.sourceUrl || old.sourceUrl,
-    sourceRef: slot.sourceRef || old.sourceRef,
-    clip: slot.clip || old.clip,
-    clipPlayback: slot.clipPlayback || old.clipPlayback,
-    speech: slot.speech || (old.speech ? structuredClone(old.speech) : undefined),
+    character: old.character,
+    sourceUrl: old.sourceUrl,
+    sourceRef: old.sourceRef,
+    clip: old.clip,
+    clipPlayback: old.clipPlayback,
+    speech: old.speech ? structuredClone(old.speech) : undefined,
     screen,
   }
 }
