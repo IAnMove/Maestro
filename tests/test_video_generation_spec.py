@@ -57,7 +57,7 @@ def test_effective_defaults_are_video_selectors_and_omissions_survive():
     omitted = (
         "generation_mode", "image_mode", "repeat_generation", "batch_size",
         "prompt_enhancer", "activated_loras", "loras_multipliers", "seed",
-        "video_prompt_type", "image_prompt_type",
+        "video_prompt_type", "image_prompt_type", "multi_prompts_gen_type",
     )
     for key in omitted:
         submitted["input"]["params"].pop(key, None)
@@ -104,6 +104,8 @@ def test_fingerprint_is_canonical_sha256():
         ("model_type", "minimax_h3"),
         ("prompt_enhancer", "cinematic"),
         ("repeat_generation", 2),
+        ("multi_prompts_gen_type", 0),
+        ("multi_prompts_gen_type", 3),
     ],
 )
 def test_closed_video_surface_rejects_other_families_and_modes(field, value):
