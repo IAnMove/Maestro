@@ -81,21 +81,34 @@ export function cinemaExtensionOf(value: unknown): string | undefined {
   return undefined
 }
 
+const TRANSIENT_PREFIXES = ['blob:', 'file:', 'filesystem:', 'javascript:', 'data:']
+const EXTERNAL_PREFIXES = ['http://', 'https://', '//']
+
+function startsWithAny(text: string, prefixes: readonly string[]): boolean {
+  return prefixes.some(prefix => text.startsWith(prefix))
+}
+
+function hasControlChars(text: string): boolean {
+  return [...text].some(char => char.charCodeAt(0) <= 32 || char === '\\')
+}
+
+function classifyPath(path: string, text: string): UrlClass {
+  if (path.startsWith('/api/v1/file/')) return 'gallery'
+  if (path.startsWith('/api/v1/uploads/')) return 'uploads'
+  const dotted = path.split('/').includes('..')
+  if (path.startsWith(`${MEDIA_DIR}/`)) return dotted ? 'unsafe' : 'relative'
+  if (path.startsWith('/') || text.includes('://')) return 'external'
+  return dotted ? 'unsafe' : 'relative'
+}
+
 export function classifyUrl(url: string): UrlClass {
   const text = String(url || '').trim()
   if (!text) return 'empty'
-  if ([...text].some(char => char.charCodeAt(0) <= 32 || char === '\\')) return 'unsafe'
+  if (hasControlChars(text)) return 'unsafe'
   const lowered = text.toLowerCase()
-  if (lowered.startsWith('blob:') || lowered.startsWith('file:') || lowered.startsWith('filesystem:')
-    || lowered.startsWith('javascript:') || lowered.startsWith('data:')) return 'transient'
-  if (lowered.startsWith('http://') || lowered.startsWith('https://') || lowered.startsWith('//')) return 'external'
-  const path = text.split('?')[0]
-  if (path.startsWith('/api/v1/file/')) return 'gallery'
-  if (path.startsWith('/api/v1/uploads/')) return 'uploads'
-  if (path.startsWith(`${MEDIA_DIR}/`) && !path.split('/').includes('..')) return 'relative'
-  if (path.startsWith('/') || text.includes('://')) return 'external'
-  if (path.split('/').includes('..')) return 'unsafe'
-  return 'relative'
+  if (startsWithAny(lowered, TRANSIENT_PREFIXES)) return 'transient'
+  if (startsWithAny(lowered, EXTERNAL_PREFIXES)) return 'external'
+  return classifyPath(text.split('?')[0], text)
 }
 
 export function collectUnknownFields(raw: unknown, prefix = ''): string[] {
@@ -122,21 +135,37 @@ function basename(value: string): string {
   return value.replace(/\\/g, '/').split('/').pop() || ''
 }
 
-function refFrom(value: unknown, url = ''): AssetUse | undefined {
-  if (typeof value === 'string' && value) {
-    return { docId: '', role: '', kind: '', workspaceId: '', filename: basename(value.split('?')[0]), url: value }
+function pickString(record: Record<string, unknown>, keys: string[]): string {
+  for (const key of keys) {
+    const value = record[key]
+    if (typeof value === 'string' && value) return value
   }
-  if (!value || typeof value !== 'object') {
-    if (!url) return undefined
-    return { docId: '', role: '', kind: '', workspaceId: '', filename: basename(url.split('?')[0]), url }
-  }
-  const record = value as Record<string, unknown>
-  const filename = basename(String(record.filename || ''))
-  const refUrl = String(record.url || record.sourceUrl || url || '')
-  const workspaceId = String(record.workspaceId || record.workspace_id || '')
-  const assetId = String(record.assetId || record.asset_id || '')
+  return ''
+}
+
+function emptyUse(url: string): AssetUse {
+  return { docId: '', role: '', kind: '', workspaceId: '', filename: basename(url.split('?')[0]), url }
+}
+
+function refFromRecord(record: Record<string, unknown>, url: string): AssetUse | undefined {
+  const filename = basename(pickString(record, ['filename']))
+  const refUrl = pickString(record, ['url', 'sourceUrl']) || url
   if (!filename && !refUrl) return undefined
-  return { docId: '', role: '', kind: '', workspaceId, filename: filename || basename(refUrl.split('?')[0]), url: refUrl, assetId }
+  return {
+    docId: '',
+    role: '',
+    kind: '',
+    workspaceId: pickString(record, ['workspaceId', 'workspace_id']),
+    filename: filename || basename(refUrl.split('?')[0]),
+    url: refUrl,
+    assetId: pickString(record, ['assetId', 'asset_id']),
+  }
+}
+
+function refFrom(value: unknown, url = ''): AssetUse | undefined {
+  if (typeof value === 'string' && value) return emptyUse(value)
+  if (value && typeof value === 'object') return refFromRecord(value as Record<string, unknown>, url)
+  return url ? emptyUse(url) : undefined
 }
 
 function pushUse(uses: AssetUse[], raw: unknown, docId: string, role: string, kind: string, url = '') {
