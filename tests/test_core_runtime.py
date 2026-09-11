@@ -146,6 +146,60 @@ class CoreRuntimeTests(unittest.TestCase):
         self.assertEqual(body["receipt"]["operation"], "scenes.world3d.export")
         self.assertTrue(body["receipt"]["taskIds"])
 
+    def test_scene_packages_export_and_import_on_the_core_profile(self):
+        from services.scene_packages import PACKAGE_KIND
+
+        document = {
+            "version": 1, "units": "meters", "up": "y", "width": 64, "height": 64,
+            "fps": 30, "duration": 1, "templateId": "two-shot",
+            "camera": {"family": "establishment", "eye": [0, 1.6, 4.2], "look": [0, 1, 0], "fov": 50},
+            "light": {"kind": "directional", "direction": [-0.35, -1, -0.25], "intensity": 1.15, "color": "#fff4e5"},
+            "slots": [{
+                "id": "subject_1", "slot": "subject_1", "position": [0, 0, 0], "rotationY": 0,
+                "scale": 1,
+                "sourceUrl": "/api/v1/file/hero.glb?workspace=default",
+                "sourceRef": {
+                    "workspaceId": "default",
+                    "filename": "hero.glb",
+                    "url": "/api/v1/file/hero.glb?workspace=default",
+                    "assetId": "asset_hero",
+                },
+                "media": "model3d",
+                "clip": None,
+            }],
+        }
+        folder, previous = self._in_temp_workspace()
+        try:
+            Path("outputs").mkdir()
+            Path("outputs", "lab").mkdir()
+            Path("outputs", "hero.glb").write_bytes(b"glb-core-package")
+            catalog = self.client.get("/api/v1/scene-packages/format")
+            missing = self.client.post("/api/v1/scene-packages/export", json={})
+            exported = self.client.post("/api/v1/scene-packages/export", json={
+                "workspace": "default",
+                "title": "Harbour",
+                "documents": [document],
+            })
+            imported = self.client.post(
+                "/api/v1/scene-packages/import",
+                params={"workspace": "lab"},
+                content=exported.content,
+                headers={"Content-Type": "application/zip"},
+            )
+        finally:
+            self._leave_temp_workspace(folder, previous)
+        self.assertEqual(catalog.status_code, 200, catalog.text)
+        self.assertEqual(catalog.json()["kind"], PACKAGE_KIND)
+        self.assertEqual(missing.status_code, 422, missing.text)
+        self.assertEqual(exported.status_code, 200, exported.text)
+        self.assertTrue(exported.headers.get("content-type", "").startswith("application/zip"))
+        self.assertIn("harbour.scene-package.zip", exported.headers.get("content-disposition", "").lower())
+        self.assertEqual(imported.status_code, 200, imported.text)
+        body = imported.json()
+        self.assertTrue(body["ok"])
+        self.assertEqual(len(body["scenes"]), 1)
+        self.assertGreaterEqual(body["assets_created"], 1)
+
     def test_wizard_conversation_put_round_trips_instead_of_emptying(self):
         conversation = {
             "version": 1,

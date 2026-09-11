@@ -25,6 +25,7 @@ from routers.projects import create_projects_router
 from routers.productions import create_productions_router
 from routers.recipes import create_recipes_router
 from routers.scene_commands import create_scene_commands_router
+from routers.scene_packages import create_scene_packages_router
 from routers.style_library import create_style_library_router
 from routers.system_capabilities import create_system_capabilities_router, require_capability_http
 from routers.wizard_workflow_executor import create_wizard_workflow_executor_router
@@ -95,6 +96,11 @@ api.include_router(create_comics_router(
     publish_legacy_task=None,
 ))
 api.include_router(create_scene_commands_router(SceneCommands(core.workspace_dir)))
+api.include_router(create_scene_packages_router(
+    workspace_dir=core.workspace_dir,
+    uploads_dir=core.uploads_dir,
+    list_workspaces=core.list_workspaces,
+))
 api.include_router(create_world3d_export_router(World3DExportService(
     workspace_dir=core.workspace_dir,
     registry_for=core_generation_commands.registry_for,
