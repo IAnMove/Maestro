@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { listenForAgentActivityDetails, type ActivityDetailsRequest } from '../agent/agentUiBus'
+import { listenForAgentActivityDetails, type ActivityDetailsRequest } from '../../lib/uiBus'
 import { findActivityGroup, type ActivityGroup } from './lineage'
 
 function afterPaint(callback: () => void): void {

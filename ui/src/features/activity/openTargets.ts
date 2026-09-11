@@ -1,4 +1,3 @@
-import { tabForExecutionTarget } from '../agent/executionCards'
 import { useStore } from '../../stores/useStore'
 import type { MediaFilter } from '../../types'
 import type { ActivityProjectTarget } from './lineage'
@@ -12,6 +11,21 @@ const TAB_FILTER: Partial<Record<string, MediaFilter>> = {
   video_editor: 'videoeditor',
   workspaces: 'runs',
   studio: 'all',
+}
+
+function tabForActivityTarget(kind?: string): string {
+  switch (kind) {
+    case 'comic': return 'comics'
+    case 'director_production': return 'director'
+    case 'story': return 'story_lab'
+    case 'series':
+    case 'series_episode': return 'series_lab'
+    case 'scene': return 'video_3d'
+    case 'character_kit': return 'character_kit'
+    case 'video_editor': return 'video_editor'
+    case 'workspace_collection': return 'workspaces'
+    default: return 'studio'
+  }
 }
 
 function filterForOutput(type: string, name: string): MediaFilter {
@@ -44,7 +58,7 @@ export function openActivityArtifact(name: string): boolean {
 
 export function openActivityProject(target: ActivityProjectTarget): boolean {
   const app = useStore.getState()
-  const tab = tabForExecutionTarget(target.kind)
+  const tab = tabForActivityTarget(target.kind)
   app.setDashboardOpen(tab === 'director')
   const filter = TAB_FILTER[tab]
   if (filter) app.setMediaFilter(filter)
