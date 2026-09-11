@@ -510,6 +510,10 @@
     "character-materialization": {
       "title": "Character materialization",
       "description": "Photos behind, lightning and a centered animated character on a platform."
+    },
+    "blast-stage": {
+      "title": "Ground blast",
+      "description": "A cinematic explosion on the metal floor: flash, fireball, shock ring, debris and smoke."
     }
   },
   "gallerySearch": "Search the catalog",

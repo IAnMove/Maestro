@@ -5,7 +5,7 @@ export const WORLD_SFX_KINDS = [
   'portal', 'magic_circle', 'summoning_gate',
   'lightning', 'energy_beam', 'laser',
   'energy_orb', 'anime_aura', 'arcane_missiles', 'shockwave',
-  'smoke', 'sparks',
+  'smoke', 'sparks', 'explosion',
 ] as const
 export type WorldSfxKind = (typeof WORLD_SFX_KINDS)[number]
 export const WORLD_BEAM_KINDS = new Set<WorldSfxKind>(['lightning', 'energy_beam', 'laser', 'arcane_missiles'])
@@ -104,15 +104,16 @@ export function parseWorldSfx(raw: unknown): WorldSfx[] {
     const preset = PRESETS[value.kind]
     const floor = value.kind === 'magic_circle' || value.kind === 'shockwave'
     const standing = value.kind === 'portal' || value.kind === 'summoning_gate'
+    const blast = value.kind === 'explosion'
     return [{
       id,
       kind: value.kind,
       ...(typeof value.label === 'string' ? { label: value.label.slice(0, 80) } : {}),
       start,
       end,
-      position: worldVec3(value.position, { x: 0, y: floor ? 0.02 : standing ? 1.1 : 1.0, z: 0 }, -50, 50),
+      position: worldVec3(value.position, { x: 0, y: floor ? 0.02 : blast ? 0.42 : standing ? 1.1 : 1.0, z: 0 }, -50, 50),
       rotation: worldVec3(value.rotation, { x: 0, y: 0, z: 0 }, -180, 180),
-      scale: number(value.scale, value.kind === 'laser' ? 0.7 : 1.4, 0.05, 20),
+      scale: number(value.scale, value.kind === 'laser' ? 0.7 : value.kind === 'explosion' ? 1.65 : 1.4, 0.05, 20),
       intensity: number(value.intensity, 1, 0.1, 2),
       color: typeof value.color === 'string' && /^#[\da-f]{6}$/i.test(value.color) ? value.color : preset.color,
       seed: Math.round(number(value.seed, index + 21, 1, 1000000)),
@@ -146,12 +147,13 @@ export function createWorldSfx(kind: WorldSfxKind, duration: number, taken: Iter
   while (used.has(id)) { n += 1; id = `world-${kind}-${n}` }
   const floor = kind === 'magic_circle' || kind === 'shockwave'
   const beam = WORLD_BEAM_KINDS.has(kind)
+  const blast = kind === 'explosion'
   return parseWorldSfx([{
     id,
     kind,
     start: 0,
-    end: Math.min(8, Math.max(1, duration)),
-    position: floor ? { x: 0, y: 0.02, z: 0.2 } : { x: 0, y: 1.1, z: -1.2 },
+    end: Math.min(blast ? 2.6 : 8, Math.max(1, duration)),
+    position: floor ? { x: 0, y: 0.02, z: 0.2 } : blast ? { x: 0, y: 0.42, z: -0.4 } : { x: 0, y: 1.1, z: -1.2 },
     ...(beam ? { targetPosition: { x: 0, y: 1.2, z: 1.8 } } : {}),
     sound: true,
   }])[0]

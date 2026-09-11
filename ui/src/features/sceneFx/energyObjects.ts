@@ -9,8 +9,15 @@ function surface(kind: EnergySurface, color: string, width: number, height = wid
 function sparks(color: string, mode: string, radius = .7, count = 72) {
   const data = new Float32Array(count * 3)
   for (let i = 0; i < count; i++) {
-    const a = fxRandom(19, i) * Math.PI * 2, r = radius * (.7 + fxRandom(3, i) * .3)
-    data.set([Math.cos(a) * r, 0, Math.sin(a) * r], i * 3)
+    if (mode === 'burst') {
+      const theta = fxRandom(19, i) * Math.PI * 2
+      const phi = Math.acos(2 * fxRandom(3, i) - 1)
+      const r = radius * (.25 + fxRandom(7, i) * .9)
+      data.set([Math.sin(phi) * Math.cos(theta) * r, Math.cos(phi) * r, Math.sin(phi) * Math.sin(theta) * r], i * 3)
+    } else {
+      const a = fxRandom(19, i) * Math.PI * 2, r = radius * (.7 + fxRandom(3, i) * .3)
+      data.set([Math.cos(a) * r, 0, Math.sin(a) * r], i * 3)
+    }
   }
   const geometry = new BufferGeometry()
   geometry.setAttribute('position', new BufferAttribute(data, 3))
@@ -95,6 +102,22 @@ function aura(color: string) {
   root.add(surface('aura', color, 1.45, 2.1, true), sparks(color, 'rise', .45, 96))
   return root
 }
+function explosion(color: string) {
+  const root = new Group()
+  const core = surface('fireball', color, 1.85, 1.85, true)
+  core.userData.kind = 'fireball'
+  const inner = surface('flash', '#fff6d2', 1.35, 1.35, true)
+  inner.userData.kind = 'flash'
+  const shock = surface('shock', color, 6.2)
+  shock.rotation.x = -Math.PI / 2
+  shock.position.y = .02
+  const debris = sparks(color, 'burst', .22, 220)
+  const plume = mist('#5c463c')
+  plume.userData.kind = 'plume'
+  plume.position.y = .18
+  root.add(inner, core, shock, debris, plume)
+  return root
+}
 function missiles(color: string) {
   const root = new Group()
   for (let i = 0; i < 3; i++) {
@@ -124,5 +147,6 @@ export function buildEnergyEffect(kind: WorldSfxKind, color: string) {
     case 'arcane_missiles': return missiles(color)
     case 'smoke': return mist(color)
     case 'sparks': { const root = new Group(); root.add(sparks(color, 'rise', .45, 144)); return root }
+    case 'explosion': return explosion(color)
   }
 }

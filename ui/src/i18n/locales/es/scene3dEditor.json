@@ -510,6 +510,10 @@
     "character-materialization": {
       "title": "Materialización de personaje",
       "description": "Fotos detrás, rayo y personaje animado centrado sobre una tarima."
+    },
+    "blast-stage": {
+      "title": "Explosión en suelo",
+      "description": "Explosión cinematográfica sobre el metal: destello, bola de fuego, onda, escombros y humo."
     }
   },
   "gallerySearch": "Buscar en el catálogo",

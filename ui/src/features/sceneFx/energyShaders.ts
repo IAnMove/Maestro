@@ -23,7 +23,7 @@ void main() {
   gl_Position=projectionMatrix*center;
 }`
 
-export type EnergySurface = 'portal' | 'circle' | 'beam' | 'orb' | 'aura' | 'shock' | 'mist'
+export type EnergySurface = 'portal' | 'circle' | 'beam' | 'orb' | 'aura' | 'shock' | 'mist' | 'fireball' | 'flash'
 const BODIES: Record<EnergySurface, string> = {
   portal: `
     vec2 p=(vUv-.5)*2.; float r=length(p), a=atan(p.y,p.x);
@@ -71,6 +71,22 @@ const BODIES: Record<EnergySurface, string> = {
     float alpha=smoothstep(.28,.74,n)*edge*.55;
     float light=fbm(vUv*7.+n+uTime*.04);
     gl_FragColor=vec4(uColor*(.3+light*.65),alpha*uPower);`,
+  fireball: `
+    vec2 p=(vUv-.5)*2.; float r=length(p);
+    float n=fbm(vUv*5.8+vec2(uTime*1.35,-uTime*.7)+uSeed);
+    float grow=.12+uProgress*.58;
+    float body=smoothstep(grow+.28,grow-.12,r-(n-.5)*.16);
+    float core=exp(-r*r*(7.5+uProgress*10.));
+    float rim=exp(-abs(r-grow*.7)*9.)*(1.-uProgress);
+    float fade=pow(max(0.,1.-uProgress*.78),1.05);
+    float alpha=(body*.82+core+rim*.35)*fade;
+    vec3 hot=mix(uColor,vec3(1.,.94,.68),clamp(core*1.15,0.,1.));
+    gl_FragColor=vec4(hot*(core*6.5+body*3.8+rim*1.2)*uPower,alpha*uPower);`,
+  flash: `
+    float r=length((vUv-.5)*2.);
+    float core=exp(-r*r*12.), halo=exp(-r*r*2.2);
+    float fade=pow(max(0.,1.-uProgress*2.6),1.6);
+    gl_FragColor=vec4((vec3(1.,.98,.9)*core*12.+uColor*halo*4.)*uPower*fade,(core+halo*.55)*fade*uPower);`,
 }
 
 export function energyMaterial(kind: EnergySurface, color: string, billboard = false) {
