@@ -103,6 +103,31 @@ class CoreRuntimeTests(unittest.TestCase):
             response = self.client.post("/api/v1/llm/load", json={"provider": "minimax", "model_id": "MiniMax-M3"})
         self.assertEqual(response.status_code, 200)
 
+    def test_llm_prompt_tools_use_remote_llm_and_hide_h3_planner(self):
+        missing = self.client.post("/api/v1/llm/enhance-prompt", json={})
+        self.assertEqual(missing.status_code, 400, missing.text)
+        self.assertEqual(missing.json()["detail"], "prompt is required")
+        with patch("services.llm_service.is_loaded", return_value=False), patch(
+            "services.llm_service.load_model",
+        ), patch("services.llm_service.enhance_prompt", return_value="a talking cat") as enhance:
+            enhanced = self.client.post("/api/v1/llm/enhance-prompt", json={"prompt": "a cat", "mode": "image"})
+        self.assertEqual(enhanced.status_code, 200, enhanced.text)
+        self.assertEqual(enhanced.json(), {"original": "a cat", "enhanced": "a talking cat"})
+        enhance.assert_called_once()
+        with patch("services.llm_service.is_loaded", return_value=False), patch(
+            "services.llm_service.load_model",
+        ), patch("services.llm_service.describe_image", return_value="a red cube") as describe:
+            described = self.client.post("/api/v1/llm/describe-image", json={"image_path": "/tmp/cube.png"})
+        self.assertEqual(described.status_code, 200, described.text)
+        self.assertEqual(described.json(), {"description": "a red cube"})
+        describe.assert_called_once()
+        planned = self.client.post(
+            "/api/v1/llm/plan-h3-windows",
+            json={"prompt": "Clark turns toward the truck", "model_type": "minimax_h3"},
+        )
+        self.assertEqual(planned.status_code, 409, planned.text)
+        self.assertEqual(planned.json()["detail"]["code"], FEATURE_UNAVAILABLE)
+
     def test_video3d_world3d_save_persists_the_document(self):
         document = SceneCommands(None).execute({
             "version": 1,
