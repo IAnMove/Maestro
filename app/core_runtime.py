@@ -10,8 +10,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from fastapi import File, UploadFile
-
 from routers.assets import create_assets_router
 from routers.comics import create_comics_router
 from routers.lan_auth import create_lan_auth_router
@@ -500,12 +498,13 @@ def video_export_status(job_id: str):
 
 
 @api.post("/api/v1/upload")
-async def upload_file(file: UploadFile = File(...)):
+async def upload_file(request: Request, filename: str = "upload.bin"):
     folder = core.uploads_dir()
-    name = os.path.basename(file.filename or "upload.bin")
+    name = os.path.basename(filename or "upload.bin")
     dest = os.path.join(folder, name)
     with open(dest, "wb") as handle:
-        handle.write(await file.read())
+        async for chunk in request.stream():
+            handle.write(chunk)
     return {"filename": name, "url": f"/api/v1/file/{name}?workspace=__uploads__"}
 
 
