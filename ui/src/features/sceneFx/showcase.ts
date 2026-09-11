@@ -39,8 +39,8 @@ export function sceneHasAuthoredContent(document: unknown): boolean {
   ))) return true
   if (Array.isArray(value.slots) && value.slots.some(slot => {
     if (!slot || typeof slot !== 'object') return false
-    const item = slot as { sourceUrl?: string; speech?: unknown }
-    return Boolean(String(item.sourceUrl ?? '').trim() || item.speech)
+    const item = slot as { sourceUrl?: string; speech?: unknown; screen?: { sourceUrl?: string } }
+    return Boolean(String(item.sourceUrl ?? '').trim() || item.speech || String(item.screen?.sourceUrl ?? '').trim())
   })) return true
   return Boolean(value.production)
     || ['sfx', 'worldSfx', 'texts', 'soundtrack'].some(key => Array.isArray(value[key]) && (value[key] as unknown[]).length > 0)
