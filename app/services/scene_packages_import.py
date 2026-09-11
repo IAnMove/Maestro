@@ -22,6 +22,7 @@ from services.scene_packages import (
     _SHA256,
     _basename,
     _kind_from_name,
+    classify_url,
     gallery_url,
     is_template_wrapper,
     parse_media_locator,

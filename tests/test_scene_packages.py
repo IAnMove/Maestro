@@ -434,6 +434,39 @@ def test_wrapper_is_accepted_inside_a_package_but_not_as_the_package(tmp_path: P
     assert document.get("kind") != TEMPLATE_KIND
 
 
+def test_import_keeps_empty_companion_slots(tmp_path: Path):
+    client, roots = _client(tmp_path)
+    refs = _seed_film(roots["film"])
+    shot = _shot(title="Partial", glb=refs["glb"], voice=refs["voice"], screen=refs["screen"], environment=refs["env"])
+    shot["slots"].append({
+        "id": "subject_2",
+        "slot": "subject_2",
+        "position": [0.85, 0, 0],
+        "rotationY": -0.35,
+        "scale": 1,
+        "sourceUrl": "",
+        "media": "model3d",
+        "clip": None,
+        "screen": {
+            "sourceUrl": "", "media": "image", "mode": "mesh",
+            "targetMesh": "SCREEN_CONTENT", "anchor": "",
+            "offset": [0, 0, 0], "pitch": 0, "yaw": 0, "roll": 0,
+            "width": 4, "height": 3, "style": "monitor", "fit": "contain",
+            "start": 0, "speed": 1, "loop": True, "flipY": False,
+        },
+    })
+    exported = client.post("/api/v1/scene-packages/export", json={"workspace": "film", "documents": [shot]})
+    assert exported.status_code == 200, exported.text
+    imported = _post_zip(client, "/api/v1/scene-packages/import", exported.content, workspace="lab")
+    assert imported.status_code == 200, imported.text
+    document = json.loads(next(roots["lab"].glob("*.world3d.scene.json")).read_text())
+    empty = next(slot for slot in document["slots"] if slot["id"] == "subject_2")
+    assert empty["sourceUrl"] == ""
+    assert empty["screen"]["sourceUrl"] == ""
+    assert document["slots"][0]["sourceUrl"].startswith("/api/v1/file/")
+    assert "workspace=lab" in document["slots"][0]["sourceUrl"]
+
+
 def test_source_url_only_slots_rebind_on_import(tmp_path: Path):
     client, roots = _client(tmp_path)
     (roots["film"] / "hero.glb").write_bytes(b"glb-shared")
