@@ -6734,18 +6734,29 @@ def concatenate_multi_clip_videos(
     else:
         filter_inputs = "".join(f"[{i}:v]" for i in range(n))
         filter_str = f"{filter_inputs}concat=n={n}:v=1:a=0[outv]"
-        if audio_path and (audio_start_sec > 0 or pad_audio):
+        if audio_path:
+            # Always pad the driving soundtrack before -shortest. Mapping the
+            # raw song used to stop encoding when the mp3 ended, discarding
+            # the tail of the concatenated video (4s of clips + 1s song → 1s
+            # movie). Bound apad so its infinite stream cannot stall concat.
             audio_filters = []
             if audio_start_sec > 0:
                 audio_filters.append(
                     f"atrim=start={audio_start_sec:.6f}"
                 )
             audio_filters.append("asetpts=PTS-STARTPTS")
+            audio_filters.append("apad")
             if pad_audio:
-                audio_filters.append("apad")
                 audio_filters.append(
                     f"atrim=duration={audio_duration_sec:.6f}"
                 )
+            else:
+                clip_secs = [
+                    probe_duration_seconds(path, ffmpeg_bin) or 1.0
+                    for path in valid_paths
+                ]
+                bound = max(0.1, sum(clip_secs) - audio_start_sec) + 2.0
+                audio_filters.append(f"atrim=duration={bound:.6f}")
             filter_str += (
                 f";[{n}:a]"
                 + ",".join(audio_filters)
@@ -6758,12 +6769,7 @@ def concatenate_multi_clip_videos(
         # Keep one pristine continuous soundtrack, but trim any leading time
         # omitted by the Director plan. This avoids both lip-sync offset and
         # the audible boundary blips caused by concatenating native clip audio.
-        audio_map = (
-            "[outa]"
-            if audio_start_sec > 0 or pad_audio
-            else f"{n}:a:0"
-        )
-        cmd += ["-map", audio_map]
+        cmd += ["-map", "[outa]"]
         cmd += ["-c:a", "aac", "-shortest"]
 
     # Force constant frame rate to prevent cumulative timing drift.

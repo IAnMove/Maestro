@@ -235,8 +235,11 @@ def build_hold_crossfade_filter(
         and not all(audio_flags)
     )
     for index in range(count):
+        # xfade rejects mismatched timebases (1/30 vs 1/15360 at the same fps,
+        # or encoder tbn vs AV_TIME_BASE). Force a common TB before the hold.
         parts.append(
-            f"[{index}:v]tpad=stop_mode=clone:stop_duration={hold:.3f}[v{index}]"
+            f"[{index}:v]settb=AVTB,setpts=PTS-STARTPTS,"
+            f"tpad=stop_mode=clone:stop_duration={hold:.3f}[v{index}]"
         )
         if mix_audio:
             if use_silence_pads and audio_flags is not None:

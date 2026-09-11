@@ -11,6 +11,7 @@ from services.generation import runtime as generation_runtime
 from app.services.mix_concat import (
     build_hard_concat_filter,
     build_hold_crossfade_filter,
+    concat_with_tail_hold_and_crossfade,
     concatenate_multi_clip_videos,
     hold_crossfade_output_seconds,
     probe_audio_flags,
@@ -53,12 +54,22 @@ def test_concatenate_port_delegates_to_bound_wgp():
 
 def test_hold_crossfade_filter_covers_every_clip_and_xfade():
     filter_str, video, audio = build_hold_crossfade_filter([5.0, 5.0, 5.0])
-    assert "[0:v]tpad=stop_mode=clone:stop_duration=0.500[v0]" in filter_str
+    assert (
+        "[0:v]settb=AVTB,setpts=PTS-STARTPTS,"
+        "tpad=stop_mode=clone:stop_duration=0.500[v0]"
+    ) in filter_str
     assert "[1:a]apad=pad_dur=0.500[a1]" in filter_str
     assert "xfade=transition=fade:duration=0.400" in filter_str
     assert "acrossfade=d=0.400" in filter_str
     assert video == "vx2"
     assert audio == "ax2"
+
+
+def test_hold_crossfade_forces_a_common_timebase_before_xfade():
+    # Same fps with encoder tbn 1/30 vs 1/15360 used to fail with
+    # "First input link main timebase do not match".
+    filter_str, _video, _audio = build_hold_crossfade_filter([1.0, 1.0], with_audio=False)
+    assert filter_str.count("settb=AVTB,setpts=PTS-STARTPTS") == 2
 
 
 def test_video_only_filter_omits_audio_pads():
@@ -95,6 +106,16 @@ def test_concatenate_gates_soft_join_on_the_duration_lock():
     assert "abort_callback=abort_callback" in text
     assert "probe_audio_flags" in text
     assert "build_hard_concat_filter" in text
+    # External soundtrack used to be mapped as `{n}:a:0` with -shortest, so a
+    # song shorter than the concat truncated the video. Always apad first.
+    concat_fn = text[
+        text.index("def concatenate_multi_clip_videos(")
+        : text.index("def _remove_partial_output():")
+    ]
+    assert 'f"{n}:a:0"' not in concat_fn
+    assert "audio_filters.append(\"apad\")" in concat_fn
+    assert "atrim=duration={bound:.6f}" in concat_fn
+    assert '"-map", "[outa]"' in concat_fn
     # Hard concat used to probe only valid_paths[0] for audio. The fps
     # probe may still read clip 0; the audio decision must not.
     audio_probe_window = text[
@@ -267,3 +288,76 @@ def test_hard_concat_mixed_audio_ffmpeg_survives_later_silent_clip(tmp_path):
     )
     assert completed.returncode == 0, completed.stderr[-600:]
     assert probe_has_audio(str(out)) is True
+
+
+def _write_timescale_clip(path: Path, *, frames: int, fps: int, timescale: int) -> None:
+    completed = subprocess.run(
+        [
+            "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+            "-f", "lavfi", "-i", f"color=c=blue:s=160x120:r={fps}",
+            "-frames:v", str(frames),
+            "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p",
+            "-video_track_timescale", str(timescale),
+            str(path),
+        ],
+        capture_output=True, text=True, timeout=30,
+    )
+    assert completed.returncode == 0, completed.stderr[-400:]
+
+
+@pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg is required")
+def test_hold_crossfade_ffmpeg_accepts_mismatched_encoder_timebases(tmp_path):
+    # Two 30fps clips with tbn 1/30 vs 1/15360. Without settb, xfade rejects
+    # the graph and Director fell back to a slap-cut.
+    first = tmp_path / "tbn30.mp4"
+    second = tmp_path / "tbn15360.mp4"
+    out = tmp_path / "xfade.mp4"
+    _write_timescale_clip(first, frames=30, fps=30, timescale=30)
+    _write_timescale_clip(second, frames=30, fps=30, timescale=15360)
+    assert concat_with_tail_hold_and_crossfade(
+        [str(first), str(second)], str(out),
+    ) is True
+    assert out.is_file() and out.stat().st_size > 0
+
+
+@pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg is required")
+def test_padded_soundtrack_shortest_keeps_the_concat_video(tmp_path):
+    # Director used to map a raw song with -shortest, so 4s of video + 1s of
+    # music encoded 1s of pictures. apad + -shortest keeps the video span.
+    first = tmp_path / "a.mp4"
+    second = tmp_path / "b.mp4"
+    song = tmp_path / "song.m4a"
+    out = tmp_path / "joined.mp4"
+    _write_test_clip(first, with_audio=False, duration=2.0)
+    _write_test_clip(second, with_audio=False, duration=2.0)
+    completed = subprocess.run(
+        [
+            "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+            "-f", "lavfi", "-i", "sine=f=440:d=1", "-c:a", "aac", str(song),
+        ],
+        capture_output=True, text=True, timeout=30,
+    )
+    assert completed.returncode == 0, completed.stderr[-400:]
+    completed = subprocess.run(
+        [
+            "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+            "-i", str(first), "-i", str(second), "-i", str(song),
+            "-filter_complex",
+            "[0:v][1:v]concat=n=2:v=1:a=0[outv];"
+            "[2:a]asetpts=PTS-STARTPTS,apad,atrim=duration=6[outa]",
+            "-map", "[outv]", "-map", "[outa]",
+            "-c:v", "libx264", "-c:a", "aac", "-shortest",
+            "-pix_fmt", "yuv420p", str(out),
+        ],
+        capture_output=True, text=True, timeout=30,
+    )
+    assert completed.returncode == 0, completed.stderr[-600:]
+    probe = subprocess.run(
+        [
+            "ffprobe", "-v", "error", "-select_streams", "v:0", "-count_frames",
+            "-show_entries", "stream=nb_read_frames", "-of", "csv=p=0", str(out),
+        ],
+        capture_output=True, text=True, timeout=30,
+    )
+    frames = int((probe.stdout or "0").strip() or 0)
+    assert frames >= 100, frames
