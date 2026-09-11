@@ -62,7 +62,8 @@ function translate(lang: 'en' | 'es') {
 test('shared corpus fixture is bilingual and action-oriented', () => {
   assert.equal(corpus.expect_actions_not_prose, true)
   assert.ok(corpus.published_operations.includes('generation.image'))
-  assert.ok(corpus.unpublished_operations.includes('generation.video'))
+  assert.ok(corpus.published_operations.includes('generation.image'))
+  assert.ok(corpus.unpublished_operations.includes('generation.model3d'))
   const kinds = new Set(corpus.cases.map(item => item.kind))
   for (const kind of ['intent', 'negation', 'ambiguous', 'workspace_change', 'retry', 'compound', 'unpublished']) {
     assert.ok(kinds.has(kind), kind)

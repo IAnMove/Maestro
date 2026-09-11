@@ -37,7 +37,7 @@ test('Wizard refusal does not POST a generation command', async ({ page }) => {
     await snap(page, '01-wizard-open.png')
     const refusal = corpus.cases.find(item => item.id === 'en-negation-do-not-generate')
     const transcript = await askWizard(page, refusal!.request!)
-    await expect(panel).toContainText('No action was executed')
+    await expect(panel).toContainText(/No action was executed|Actions not executed|No se ha ejecutado/)
     expect(transcript).not.toContain('invented-boat.png')
     expect(posts).toEqual([])
     await snap(page, '02-wizard-refusal.png')

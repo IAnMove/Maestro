@@ -145,8 +145,8 @@ def test_corpus_fixture_covers_required_kinds_and_languages():
     assert kinds >= {"intent", "negation", "ambiguous", "workspace_change", "retry", "compound", "unpublished", "error_recovery"}
     assert langs == {"en", "es"}
     assert corpus["expect_actions_not_prose"] is True
-    assert "generation.video" in corpus["unpublished_operations"]
-    assert "generation.video" not in corpus["published_operations"]
+    assert "generation.model3d" in corpus["unpublished_operations"]
+    assert "generation.model3d" not in corpus["published_operations"]
     write_evidence("corpus-index.json", {
         "id": corpus["id"],
         "cases": [case["id"] for case in corpus["cases"]],
@@ -164,7 +164,7 @@ def test_http_catalog_and_mcp_list_only_published_operations(tmp_path):
     names = [entry["name"] for entry in http.json()["operations"]]
     assert names == [entry["name"] for entry in catalog]
     assert set(corpus["published_operations"]) <= set(names)
-    assert "generation.video" not in names
+    assert "generation.model3d" not in names
     listed = client.post(
         "/api/v1/wangp/mcp",
         headers={"Authorization": "Bearer test-token"},
@@ -173,13 +173,13 @@ def test_http_catalog_and_mcp_list_only_published_operations(tmp_path):
     tool_names = [tool["name"] for tool in listed]
     for operation in corpus["published_operations"]:
         assert operation in tool_names
-    assert "generation.video" not in tool_names
+    assert "generation.model3d" not in tool_names
     image = next(tool for tool in listed if tool["name"] == "generation.image")
     assert "operation" not in image["inputSchema"]["properties"]
     write_evidence("catalog-simulated.json", {
         "http": names,
         "mcp": tool_names,
-        "unpublished_absent": "generation.video" not in tool_names,
+        "unpublished_absent": "generation.model3d" not in tool_names,
     })
 
 
@@ -205,7 +205,7 @@ def test_unpublished_tool_does_not_promise_success_or_create_a_task(tmp_path):
         "id": 9,
         "method": "tools/call",
         "params": {
-            "name": "generation.video",
+            "name": "generation.model3d",
             "arguments": {
                 "version": 2,
                 "intent_id": "corpus-video",
@@ -221,7 +221,7 @@ def test_unpublished_tool_does_not_promise_success_or_create_a_task(tmp_path):
     assert _db_counts(service.registry("workspace-a"))["tasks"] == 0
     http = client.post("/api/v1/generation/commands", json={
         "version": 2,
-        "operation": "generation.video",
+        "operation": "generation.model3d",
         "intent_id": "corpus-video-http",
         "input": {"workspace": "workspace-a", "params": {"model_type": "pi_flux2", "prompt": "a clip"}},
     })
@@ -415,7 +415,7 @@ def test_live_catalog_probe_is_read_only_and_separate_from_mock():
         return
     assert status == 200
     assert set(corpus["published_operations"]) <= set(live["operations"])
-    assert "generation.video" not in live["operations"]
+    assert "generation.model3d" not in live["operations"]
     assert unauthorized in {401, 403, 503}
     assert "token" not in (mcp or {})
     write_evidence("real-circuit.json", {

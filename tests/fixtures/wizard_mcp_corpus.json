@@ -23,7 +23,7 @@
     "commands.receipt"
   ],
   "unpublished_operations": [
-    "generation.video"
+    "generation.model3d"
   ],
   "legacy_mcp_tools": [
     "models",
@@ -322,13 +322,13 @@
       }
     },
     {
-      "id": "en-unpublished-video-mcp",
+      "id": "en-unpublished-model3d-mcp",
       "lang": "en",
       "kind": "unpublished",
       "surface": "mcp",
-      "request": "Call MCP tool generation.video for a native clip.",
+      "request": "Call MCP tool generation.model3d for a native mesh.",
       "expect": {
-        "operation": "generation.video",
+        "operation": "generation.model3d",
         "unpublished": true,
         "creates_task": false,
         "promise_success": false,
