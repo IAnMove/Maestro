@@ -77,6 +77,19 @@ export interface VideoGenerationPresentation {
   imageStart?: string | null
 }
 
+type OptionalField<T> = { ok: true, value?: T } | { ok: false }
+
+interface ResolvedVideoFields {
+  prompt: string
+  workspace: string
+  intent: string
+  selectedModel: VideoModelType
+  resolution: string
+  videoLength: number
+  steps: number
+  guidance: number
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 }
@@ -115,14 +128,15 @@ function modelType(value: unknown): VideoModelType | null {
   return value === 't2v' || value === 't2v_1.3B' ? value : null
 }
 
+function resolutionSidesValid(width: number, height: number): boolean {
+  return [width, height].every(size => size >= 64 && size <= 4096 && size % 8 === 0)
+}
+
 function resolutionValue(value: unknown): string | null {
   if (typeof value !== 'string' || !RESOLUTION.test(value)) return null
   const match = RESOLUTION.exec(value)
   if (!match) return null
-  const width = Number(match[1])
-  const height = Number(match[2])
-  if ([width, height].some(size => size < 64 || size > 4096 || size % 8)) return null
-  return value
+  return resolutionSidesValid(Number(match[1]), Number(match[2])) ? value : null
 }
 
 function finiteNumber(value: unknown, minimum: number, maximum: number, integer = false): number | undefined {
@@ -131,62 +145,127 @@ function finiteNumber(value: unknown, minimum: number, maximum: number, integer 
   return integer ? Math.round(bounded) : bounded
 }
 
+function literalPrompt(value: unknown): string | null {
+  if (typeof value !== 'string' || value.length > MAX_PROMPT || !value.trim()) return null
+  return value
+}
+
+function workspaceName(value: unknown): string | null {
+  return typeof value === 'string' && WORKSPACE.test(value) ? value : null
+}
+
+function intentId(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() !== '' && value.length <= MAX_INTENT ? value : null
+}
+
+function defaultedModel(value: unknown): VideoModelType | null {
+  return value === undefined ? VIDEO_GENERATION_DEFAULTS.modelType : modelType(value)
+}
+
+function defaultedResolution(value: unknown): string | null {
+  return value === undefined ? VIDEO_GENERATION_DEFAULTS.resolution : resolutionValue(value)
+}
+
+function defaultedVideoLength(raw: Record<string, unknown>): number | undefined {
+  if (raw.video_length !== undefined) return finiteNumber(raw.video_length, 5, 10_000, true)
+  if (typeof raw.duration_seconds === 'number') return framesFromDurationSeconds(raw.duration_seconds)
+  return VIDEO_GENERATION_DEFAULTS.videoLength
+}
+
+function defaultedSteps(value: unknown): number | undefined {
+  if (value === undefined) return VIDEO_GENERATION_DEFAULTS.numInferenceSteps
+  return finiteNumber(value, 1, 1000, true)
+}
+
+function defaultedGuidance(value: unknown): number | undefined {
+  if (value === undefined) return VIDEO_GENERATION_DEFAULTS.guidanceScale
+  return finiteNumber(value, 0, 1000)
+}
+
+function optionalImageStart(value: unknown): OptionalField<string | null> {
+  if (value === undefined) return { ok: true }
+  if (value === null || value === '') return { ok: true, value }
+  if (typeof value !== 'string') return { ok: false }
+  try {
+    assertCanonicalAudioReference(value, 'image_start', 'video')
+    return { ok: true, value }
+  } catch {
+    return { ok: false }
+  }
+}
+
+function optionalCollectionId(value: unknown): OptionalField<string> {
+  if (value === undefined || value === null) return { ok: true }
+  if (typeof value === 'string' && value.trim() !== '' && value.length <= 200) {
+    return { ok: true, value }
+  }
+  return { ok: false }
+}
+
+function optionalSeed(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isSafeInteger(value)) return value
+  return undefined
+}
+
+function optionalNegativePrompt(value: unknown): string | undefined {
+  if (typeof value === 'string' && value.length <= MAX_PROMPT) return value
+  return undefined
+}
+
+function requiredResolvedFields(raw: Record<string, unknown>): ResolvedVideoFields | null {
+  const prompt = literalPrompt(raw.prompt)
+  const workspace = workspaceName(raw.workspace)
+  const intent = intentId(raw.intent_id)
+  const selectedModel = defaultedModel(raw.model_type)
+  const resolution = defaultedResolution(raw.resolution)
+  if (!prompt || !workspace || !intent || !selectedModel || !resolution) return null
+  const videoLength = defaultedVideoLength(raw)
+  const steps = defaultedSteps(raw.num_inference_steps)
+  const guidance = defaultedGuidance(raw.guidance_scale)
+  if (videoLength === undefined || steps === undefined || guidance === undefined) return null
+  return { prompt, workspace, intent, selectedModel, resolution, videoLength, steps, guidance }
+}
+
+function videoActionFromResolved(
+  fields: ResolvedVideoFields,
+  extras: {
+    seed?: number
+    negativePrompt?: string
+    imageStart?: string | null
+    collectionId?: string
+  },
+): AgentGenerationVideoAction {
+  const action: AgentGenerationVideoAction = {
+    type: 'generation_video',
+    intentId: fields.intent,
+    workspace: fields.workspace,
+    prompt: fields.prompt,
+    modelType: fields.selectedModel,
+    resolution: fields.resolution,
+    videoLength: alignWanT2vFrames(fields.videoLength),
+    numInferenceSteps: fields.steps,
+    guidanceScale: fields.guidance,
+    confirm: true,
+  }
+  if (extras.seed !== undefined) action.seed = extras.seed
+  if (extras.negativePrompt !== undefined) action.negativePrompt = extras.negativePrompt
+  if (extras.imageStart !== undefined) action.imageStart = extras.imageStart
+  if (extras.collectionId !== undefined) action.workspaceCollectionId = extras.collectionId
+  return action
+}
+
 export function resolveVideoGenerationAction(raw: Record<string, unknown>): AgentGenerationVideoAction | null {
   if (raw.confirm !== true) return null
-  const prompt = typeof raw.prompt === 'string' && raw.prompt.length <= MAX_PROMPT ? raw.prompt : null
-  if (!prompt?.trim()) return null
-  const workspace = typeof raw.workspace === 'string' && WORKSPACE.test(raw.workspace) ? raw.workspace : null
-  if (!workspace) return null
-  const selectedModel = raw.model_type === undefined ? VIDEO_GENERATION_DEFAULTS.modelType : modelType(raw.model_type)
-  const resolution = raw.resolution === undefined
-    ? VIDEO_GENERATION_DEFAULTS.resolution
-    : resolutionValue(raw.resolution)
-  if (!selectedModel || !resolution) return null
-  const videoLength = raw.video_length === undefined
-    ? (typeof raw.duration_seconds === 'number'
-      ? framesFromDurationSeconds(raw.duration_seconds)
-      : VIDEO_GENERATION_DEFAULTS.videoLength)
-    : finiteNumber(raw.video_length, 5, 10_000, true)
-  const steps = raw.num_inference_steps === undefined
-    ? VIDEO_GENERATION_DEFAULTS.numInferenceSteps
-    : finiteNumber(raw.num_inference_steps, 1, 1000, true)
-  const guidance = raw.guidance_scale === undefined
-    ? VIDEO_GENERATION_DEFAULTS.guidanceScale
-    : finiteNumber(raw.guidance_scale, 0, 1000)
-  if (videoLength === undefined || steps === undefined || guidance === undefined) return null
-  const intentId = typeof raw.intent_id === 'string' && raw.intent_id.trim() && raw.intent_id.length <= MAX_INTENT
-    ? raw.intent_id
-    : null
-  if (!intentId) return null
-  if (raw.image_start !== undefined && raw.image_start !== null && raw.image_start !== '') {
-    try {
-      assertCanonicalAudioReference(raw.image_start, 'image_start', 'video')
-    } catch {
-      return null
-    }
-  }
-  const collection = raw.workspace_collection_id
-  if (collection !== undefined && collection !== null
-    && (typeof collection !== 'string' || !collection.trim() || collection.length > 200)) {
-    return null
-  }
-  return {
-    type: 'generation_video',
-    intentId,
-    workspace,
-    prompt,
-    modelType: selectedModel,
-    resolution,
-    videoLength: alignWanT2vFrames(videoLength),
-    numInferenceSteps: steps,
-    guidanceScale: guidance,
-    confirm: true,
-    ...(typeof raw.seed === 'number' && Number.isSafeInteger(raw.seed) ? { seed: raw.seed } : {}),
-    ...(typeof raw.negative_prompt === 'string' && raw.negative_prompt.length <= MAX_PROMPT
-      ? { negativePrompt: raw.negative_prompt } : {}),
-    ...(raw.image_start !== undefined ? { imageStart: raw.image_start as string | null } : {}),
-    ...(typeof collection === 'string' ? { workspaceCollectionId: collection } : {}),
-  }
+  const fields = requiredResolvedFields(raw)
+  const imageStart = optionalImageStart(raw.image_start)
+  const collection = optionalCollectionId(raw.workspace_collection_id)
+  if (!fields || !imageStart.ok || !collection.ok) return null
+  return videoActionFromResolved(fields, {
+    seed: optionalSeed(raw.seed),
+    negativePrompt: optionalNegativePrompt(raw.negative_prompt),
+    imageStart: imageStart.value,
+    collectionId: collection.value,
+  })
 }
 
 export function validateVideoGenerationAction(action: AgentGenerationVideoAction): string[] {
@@ -198,7 +277,7 @@ export function validateVideoGenerationAction(action: AgentGenerationVideoAction
 }
 
 export function videoGenerationPresentation(action: AgentGenerationVideoAction): VideoGenerationPresentation {
-  return {
+  const presentation: VideoGenerationPresentation = {
     destination: 'studio',
     anchors: ['video', 'generate', 'destination'],
     workspace: action.workspace,
@@ -206,13 +285,12 @@ export function videoGenerationPresentation(action: AgentGenerationVideoAction):
     resolution: action.resolution,
     videoLength: action.videoLength,
     prompt: action.prompt,
-    ...(action.imageStart !== undefined ? { imageStart: action.imageStart } : {}),
   }
+  if (action.imageStart !== undefined) presentation.imageStart = action.imageStart
+  return presentation
 }
 
-export function buildVideoGenerationCommand(action: AgentGenerationVideoAction): VideoGenerationCommand {
-  const errors = validateVideoGenerationAction(action)
-  if (errors.length) throw new Error(errors[0])
+function commandParamsFromAction(action: AgentGenerationVideoAction): Record<string, unknown> {
   const params: Record<string, unknown> = {
     prompt: action.prompt,
     model_type: action.modelType,
@@ -226,52 +304,74 @@ export function buildVideoGenerationCommand(action: AgentGenerationVideoAction):
   if (action.seed !== undefined) params.seed = action.seed
   if (action.negativePrompt !== undefined) params.negative_prompt = action.negativePrompt
   if (action.imageStart !== undefined) params.image_start = action.imageStart
+  return params
+}
+
+export function buildVideoGenerationCommand(action: AgentGenerationVideoAction): VideoGenerationCommand {
+  const errors = validateVideoGenerationAction(action)
+  if (errors.length) throw new Error(errors[0])
   const input: VideoGenerationCommand['input'] = {
     workspace: action.workspace,
-    params,
+    params: commandParamsFromAction(action),
   }
   if (action.workspaceCollectionId !== undefined) {
     input.workspace_collection_id = action.workspaceCollectionId
   }
-  const command: VideoGenerationCommand = {
+  return detachedVideoGenerationCommand({
     version: VIDEO_GENERATION_SCHEMA_VERSION,
     operation: VIDEO_GENERATION_OPERATION,
     intent_id: action.intentId,
     input,
+  })
+}
+
+function assertAllowedKeys(value: Record<string, unknown>, allowed: Set<string>, prefix: string): void {
+  for (const key of Object.keys(value)) {
+    if (!allowed.has(key)) throw new Error(`${prefix}${key} is not supported by generation.video`)
   }
-  return detachedVideoGenerationCommand(command)
+}
+
+function assertCommandEnvelope(value: Record<string, unknown>): void {
+  assertAllowedKeys(value, COMMAND_FIELDS, 'command.')
+  if (value.version !== VIDEO_GENERATION_SCHEMA_VERSION) throw new Error('version must be the integer 2')
+  if (value.operation !== VIDEO_GENERATION_OPERATION) throw new Error('operation must be generation.video')
+  exactText(value.intent_id, 'intent_id', MAX_INTENT)
+}
+
+function assertCommandInput(input: unknown): Record<string, unknown> {
+  if (!isRecord(input)) throw new Error('input must be an object')
+  assertAllowedKeys(input, INPUT_FIELDS, 'input.')
+  const workspace = exactText(input.workspace, 'input.workspace', 240)
+  if (!WORKSPACE.test(workspace)) throw new Error('input.workspace must be an exact output workspace name')
+  return input
+}
+
+function assertInactiveVideoSentinels(params: Record<string, unknown>): void {
+  if (params.generation_mode !== undefined && params.generation_mode !== 'video') {
+    throw new Error('input.params.generation_mode must be video')
+  }
+  if (params.image_mode !== undefined && params.image_mode !== 0) {
+    throw new Error('input.params.image_mode must be 0')
+  }
+  if (params.image_start !== undefined) {
+    assertCanonicalAudioReference(params.image_start, 'input.params.image_start', 'video')
+  }
+}
+
+function assertVideoParams(params: unknown): void {
+  if (!isRecord(params)) throw new Error('input.params must be an object')
+  assertAllowedKeys(params, PARAM_FIELDS, 'input.params.')
+  requiredText(params.prompt, 'input.params.prompt', MAX_PROMPT)
+  if (!modelType(params.model_type)) throw new Error('input.params.model_type must be t2v or t2v_1.3B')
+  if (!resolutionValue(params.resolution)) throw new Error('input.params.resolution is invalid')
+  assertInactiveVideoSentinels(params)
 }
 
 export function assertVideoGenerationCommand(value: unknown): asserts value is VideoGenerationCommand {
   if (!isRecord(value)) throw new Error('generation.video command must be an object')
-  for (const key of Object.keys(value)) {
-    if (!COMMAND_FIELDS.has(key)) throw new Error(`command.${key} is not supported by generation.video`)
-  }
-  if (value.version !== VIDEO_GENERATION_SCHEMA_VERSION) throw new Error('version must be the integer 2')
-  if (value.operation !== VIDEO_GENERATION_OPERATION) throw new Error('operation must be generation.video')
-  exactText(value.intent_id, 'intent_id', MAX_INTENT)
-  if (!isRecord(value.input)) throw new Error('input must be an object')
-  for (const key of Object.keys(value.input)) {
-    if (!INPUT_FIELDS.has(key)) throw new Error(`input.${key} is not supported by generation.video`)
-  }
-  const workspace = exactText(value.input.workspace, 'input.workspace', 240)
-  if (!WORKSPACE.test(workspace)) throw new Error('input.workspace must be an exact output workspace name')
-  if (!isRecord(value.input.params)) throw new Error('input.params must be an object')
-  for (const key of Object.keys(value.input.params)) {
-    if (!PARAM_FIELDS.has(key)) throw new Error(`input.params.${key} is not supported by generation.video`)
-  }
-  requiredText(value.input.params.prompt, 'input.params.prompt', MAX_PROMPT)
-  if (!modelType(value.input.params.model_type)) throw new Error('input.params.model_type must be t2v or t2v_1.3B')
-  if (!resolutionValue(value.input.params.resolution)) throw new Error('input.params.resolution is invalid')
-  if (value.input.params.generation_mode !== undefined && value.input.params.generation_mode !== 'video') {
-    throw new Error('input.params.generation_mode must be video')
-  }
-  if (value.input.params.image_mode !== undefined && value.input.params.image_mode !== 0) {
-    throw new Error('input.params.image_mode must be 0')
-  }
-  if (value.input.params.image_start !== undefined) {
-    assertCanonicalAudioReference(value.input.params.image_start, 'input.params.image_start', 'video')
-  }
+  assertCommandEnvelope(value)
+  const input = assertCommandInput(value.input)
+  assertVideoParams(input.params)
   stableSerialize(value)
 }
 
@@ -281,7 +381,8 @@ export function detachedVideoGenerationCommand(value: unknown): VideoGenerationC
 }
 
 export function mcpArgumentsFromCommand(command: VideoGenerationCommand): Record<string, unknown> {
-  const { operation: _operation, ...arguments_ } = command
+  const arguments_ = { ...command } as Record<string, unknown>
+  delete arguments_.operation
   return arguments_
 }
 

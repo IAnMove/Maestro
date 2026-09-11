@@ -62,16 +62,44 @@ async function readJson(response: Response): Promise<unknown> {
   return response.json().catch(() => undefined)
 }
 
+function receiptRecord(value: unknown): Record<string, unknown> | null {
+  if (!isRecord(value)) return null
+  if ('receipt' in value && isRecord(value.receipt)) return value.receipt
+  return value
+}
+
 function asReceipt(value: unknown, command: VideoGenerationCommand): VideoGenerationReceipt {
-  if (!isRecord(value)) throw new Error('generation.video receipt is missing')
-  const receipt = 'receipt' in value && isRecord(value.receipt) ? value.receipt : value
-  if (receipt.operation !== VIDEO_GENERATION_OPERATION
+  const receipt = receiptRecord(value)
+  if (!receipt
+    || receipt.operation !== VIDEO_GENERATION_OPERATION
     || receipt.commandId !== command.intent_id
     || !isRecord(receipt.result)
     || receipt.result.workspace !== command.input.workspace) {
-    throw new Error('generation.video receipt does not match the submitted command')
+    throw new Error(
+      isRecord(value)
+        ? 'generation.video receipt does not match the submitted command'
+        : 'generation.video receipt is missing',
+    )
   }
-  return receipt as VideoGenerationReceipt
+  return receipt as unknown as VideoGenerationReceipt
+}
+
+function wizardHeaders(context?: GenerationSubmissionContext): Record<string, string> {
+  const headers: Record<string, string> = {
+    'content-type': 'application/json',
+    'X-Hocus-UI-Surface': 'wizard',
+  }
+  if (!context?.workflowId && !context?.runId) return headers
+  headers['X-Hocus-UI-Context'] = JSON.stringify({
+    ...(context.workflowId ? { workflowId: context.workflowId } : {}),
+    ...(context.runId ? { runId: context.runId } : {}),
+  })
+  return headers
+}
+
+function queuedMessage(replayed: boolean, presentation: VideoGenerationPresentation): string {
+  if (replayed) return `Reused generation.video admission in ${presentation.workspace}`
+  return `Queued generation.video in ${presentation.workspace} with ${presentation.modelType} ${presentation.resolution} ${presentation.videoLength} frames`
 }
 
 export function createVideoGenerationAdapter(options: { fetch?: typeof fetch } = {}) {
@@ -90,19 +118,9 @@ export function createVideoGenerationAdapter(options: { fetch?: typeof fetch } =
     ): Promise<VideoGenerationSubmitResult> {
       const command = buildVideoGenerationCommand(action)
       const presentation = videoGenerationPresentation(action)
-      const headers: Record<string, string> = {
-        'content-type': 'application/json',
-        'X-Hocus-UI-Surface': 'wizard',
-      }
-      if (context?.workflowId || context?.runId) {
-        headers['X-Hocus-UI-Context'] = JSON.stringify({
-          ...(context.workflowId ? { workflowId: context.workflowId } : {}),
-          ...(context.runId ? { runId: context.runId } : {}),
-        })
-      }
       const response = await send(`${BASE}/api/v1/generation/commands`, {
         method: 'POST',
-        headers,
+        headers: wizardHeaders(context),
         body: JSON.stringify(command),
       })
       const payload = await readJson(response)
@@ -117,9 +135,7 @@ export function createVideoGenerationAdapter(options: { fetch?: typeof fetch } =
         command,
         presentation,
         mcpArguments: mcpArgumentsFromCommand(command),
-        message: replayed
-          ? `Reused generation.video admission in ${presentation.workspace}`
-          : `Queued generation.video in ${presentation.workspace} with ${presentation.modelType} ${presentation.resolution} ${presentation.videoLength} frames`,
+        message: queuedMessage(replayed, presentation),
         taskId: receipt.result.task_id,
       }
     },
