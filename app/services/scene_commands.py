@@ -15,6 +15,11 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator, ValidationEr
 
 CATALOG = json.loads((Path(__file__).parent.parent / 'shared' / 'scene_effects.json').read_text())
 PRESETS = {entry['id']: entry for entry in CATALOG}
+ANIME_COUNT = sum(1 for item in CATALOG if item['collection'] == 'anime')
+RETRO_COUNT = sum(1 for item in CATALOG if item['collection'] == 'retro')
+ALL_SECONDS = 3 * len(CATALOG)
+ANIME_SECONDS = 3 * ANIME_COUNT
+RETRO_SECONDS = 3 * RETRO_COUNT
 # Keep in lockstep with ui/src/features/sceneFx/world.ts WORLD_SFX_KINDS.
 # Additive apply revalidates every existing worldSfx cue against this set.
 WORLD_KINDS = {
@@ -142,7 +147,7 @@ class EffectsShowcase(Strict):
     document: dict | None = None
     dimension: Literal['2d', '3d'] = '3d'
     sound: bool = True
-    collection: Literal['all', 'anime'] = 'all'
+    collection: Literal['all', 'anime', 'retro'] = 'all'
 
     @model_validator(mode='after')
     def resolve_document(self):
@@ -170,9 +175,9 @@ class SpeechPrepare(DocumentInput):
 
 OPERATIONS = {
     'scenes.speech.capabilities': (Strict, 'Read local Rhubarb and optional installed-only CPU BS-RoFormer availability. No model downloads or inference.'),
-    'scenes.effects.catalog': (Strict, 'List 36 screen overlays plus world-space kinds in result.worldKinds (portal, magic_circle, summoning_gate, lightning, energy_beam, laser, energy_orb, anime_aura, arcane_missiles, shockwave, smoke, sparks, explosion, fire, rain, snow, fog, shield, tornado, splash, dust, ice_burst, black_hole, media_portal). Screen uses percent; world uses meters. No AI generation.'),
+    'scenes.effects.catalog': (Strict, f'List {len(CATALOG)} screen overlays plus world-space kinds in result.worldKinds (portal, magic_circle, summoning_gate, lightning, energy_beam, laser, energy_orb, anime_aura, arcane_missiles, shockwave, smoke, sparks, explosion, fire, rain, snow, fog, shield, tornado, splash, dust, ice_burst, black_hole, media_portal). Screen uses percent; world uses meters. Retro looks (psx, vhs, crt, consoles) are screen-only. No AI generation.'),
     'scenes.effects.apply': (EffectsApply, 'Return an editable 2D/3D document with timed SFX. Screen cues go to sfx; worldCues go to worldSfx on Video3D only. Matching IDs replace in place. No save or export.'),
-    'scenes.effects.showcase': (EffectsShowcase, 'Return a reusable SFX showcase: all effects 108 seconds, or collection anime 36 seconds. Retains actors/camera and replaces only SFX. No save or export.'),
+    'scenes.effects.showcase': (EffectsShowcase, f'Return a reusable SFX showcase: all effects {ALL_SECONDS} seconds, collection anime {ANIME_SECONDS} seconds, or collection retro {RETRO_SECONDS} seconds. Retains actors/camera and replaces only SFX. No save or export.'),
     'scenes.speech.prepare': (SpeechPrepare, 'Analyze an existing workspace voice with Rhubarb and attach it to an exact 3D speaker/clip. Optional isolate_vocals uses installed-only local CPU BS-RoFormer, preserving original playback. Returns an editable document; face calibration may be needed. No downloads, voice generation, save or video export.'),
 }
 

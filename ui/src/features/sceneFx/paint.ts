@@ -4,6 +4,7 @@ import { animePainters } from './animePaint'
 import { paintExplosion } from './explosionPaint'
 import { isWorldSfxKind } from './world'
 import { rasterizeWorldFx } from './explosionSprite'
+import { applyRetroLook, isRetroLook } from './retroPaint'
 
 type Painter = (ctx: CanvasRenderingContext2D, cue: SceneFx, time: number, progress: number) => void
 const tau = Math.PI * 2
@@ -96,9 +97,22 @@ const laser: Painter = (ctx, _cue, time) => {
 const special: Record<string, Painter> = { portal: rings, shockwave: rings, lightning, speedlines, scanline, aurora, laser, explosion: paintExplosion, ...magicPainters, ...animePainters }
 
 /** Composited screen-space effects, identical in the 2D and 3D previews/exports. */
-export function paintSceneFx(ctx: CanvasRenderingContext2D, width: number, height: number, seconds: number, cues: readonly SceneFx[] = []) {
-  for (const cue of cues) {
-    if (seconds < cue.start || seconds >= cue.end) continue
+export function paintSceneFx(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  seconds: number,
+  cues: readonly SceneFx[] = [],
+  source?: CanvasImageSource | null,
+) {
+  const live = cues.filter(cue => seconds >= cue.start && seconds < cue.end)
+  const looks = live.filter(cue => isRetroLook(cue.kind))
+  if (looks.length) {
+    if (source && typeof ctx.drawImage === 'function') ctx.drawImage(source, 0, 0, width, height)
+    for (const cue of looks) applyRetroLook(ctx, width, height, cue, seconds)
+  }
+  for (const cue of live) {
+    if (isRetroLook(cue.kind)) continue
     const time = seconds - cue.start, progress = time / (cue.end - cue.start)
     const scale = Math.min(width, height) * cue.size / 100
     ctx.save(); ctx.translate(width * cue.x / 100, height * cue.y / 100); ctx.scale(scale, scale)

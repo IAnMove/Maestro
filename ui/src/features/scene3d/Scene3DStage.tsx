@@ -56,6 +56,7 @@ export type Scene3DStageHandle = {
   setExportSize: (width: number, height: number) => void
   setExportQuality: (enabled: boolean) => void
   restoreSize: () => void
+  canvas: () => HTMLCanvasElement | null
   beginExport: (document: Scene3DDocument) => void
   endExport: () => void
   facePlacement?: (slotId: string, profile: PlacementMode) => FacePlacement | undefined
@@ -198,6 +199,9 @@ export const Scene3DStage = forwardRef<Scene3DStageHandle, Props>(function Scene
       const world = worldRef.current
       const host = hostRef.current
       if (world && host) resizeWorld(world, host)
+    },
+    canvas() {
+      return worldRef.current?.renderer.domElement ?? null
     },
     facePlacement(slotId, profile) {
       const placement = worldRef.current?.slots.get(slotId)?.root.userData.speechPlacements?.[profile] as FacePlacement | undefined
