@@ -318,6 +318,88 @@ def test_ui_lease_blocks_server_advance(tmp_path):
     assert loaded["workflows"][0]["executorOwner"] == "ui"
 
 
+def test_sibling_persist_during_submit_keeps_receipt(tmp_path):
+    executor, native, service, workspace_dir = _executor(tmp_path)
+    original_submit = service.submit
+
+    async def racing_submit(command, **kwargs):
+        directory = workspace_dir(WORKSPACE)
+        collection = read_workflows(directory)
+        collection["workflows"].append({
+            "workflowId": "wf-ui-sibling",
+            "type": "create_rhythmic_3d_video",
+            "workspace": WORKSPACE,
+            "state": "waiting",
+            "currentStep": 0,
+            "steps": [{"stepId": "song", "kind": "generate_song", "state": "waiting", "input": {}}],
+        })
+        write_workflows(directory, collection, base_revision=int(collection["revision"]))
+        return await original_submit(command, **kwargs)
+
+    executor._submit_command = racing_submit
+    from asyncio import run
+    started = run(executor.start(_start_body("wf-race")))
+    workflow = started["workflow"]
+    assert workflow["steps"][0]["state"] == "waiting"
+    assert workflow["steps"][0]["taskId"]
+    assert workflow["steps"][0]["output"]["receipt"]["commandId"]
+    assert len(native.dispatch_calls) == 1
+    loaded = read_workflows(workspace_dir(WORKSPACE))
+    assert {item["workflowId"] for item in loaded["workflows"]} == {"wf-race", "wf-ui-sibling"}
+    saved = next(item for item in loaded["workflows"] if item["workflowId"] == "wf-race")
+    assert saved["steps"][0]["state"] == "waiting"
+    assert saved["steps"][0]["taskId"] == workflow["steps"][0]["taskId"]
+
+
+def test_start_retry_reattaches_receipt_to_running_checkpoint(tmp_path):
+    executor, native, _service, workspace_dir = _executor(tmp_path)
+    from asyncio import run
+    first = run(executor.start(_start_body("wf-running")))
+    directory = workspace_dir(WORKSPACE)
+    collection = read_workflows(directory)
+    lost = deepcopy(collection)
+    step = lost["workflows"][0]["steps"][0]
+    step["state"] = "running"
+    step["taskId"] = ""
+    step["output"] = {}
+    lost["workflows"][0]["state"] = "running"
+    write_workflows(directory, lost, base_revision=int(collection["revision"]))
+
+    recovered = run(executor.start(_start_body("wf-running")))
+    workflow = recovered["workflow"]
+    assert workflow["steps"][0]["taskId"] == first["workflow"]["steps"][0]["taskId"]
+    assert workflow["steps"][0]["output"]["receipt"]["commandId"]
+    assert workflow["steps"][0]["state"] == "waiting"
+    assert len(native.dispatch_calls) == 1
+
+
+def test_start_retry_advances_prepared_server_checkpoint(tmp_path):
+    executor, native, _service, workspace_dir = _executor(tmp_path)
+    write_workflows(workspace_dir(WORKSPACE), {
+        "revision": 0,
+        "workflows": [{
+            "workflowId": "wf-prepared",
+            "type": WORKFLOW_TYPE,
+            "workspace": WORKSPACE,
+            "state": "prepared",
+            "currentStep": 0,
+            "executorOwner": SERVER_OWNER,
+            "steps": [
+                {"stepId": STEP_IMAGE, "kind": "generation.image", "state": "pending", "input": _snapshot()},
+                {"stepId": STEP_UPSCALE, "kind": "tools.upscale", "state": "pending", "input": {}},
+            ],
+            "inputSnapshot": _snapshot(),
+        }],
+    }, base_revision=0)
+    from asyncio import run
+    started = run(executor.start(_start_body("wf-prepared")))
+    workflow = started["workflow"]
+    assert workflow["state"] == "queued"
+    assert workflow["steps"][0]["state"] == "waiting"
+    assert workflow["steps"][0]["taskId"]
+    assert len(native.dispatch_calls) == 1
+
+
 def test_catalog_describes_start_and_answer_operations():
     names = [item["name"] for item in catalog()]
     assert names == ["wizard.image_upscale", "wizard.workflow_answer"]

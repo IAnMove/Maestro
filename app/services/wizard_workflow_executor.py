@@ -394,10 +394,33 @@ class WizardWorkflowExecutor:
         return read_workflows(self._dir(workspace))
 
     def _commit(self, workspace: str, collection: dict[str, Any], workflow: dict[str, Any]) -> dict[str, Any]:
+        """Persist one workflow without dropping siblings written during await.
+
+        Admission can yield inside ``_submit``. A Wizard UI persist of another
+        row increments the shared revision in that window; retrying against the
+        latest collection keeps the receipt instead of leaving a running
+        checkpoint with no task id.
+        """
         workflow["updatedAt"] = _now()
-        _replace(collection, workflow)
-        saved = write_workflows(self._dir(workspace), collection, base_revision=int(collection["revision"]))
-        return {"revision": saved["revision"], "workflow": workflow}
+        candidate = collection
+        last_error: Exception | None = None
+        for _ in range(5):
+            try:
+                _replace(candidate, workflow)
+                saved = write_workflows(
+                    self._dir(workspace),
+                    candidate,
+                    base_revision=int(candidate["revision"]),
+                )
+                collection["revision"] = saved["revision"]
+                if candidate is not collection:
+                    collection["workflows"] = candidate["workflows"]
+                return {"revision": saved["revision"], "workflow": workflow}
+            except WizardWorkflowRevisionConflict as error:
+                last_error = error
+                candidate = self._read(workspace)
+        assert last_error is not None
+        raise last_error
 
     def _load(self, workspace: str, workflow_id: str) -> tuple[dict[str, Any], dict[str, Any]]:
         collection = self._read(workspace)
@@ -592,13 +615,24 @@ class WizardWorkflowExecutor:
             raise command_error(422, "invalid_command", "Start body must be a JSON object")
         workflow = _new_workflow(body, self._owner)
         workspace = workflow["workspace"]
+        workflow_id = workflow["workflowId"]
         with self._lock:
             collection = self._read(workspace)
-            existing = next((item for item in collection["workflows"] if item.get("workflowId") == workflow["workflowId"]), None)
+            existing = next((item for item in collection["workflows"] if item.get("workflowId") == workflow_id), None)
             if existing is not None:
-                return {"revision": collection["revision"], "workflow": existing}
-            self._commit(workspace, collection, workflow)
-        return await self._advance(workspace, workflow["workflowId"])
+                if self._return_existing(existing):
+                    return {"revision": collection["revision"], "workflow": existing}
+            else:
+                self._commit(workspace, collection, workflow)
+        return await self._advance(workspace, workflow_id)
+
+    def _return_existing(self, existing: dict[str, Any]) -> bool:
+        owner = str(existing.get("executorOwner") or "")
+        return (
+            existing.get("type") != WORKFLOW_TYPE
+            or existing.get("state") in TERMINAL_STATES
+            or bool(owner and owner != self._owner)
+        )
 
     def _prepare_answer(self, workspace: str, workflow_id: str, body: dict[str, Any], answer: dict[str, Any], expected: int) -> None:
         collection, workflow = self._load(workspace, workflow_id)
