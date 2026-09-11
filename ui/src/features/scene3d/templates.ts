@@ -21,6 +21,7 @@ export const TEMPLATE_CATEGORIES: Record<Scene3DTemplateId, Scene3DTemplateCateg
   ...MEDIA_CATEGORIES,
   'reflective-stage': 'cinema',
   'character-materialization': 'cinema',
+  'blast-stage': 'cinema',
   'coder-room': 'cinema',
   'clone-chase': 'cinema',
   'siege-ring': 'cinema',

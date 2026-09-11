@@ -1,6 +1,9 @@
 import { fxRandom, type SceneFx } from './types'
 import { magicPainters } from './magicPaint'
 import { animePainters } from './animePaint'
+import { paintExplosion } from './explosionPaint'
+import { isWorldSfxKind } from './world'
+import { rasterizeWorldFx } from './explosionSprite'
 
 type Painter = (ctx: CanvasRenderingContext2D, cue: SceneFx, time: number, progress: number) => void
 const tau = Math.PI * 2
@@ -12,7 +15,7 @@ const line = (ctx: CanvasRenderingContext2D, x: number, y: number, x2: number, y
   ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x2, y2); ctx.stroke()
 }
 const particles: Painter = (ctx, cue, time, progress) => {
-  const burst = ['explosion', 'fireworks', 'confetti', 'sparks'].includes(cue.kind)
+  const burst = ['fireworks', 'confetti', 'sparks'].includes(cue.kind)
   const cloud = cue.kind === 'smoke' || cue.kind === 'fog'
   const count = Math.round((cloud ? 22 : 100) * cue.intensity)
   for (let i = 0; i < count; i++) {
@@ -90,7 +93,7 @@ const laser: Painter = (ctx, _cue, time) => {
   for (let i = 0; i < 4; i++) { ctx.globalAlpha = .15 + i * .18; ctx.lineWidth = .05 / (i + 1); line(ctx, -.65, 0, .65, 0) }
   ctx.strokeStyle = '#ffffff'; ctx.lineWidth = .003; line(ctx, -.65, 0, .65, 0); ctx.restore()
 }
-const special: Record<string, Painter> = { portal: rings, shockwave: rings, lightning, speedlines, scanline, aurora, laser, ...magicPainters, ...animePainters }
+const special: Record<string, Painter> = { portal: rings, shockwave: rings, lightning, speedlines, scanline, aurora, laser, explosion: paintExplosion, ...magicPainters, ...animePainters }
 
 /** Composited screen-space effects, identical in the 2D and 3D previews/exports. */
 export function paintSceneFx(ctx: CanvasRenderingContext2D, width: number, height: number, seconds: number, cues: readonly SceneFx[] = []) {
@@ -101,7 +104,15 @@ export function paintSceneFx(ctx: CanvasRenderingContext2D, width: number, heigh
     ctx.save(); ctx.translate(width * cue.x / 100, height * cue.y / 100); ctx.scale(scale, scale)
     ctx.rotate((cue.rotation ?? 0) * Math.PI / 180)
     ctx.fillStyle = cue.color; ctx.strokeStyle = cue.color; ctx.lineWidth = .002; ctx.lineCap = 'round'
-    ;(special[cue.kind] ?? particles)(ctx, cue, time, progress)
+    if (cue.kind === 'explosion') paintExplosion(ctx, cue, time, progress)
+    else {
+      const sprite = isWorldSfxKind(cue.kind) && typeof ctx.drawImage === 'function' ? rasterizeWorldFx(cue, time) : null
+      if (sprite) {
+        ctx.save(); ctx.globalCompositeOperation = 'lighter'
+        ctx.drawImage(sprite, -0.62, -0.78, 1.24, 1.28)
+        ctx.restore()
+      } else (special[cue.kind] ?? particles)(ctx, cue, time, progress)
+    }
     ctx.restore()
     if (cue.label) {
       ctx.save(); ctx.font = `600 ${Math.round(height * .032)}px monospace`; ctx.textAlign = 'left'

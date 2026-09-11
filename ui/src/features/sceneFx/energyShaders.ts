@@ -23,7 +23,7 @@ void main() {
   gl_Position=projectionMatrix*center;
 }`
 
-export type EnergySurface = 'portal' | 'circle' | 'beam' | 'orb' | 'aura' | 'shock' | 'mist'
+export type EnergySurface = 'portal' | 'circle' | 'beam' | 'orb' | 'aura' | 'shock' | 'mist' | 'fireball' | 'flash' | 'blastRing' | 'fire' | 'shield' | 'tornado' | 'splash' | 'ice' | 'hole' | 'portalGlass'
 const BODIES: Record<EnergySurface, string> = {
   portal: `
     vec2 p=(vUv-.5)*2.; float r=length(p), a=atan(p.y,p.x);
@@ -71,6 +71,91 @@ const BODIES: Record<EnergySurface, string> = {
     float alpha=smoothstep(.28,.74,n)*edge*.55;
     float light=fbm(vUv*7.+n+uTime*.04);
     gl_FragColor=vec4(uColor*(.3+light*.65),alpha*uPower);`,
+  fireball: `
+    vec2 p=(vUv-.5)*vec2(2.,2.15); float r=length(p), a=atan(p.y,p.x);
+    float n=fbm(vec2(a*2.4, r*5.2-uTime*2.4)+uSeed);
+    float n2=fbm(vec2(a*5.1+uTime, r*7.-uTime*3.1));
+    float edge=r-(n-.5)*.55-(n2-.5)*.22;
+    float body=smoothstep(.92,.12,edge);
+    float tongues=pow(max(n2,0.),2.1)*smoothstep(.95,.2,r);
+    float core=exp(-edge*edge*9.)*smoothstep(.9,.05,r);
+    float fade=pow(max(0.,1.-uProgress*.82),1.08);
+    float card=1.-smoothstep(.42,.5,max(abs(vUv.x-.5),abs(vUv.y-.5)));
+    float alpha=(body*.7+tongues*.55+core*.85)*fade*card;
+    vec3 coal=uColor*.35;
+    vec3 flame=mix(uColor,vec3(1.,.45,.05),tongues);
+    vec3 hot=mix(flame,vec3(1.,.82,.42),core*.7);
+    gl_FragColor=vec4(mix(coal,hot,body)*(1.8+core*4.)*uPower,alpha*uPower);`,
+  flash: `
+    vec2 p=(vUv-.5)*2.; float r=length(p);
+    float n=fbm(vUv*9.+uSeed);
+    float core=exp(-r*r*(9.+n*4.));
+    float halo=exp(-r*r*(1.6+n))*step(.22,n);
+    float fade=pow(max(0.,1.-uProgress*3.1),1.8);
+    float card=1.-smoothstep(.4,.5,max(abs(vUv.x-.5),abs(vUv.y-.5)));
+    gl_FragColor=vec4((vec3(1.,.9,.55)*core*7.+uColor*halo*2.2)*uPower*fade,(core*.8+halo*.3)*fade*uPower*card);`,
+  blastRing: `
+    vec2 p=(vUv-.5)*2.; float r=length(p), a=atan(p.y,p.x);
+    float radius=.12+uProgress*.78;
+    float n=fbm(vec2(a*3.5, r*10.)+uSeed);
+    float band=exp(-abs(r-radius-(n-.5)*.11)*28.);
+    float grit=pow(n,2.)*exp(-abs(r-radius)*8.);
+    float fade=(1.-uProgress)*step(.18,n+.35);
+    gl_FragColor=vec4(uColor*(band*2.6+grit*1.4)*uPower,(band*.7+grit)*fade*uPower);`,
+  fire: `
+    vec2 p=vUv; float n=fbm(vec2(p.x*9., p.y*6.-uTime*2.4)+uSeed);
+    float n2=fbm(vec2(p.x*14.+uTime, p.y*8.-uTime*3.1));
+    float edge=pow(max(0.,1.-abs(p.x-.5)*2.15),1.35);
+    float flame=smoothstep(.18,.78,n)*edge*(1.-smoothstep(.12,.98,p.y));
+    float tongues=pow(n2,2.2)*edge*smoothstep(.95,.25,p.y);
+    float core=exp(-pow((p.x-.5)*6.,2.))*smoothstep(.9,.2,p.y);
+    vec3 hot=mix(uColor,vec3(1.,.55,.08),tongues);
+    hot=mix(hot,vec3(1.,.9,.45),core*.7);
+    float card=1.-smoothstep(.46,.5,abs(p.x-.5));
+    gl_FragColor=vec4(hot*(flame*2.4+tongues*3.+core*4.)*uPower,(flame*.75+tongues*.5+core)*card*uPower);`,
+  shield: `
+    vec2 p=(vUv-.5)*2.; float r=length(p);
+    float n=fbm(p*4.+uTime*.3+uSeed);
+    float fres=pow(max(0.,1.-r),1.4);
+    float hex=pow(abs(sin(p.x*18.)*sin(p.y*16.)),12.)*smoothstep(1.,.35,r);
+    float rim=exp(-abs(r-.86)*28.);
+    float alpha=(fres*.18+rim*.85+hex*.25)*uPower;
+    gl_FragColor=vec4(mix(uColor,vec3(.7,.95,1.),rim)*(1.4+hex*2.)*uPower,alpha);`,
+  tornado: `
+    vec2 p=vUv-.5; float x=p.x*2., y=p.y+.5;
+    float spin=fbm(vec2(x*6.+uTime*2.2, y*4.));
+    float funnel=pow(max(0.,1.-abs(x)/(0.18+y*.7)),1.4);
+    float dust=pow(spin,1.6)*funnel;
+    float card=smoothstep(.5,.38,abs(p.x));
+    gl_FragColor=vec4(uColor*(funnel*.7+dust*1.8)*uPower,(funnel*.28+dust*.55)*card*uPower);`,
+  splash: `
+    vec2 p=(vUv-.5)*2.; float r=length(p), a=atan(p.y,p.x);
+    float n=fbm(vec2(a*4., r*6.-uTime)+uSeed);
+    float crown=smoothstep(.15,.02,abs(r-.35-(n-.5)*.18))*step(p.y,-.05+n*.2);
+    float drops=exp(-r*r*3.)*pow(n,3.);
+    float fade=pow(max(0.,1.-uProgress),1.1);
+    gl_FragColor=vec4(mix(uColor,vec3(.85,.95,1.),drops)*(crown*3.+drops*2.)*uPower,(crown*.7+drops)*fade*uPower);`,
+  ice: `
+    vec2 p=(vUv-.5)*2.; float r=length(p), a=atan(p.y,p.x);
+    float n=fbm(p*7.+uSeed);
+    float shard=pow(abs(sin(a*5.+n*2.)), 6.)*smoothstep(1.,.15,r);
+    float frost=n*smoothstep(.95,.2,r);
+    float core=exp(-r*r*8.);
+    float fade=pow(max(0.,1.-uProgress*.7),1.05);
+    gl_FragColor=vec4(mix(uColor,vec3(.85,.95,1.),shard)*(shard*3.+frost+core*2.)*uPower,(shard*.8+frost*.35+core)*fade*uPower);`,
+  hole: `
+    vec2 p=(vUv-.5)*2.; float r=length(p), a=atan(p.y,p.x);
+    float n=fbm(vec2(a*3., r*8.-uTime*.8));
+    float disk=smoothstep(.55,.22,r)*smoothstep(.02,.18,r);
+    float event=smoothstep(.2,.0,r);
+    float arc=exp(-abs(r-.38-(n-.5)*.06)*22.);
+    gl_FragColor=vec4(mix(vec3(0.), uColor, arc+disk*.25)*(arc*4.+disk)*uPower,(disk*.55+arc+event)*uPower);`,
+  portalGlass: `
+    vec2 p=(vUv-.5)*2.; float r=length(p*vec2(1.,1.22));
+    float n=fbm(vUv*7.+uTime*.35+uSeed);
+    float hole=smoothstep(.96,.68,r);
+    vec3 voidc=mix(vec3(.01,.03,.07), uColor*.12, n);
+    gl_FragColor=vec4(voidc, hole*.92);`,
 }
 
 export function energyMaterial(kind: EnergySurface, color: string, billboard = false) {
@@ -82,7 +167,7 @@ export function energyMaterial(kind: EnergySurface, color: string, billboard = f
     fragmentShader: `varying vec2 vUv; uniform float uTime,uPower,uSeed,uProgress;
       uniform vec3 uColor; ${ENERGY_NOISE} void main() { ${BODIES[kind]} }`,
     transparent: true, depthWrite: false, side: DoubleSide,
-    ...(kind !== 'mist' ? { blending: AdditiveBlending } : {}),
+    ...(kind === 'mist' || kind === 'portalGlass' || kind === 'hole' ? {} : { blending: AdditiveBlending }),
   })
 }
 

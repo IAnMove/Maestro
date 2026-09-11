@@ -69,6 +69,7 @@ export const SCENE3D_TEMPLATE_IDS = [
   ...MEDIA_TEMPLATE_IDS,
   'reflective-stage',
   'character-materialization',
+  'blast-stage',
 ] as const
 
 export type Scene3DTemplateId = (typeof SCENE3D_TEMPLATE_IDS)[number]

@@ -2,6 +2,7 @@ import { AdditiveBlending, BufferAttribute, BufferGeometry, Color, CylinderGeome
 import { energyMaterial, softSparkMaterial, type EnergySurface } from './energyShaders'
 import { fxRandom } from './types'
 import type { WorldSfxKind } from './world'
+import { buildPackedEffect } from './worldPack'
 
 function surface(kind: EnergySurface, color: string, width: number, height = width, billboard = false) {
   return new Mesh(new PlaneGeometry(width, height), energyMaterial(kind, color, billboard))
@@ -9,8 +10,15 @@ function surface(kind: EnergySurface, color: string, width: number, height = wid
 function sparks(color: string, mode: string, radius = .7, count = 72) {
   const data = new Float32Array(count * 3)
   for (let i = 0; i < count; i++) {
-    const a = fxRandom(19, i) * Math.PI * 2, r = radius * (.7 + fxRandom(3, i) * .3)
-    data.set([Math.cos(a) * r, 0, Math.sin(a) * r], i * 3)
+    if (mode === 'burst') {
+      const theta = fxRandom(19, i) * Math.PI * 2
+      const phi = Math.acos(2 * fxRandom(3, i) - 1)
+      const r = radius * (.25 + fxRandom(7, i) * .9)
+      data.set([Math.sin(phi) * Math.cos(theta) * r, Math.cos(phi) * r, Math.sin(phi) * Math.sin(theta) * r], i * 3)
+    } else {
+      const a = fxRandom(19, i) * Math.PI * 2, r = radius * (.7 + fxRandom(3, i) * .3)
+      data.set([Math.cos(a) * r, 0, Math.sin(a) * r], i * 3)
+    }
   }
   const geometry = new BufferGeometry()
   geometry.setAttribute('position', new BufferAttribute(data, 3))
@@ -95,6 +103,33 @@ function aura(color: string) {
   root.add(surface('aura', color, 1.45, 2.1, true), sparks(color, 'rise', .45, 96))
   return root
 }
+function explosion(color: string) {
+  const root = new Group()
+  for (let i = 0; i < 3; i++) {
+    const core = surface('fireball', color, 1.7 + i * .18, 2.05 + i * .12, true)
+    core.userData.kind = 'fireball'
+    core.userData.seedOffset = i * 13
+    core.position.set((i - 1) * .08, i * .05, (i - 1) * .06)
+    root.add(core)
+  }
+  const inner = surface('flash', color, 1.05, 1.05, true)
+  inner.userData.kind = 'flash'
+  const tongues = surface('aura', color, 1.7, 2.4, true)
+  tongues.userData.kind = 'fireball'
+  tongues.position.y = .25
+  const ring = surface('blastRing', color, 7.2)
+  ring.rotation.x = -Math.PI / 2
+  ring.position.y = .03
+  const debris = sparks(color, 'burst', .28, 280)
+  debris.material = softSparkMaterial(color, .07)
+  const cinders = sparks('#ffcc77', 'burst', .18, 120)
+  cinders.material = softSparkMaterial('#ffcc77', .045)
+  const plume = mist('#3a2c26')
+  plume.userData.kind = 'plume'
+  plume.position.y = .2
+  root.add(inner, tongues, ring, debris, cinders, plume)
+  return root
+}
 function missiles(color: string) {
   const root = new Group()
   for (let i = 0; i < 3; i++) {
@@ -124,5 +159,7 @@ export function buildEnergyEffect(kind: WorldSfxKind, color: string) {
     case 'arcane_missiles': return missiles(color)
     case 'smoke': return mist(color)
     case 'sparks': { const root = new Group(); root.add(sparks(color, 'rise', .45, 144)); return root }
+    case 'explosion': return explosion(color)
+    default: return buildPackedEffect(kind, color) ?? new Group()
   }
 }
