@@ -33,9 +33,19 @@ Core surfaces that stay available on Apple Silicon: projects, editors,
 Video3D, remote LLM/image/music/3D (including Meshy). FFmpeg and Rhubarb
 are `available` only when the binary is present; otherwise `disabled`.
 
-## Not in this slice
+## Integration line
 
-Install/Update/Start/Reset profiles, splitting `requirements.txt`, skipping
-Torch on Mac, catalog filters, and per-endpoint generate guards land in
-later PRs. Linux/Windows NVIDIA behaviour must stay unchanged until those
-guards are wired one hotspot at a time.
+Work lands on `development-mac-integration`, not on `development`, until the
+Apple Silicon profile can install and start. PRs into that line should be
+large working slices, not a contract-only drip.
+
+## Core/remote profile
+
+`select_profiles("darwin", "arm64", …)` is supported via the `core` engine
+(`app/env`, FastAPI/UI, no Torch). WanGP, MiniMax H3, Hunyuan3D, SAM and
+UniRig stay unsupported and are skipped by `installEngines`. `launch.py`
+starts `core_runtime` instead of `_launch_runtime` so the server does not
+import CUDA. `POST /api/v1/generate` returns `409 feature_unavailable`.
+
+Linux/Windows NVIDIA recipes and receipt IDs (`linux-x64-nvidia-wangp`)
+are unchanged.

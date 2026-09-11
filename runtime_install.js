@@ -72,6 +72,16 @@ function startGuard() {
   }}
 }
 
+function startGuards() {
+  return [
+    startGuard(),
+    {when: "{{exists('app/.runtime/core.managed') && !exists('app/.runtime/wangp.managed')}}", method: 'shell.run', params: {
+      path: 'app', venv: 'env', env: {PYTHONNOUSERSITE: '1', PYTHONPATH: '', PYTHONHOME: ''},
+      message: guarded('python ../scripts/runtime_probe.py --require-installed core'),
+    }},
+  ]
+}
+
 function vendorSteps(id) {
   const vendor = vendors[id]
   if (!vendor) throw new Error(`Unknown vendor ${id}`)
@@ -102,11 +112,12 @@ function engineSteps(engine, platform) {
     .map(k => `${k}==${spec[k]}+cu${spec.cuda.replace('.', '')}`).join(' ')
   const removals = engine === 'wangp' && platform === 'win32'
     ? [pip(engine, platform, 'uninstall torchcodec')] : []
-  run.push({method: 'shell.run', params: {...shell(engine, platform), message: [
+  const packages = [
     ...removals,
-    pip(engine, platform, `install ${torch}`),
+    ...(torch ? [pip(engine, platform, `install ${torch}`)] : []),
     pip(engine, platform, `install -r app/runtime/locks/${platform}-${engine}.txt`),
-  ]}})
+  ]
+  run.push({method: 'shell.run', params: {...shell(engine, platform), message: packages}})
   const triton = spec.constraints['triton-windows']
   if (platform === 'win32' && triton) run.push({method: 'shell.run', params: {
     ...shell(engine, platform), message: pip(engine, platform, `install triton-windows==${triton}`),
@@ -156,4 +167,4 @@ function installEngines(names) {
     }))))
 }
 
-module.exports = {catalog, selected, shell, python, pip, guarded, call, preflight, startGuard, vendorSteps, installEngines}
+module.exports = {catalog, selected, shell, python, pip, guarded, call, preflight, startGuard, startGuards, vendorSteps, installEngines}

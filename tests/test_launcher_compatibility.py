@@ -29,6 +29,10 @@ class TestPinokioGpuCompatibility(unittest.TestCase):
         rejected = select_profiles("win32", "x64", "amd")
         self.assertFalse(rejected["supported"])
         self.assertIn("NVIDIA", rejected["engines"]["wangp"]["reason"])
+        apple = select_profiles("darwin", "arm64", "apple")
+        self.assertTrue(apple["supported"])
+        self.assertTrue(apple["engines"]["core"]["supported"])
+        self.assertFalse(apple["engines"]["wangp"]["supported"])
 
     def test_start_url_uses_the_required_capture_object(self):
         start = (_ROOT / "start.js").read_text(encoding="utf-8")
