@@ -6,6 +6,8 @@ import { splitPromptSchedule } from '../../lib/promptScheduler'
 import { newUserGenerationContext } from '../../features/studio/generationProvenance'
 import { useViggleGenerationGuard } from '../../lib/useViggleGenerationGuard'
 import { isGenerationJobActive } from '../../lib/generationJobState'
+import { usePlatformCapabilities } from '../../lib/usePlatformCapabilities'
+import { generateBlockedCopy, isRemoteMiniMaxImage } from '../../lib/generateButtonGate'
 
 export function GenerateButton() {
   const { t } = useUiTranslation('studio')
@@ -50,7 +52,11 @@ export function GenerateButton() {
   const schedulerApplies = promptSchedulerEnabled && generationMode === 'video' && imageMode === 0
   const scheduledVideoCount = schedulerApplies ? splitPromptSchedule(prompt).length : 0
   const needsScheduledPrompts = schedulerApplies && scheduledVideoCount === 0
-  const blocked = needsImage || needsReference || needsOutpaintSource || needsOutpaintArea || needsScheduledPrompts
+  const modelType = useStore(s => s.params.model_type)
+  const imageProvider = useStore(s => s.productionProfile?.image?.provider)
+  const localUnavailable = usePlatformCapabilities()?.capabilities.wangp_local?.state === 'hidden'
+    && !isRemoteMiniMaxImage(generationMode, modelType, imageProvider)
+  const blocked = localUnavailable || needsImage || needsReference || needsOutpaintSource || needsOutpaintArea || needsScheduledPrompts
 
   const handleClick = async () => {
     if (blocked || submissionPending.current) return
@@ -73,20 +79,9 @@ export function GenerateButton() {
   const queueCount = jobs.filter(job => isGenerationJobActive(job.status)).length
 
   if (blocked) {
-    const label = needsImage
-      ? t('generate.needImage')
-      : needsReference
-        ? t('generate.needReference')
-      : needsOutpaintSource
-        ? t('generate.needSource')
-      : needsOutpaintArea
-        ? t('generate.chooseCanvas')
-        : t('generate.addPrompt')
-    const title = needsOutpaintArea
-      ? t('generate.outpaintAreaHint')
-      : needsReference
-        ? t('generate.referenceHint')
-        : undefined
+    const { label, title } = generateBlockedCopy({
+      localUnavailable, needsImage, needsReference, needsOutpaintSource, needsOutpaintArea, t,
+    })
     return (
       <button
         disabled

@@ -666,6 +666,7 @@ const familyModeMap: Record<string, GenerationMode> = {
   z_image: 'image',
   krea2: 'image',
   hidream: 'image',
+  minimax: 'image',
   wan: 'video',
   wan2_2: 'video',
   hunyuan: 'video',
