@@ -1366,6 +1366,19 @@ export interface LyricSegment {
   speaker?: string | null
   /** Word-level alignment when the transcription engine supplies it. */
   words?: Array<{ start: number; end: number; text: string }> | null
+  source?: 'transcription' | 'aligned_lyrics' | 'interpolated' | string
+  confidence?: number | null
+  section?: string | null
+}
+
+export interface LyricVisualEvent {
+  time: number
+  end: number
+  kind: 'entrance' | 'transformation' | 'impact' | string
+  cue_index: number
+  lyric: string
+  trigger: string
+  rule: string
 }
 
 export interface SongStructureEntry {
@@ -1386,6 +1399,18 @@ export interface AudioAnalysisResult {
   vocals_path: string | null
   warnings?: string[] | null
   song_structure?: SongStructureEntry[] | null
+  /** Raw ASR evidence; `lyrics`/`lyric_timeline` preserve supplied lyrics. */
+  transcript?: LyricSegment[] | null
+  lyric_timeline?: LyricSegment[] | null
+  lyrics_srt?: string | null
+  lyric_timing?: {
+    method: string
+    coverage: number
+    matched_words: number
+    total_words: number
+    approximate_lines?: number
+  } | null
+  visual_events?: LyricVisualEvent[] | null
 }
 
 export interface SuggestedClip {
@@ -1400,6 +1425,8 @@ export interface PlannedClip extends SuggestedClip {
   beat_count: number
   duration_frames: number
   dominant_speaker?: string | null
+  lyric_cues?: Array<LyricSegment & { offset: number }>
+  visual_events?: Array<LyricVisualEvent & { offset: number }>
 }
 
 export interface SpeakerMapping {

@@ -9043,6 +9043,7 @@ _AUDIO_ANALYSIS_STEPS = {
     "extracting_vocals": 5,
     "loading_transcription_model": 5,
     "transcribing": 6,
+    "aligning_lyrics": 7,
     "loading_diarization_model": 7,
     "identifying_speakers": 8,
     "finalizing": 9,
@@ -9511,6 +9512,16 @@ async def director_classify_sections(request: Request):
         return {"sections": sections, "method": "heuristic"}
 
     try:
+        timed_structure = audio_analysis.structure_from_aligned_lyrics(
+            analysis.get("lyric_timeline") or []
+        )
+        if timed_structure:
+            updated = audio_analysis.replace_sections_with_structure(analysis, timed_structure)
+            return {
+                "sections": updated["sections"],
+                "song_structure": timed_structure,
+                "method": "lyrics_timeline",
+            }
         tagged_structure = llm_service.structure_from_tagged_lyrics(lyrics_hint, duration)
         if tagged_structure:
             updated = audio_analysis.replace_sections_with_structure(analysis, tagged_structure)
