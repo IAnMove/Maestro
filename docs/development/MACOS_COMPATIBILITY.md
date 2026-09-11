@@ -1,6 +1,8 @@
 # macOS compatibility contract
 
-Status: Phase 1 of `outputs/song-timings-20260911/PLAN_COMPATIBILIDAD_MACOS.md`.
+Status: Apple Silicon core/remote implemented on `development-mac-integration`.
+Physical Mac install/start/export QA is still required before merging to
+`development`.
 Apple Silicon core/remote is the first supported Mac profile. Intel Mac is
 explicitly out of the first launch. This document is the live contract, not
 the full engineering estimate.
@@ -45,7 +47,11 @@ large working slices, not a contract-only drip.
 (`app/env`, FastAPI/UI, no Torch). WanGP, MiniMax H3, Hunyuan3D, SAM and
 UniRig stay unsupported and are skipped by `installEngines`. `launch.py`
 starts `core_runtime` instead of `_launch_runtime` so the server does not
-import CUDA. `POST /api/v1/generate` returns `409 feature_unavailable`.
+import CUDA. `POST /api/v1/generate`, recast, upscale, Hunyuan3D and UniRig return
+`409 feature_unavailable`, including MCP `generate`. Local llama.cpp load is
+blocked; remote MiniMax/OpenAI/Grok/Anthropic loads stay available.
+The Pinokio Advanced menu hides SAM and UniRig installers on Darwin.
+Settings hides CUDA/VRAM/Triton controls when `show_cuda_controls` is false.
 
 Linux/Windows NVIDIA recipes and receipt IDs (`linux-x64-nvidia-wangp`)
 are unchanged.

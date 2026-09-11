@@ -122,6 +122,9 @@ function engineSteps(engine, platform) {
   if (platform === 'win32' && triton) run.push({method: 'shell.run', params: {
     ...shell(engine, platform), message: pip(engine, platform, `install triton-windows==${triton}`),
   }})
+  if (engine === 'core') run.push({method: 'shell.run', params: {
+    message: guarded('conda install -y -c conda-forge ffmpeg'),
+  }})
   if (engine === 'wangp') run.push(...call('torch.js', {managed: true}))
   if (engine === 'hunyuan3d') {
     run.push({method: 'shell.run', params: {...shell(engine, platform),

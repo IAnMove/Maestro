@@ -20,6 +20,8 @@ class TestPinokioGpuCompatibility(unittest.TestCase):
         self.assertNotIn("Open Classic UI", launcher)
         self.assertNotIn("Classic Compiled", launcher)
         self.assertNotIn("start_classic.js", launcher)
+        self.assertIn('=== "darwin"', launcher)
+        self.assertIn("sam_install.js", launcher)
 
     def test_fresh_install_still_uses_pinokios_documented_gpu_variable(self):
         installer = (_ROOT / "install.js").read_text(encoding="utf-8")

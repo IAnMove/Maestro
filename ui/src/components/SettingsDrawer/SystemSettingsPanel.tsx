@@ -9,6 +9,7 @@ import { setUiLanguage, useUiTranslation, type UiLanguage } from '../../i18n'
 import { H3ModelName } from '../Sidebar/H3ModelInfo'
 import { ModelCatalogInfo } from '../Sidebar/ModelCatalogInfo'
 import { catalogVramGb } from '../../lib/modelCatalog'
+import { showsCudaControls, usePlatformCapabilities } from '../../lib/usePlatformCapabilities'
 import { MINIMAX_MUSIC_COMMUNITY_MODELS, modelRequirementsText } from '../../lib/minimaxMusicCatalog'
 
 const profileLabels: Record<string, string> = {
@@ -1024,6 +1025,7 @@ export function SystemSettingsPanel() {
   const updateConfig = useStore(s => s.updateSystemConfig)
   const servicesConfig = useStore(s => s.servicesConfig)
   const updateServicesConfig = useStore(s => s.updateServicesConfig)
+  const cudaControls = showsCudaControls(usePlatformCapabilities())
   // Detected VRAM is used in the VRAM coefficient subtext (see below)
   // so the "Max VRAM target: ~X GB of Y GB" line shows real numbers
   // instead of a hardcoded 24 GB. AutoPerformanceCard populates this
@@ -1221,14 +1223,12 @@ export function SystemSettingsPanel() {
 
       <hr className="border-border" />
 
-      {/* Auto-tune card always visible. The fields below are
-          conditionally hidden based on autoOn. */}
-      <AutoPerformanceCard />
+      {cudaControls && <AutoPerformanceCard />}
 
       {/* Auto ON: collapse the advanced fields under an expander.
           The expander defaults closed — power users who want to peek
           at what auto picked can open it without leaving the page. */}
-      {autoOn ? (
+      {cudaControls && (autoOn ? (
         <div>
           <button
             onClick={() => setAdvancedOpen(o => !o)}
@@ -1244,13 +1244,10 @@ export function SystemSettingsPanel() {
           )}
         </div>
       ) : (
-        // Auto OFF: show fields directly + a "Reset to auto-tune"
-        // affordance below them. The Reset button just toggles auto
-        // back ON, which triggers the apply endpoint via the card.
         <>
           {renderAdvancedFields()}
         </>
-      )}
+      ))}
 
       <hr className="border-border" />
 
