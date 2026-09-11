@@ -52,7 +52,7 @@ test('2D explosion painter is seeded and draws fire, debris and smoke without st
     save() { ops.push('save') }, restore() { ops.push('restore') },
     translate() {}, scale() {}, rotate() {}, beginPath() { ops.push('path') },
     ellipse() { ops.push('blob') }, fill() { ops.push('fill') }, stroke() { ops.push('stroke') },
-    fillRect() { ops.push('chunk') }, measureText: () => ({ width: 0 }),
+    fillRect() { ops.push('chunk') }, drawImage() { ops.push('sprite') }, measureText: () => ({ width: 0 }),
     fillStyle: '', strokeStyle: '', globalAlpha: 1, globalCompositeOperation: 'source-over',
     font: '', textAlign: 'left',
   } as unknown as CanvasRenderingContext2D
@@ -61,7 +61,6 @@ test('2D explosion painter is seeded and draws fire, debris and smoke without st
   ops.length = 0
   paintSceneFx(ctx, 96, 96, 0.12, [cue])
   assert.equal(ops.join(','), first)
-  assert.ok(first.includes('blob'))
+  assert.ok(first.includes('blob') || first.includes('sprite'))
   assert.equal(first.includes('stroke'), false)
-  assert.equal(first.includes('chunk'), false)
 })

@@ -1,4 +1,5 @@
 import { fxRandom, type SceneFx } from './types'
+import { rasterizeExplosion } from './explosionSprite'
 
 function blob(ctx: CanvasRenderingContext2D, x: number, y: number, rx: number, ry: number, rot: number) {
   ctx.save()
@@ -14,8 +15,16 @@ function rgba(r: number, g: number, b: number, a: number) {
   return `rgba(${r | 0},${g | 0},${b | 0},${Math.max(0, Math.min(1, a))})`
 }
 
-/** Volumetric blast. No stroked rings or single-gradient orbs. */
-export function paintExplosion(ctx: CanvasRenderingContext2D, cue: SceneFx, _time: number, progress: number) {
+/** Same 3D blast when WebGL is available; particle fire if it is not. */
+export function paintExplosion(ctx: CanvasRenderingContext2D, cue: SceneFx, time: number, progress: number) {
+  const sprite = typeof ctx.drawImage === 'function' ? rasterizeExplosion(cue, time) : null
+  if (sprite) {
+    ctx.save()
+    ctx.globalCompositeOperation = 'lighter'
+    ctx.drawImage(sprite, -0.62, -0.78, 1.24, 1.28)
+    ctx.restore()
+    return
+  }
   const power = cue.intensity
   const flash = Math.pow(Math.max(0, 1 - progress * 5.2), 2)
   const fire = Math.pow(Math.max(0, 1 - progress * 1.05), 0.62)
