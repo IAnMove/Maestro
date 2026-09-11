@@ -46,6 +46,21 @@ export function Scene3DSpeechControls({ slot, workspace, disabled, calibrate, on
     void fetchOutputs(200, 0, { mediaType: 'audio', workspace }).then(result => { if (alive) setItems(result.outputs.filter(item => item.type === 'audio')) }).catch(() => {})
     return () => { alive = false; jobs.serial++; jobs.controller?.abort(); setBusy(false) }
   }, [workspace, slot.id, slot.sourceUrl, jobs])
+  const applyVoice = (item: ApiOutput | null) => {
+    if (disabled) return
+    if (!item) {
+      jobs.serial++
+      jobs.controller?.abort()
+      setBusy(false)
+      onChange({ ...speech, audio: undefined, cues: [] })
+      return
+    }
+    if (item.type !== 'audio') return
+    void run(async () => {
+      const buffer = await decodeVoice(item.url)
+      return () => onChange({ ...speech, offset: 0, audio: sourceRefFromOutput(item, workspace), cues: amplitudeCues(buffer), driver: 'amplitude' })
+    })
+  }
   const run = async (task: (signal: AbortSignal) => Promise<() => void>) => {
     const generation = ++jobs.serial
     jobs.controller?.abort(); jobs.controller = new AbortController()
@@ -56,15 +71,6 @@ export function Scene3DSpeechControls({ slot, workspace, disabled, calibrate, on
     } catch (caught) {
       if (generation === jobs.serial && !jobs.controller.signal.aborted) setError(caught instanceof Error ? caught.message : String(caught))
     } finally { if (generation === jobs.serial) setBusy(false) }
-  }
-  const chooseVoice = (item: ApiOutput | null) => {
-    if (disabled) return
-    if (!item) { jobs.serial++; jobs.controller?.abort(); setBusy(false); onChange({ ...speech, audio: undefined, cues: [] }); return }
-    if (item.type !== 'audio') return
-    void run(async () => {
-      const buffer = await decodeVoice(item.url)
-      return () => onChange({ ...speech, offset: 0, audio: sourceRefFromOutput(item, workspace), cues: amplitudeCues(buffer), driver: 'amplitude' })
-    })
   }
   const locked = disabled || busy || recording
   const voiceDisabled = locked || !slot.sourceUrl
@@ -95,12 +101,12 @@ export function Scene3DSpeechControls({ slot, workspace, disabled, calibrate, on
       })} />}
     <fieldset disabled={locked} className="space-y-3 disabled:opacity-60">
       <AssetInput label={t('speech.voice')} placeholder={t('speech.pickVoice')} items={items} value={audioValue} optional
-        disabled={voiceDisabled} workspaceId={workspace} accept="audio/*" constraints={{ kinds: ['audio'], maxCount: 1, optional: true }} onChoose={chooseVoice} />
+        disabled={voiceDisabled} workspaceId={workspace} accept="audio/*" constraints={{ kinds: ['audio'], maxCount: 1, optional: true }} onChoose={applyVoice} />
       <div className="flex flex-wrap gap-3">
         <button type="button" className={speechInput} disabled={!speech.audio} onClick={() => void run(async signal => {
           const buffer = await decodeVoice(speech.audio!.url)
-          const duration = Math.min(buffer.duration - speech.offset, (speech.end ?? speech.start + buffer.duration - speech.offset) - speech.start)
-          const next = await analyzedSpeech(speech, buffer, speech.offset, speech.offset + duration, signal, isolateVocals)
+          const span = Math.min(buffer.duration - speech.offset, (speech.end ?? speech.start + buffer.duration - speech.offset) - speech.start)
+          const next = await analyzedSpeech(speech, buffer, speech.offset, speech.offset + span, signal, isolateVocals)
           return () => onChange(next)
         })}>{t('speech.analyze')}</button>
         <button type="button" className={speechInput} disabled={!speech.cues.length} onClick={() => onFit(Math.max(.1, speech.start + (speech.cues.at(-1)?.end ?? 0) - speech.offset))}>{t('speech.fit')}</button>

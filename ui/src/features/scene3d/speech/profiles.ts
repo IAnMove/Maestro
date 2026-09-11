@@ -64,18 +64,30 @@ export async function hashSha256(data: ArrayBuffer): Promise<string> {
   return sha256Hex(new Uint8Array(data))
 }
 
+function fileNameFromApiPath(pathname: string) {
+  const marker = '/api/v1/file/'
+  const at = pathname.indexOf(marker)
+  if (at < 0) return undefined
+  let filename = pathname.slice(at + marker.length)
+  try { filename = decodeURIComponent(filename) } catch { return undefined }
+  if (!filename || filename.includes('/') || filename.includes('\\')) return undefined
+  if (!filename.toLowerCase().endsWith('.glb')) return undefined
+  return filename
+}
+
+function workspaceScope(parsed: URL, workspace?: string) {
+  const scope = parsed.searchParams.get('workspace') || workspace || ''
+  if (!scope || scope === '.' || scope === '..' || /[\\/]/.test(scope) || scope.length > 120) return undefined
+  return scope
+}
+
 export function storedGlbTarget(url: string, workspace?: string) {
   if (!safeMediaUrl(url)) return undefined
   let parsed: URL
   try { parsed = new URL(url, 'https://hocus.invalid') } catch { return undefined }
-  const marker = '/api/v1/file/'
-  const at = parsed.pathname.indexOf(marker)
-  if (at < 0) return undefined
-  let filename = parsed.pathname.slice(at + marker.length)
-  try { filename = decodeURIComponent(filename) } catch { return undefined }
-  if (!filename || filename.includes('/') || filename.includes('\\') || !filename.toLowerCase().endsWith('.glb')) return undefined
-  const scope = parsed.searchParams.get('workspace') || workspace || ''
-  if (!scope || scope === '.' || scope === '..' || /[\\/]/.test(scope) || scope.length > 120) return undefined
+  const filename = fileNameFromApiPath(parsed.pathname)
+  const scope = workspaceScope(parsed, workspace)
+  if (!filename || !scope) return undefined
   return { workspace: scope, filename }
 }
 
