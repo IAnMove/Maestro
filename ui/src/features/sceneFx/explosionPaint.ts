@@ -1,5 +1,5 @@
 import { fxRandom, type SceneFx } from './types'
-import { rasterizeExplosion } from './explosionSprite'
+import { rasterizeWorldFx } from './explosionSprite'
 
 function blob(ctx: CanvasRenderingContext2D, x: number, y: number, rx: number, ry: number, rot: number) {
   ctx.save()
@@ -17,7 +17,7 @@ function rgba(r: number, g: number, b: number, a: number) {
 
 /** Same 3D blast when WebGL is available; particle fire if it is not. */
 export function paintExplosion(ctx: CanvasRenderingContext2D, cue: SceneFx, time: number, progress: number) {
-  const sprite = typeof ctx.drawImage === 'function' ? rasterizeExplosion(cue, time) : null
+  const sprite = typeof ctx.drawImage === 'function' ? rasterizeWorldFx(cue, time) : null
   if (sprite) {
     ctx.save()
     ctx.globalCompositeOperation = 'lighter'

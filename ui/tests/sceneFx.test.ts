@@ -14,7 +14,7 @@ test('2D and 3D preserve all effects and audio settings through save/reopen', ()
   assert.deepEqual(parseScene3DDocument(JSON.parse(JSON.stringify(world)))?.sfx, world.sfx)
   const scene = withFxShowcase({ version: 1 as const, name: 'FX', layers: [], width: 640, height: 360, duration: 3 })
   assert.deepEqual(parseSceneFile(serializeSceneFile(scene)).sfx, scene.sfx)
-  assert.equal(scene.duration, 90)
+  assert.equal(scene.duration, FX_CATALOG.length * 3)
   assert.deepEqual(scene.sfx.map(cue => cue.kind), FX_CATALOG.map(cue => cue.id))
 })
 
@@ -60,7 +60,7 @@ test('world SFX stay in meters and do not rewrite screen overlays', () => {
   assert.equal(reopened?.worldSfx?.[0].kind, 'portal')
   assert.equal(reopened?.worldSfx?.[0].position.z, -1.55)
   assert.equal(reopened?.sfx?.[0].kind, 'speedlines')
-  assert.equal(parseWorldSfx([{ kind: 'rain', start: 0, end: 1 }]).length, 0)
+  assert.equal(parseWorldSfx([{ kind: 'confetti', start: 0, end: 1 }]).length, 0)
   assert.equal(parseWorldSfx([{ id: 'a', kind: 'portal', start: 3, end: 2 }]).length, 0)
   const audio = worldSfxAudioCues(demo.worldSfx)
   assert.equal(audio.every(cue => (WORLD_SFX_KINDS as readonly string[]).includes(cue.kind)), true)
@@ -73,7 +73,7 @@ test('world SFX stay in meters and do not rewrite screen overlays', () => {
 })
 
 test('2D showcase background matches the requested collection after reopening', () => {
-  for (const [collection, seconds] of [['anime', 36], ['all', 90]] as const) {
+  for (const [collection, seconds] of [['anime', 36], ['all', FX_CATALOG.length * 3]] as const) {
     const next = withFxShowcase({ version: 1 as const, name: 'FX', layers: [], width: 640, height: 360, duration: 3 }, collection)
     const reopened = parseSceneFile(serializeSceneFile(next))
     assert.equal(reopened.duration, seconds)

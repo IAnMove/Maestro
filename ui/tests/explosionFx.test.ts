@@ -45,6 +45,17 @@ test('3D explosion nodes seek and release like other cinematic kinds', () => {
   assert.equal(nodes.size, 0)
 })
 
+test('new cinematic world kinds parse and mount', () => {
+  const kinds = ['fire', 'rain', 'snow', 'fog', 'shield', 'tornado', 'splash', 'dust', 'ice_burst', 'black_hole', 'media_portal'] as const
+  const scene = new Scene(), nodes = new Map()
+  const cues = parseWorldSfx(kinds.map((kind, i) => ({ id: kind, kind, start: 0, end: 3, seed: i + 1, sourceUrl: kind === 'media_portal' ? '/examples/tv-head-face.png' : undefined })))
+  assert.equal(cues.length, 11)
+  syncWorldSfx(scene, nodes, cues, 1, [])
+  assert.equal(nodes.size, 11)
+  const portal = parseWorldSfx([{ id: 'p', kind: 'media_portal', start: 0, end: 2, sourceUrl: '/examples/tv-head-face.png' }])[0]
+  assert.equal(portal.sourceUrl, '/examples/tv-head-face.png')
+})
+
 test('2D explosion painter is seeded and draws fire, debris and smoke without stroked rings', () => {
   const cue = parseSceneFx([{ id: 'e', kind: 'explosion', start: 0, end: 1, x: 50, y: 50, size: 80, intensity: 1.2, seed: 9 }])[0]
   const ops: string[] = []

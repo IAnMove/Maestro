@@ -46,8 +46,16 @@
     "energy_orb": "Energy orb",
     "energy_beam": "Energy beam",
     "sword_slash": "Sword slash",
-    "manga_impact": "Manga impact"
+    "manga_impact": "Manga impact",
+    "fire": "Fire",
+    "shield": "Energy shield",
+    "tornado": "Tornado",
+    "splash": "Water splash",
+    "dust": "Dust burst",
+    "media_portal": "Media portal"
   },
+  "worldMedia": "Other side (photo or video)",
+  "worldMediaHelp": "URL or file — seen through the portal",
   "rotation": "Rotation (°)",
   "animeShowcase": "Apply magic and anime demo",
   "worldTitle": "World SFX (3D)",

@@ -2,6 +2,7 @@ import { AdditiveBlending, BufferAttribute, BufferGeometry, Color, CylinderGeome
 import { energyMaterial, softSparkMaterial, type EnergySurface } from './energyShaders'
 import { fxRandom } from './types'
 import type { WorldSfxKind } from './world'
+import { buildPackedEffect } from './worldPack'
 
 function surface(kind: EnergySurface, color: string, width: number, height = width, billboard = false) {
   return new Mesh(new PlaneGeometry(width, height), energyMaterial(kind, color, billboard))
@@ -159,5 +160,6 @@ export function buildEnergyEffect(kind: WorldSfxKind, color: string) {
     case 'smoke': return mist(color)
     case 'sparks': { const root = new Group(); root.add(sparks(color, 'rise', .45, 144)); return root }
     case 'explosion': return explosion(color)
+    default: return buildPackedEffect(kind, color) ?? new Group()
   }
 }

@@ -34,6 +34,13 @@ export function WorldSfxControls({ cues = [], duration, selectedId, disabled, on
           </select></label>
           <label>{t('color')}<input type="color" value={cue.color} onChange={e => update(cue.id, { color: e.target.value })} /></label>
           <label><input type="checkbox" checked={cue.sound} onChange={e => update(cue.id, { sound: e.target.checked })} /> {t('sound')}</label>
+        {cue.kind === 'media_portal' && <>
+          <label className="text-xs">{t('worldMedia')}<input value={cue.sourceUrl ?? ''} placeholder={t('worldMediaHelp')}
+            onChange={e => update(cue.id, { sourceUrl: e.target.value.trim() || undefined })}
+            className="ml-2 min-h-9 min-w-[12rem] rounded border border-border bg-bg-tertiary px-2" /></label>
+          <input type="file" accept="image/*,video/*" aria-label={t('worldMedia')} disabled={disabled}
+            onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; if (file) update(cue.id, { sourceUrl: URL.createObjectURL(file) }) }} />
+        </>}
         </div>
         <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
           {(['start', 'end', 'scale', 'intensity', 'volume', 'seed'] as const).map(key => <label key={key} className="text-xs">{t(key === 'scale' ? 'worldScale' : key)}<input type="number" value={cue[key]} min={key === 'end' ? cue.start + 0.1 : key === 'scale' ? 0.05 : 0} step={key === 'seed' ? 1 : 0.1} onChange={e => {

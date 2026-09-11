@@ -1,6 +1,6 @@
 import { Color, PerspectiveCamera, Scene, WebGLRenderer } from 'three'
 import type { SceneFx } from './types'
-import { parseWorldSfx } from './world'
+import { isWorldSfxKind, parseWorldSfx, type WorldSfxKind } from './world'
 import { syncWorldSfx, type WorldSfxGpu } from './worldRuntime'
 
 type Gpu = {
@@ -38,25 +38,34 @@ function ensureGpu(): Gpu | null {
   }
 }
 
-/** Same 3D blast, filmed for the 2D overlay. */
-export function rasterizeExplosion(cue: SceneFx, time: number): HTMLCanvasElement | null {
+/** Same 3D effect, filmed for the 2D overlay. */
+export function rasterizeWorldFx(cue: SceneFx, time: number): HTMLCanvasElement | null {
+  if (!isWorldSfxKind(cue.kind)) return null
   const pack = ensureGpu()
   if (!pack) return null
+  const kind = cue.kind as WorldSfxKind
   const span = Math.max(0.35, cue.end - cue.start || 1)
+  const portal = kind === 'media_portal' || kind === 'portal' || kind === 'summoning_gate'
+  pack.camera.position.set(portal ? 0.2 : 2.7, portal ? 1.2 : 1.85, portal ? 3.4 : 5.1)
+  pack.camera.lookAt(0, portal ? 1.1 : 0.48, 0)
   const world = parseWorldSfx([{
     id: `overlay-${cue.id}`,
-    kind: 'explosion',
+    kind,
     start: 0,
     end: span,
-    position: { x: 0, y: 0.38, z: 0 },
-    scale: 1.55 + cue.intensity * 0.35,
+    scale: (kind === 'explosion' ? 1.55 : 1.35) + cue.intensity * 0.3,
     color: cue.color,
     intensity: cue.intensity,
     seed: cue.seed,
+
   }])
   syncWorldSfx(pack.scene, pack.nodes, world, time, [])
   pack.renderer.setClearColor(new Color(0x000000), 0)
   pack.renderer.clear()
   pack.renderer.render(pack.scene, pack.camera)
   return pack.canvas
+}
+
+export function rasterizeExplosion(cue: SceneFx, time: number) {
+  return rasterizeWorldFx(cue, time)
 }

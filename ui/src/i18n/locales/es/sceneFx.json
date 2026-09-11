@@ -46,8 +46,16 @@
     "energy_orb": "Esfera de energía",
     "energy_beam": "Rayo de energía",
     "sword_slash": "Corte de espada",
-    "manga_impact": "Impacto manga"
+    "manga_impact": "Impacto manga",
+    "fire": "Fuego",
+    "shield": "Escudo de energía",
+    "tornado": "Tornado",
+    "splash": "Salpicadura",
+    "dust": "Nube de polvo",
+    "media_portal": "Portal con imagen"
   },
+  "worldMedia": "Al otro lado (foto o vídeo)",
+  "worldMediaHelp": "URL o archivo — se ve a través del portal",
   "rotation": "Rotación (°)",
   "animeShowcase": "Aplicar demo magia y anime",
   "worldTitle": "SFX en el mundo 3D",

@@ -2,6 +2,8 @@ import { fxRandom, type SceneFx } from './types'
 import { magicPainters } from './magicPaint'
 import { animePainters } from './animePaint'
 import { paintExplosion } from './explosionPaint'
+import { isWorldSfxKind } from './world'
+import { rasterizeWorldFx } from './explosionSprite'
 
 type Painter = (ctx: CanvasRenderingContext2D, cue: SceneFx, time: number, progress: number) => void
 const tau = Math.PI * 2
@@ -102,7 +104,15 @@ export function paintSceneFx(ctx: CanvasRenderingContext2D, width: number, heigh
     ctx.save(); ctx.translate(width * cue.x / 100, height * cue.y / 100); ctx.scale(scale, scale)
     ctx.rotate((cue.rotation ?? 0) * Math.PI / 180)
     ctx.fillStyle = cue.color; ctx.strokeStyle = cue.color; ctx.lineWidth = .002; ctx.lineCap = 'round'
-    ;(special[cue.kind] ?? particles)(ctx, cue, time, progress)
+    if (cue.kind === 'explosion') paintExplosion(ctx, cue, time, progress)
+    else {
+      const sprite = isWorldSfxKind(cue.kind) && typeof ctx.drawImage === 'function' ? rasterizeWorldFx(cue, time) : null
+      if (sprite) {
+        ctx.save(); ctx.globalCompositeOperation = 'lighter'
+        ctx.drawImage(sprite, -0.62, -0.78, 1.24, 1.28)
+        ctx.restore()
+      } else (special[cue.kind] ?? particles)(ctx, cue, time, progress)
+    }
     ctx.restore()
     if (cue.label) {
       ctx.save(); ctx.font = `600 ${Math.round(height * .032)}px monospace`; ctx.textAlign = 'left'
