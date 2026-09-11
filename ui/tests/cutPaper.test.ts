@@ -13,6 +13,7 @@ import { createTijeralStoryProject, TIJERAL_STORY_ID } from '../src/features/cut
 import { normalizeStoryProject } from '../src/features/stories/model.ts'
 import { assertCutPaperKitHasNoPrivateGlb, cutPaperKitManifest, cutPaperPuppetLayers } from '../src/features/cutPaper/puppet.ts'
 import { parseSceneFile, serializeSceneFile } from '../src/lib/sceneFile.ts'
+import { normalizeSceneKeyframes, withSceneKeyframes } from '../src/lib/sceneTimeline.ts'
 
 test('Tijeral kit ids are stable, original and not a private GLB body', () => {
   assert.equal(CUT_PAPER_KIT_ID, 'tijeral-cut-paper')
@@ -74,4 +75,31 @@ test('Story Lab chapter roundtrips and each beat links to Video 2D', () => {
   assert.ok(talk.dialogueBeats?.length)
   assert.ok(sticker.layers.some(layer => layer.id === 'puppet-kito'))
   assert.ok(parseSceneFile(serializeSceneFile(talk)).dialogueBeats?.length)
+})
+
+function animatorImportedDuration(scene: ReturnType<typeof compileCutPaperShot>): number {
+  const ends = scene.layers.map(layer => {
+    const frames = normalizeSceneKeyframes(layer.animation.keyframes, layer)
+    if (!frames) return layer.animation.duration
+    return withSceneKeyframes(layer, frames, layer.animation.duration).animation.duration
+  })
+  return Math.min(3600, Math.max(0.1, scene.duration, ...ends))
+}
+
+test('Video 2D beats stay inside their shot duration after Scene Animator import', () => {
+  const shots = [
+    ['plaza', 6],
+    ['talk', 40],
+    ['sticker', 26],
+  ] as const
+  for (const [id, duration] of shots) {
+    const scene = compileCutPaperShot(id)
+    const restored = parseSceneFile(serializeSceneFile(scene))
+    assert.equal(scene.duration, duration)
+    assert.ok(scene.layers.every(layer => (layer.animation.keyframes ?? []).every(frame => frame.time <= duration + 1e-6)))
+    assert.ok(scene.layers.every(layer => layer.animation.duration <= duration + 1e-6))
+    assert.equal(animatorImportedDuration(restored), duration)
+  }
+  const ice = compileCutPaperShot('plaza').layers.find(layer => layer.id === 'sticker-ice')
+  assert.ok((ice?.animation.keyframes ?? []).every(frame => (frame.opacity ?? 1) > 0.5))
 })

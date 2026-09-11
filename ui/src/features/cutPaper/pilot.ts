@@ -1,5 +1,5 @@
 import { rebuildCutoutDialogueLayers } from '../../lib/cutoutDialogue'
-import type { Scene } from '../../types'
+import type { Scene, SceneKeyframe, SceneLayer } from '../../types'
 import {
   applyPuppetSpeech,
   assertCutPaperKitHasNoPrivateGlb,
@@ -73,13 +73,52 @@ export function compileCutPaperPilotScene(): Scene {
 
 export type CutPaperShotId = 'plaza' | 'talk' | 'sticker'
 
+/**
+ * Scene Animator import expands a layer (and then the scene) to the last
+ * keyframe time. A shot sliced from the 78 s pilot must not keep t=78
+ * holds or the later ice-peel, or opening the beat becomes a 78 s timeline.
+ */
+function clampLayerToShotDuration(layer: SceneLayer, duration: number): SceneLayer {
+  const frames = [...(layer.animation.keyframes ?? [])].sort((left, right) => left.time - right.time)
+  if (!frames.length) {
+    return { ...layer, animation: { ...layer.animation, duration } }
+  }
+  const epsilon = 1e-9
+  const kept = frames.filter(frame => frame.time <= duration + epsilon)
+  let keyframes: SceneKeyframe[]
+  if (frames.length === 2 && frames[0].time <= epsilon && frames[1].time > duration + epsilon) {
+    keyframes = [
+      { ...frames[0], time: 0 },
+      { ...frames[1], id: `${layer.id}-${Math.round(duration * 1000)}`, time: duration },
+    ]
+  } else {
+    keyframes = kept.length ? kept : [{ ...frames[0], time: 0 }]
+    const lastKept = keyframes[keyframes.length - 1]
+    if (lastKept.time < duration - epsilon) {
+      keyframes = [...keyframes, { ...lastKept, id: `${layer.id}-${Math.round(duration * 1000)}`, time: duration }]
+    }
+  }
+  const first = keyframes[0]
+  const last = keyframes[keyframes.length - 1]
+  return {
+    ...layer,
+    animation: {
+      ...layer.animation,
+      duration,
+      start: { x: first.x, y: first.y, scale: first.scale, opacity: first.opacity, rotation: first.rotation },
+      end: { x: last.x, y: last.y, scale: last.scale, opacity: last.opacity, rotation: last.rotation },
+      keyframes,
+    },
+  }
+}
+
 /** One Video 2D clip per Story Lab beat. Same kit, shorter timeline. */
 export function compileCutPaperShot(shot: CutPaperShotId): Scene {
   const full = compileCutPaperPilotScene()
   if (shot === 'plaza') {
     const duration = 6
     const layers = full.layers.filter(layer => layer.type === 'camera' || layer.id === 'location-plaza' || layer.id === 'sticker-ice')
-      .map(layer => ({ ...layer, animation: { ...layer.animation, duration } }))
+      .map(layer => clampLayerToShotDuration(layer, duration))
     const scene = { ...full, name: 'Tijeral · plano 1 plaza', duration, layers, dialogueBeats: [], audioTracks: [], texts: full.texts }
     assertCutPaperKitHasNoPrivateGlb(scene)
     return scene
@@ -89,7 +128,7 @@ export function compileCutPaperShot(shot: CutPaperShotId): Scene {
     const layers = full.layers.filter(layer =>
       layer.type === 'camera' || layer.id === 'location-plaza' || layer.id === 'sticker-ice'
       || layer.id.startsWith('puppet-nilo') || layer.id.startsWith('puppet-berta'))
-      .map(layer => ({ ...layer, animation: { ...layer.animation, duration } }))
+      .map(layer => clampLayerToShotDuration(layer, duration))
     const scene = {
       ...full, name: 'Tijeral · plano 2 cola fría', duration, layers,
       dialogueBeats: (full.dialogueBeats ?? []).filter(beat => beat.start < 40),
@@ -129,6 +168,7 @@ export function compileCutPaperShot(shot: CutPaperShotId): Scene {
     confidence: 'known-text' as const,
   }]
   scene.layers = rebuildCutoutDialogueLayers(scene.layers, scene.dialogueBeats ?? [], 30, duration)
+    .map(layer => clampLayerToShotDuration(layer, duration))
   scene.audioTracks = [{ id: 'vo-kito-1', filename: 'vo-kito-kito-1.wav', name: 'kito · sticker', kind: 'speech', startTime: 10, volume: 1 }]
   assertCutPaperKitHasNoPrivateGlb(scene)
   return scene
