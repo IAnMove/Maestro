@@ -510,7 +510,7 @@ export function applyKeptSlotAssets(slot: Scene3DSlot, old: Scene3DSlot | undefi
         sourceRef: slot.screen.sourceRef || old.screen?.sourceRef,
         media: slot.screen.sourceUrl ? slot.screen.media : (old.screen?.media || slot.screen.media),
       }
-    : slot.screen
+    : (old.speech?.facePack && old.screen ? structuredClone(old.screen) : slot.screen)
   if (slot.sourceUrl) return { ...slot, screen }
   return {
     ...slot,
