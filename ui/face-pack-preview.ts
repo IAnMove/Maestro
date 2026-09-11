@@ -11,16 +11,38 @@ import {
   renderWorld,
   resizeWorld,
 } from './src/features/scene3d/gpu.ts'
-import { FACE_PACK_IDS, FACE_PACKS } from './src/features/scene3d/speech/facePackExamples.ts'
+import { FACE_PACK_IDS, FACE_PACKS, talkingMascot, type FacePackId } from './src/features/scene3d/speech/facePackExamples.ts'
 import { expressionAt, mouthAt } from './src/features/scene3d/speech/track.ts'
 import { VISEMES } from './src/features/scene3d/speech/types.ts'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 
-const SHOTS = ['hangar-talk', 'sea-talk', 'voxel-talk'] as const
+const SHOTS = ['hangar-talk', 'sea-talk', 'voxel-talk', 'felt-talk', 'pumpkin-talk', 'cat-talk'] as const
 const LABELS: Record<typeof SHOTS[number], string> = {
   'hangar-talk': 'Hangar · CRT + skull',
   'sea-talk': 'Sea · CRT + skull',
   'voxel-talk': 'Roof · cube + voxel skull',
+  'felt-talk': 'Hangar · felt + clay',
+  'pumpkin-talk': 'Roof · pumpkin + oni',
+  'cat-talk': 'Hangar · cat + alien',
+}
+
+function remix(base: 'hangar-talk' | 'voxel-talk', left: FacePackId, right: FacePackId) {
+  const doc = applyActionTemplate(base)!
+  const [lead, reply] = doc.slots
+  return {
+    ...doc,
+    slots: [
+      talkingMascot(lead.id, lead.slot, lead.position, left, { rotationY: lead.rotationY, scale: lead.scale, motion: lead.motion }),
+      talkingMascot(reply.id, reply.slot, reply.position, right, { rotationY: reply.rotationY, scale: reply.scale, motion: reply.motion }),
+    ],
+  }
+}
+
+function shotDocument(id: typeof SHOTS[number]) {
+  if (id === 'felt-talk') return remix('hangar-talk', 'felt', 'clay')
+  if (id === 'pumpkin-talk') return remix('voxel-talk', 'pumpkin', 'oni')
+  if (id === 'cat-talk') return remix('hangar-talk', 'cat', 'alien')
+  return applyActionTemplate(id)!
 }
 const host = document.querySelector('#view') as HTMLDivElement
 const caption = document.querySelector('#caption') as HTMLParagraphElement
@@ -33,7 +55,7 @@ const startId = SHOTS.includes(params.get('shot') as typeof SHOTS[number]) ? par
 const freezeParam = params.get('t')
 const freeze = freezeParam === null || freezeParam === '' ? Number.NaN : Number(freezeParam)
 
-let current = applyActionTemplate(startId)!
+let current = shotDocument(startId)
 let playing = false
 let started = 0
 const driven: { seconds: number | null } = { seconds: null }
@@ -61,7 +83,7 @@ for (const id of SHOTS) {
   button.type = 'button'
   button.textContent = LABELS[id]
   button.dataset.shot = id
-  button.setAttribute('aria-pressed', id === current.templateId ? 'true' : 'false')
+  button.setAttribute('aria-pressed', id === startId ? 'true' : 'false')
   button.addEventListener('click', () => select(id))
   strip.append(button)
 }
@@ -111,10 +133,10 @@ function mount(doc: typeof current) {
 }
 
 function select(id: typeof SHOTS[number]) {
-  current = applyActionTemplate(id)!
+  current = shotDocument(id)
   mount(current)
   caption.textContent = `${LABELS[id]} · ${current.dressing} · ${current.duration}s · synthetic vowels`
-  for (const button of strip.querySelectorAll('button')) {
+  for (const button of strip.querySelectorAll<HTMLButtonElement>('button')) {
     button.setAttribute('aria-pressed', button.dataset.shot === id ? 'true' : 'false')
   }
   voice.currentTime = 0
