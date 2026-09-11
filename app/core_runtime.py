@@ -26,6 +26,7 @@ from routers.recipes import create_recipes_router
 from routers.scene_commands import create_scene_commands_router
 from routers.style_library import create_style_library_router
 from routers.system_capabilities import create_system_capabilities_router, require_capability_http
+from routers.wizard_workflow_executor import create_wizard_workflow_executor_router
 from routers.workspace_collections import create_workspace_collections_router
 from services import (
     core_editor,
@@ -50,6 +51,7 @@ from services.wizard_workflows import (
     read_workflows,
     write_workflows,
 )
+from services.wizard_workflow_executor import WizardWorkflowExecutor
 from services.workspace_registry import WorkspaceRegistry
 
 api = FastAPI(title="HocusPocus core")
@@ -93,7 +95,14 @@ api.include_router(create_core_labs_router())
 api.include_router(create_core_series_plan_router())
 api.include_router(create_core_remote_router())
 api.include_router(create_core_mcp_router())
-api.include_router(create_image_generation_commands_router(core_generation_commands.service()))
+_core_image_commands = core_generation_commands.service()
+api.include_router(create_image_generation_commands_router(_core_image_commands))
+api.include_router(create_wizard_workflow_executor_router(WizardWorkflowExecutor(
+    workspace_dir=core.workspace_dir,
+    submit_command=_core_image_commands.submit,
+    command_receipt=_core_image_commands.receipt,
+    get_task=core_generation_commands.get_task,
+)))
 api.include_router(create_character_kit_face_router(
     workspace_dir=core.workspace_dir,
     uploads_root=core.uploads_dir,

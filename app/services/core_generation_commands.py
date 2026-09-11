@@ -37,9 +37,17 @@ def _registry(workspace: str) -> TaskRegistry:
         return registry
 
 
+def get_task(workspace: str, task_id: str) -> dict[str, Any] | None:
+    if not str(task_id or "").strip():
+        return None
+    return _registry(workspace).get(str(task_id))
+
+
 def _freeze(command: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
     if not isinstance(command, dict):
         raise command_error(422, "invalid_command", "Command must be a JSON object")
+    if command.get("operation") == "tools.upscale":
+        require_capability_http("wangp_local")
     if command.get("operation") != "generation.image":
         raise command_error(422, "unsupported_operation", "This runtime admits generation.image only")
     if type(command.get("version")) is int and command["version"] == 2:

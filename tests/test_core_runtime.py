@@ -502,6 +502,46 @@ class CoreRuntimeTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200, response.text)
         self.assertEqual(response.json()["references"], ["/api/v1/uploads/hero.png"])
 
+    def test_wizard_image_upscale_executor_starts_minimax_and_blocks_local_upscale(self):
+        folder, previous = self._in_temp_workspace()
+        try:
+            Path("outputs").mkdir()
+            fake = {"name": "minimax.jpg", "path": "minimax.jpg", "prompt": "a lantern", "aspect_ratio": "1:1"}
+            with patch("services.minimax_image_service.generate_image", return_value=fake), patch(
+                "services.execution_mode.validate_remote_provider",
+            ), patch("services.core_remote_image.threading.Thread", ImmediateThread):
+                catalog = self.client.get("/api/v1/wizard/workflows/executor/commands")
+                started = self.client.post("/api/v1/wizard/workflows/executor", json={
+                    "workspace": "default",
+                    "workflowId": "wf-mac-image",
+                    "userRequest": "Generate a lantern",
+                    "inputSnapshot": {
+                        "model_type": "minimax:image-01",
+                        "prompt": "a lantern in the rain",
+                        "resolution": "1024x1024",
+                        "num_inference_steps": 1,
+                        "seed": 1,
+                        "guidance_scale": 1.0,
+                    },
+                })
+                upscale = self.client.post("/api/v1/generation/commands", json={
+                    "version": 1,
+                    "operation": "tools.upscale",
+                    "intent_id": "mac-upscale",
+                    "input": {"workspace": "default", "params": {"source": "minimax.jpg"}},
+                })
+        finally:
+            self._leave_temp_workspace(folder, previous)
+        self.assertEqual(catalog.status_code, 200, catalog.text)
+        operations = {item.get("name") for item in catalog.json().get("operations") or []}
+        self.assertIn("wizard.image_upscale", operations)
+        self.assertEqual(started.status_code, 200, started.text)
+        workflow = started.json()["workflow"]
+        self.assertEqual(workflow["workflowId"], "wf-mac-image")
+        self.assertEqual(workflow["steps"][0]["kind"], "generation.image")
+        self.assertEqual(upscale.status_code, 409, upscale.text)
+        self.assertEqual(upscale.json()["detail"]["code"], FEATURE_UNAVAILABLE)
+
     def test_series_plan_start_uses_the_remote_llm(self):
         series = {
             "id": "series_mac", "revision": 1, "provider": {},
