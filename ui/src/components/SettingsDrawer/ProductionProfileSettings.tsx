@@ -2,11 +2,16 @@ import { useState } from 'react'
 import { useUiTranslation } from '../../i18n'
 import { useStore, getFamiliesForMode } from '../../stores/useStore'
 import {
-  HUNYUAN3D_PROFILE_MODELS,
   MINIMAX_IMAGE_MODELS,
   MINIMAX_MUSIC_MODELS,
+  defaultImageModel,
+  defaultModel3dModel,
+  defaultTextBaseUrl,
+  defaultTextModel,
   downloadedModelOptions,
   keepCurrentOption,
+  listedTextModels,
+  model3dProfileOptions,
   textModelOptions,
 } from '../../lib/productionProfileCatalog'
 
@@ -54,9 +59,19 @@ export function ProductionProfileSettings() {
   const loadRemoteTextModels = async () => {
     setRefreshing(true)
     try {
+      const provider = productionProfile.text.provider
       await loadLlmModels({
-        provider: productionProfile.text.provider,
+        provider,
         url: productionProfile.text.base_url,
+      })
+      const listed = listedTextModels(useStore.getState().llmModels, provider)
+      setProductionProfile(current => {
+        const draft = current ?? savedProductionProfile
+        if (listed.some(option => option.id === draft.text.model)) return draft
+        return {
+          ...draft,
+          text: { ...draft.text, model: listed[0]?.id || '' },
+        }
       })
     } finally {
       setRefreshing(false)
@@ -76,20 +91,32 @@ export function ProductionProfileSettings() {
           {t('services.textProvider')}
           <select
             value={productionProfile.text.provider}
-            onChange={e => setProductionProfile({
-              ...productionProfile,
-              text: {
-                ...productionProfile.text,
-                provider: e.target.value as typeof productionProfile.text.provider,
-                base_url: e.target.value === 'ollama'
-                  ? (productionProfile.text.base_url || 'http://127.0.0.1:11434')
-                  : e.target.value === 'grok'
-                    ? 'https://api.x.ai'
-                    : e.target.value === 'minimax'
-                      ? 'https://api.minimax.io'
-                      : productionProfile.text.base_url,
-              },
-            })}
+            onChange={e => {
+              const provider = e.target.value as typeof productionProfile.text.provider
+              const base_url = defaultTextBaseUrl(provider, productionProfile.text.base_url || '')
+              setProductionProfile({
+                ...productionProfile,
+                text: {
+                  ...productionProfile.text,
+                  provider,
+                  model: defaultTextModel(provider, productionProfile.text.model, llmModels),
+                  base_url,
+                },
+              })
+              if (provider === 'ollama' || provider === 'remote') {
+                void loadLlmModels({ provider, url: base_url }).then(() => {
+                  const listed = listedTextModels(useStore.getState().llmModels, provider)
+                  setProductionProfile(current => {
+                    const draft = current ?? savedProductionProfile
+                    if (listed.some(option => option.id === draft.text.model)) return draft
+                    return {
+                      ...draft,
+                      text: { ...draft.text, model: listed[0]?.id || '' },
+                    }
+                  })
+                })
+              }
+            }}
             disabled={productionProfileLoading}
             className="mt-1 w-full bg-bg-tertiary border border-border rounded-lg px-2 py-1.5 text-xs text-text-primary"
           >
@@ -146,10 +173,18 @@ export function ProductionProfileSettings() {
           <div className="mt-1 flex gap-1">
             <select
               value={productionProfile.image.provider}
-              onChange={e => setProductionProfile({
-                ...productionProfile,
-                image: { ...productionProfile.image, provider: e.target.value as typeof productionProfile.image.provider },
-              })}
+              onChange={e => {
+                const provider = e.target.value as typeof productionProfile.image.provider
+                const localOptions = downloadedModelOptions(installedModels, imageFamilies)
+                setProductionProfile({
+                  ...productionProfile,
+                  image: {
+                    ...productionProfile.image,
+                    provider,
+                    model: defaultImageModel(provider, localOptions, productionProfile.image.model),
+                  },
+                })
+              }}
               disabled={productionProfileLoading}
               className="w-2/5 bg-bg-tertiary border border-border rounded-lg px-2 py-1.5 text-xs text-text-primary"
             >
@@ -212,13 +247,17 @@ export function ProductionProfileSettings() {
           <div className="mt-1 flex gap-1">
             <select
               value={productionProfile.model3d?.provider || 'local'}
-              onChange={e => setProductionProfile({
-                ...productionProfile,
-                model3d: {
-                  ...(productionProfile.model3d || { provider: 'local', model: 'hunyuan3d-2mini-turbo' }),
-                  provider: e.target.value as NonNullable<typeof productionProfile.model3d>['provider'],
-                },
-              })}
+              onChange={e => {
+                const provider = e.target.value as NonNullable<typeof productionProfile.model3d>['provider']
+                setProductionProfile({
+                  ...productionProfile,
+                  model3d: {
+                    ...(productionProfile.model3d || { provider: 'local', model: 'hunyuan3d-2mini-turbo' }),
+                    provider,
+                    model: defaultModel3dModel(provider),
+                  },
+                })
+              }}
               disabled={productionProfileLoading}
               className="w-2/5 bg-bg-tertiary border border-border rounded-lg px-2 py-1.5 text-xs text-text-primary"
             >
@@ -228,7 +267,7 @@ export function ProductionProfileSettings() {
             </select>
             <CatalogSelect
               value={productionProfile.model3d?.model || 'hunyuan3d-2mini-turbo'}
-              options={hunyuanOptions.length ? hunyuanOptions : HUNYUAN3D_PROFILE_MODELS}
+              options={model3dProfileOptions(productionProfile.model3d?.provider || 'local', hunyuanOptions)}
               disabled={productionProfileLoading}
               onChange={value => setProductionProfile({
                 ...productionProfile,
@@ -328,7 +367,7 @@ export function ProductionProfileSettings() {
       <div className="flex justify-end">
         <button
           type="button"
-          disabled={productionProfileLoading || JSON.stringify(productionProfile) === JSON.stringify(savedProductionProfile)}
+          disabled={productionProfileLoading || !productionProfile.text.model || JSON.stringify(productionProfile) === JSON.stringify(savedProductionProfile)}
           onClick={() => void updateProductionProfile(productionProfile).then(() => setProductionProfile(null))}
           className="rounded-lg bg-accent-blue px-3 py-1.5 text-xs text-white disabled:opacity-40"
         >
