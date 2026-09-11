@@ -233,9 +233,9 @@ async def create_workspace(request: Request):
 
 
 @api.get("/api/v1/outputs")
-def list_outputs(workspace: str = ""):
+def list_outputs(workspace: str = "", media_type: str = "", limit: int = 0, offset: int = 0):
     try:
-        return core.list_outputs(workspace)
+        return core.list_outputs(workspace, media_type=media_type, limit=limit, offset=offset)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
 

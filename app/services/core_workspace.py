@@ -14,6 +14,31 @@ _LOCK = threading.Lock()
 _WORKSPACE_NAME = re.compile(r"(?:default|[A-Za-z0-9][A-Za-z0-9_-]*)")
 MEDIA_EXTS = {".mp4", ".webm", ".gif", ".png", ".jpg", ".jpeg", ".webp", ".wav", ".mp3",
               ".glb", ".gltf", ".obj", ".ply", ".stl", ".usdz", ".zip", ".json"}
+VIDEO_EXTS = {".mp4", ".webm", ".gif"}
+AUDIO_EXTS = {".wav", ".mp3"}
+MODEL3D_EXTS = {".glb", ".gltf", ".obj", ".ply", ".stl", ".usdz", ".zip"}
+IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp"}
+
+
+def classify_output_type(name: str) -> str | None:
+    """Match the NVIDIA gallery kinds the UI filters on (`image`, `model3d`, …)."""
+    filename = os.path.basename(str(name or ""))
+    if filename.endswith(".preview.png"):
+        return None
+    if filename.endswith(".scene.json"):
+        return "scene"
+    if filename.endswith(".comic.json"):
+        return "comic"
+    ext = os.path.splitext(filename)[1].lower()
+    if ext in VIDEO_EXTS:
+        return "video"
+    if ext in AUDIO_EXTS:
+        return "audio"
+    if ext in MODEL3D_EXTS:
+        return "model3d"
+    if ext in IMAGE_EXTS:
+        return "image"
+    return None
 
 
 def root() -> Path:
@@ -111,23 +136,44 @@ def list_workspaces() -> list[dict[str, Any]]:
     return rows
 
 
-def list_outputs(workspace: str = "") -> dict[str, Any]:
+def list_outputs(
+    workspace: str = "",
+    media_type: str = "",
+    limit: int = 0,
+    offset: int = 0,
+) -> dict[str, Any]:
     folder = Path(uploads_dir()) if workspace == "__uploads__" else Path(workspace_dir(workspace or None))
     if not folder.is_dir():
         return {"outputs": [], "total": 0}
+    wanted = str(media_type or "").strip()
     items = []
     for entry in folder.iterdir():
-        if not entry.is_file() or entry.name.startswith(".") or entry.suffix.lower() not in MEDIA_EXTS:
+        if not entry.is_file() or entry.name.startswith("."):
+            continue
+        kind = classify_output_type(entry.name)
+        if kind is None or (wanted and kind != wanted):
+            continue
+        try:
+            stat = entry.stat()
+        except OSError:
             continue
         suffix = f"?workspace={workspace}" if workspace else ""
         items.append({
             "name": entry.name,
+            "type": kind,
+            "mode": None,
+            "size": stat.st_size,
+            "created_at": stat.st_mtime,
+            "completed_at": stat.st_mtime,
+            "completion_time_source": "file",
             "url": f"/api/v1/file/{entry.name}{suffix}",
-            "mtime": entry.stat().st_mtime,
-            "type": "video" if entry.suffix.lower() in {".mp4", ".webm", ".gif"} else "file",
         })
-    items.sort(key=lambda row: row["mtime"], reverse=True)
-    return {"outputs": items, "total": len(items)}
+    items.sort(key=lambda row: row["created_at"], reverse=True)
+    total = len(items)
+    start = max(0, int(offset or 0))
+    if limit and int(limit) > 0:
+        items = items[start:start + int(limit)]
+    return {"outputs": items, "total": total}
 
 
 def system_config() -> dict[str, Any]:

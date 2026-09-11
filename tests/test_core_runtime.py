@@ -542,6 +542,55 @@ class CoreRuntimeTests(unittest.TestCase):
         self.assertEqual(upscale.status_code, 409, upscale.text)
         self.assertEqual(upscale.json()["detail"]["code"], FEATURE_UNAVAILABLE)
 
+    def test_outputs_classify_studio_kinds_and_honor_media_type(self):
+        from services.core_workspace import classify_output_type
+
+        self.assertEqual(classify_output_type("2026-09-11_minimax-image-01_abcd1234.jpg"), "image")
+        self.assertEqual(classify_output_type("meshy-harbour.glb"), "model3d")
+        self.assertEqual(classify_output_type("minimax-music.wav"), "audio")
+        self.assertEqual(classify_output_type("harbour-shot.mp4"), "video")
+        self.assertEqual(classify_output_type("harbour.world3d.scene.json"), "scene")
+        self.assertEqual(classify_output_type("page-01.comic.json"), "comic")
+        self.assertIsNone(classify_output_type("harbour.preview.png"))
+        self.assertIsNone(classify_output_type("harbour.meta.json"))
+
+        folder, previous = self._in_temp_workspace()
+        try:
+            Path("outputs").mkdir()
+            Path("outputs", "2026-09-11_minimax-image-01_abcd1234.jpg").write_bytes(b"jpg")
+            Path("outputs", "meshy-harbour.glb").write_bytes(b"glb")
+            Path("outputs", "minimax-music.wav").write_bytes(b"wav")
+            Path("outputs", "harbour-shot.mp4").write_bytes(b"mp4")
+            Path("outputs", "harbour.world3d.scene.json").write_text("{}", encoding="utf-8")
+            Path("outputs", "harbour.preview.png").write_bytes(b"preview")
+            Path("outputs", "harbour.meta.json").write_text("{}", encoding="utf-8")
+            listed = self.client.get("/api/v1/outputs")
+            images = self.client.get("/api/v1/outputs", params={"media_type": "image"})
+            models = self.client.get("/api/v1/outputs", params={"media_type": "model3d", "limit": 1})
+        finally:
+            self._leave_temp_workspace(folder, previous)
+        self.assertEqual(listed.status_code, 200, listed.text)
+        by_name = {item["name"]: item for item in listed.json()["outputs"]}
+        self.assertEqual(set(by_name), {
+            "2026-09-11_minimax-image-01_abcd1234.jpg",
+            "meshy-harbour.glb",
+            "minimax-music.wav",
+            "harbour-shot.mp4",
+            "harbour.world3d.scene.json",
+        })
+        self.assertEqual(by_name["2026-09-11_minimax-image-01_abcd1234.jpg"]["type"], "image")
+        self.assertEqual(by_name["meshy-harbour.glb"]["type"], "model3d")
+        self.assertEqual(by_name["minimax-music.wav"]["type"], "audio")
+        self.assertEqual(by_name["harbour-shot.mp4"]["type"], "video")
+        self.assertEqual(by_name["harbour.world3d.scene.json"]["type"], "scene")
+        self.assertNotIn("file", {item["type"] for item in listed.json()["outputs"]})
+        self.assertEqual([item["name"] for item in images.json()["outputs"]], [
+            "2026-09-11_minimax-image-01_abcd1234.jpg",
+        ])
+        self.assertEqual(images.json()["outputs"][0]["type"], "image")
+        self.assertEqual(models.json()["total"], 1)
+        self.assertEqual(models.json()["outputs"][0]["type"], "model3d")
+
     def test_series_plan_start_uses_the_remote_llm(self):
         series = {
             "id": "series_mac", "revision": 1, "provider": {},
