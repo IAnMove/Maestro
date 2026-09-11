@@ -26,17 +26,21 @@ test('Tijeral kit ids are stable, original and not a private GLB body', () => {
   assert.equal(cutPaperKitManifest().characters.join(','), 'nilo,berta,kito,rami,paca,lino')
 })
 
-test('a puppet is parented paper pieces with a square face and independent mouths', () => {
+test('a puppet is one transparent body plus four independent mouths', () => {
   const layers = cutPaperPuppetLayers({ characterId: 'nilo', x: 40, y: 60, scale: 1 }, 8)
   const ids = layers.map(layer => layer.id)
-  assert.ok(ids.includes('puppet-nilo'))
-  assert.ok(CUT_PAPER_PIECES.every(piece => ids.includes(`puppet-nilo-${piece}`)))
-  assert.ok(ids.includes('puppet-nilo-face'))
-  assert.equal(layers.find(layer => layer.id === 'puppet-nilo-face')?.name.includes('face'), true)
+  const body = layers.find(layer => layer.id === 'puppet-nilo')
+  assert.equal(ids.filter(id => id === 'puppet-nilo').length, 1)
+  assert.equal(body?.source.endsWith('nilo-body.png'), true)
   const mouths = layers.filter(layer => layer.faceBinding?.role === 'mouth')
   assert.equal(mouths.length, 4)
   assert.ok(mouths.every(layer => layer.faceBinding?.poseLayerId === 'puppet-nilo'))
   assert.ok(mouths.every(layer => layer.relationship?.targetLayerId === 'puppet-nilo'))
+  assert.ok(mouths.every(layer => layer.source.includes('/mouths/paper-')))
+  assert.equal(mouths.find(layer => layer.id === 'puppet-nilo-mouth-closed')?.transform.opacity, 0)
+  assert.equal(mouths.find(layer => layer.id === 'puppet-nilo-mouth-wide')?.transform.opacity, 0)
+  assert.ok(mouths.every(layer => layer.transform.scale < (body?.transform.scale ?? 0) * 0.4))
+  assert.ok(mouths.every(layer => layer.transform.y < (body?.transform.y ?? 0)))
   assert.ok(layers.every(layer => layer.type !== 'model3d'))
   assert.throws(() => cutPaperPuppetLayers({ characterId: 'kenny', x: 0, y: 0, scale: 1 }, 1), /Unknown/)
 })
@@ -75,6 +79,7 @@ test('Story Lab chapter roundtrips and each beat links to Video 2D', () => {
   assert.ok(talk.dialogueBeats?.length)
   assert.ok(sticker.layers.some(layer => layer.id === 'puppet-kito'))
   assert.ok(parseSceneFile(serializeSceneFile(talk)).dialogueBeats?.length)
+  assert.equal(plaza.layers.find(layer => layer.id === 'location-plaza')?.fill, true)
 })
 
 function animatorImportedDuration(scene: ReturnType<typeof compileCutPaperShot>): number {

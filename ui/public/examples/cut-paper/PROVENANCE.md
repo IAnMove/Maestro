@@ -11,6 +11,8 @@
 | remaining pieces | copies of canonical until the rest of the cast is signed off | Temporary. |
 | `puppets/berta-canonical.jpg` | Imagine `image_gen` | Mustard slicker, square face. |
 | `puppets/kito-canonical.jpg` | Imagine `image_gen` + `image_edit` | Paper-boat hat; name label removed. |
+| `puppets/*-body.png` | rembg cutout from canonical | One transparent body per speaking puppet. |
+| `mouths/paper-*.png` | Drawn paper visemes | Small cream+ink ovals (`closed` is empty). Not lipstick cards, not full-face copies. |
 | `voices/*.wav` | Original buzz/formant stand-ins | Distinct pitch per speaker. Replace in Video 2D with Qwen TTS. |
 
 No private GLB. No `tv-head-humanoid.glb`.

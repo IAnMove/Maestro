@@ -8,29 +8,19 @@ import {
   CUT_PAPER_VISEMES,
   cutPaperAssetUrl,
   type CutPaperExpression,
-  type CutPaperPiece,
   type CutPaperViseme,
 } from './bible.ts'
 
-const PIECE_Z: Record<CutPaperPiece, number> = {
-  legs: 10,
-  torso: 12,
-  'arm-back': 11,
-  'arm-front': 14,
-  head: 16,
-  face: 17,
-  hat: 18,
-}
+/** One transparent body + four paper-cut mouth cards. Never stack opaque copies. */
+const BODY_SCALE: Record<string, number> = { nilo: 0.42, berta: 0.4, kito: 0.32 }
 
-const PIECE_OFFSET: Record<CutPaperPiece, { x: number; y: number; scale: number }> = {
-  legs: { x: 0, y: 10, scale: 0.42 },
-  torso: { x: 0, y: 2, scale: 0.4 },
-  'arm-back': { x: -7, y: 1, scale: 0.28 },
-  'arm-front': { x: 7, y: 2, scale: 0.28 },
-  head: { x: 0, y: -12, scale: 0.28 },
-  face: { x: 0, y: -12, scale: 0.22 },
-  hat: { x: 0, y: -20, scale: 0.24 },
+/** Pose-local mouth anchors (percent of the body layer, same units as Character Kit). */
+const MOUTH_ANCHOR: Record<string, { offsetX: number; offsetY: number; scale: number }> = {
+  nilo: { offsetX: 0.86, offsetY: -17.55, scale: 0.12 },
+  berta: { offsetX: 0.17, offsetY: -16.55, scale: 0.11 },
+  kito: { offsetX: 0, offsetY: 6.39, scale: 0.16 },
 }
+const DEFAULT_MOUTH_ANCHOR = { offsetX: 0, offsetY: -17, scale: 0.11 }
 
 function key(id: string, time: number, x: number, y: number, scale: number, opacity: number, rotation = 0, curve: SceneKeyframe['curve'] = 'hold'): SceneKeyframe {
   return { id: `${id}-${Math.round(time * 1000)}`, time, x, y, scale, opacity, rotation, curve }
@@ -49,17 +39,21 @@ function imageLayer(input: {
   parallax?: number
   faceBinding?: SceneLayer['faceBinding']
   shadow?: number
+  fill?: boolean
+  opacity?: number
 }): SceneLayer {
-  const { id, name, source, z, x, y, scale, duration, parent, parallax, faceBinding, shadow } = input
+  const { id, name, source, z, x, y, scale, duration, parent, parallax, faceBinding, shadow, fill } = input
+  const opacity = input.opacity ?? 1
   return {
     id, name, type: 'image', source, visible: true, locked: false, z,
-    transform: { x, y, scale, opacity: 1, rotation: 0 },
+    transform: { x, y, scale, opacity, rotation: 0 },
     animation: {
-      start: { x, y, scale, opacity: 1, rotation: 0 },
-      end: { x, y, scale, opacity: 1, rotation: 0 },
+      start: { x, y, scale, opacity, rotation: 0 },
+      end: { x, y, scale, opacity, rotation: 0 },
       duration, curve: 'hold',
-      keyframes: [key(id, 0, x, y, scale, 1), key(id, duration, x, y, scale, 1)],
+      keyframes: [key(id, 0, x, y, scale, opacity), key(id, duration, x, y, scale, opacity)],
     },
+    ...(fill ? { fill: true } : {}),
     ...(parent ? { relationship: { type: 'parent', targetLayerId: parent } } : {}),
     ...(parallax != null ? { parallax } : {}),
     ...(faceBinding ? { faceBinding } : {}),
@@ -76,56 +70,38 @@ export type PuppetPlacement = {
   z0?: number
 }
 
-/** Flat paper puppet: pieces on a plane, face is a square card, mouths are overlays. */
+/** One transparent body plus four mouth overlays (small paper visemes, not lipstick cards). */
 export function cutPaperPuppetLayers(placement: PuppetPlacement, duration: number): SceneLayer[] {
   const character = CUT_PAPER_CAST.find(item => item.id === placement.characterId)
   if (!character) throw new Error(`Unknown cut-paper character: ${placement.characterId}`)
   const rootId = `puppet-${character.id}`
   const z0 = placement.z0 ?? 20
-  const expression = placement.expression ?? 'neutral'
-  const layers: SceneLayer[] = []
-  const root = imageLayer({
+  const bodyScale = (BODY_SCALE[character.id] ?? 0.4) * placement.scale
+  const pose = imageLayer({
     id: rootId,
-    name: `${character.name} root`,
-    source: cutPaperAssetUrl('piece', character.id, 'torso'),
-    z: z0 + PIECE_Z.torso,
-    x: placement.x, y: placement.y, scale: placement.scale,
-    duration, parallax: 1, shadow: 0.35,
+    name: `${character.name} pose`,
+    source: `${CUT_PAPER_PUBLIC_ROOT}/puppets/${character.id}-body.png`,
+    z: z0 + 12,
+    x: placement.x, y: placement.y, scale: bodyScale,
+    duration, parallax: 1, shadow: 0.25,
   })
-  root.transform.opacity = 0
-  root.animation.start = { ...root.animation.start, opacity: 0 }
-  root.animation.end = { ...root.animation.end, opacity: 0 }
-  layers.push(root)
-  for (const piece of CUT_PAPER_PIECES) {
-    const offset = PIECE_OFFSET[piece]
-    layers.push(imageLayer({
-      id: `${rootId}-${piece}`,
-      name: `${character.name} ${piece}`,
-      source: cutPaperAssetUrl('piece', character.id, piece),
-      z: z0 + PIECE_Z[piece],
-      x: placement.x + offset.x * placement.scale,
-      y: placement.y + offset.y * placement.scale,
-      scale: placement.scale * offset.scale / 0.4,
-      duration, parent: rootId, shadow: piece === 'torso' ? 0.4 : 0.15,
-    }))
-  }
-  layers.push(imageLayer({
-    id: `${rootId}-brow`,
-    name: `${character.name} brow ${expression}`,
-    source: cutPaperAssetUrl('brow', character.id, expression),
-    z: z0 + 19,
-    x: placement.x, y: placement.y - 14 * placement.scale, scale: placement.scale * 0.2,
-    duration, parent: rootId,
-  }))
+  const layers: SceneLayer[] = [pose]
+  const anchor = MOUTH_ANCHOR[character.id] ?? DEFAULT_MOUTH_ANCHOR
+  const mouthX = placement.x + anchor.offsetX * bodyScale
+  const mouthY = placement.y + anchor.offsetY * bodyScale
+  const mouthScale = bodyScale * anchor.scale
   for (const viseme of CUT_PAPER_VISEMES) {
     layers.push(imageLayer({
       id: `${rootId}-mouth-${viseme}`,
       name: `${character.name} mouth ${viseme}`,
-      source: cutPaperAssetUrl('mouth', character.id, viseme),
+      source: `${CUT_PAPER_PUBLIC_ROOT}/mouths/paper-${viseme}.png`,
       z: z0 + 20,
-      x: placement.x, y: placement.y - 10 * placement.scale, scale: placement.scale * 0.12,
+      x: mouthX,
+      y: mouthY,
+      scale: mouthScale,
       duration, parent: rootId,
       faceBinding: { poseLayerId: rootId, role: 'mouth', state: viseme },
+      opacity: 0,
     }))
   }
   return layers
@@ -136,15 +112,15 @@ export function slidePuppet(layers: SceneLayer[], characterId: string, from: { x
   return layers.map(layer => {
     if (layer.id !== rootId) return layer
     const frames = [
-      key(layer.id, 0, from.x, from.y, layer.transform.scale, 0, 0, 'hold'),
-      key(layer.id, start, from.x, from.y, layer.transform.scale, 0, 0, 'ease'),
-      key(layer.id, end, to.x, to.y, layer.transform.scale, 0, 0, 'ease'),
-      key(layer.id, layer.animation.duration, to.x, to.y, layer.transform.scale, 0, 0, 'hold'),
+      key(layer.id, 0, from.x, from.y, layer.transform.scale, 1, 0, 'hold'),
+      key(layer.id, start, from.x, from.y, layer.transform.scale, 1, 0, 'ease'),
+      key(layer.id, end, to.x, to.y, layer.transform.scale, 1, 0, 'ease'),
+      key(layer.id, layer.animation.duration, to.x, to.y, layer.transform.scale, 1, 0, 'hold'),
     ]
     return {
       ...layer,
       transform: { ...layer.transform, x: from.x, y: from.y },
-      animation: { ...layer.animation, start: { x: from.x, y: from.y, scale: layer.transform.scale, opacity: 0 }, end: { x: to.x, y: to.y, scale: layer.transform.scale, opacity: 0 }, keyframes: frames, curve: 'ease' },
+      animation: { ...layer.animation, start: { x: from.x, y: from.y, scale: layer.transform.scale, opacity: 1 }, end: { x: to.x, y: to.y, scale: layer.transform.scale, opacity: 1 }, keyframes: frames, curve: 'ease' },
     }
   })
 }
@@ -184,7 +160,7 @@ export function cutPaperLocationLayer(locationId: string, duration: number): Sce
     id: `location-${locationId}`,
     name: `Location ${locationId}`,
     source: cutPaperAssetUrl('location', locationId),
-    z: 0, x: 50, y: 50, scale: 1, duration, parallax: 0.15,
+    z: 0, x: 50, y: 50, scale: 1, duration, parallax: 0.15, fill: true,
   })
 }
 
