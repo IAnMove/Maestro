@@ -13,6 +13,7 @@ from app.services.mix_concat import (
     build_hold_crossfade_filter,
     concat_with_tail_hold_and_crossfade,
     concatenate_multi_clip_videos,
+    driving_soundtrack_bound,
     hold_crossfade_output_seconds,
     probe_audio_flags,
     probe_has_audio,
@@ -115,6 +116,8 @@ def test_concatenate_gates_soft_join_on_the_duration_lock():
     assert 'f"{n}:a:0"' not in concat_fn
     assert "audio_filters.append(\"apad\")" in concat_fn
     assert "atrim=duration={bound:.6f}" in concat_fn
+    assert "driving_soundtrack_bound(clip_secs)" in concat_fn
+    assert "sum(clip_secs) - audio_start_sec" not in concat_fn
     assert '"-map", "[outa]"' in concat_fn
     # Hard concat used to probe only valid_paths[0] for audio. The fps
     # probe may still read clip 0; the audio decision must not.
@@ -320,6 +323,16 @@ def test_hold_crossfade_ffmpeg_accepts_mismatched_encoder_timebases(tmp_path):
     assert out.is_file() and out.stat().st_size > 0
 
 
+def test_driving_soundtrack_bound_covers_the_pictures_not_the_song_offset():
+    # Director music_video / rejoin pass audio_start_sec=12.5 (clip 0 start)
+    # and pad_audio=False. That offset is atrim=start on the track. The old
+    # bound subtracted it from the clip sum, so 10s of film + start=12.5
+    # became atrim=duration=2.1 and -shortest discarded the tail.
+    assert driving_soundtrack_bound([5.0, 5.0]) == 12.0
+    assert driving_soundtrack_bound([2.0, 2.0]) == 6.0
+    assert driving_soundtrack_bound([0.0]) == 2.1
+
+
 @pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg is required")
 def test_padded_soundtrack_shortest_keeps_the_concat_video(tmp_path):
     # Director used to map a raw song with -shortest, so 4s of video + 1s of
@@ -345,6 +358,55 @@ def test_padded_soundtrack_shortest_keeps_the_concat_video(tmp_path):
             "-filter_complex",
             "[0:v][1:v]concat=n=2:v=1:a=0[outv];"
             "[2:a]asetpts=PTS-STARTPTS,apad,atrim=duration=6[outa]",
+            "-map", "[outv]", "-map", "[outa]",
+            "-c:v", "libx264", "-c:a", "aac", "-shortest",
+            "-pix_fmt", "yuv420p", str(out),
+        ],
+        capture_output=True, text=True, timeout=30,
+    )
+    assert completed.returncode == 0, completed.stderr[-600:]
+    probe = subprocess.run(
+        [
+            "ffprobe", "-v", "error", "-select_streams", "v:0", "-count_frames",
+            "-show_entries", "stream=nb_read_frames", "-of", "csv=p=0", str(out),
+        ],
+        capture_output=True, text=True, timeout=30,
+    )
+    frames = int((probe.stdout or "0").strip() or 0)
+    assert frames >= 100, frames
+
+
+@pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg is required")
+def test_mid_song_offset_does_not_truncate_concat_video(tmp_path):
+    # Director music_video / rejoin: two 2s clips, song starts at 12.5s,
+    # pad_audio=False. Subtracting that offset from the clip sum used to
+    # atrim=2.1s; -shortest then kept ~2s of a 4s movie.
+    first = tmp_path / "verse.mp4"
+    second = tmp_path / "chorus.mp4"
+    song = tmp_path / "song.m4a"
+    out = tmp_path / "joined.mp4"
+    _write_test_clip(first, with_audio=False, duration=2.0)
+    _write_test_clip(second, with_audio=False, duration=2.0)
+    completed = subprocess.run(
+        [
+            "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+            "-f", "lavfi", "-i", "sine=f=440:d=20", "-c:a", "aac", str(song),
+        ],
+        capture_output=True, text=True, timeout=30,
+    )
+    assert completed.returncode == 0, completed.stderr[-400:]
+    stale_bound = max(0.1, 4.0 - 12.5) + 2.0
+    bound = driving_soundtrack_bound([2.0, 2.0])
+    assert bound == 6.0
+    assert stale_bound == 2.1
+    completed = subprocess.run(
+        [
+            "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+            "-i", str(first), "-i", str(second), "-i", str(song),
+            "-filter_complex",
+            "[0:v][1:v]concat=n=2:v=1:a=0[outv];"
+            "[2:a]atrim=start=12.5,asetpts=PTS-STARTPTS,apad,"
+            f"atrim=duration={bound:.6f}[outa]",
             "-map", "[outv]", "-map", "[outa]",
             "-c:v", "libx264", "-c:a", "aac", "-shortest",
             "-pix_fmt", "yuv420p", str(out),

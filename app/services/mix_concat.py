@@ -132,6 +132,23 @@ def _run_ffmpeg_command(
         return False
 
 
+def driving_soundtrack_bound(
+    clip_seconds: Sequence[float],
+    *,
+    slack_sec: float = 2.0,
+) -> float:
+    """Finite apad cap so ``-shortest`` cannot cut the concatenated pictures.
+
+    ``audio_start_sec`` is applied earlier as ``atrim=start`` on the source
+    track. After ``asetpts=PTS-STARTPTS`` the remaining audio must cover the
+    full video span. Subtracting the source offset from the clip sum used to
+    bound a mid-song Director join (start=12.5, 10s of clips → 2.1s) and
+    discard the tail of the movie.
+    """
+    span = sum(max(0.0, float(duration)) for duration in clip_seconds)
+    return max(0.1, span) + max(0.0, float(slack_sec))
+
+
 def probe_duration_seconds(path: str, ffmpeg_bin: str = "ffmpeg") -> float | None:
     ffprobe_bin = ffmpeg_bin.replace("ffmpeg", "ffprobe")
     try:

@@ -6642,6 +6642,7 @@ def concatenate_multi_clip_videos(
         from services.mix_concat import (
             build_hard_concat_filter,
             concat_with_tail_hold_and_crossfade,
+            driving_soundtrack_bound,
             probe_audio_flags,
             probe_duration_seconds,
             should_use_hold_crossfade,
@@ -6650,6 +6651,7 @@ def concatenate_multi_clip_videos(
         from app.services.mix_concat import (
             build_hard_concat_filter,
             concat_with_tail_hold_and_crossfade,
+            driving_soundtrack_bound,
             probe_audio_flags,
             probe_duration_seconds,
             should_use_hold_crossfade,
@@ -6755,7 +6757,8 @@ def concatenate_multi_clip_videos(
                     probe_duration_seconds(path, ffmpeg_bin) or 1.0
                     for path in valid_paths
                 ]
-                bound = max(0.1, sum(clip_secs) - audio_start_sec) + 2.0
+                # audio_start_sec is atrim=start on the song, not video to drop.
+                bound = driving_soundtrack_bound(clip_secs)
                 audio_filters.append(f"atrim=duration={bound:.6f}")
             filter_str += (
                 f";[{n}:a]"
