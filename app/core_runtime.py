@@ -21,7 +21,7 @@ from routers.core_remote import create_core_remote_router
 from routers.core_series_plan import create_core_series_plan_router
 from routers.image_generation_commands import create_image_generation_commands_router
 from routers.lan_auth import create_lan_auth_router
-from routers.llm import create_llm_router
+from routers.llm import create_llm_prompt_router, create_llm_router
 from routers.projects import create_projects_router
 from routers.productions import create_productions_router
 from routers.recipes import create_recipes_router
@@ -163,6 +163,7 @@ BLOCKED = (
     ("POST", "/api/v1/audio/analyze/jobs", "whisper_local"),
     ("POST", "/api/v1/director/pipelines/{pid}/clips/{clip_index}/rerun-video", "wangp_local"),
     ("POST", "/api/v1/director/pipelines/{pid}/repair", "wangp_local"),
+    ("POST", "/api/v1/llm/plan-h3-windows", "wangp_local"),
 )
 
 
@@ -171,6 +172,10 @@ def _block(capability: str):
         require_capability_http(capability)
         return {"status": "ok"}
     return endpoint
+
+
+async def _hidden_wangp_enhance(*_args, **_kwargs):
+    raise RuntimeError("WanGP enhancer is hidden on the core profile")
 
 
 for method, path, capability in BLOCKED:
@@ -630,6 +635,17 @@ api.include_router(create_llm_router(
     ensure_llm_loaded=core_production.ensure_llm_loaded,
     comic_writing_llm=core_production.comic_writing_llm,
     resolve_visual_media=core_production.resolve_visual_media,
+))
+api.include_router(create_llm_prompt_router(
+    get_services_config=core.services_raw,
+    effective_llm_routing=core_production.effective_llm_routing,
+    public_llm_providers=frozenset({"openai", "anthropic", "minimax", "grok", "deepseek"}),
+    ensure_llm_loaded=core_production.ensure_llm_loaded,
+    get_model_def=lambda _name: None,
+    get_lora_dir=lambda _name: "",
+    get_cached_hardware=lambda: {},
+    get_enhancer_enabled=lambda: 0,
+    enhance_with_wangp=_hidden_wangp_enhance,
 ))
 
 
