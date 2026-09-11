@@ -9,8 +9,8 @@ import {
   parseFacePackStillName,
   visemePrompt,
 } from './src/features/scene3d/speech/facePackPrompts.ts'
+import { composeFacePack } from './src/features/scene3d/speech/facePackAssemble.ts'
 
-const TILE = 128
 const skinInput = document.querySelector('#skin') as HTMLInputElement
 const restBox = document.querySelector('#rest-prompt') as HTMLTextAreaElement
 const promptList = document.querySelector('#prompt-list') as HTMLDivElement
@@ -35,9 +35,7 @@ function renderPrompts() {
     const area = document.createElement('textarea')
     area.id = `p-${viseme}`
     area.readOnly = true
-    area.value = alias
-      ? `Alias of ${alias}. Optional. ${visemePrompt(viseme, skin())}`
-      : visemePrompt(viseme, skin())
+    area.value = alias ? `Alias of ${alias}. Optional. ${visemePrompt(viseme, skin())}` : visemePrompt(viseme, skin())
     const btn = document.createElement('button')
     btn.type = 'button'
     btn.textContent = `Copiar ${viseme}`
@@ -97,106 +95,27 @@ function ensureSlots() {
   }
 }
 
-function luma(r: number, g: number, b: number) {
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b
-}
-
-function borderMean(data: Uint8ClampedArray) {
-  let sr = 0, sg = 0, sb = 0, n = 0
-  for (let y = 0; y < TILE; y++) {
-    for (let x = 0; x < TILE; x++) {
-      if (x >= 10 && x < TILE - 10 && y >= 10 && y < TILE - 10) continue
-      const i = (y * TILE + x) * 4
-      const r = data[i], g = data[i + 1], b = data[i + 2]
-      if (luma(r, g, b) < 28) continue
-      sr += r; sg += g; sb += b; n++
-    }
-  }
-  return n < 16 ? [1, 1, 1] : [sr / n, sg / n, sb / n]
-}
-
-function matchSkin(tile: ImageData, ref: ImageData) {
-  const [tr, tg, tb] = borderMean(tile.data)
-  const [rr, rg, rb] = borderMean(ref.data)
-  const kr = rr / tr, kg = rg / tg, kb = rb / tb
-  const out = new ImageData(new Uint8ClampedArray(tile.data), TILE, TILE)
-  for (let i = 0; i < out.data.length; i += 4) {
-    const r = out.data[i], g = out.data[i + 1], b = out.data[i + 2]
-    if (luma(r, g, b) < 28) continue
-    out.data[i] = Math.max(0, Math.min(255, Math.round(r * kr)))
-    out.data[i + 1] = Math.max(0, Math.min(255, Math.round(g * kg)))
-    out.data[i + 2] = Math.max(0, Math.min(255, Math.round(b * kb)))
-  }
-  return out
-}
-
-function pasteMouth(base: ImageData, viseme: ImageData, cx: number, cy: number, rx: number, ry: number) {
-  const out = new ImageData(new Uint8ClampedArray(base.data), TILE, TILE)
-  for (let y = 0; y < TILE; y++) {
-    const ny = (y + 0.5 - cy) / ry
-    for (let x = 0; x < TILE; x++) {
-      const nx = (x + 0.5 - cx) / rx
-      const d = nx * nx + ny * ny
-      if (d > 1.2) continue
-      const a = d <= 0.92 ? 1 : Math.max(0, 1 - (d - 0.92) / 0.28)
-      const i = (y * TILE + x) * 4
-      for (let c = 0; c < 3; c++) {
-        out.data[i + c] = Math.round(out.data[i + c] * (1 - a) + viseme.data[i + c] * a)
-      }
-    }
-  }
-  return out
-}
-
-function raster(img: HTMLImageElement) {
-  const canvas = document.createElement('canvas')
-  canvas.width = TILE
-  canvas.height = TILE
-  const ctx = canvas.getContext('2d')!
-  ctx.drawImage(img, 0, 0, TILE, TILE)
-  return ctx.getImageData(0, 0, TILE, TILE)
-}
-
-function pickViseme(id: Viseme) {
-  const alias = VISEME_ALIASES[id]
-  return stills.get(id) ?? (alias ? stills.get(alias) : undefined) ?? stills.get('rest')
-}
-
 function build() {
-  const restImg = stills.get('rest')
-  if (!restImg) {
+  const rest = stills.get('rest')
+  if (!rest) {
     status.textContent = 'Falta rest.png'
     return
   }
-  const rest = raster(restImg)
-  const vis: Record<string, ImageData> = { rest: matchSkin(rest, rest) }
+  const visemes: Partial<Record<Viseme, HTMLImageElement>> = {}
+  const expressions: Partial<Record<Expression, HTMLImageElement>> = {}
   for (const viseme of VISEMES) {
-    if (viseme === 'rest') continue
-    const img = pickViseme(viseme)
-    vis[viseme] = img ? matchSkin(raster(img), rest) : vis.rest
+    if (viseme !== 'rest' && stills.get(viseme)) visemes[viseme] = stills.get(viseme)
   }
-  const expr: Record<string, ImageData> = { neutral: vis.rest }
   for (const expression of EXPRESSIONS) {
-    if (expression === 'neutral') continue
-    const img = stills.get(expression)
-    expr[expression] = img ? matchSkin(raster(img), rest) : vis.rest
+    if (expression !== 'neutral' && stills.get(expression)) expressions[expression] = stills.get(expression)
   }
-  const ctx = preview.getContext('2d')!
+  const canvas = composeFacePack({ rest, visemes, expressions })
+  const ctx = preview.getContext('2d')
+  if (!ctx) return
   ctx.clearRect(0, 0, preview.width, preview.height)
-  const scratch = document.createElement('canvas')
-  scratch.width = TILE
-  scratch.height = TILE
-  const sctx = scratch.getContext('2d')!
-  for (const [row, expression] of EXPRESSIONS.entries()) {
-    const base = expr[expression]
-    for (const [col, viseme] of VISEMES.entries()) {
-      const tile = viseme === 'rest' ? base : pasteMouth(base, vis[viseme], 64, 92, 30, 18)
-      sctx.putImageData(tile, 0, 0)
-      ctx.drawImage(scratch, col * TILE, row * TILE)
-    }
-  }
+  ctx.drawImage(canvas, 0, 0, preview.width, preview.height)
   downloadBtn.disabled = false
-  status.textContent = `9×6 listo (${TILE} px). Color anclado al reposo.`
+  status.textContent = '9×6 listo. Color anclado al reposo.'
 }
 
 function loadFile(file: File) {
@@ -207,10 +126,9 @@ function loadFile(file: File) {
   }
   const img = new Image()
   img.onload = () => {
-    const key = parsed.kind === 'rest' ? 'rest' : parsed.id
-    stills.set(key, img)
+    stills.set(parsed.kind === 'rest' ? 'rest' : parsed.id, img)
     ensureSlots()
-    status.textContent = `Cargado ${key}`
+    status.textContent = `Cargado ${parsed.kind === 'rest' ? 'rest' : parsed.id}`
   }
   img.src = URL.createObjectURL(file)
 }

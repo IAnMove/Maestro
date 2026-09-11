@@ -27,7 +27,7 @@ moves the row by itself.
 
 The tile is the **front face of a cube**, not a round portrait. Skin fills the
 square edge to edge; only eyes, nose and mouth. Prompts:
-`/face-pack-maker.html` (copy + drop stills) and
+Character Creator → **Lipsync face (cube plane)**. Prompts live in
 `ui/src/features/scene3d/speech/facePackPrompts.ts`.
 
 CLI: `python3 ui/scripts/assemble_face_pack_from_dir.py stills/ -o pack.png`
