@@ -6,7 +6,9 @@ import * as api from '../../api/client'
 import type { GenerationMode } from '../../types'
 import { FAMILIES, resolveVariant, onOsThemeChange, type FamilyId, type ThemeMode } from '../../lib/theme'
 import { setUiLanguage, useUiTranslation, type UiLanguage } from '../../i18n'
-import { H3ModelInfo, H3ModelName } from '../Sidebar/H3ModelInfo'
+import { H3ModelName } from '../Sidebar/H3ModelInfo'
+import { ModelCatalogInfo } from '../Sidebar/ModelCatalogInfo'
+import { catalogVramGb } from '../../lib/modelCatalog'
 import { MINIMAX_MUSIC_COMMUNITY_MODELS, modelRequirementsText } from '../../lib/minimaxMusicCatalog'
 
 const profileLabels: Record<string, string> = {
@@ -69,6 +71,7 @@ const MODE_LABELS: { mode: GenerationMode; label: string }[] = [
 const COLLAPSED_FAMILIES_KEY = 'maestro-collapsed-model-families'
 
 function ModelVisibilitySection() {
+  const { t } = useUiTranslation('studio')
   const models = useStore(s => s.models)
   const families = useStore(s => s.families)
   const enabledModels = useStore(s => s.enabledModels)
@@ -205,8 +208,17 @@ function ModelVisibilitySection() {
     name: string
     is_downloaded?: boolean
     architecture?: string
+    family?: string
+    description?: string
+    selector_help?: string
     shared_cache_group?: string[]
-    resource_requirements?: { vram_gb?: number; storage_gb?: number; platform?: string; backend?: string; note?: string }
+    resource_requirements?: { vram_gb?: number; ram_gb?: number; storage_gb?: number; platform?: string; backend?: string; note?: string }
+    is_i2v?: boolean
+    is_t2v?: boolean
+    generates_audio?: boolean
+    supports_end_frame?: boolean
+    supports_ref_images?: boolean
+    tool_only?: boolean
   }
   const modelsByMode = new Map<GenerationMode, { familyId: string; familyLabel: string; models: ModelRow[] }[]>()
   for (const { mode } of MODE_LABELS) {
@@ -223,8 +235,17 @@ function ModelVisibilitySection() {
             name: m.name,
             is_downloaded: m.is_downloaded,
             architecture: m.architecture,
+            family: m.family,
+            description: m.description,
+            selector_help: m.selector_help,
             shared_cache_group: m.shared_cache_group,
             resource_requirements: m.resource_requirements,
+            is_i2v: m.is_i2v,
+            is_t2v: m.is_t2v,
+            generates_audio: m.generates_audio,
+            supports_end_frame: m.supports_end_frame,
+            supports_ref_images: m.supports_ref_images,
+            tool_only: m.tool_only,
           })),
         })
       }
@@ -350,6 +371,7 @@ function ModelVisibilitySection() {
                     )}
                     {(!showFamilyHeader || !famCollapsed) && group.models.map(m => {
                       const alsoDeletes = confirmDelete === m.model_type ? sharedDeleteNames(m) : []
+                      const vramGb = catalogVramGb(m)
                       return (
                       <div key={m.model_type}>
                       <div
@@ -395,16 +417,9 @@ function ModelVisibilitySection() {
                           }`}>
                             <H3ModelName modelType={m.model_type} fallback={m.name} />
                           </span>
-                          {m.resource_requirements && (
-                            <span
-                              className="shrink-0 text-[9px] text-text-muted tabular-nums"
-                              title={modelRequirementsText(m.resource_requirements)}
-                            >
-                              {m.resource_requirements.vram_gb != null
-                                ? `~${m.resource_requirements.vram_gb} GB VRAM`
-                                : m.resource_requirements.storage_gb != null
-                                  ? `~${m.resource_requirements.storage_gb} GB`
-                                  : 'info'}
+                          {vramGb != null && (
+                            <span className="shrink-0 text-[9px] text-text-muted tabular-nums">
+                              {t('modelCatalog.vramBadge', { vram: vramGb })}
                             </span>
                           )}
                         </label>
@@ -426,7 +441,7 @@ function ModelVisibilitySection() {
                           </button>
                         )}
                       </div>
-                      <H3ModelInfo modelType={m.model_type} />
+                      <ModelCatalogInfo model={m} />
                       {alsoDeletes.length > 0 && (
                         <p className="ml-6 text-[10px] text-red-400/90 leading-snug">
                           Shared weights — also deletes: {alsoDeletes.join(', ')}
