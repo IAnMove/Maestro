@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { defaultSpeech } from '../src/features/scene3d/speech/types'
 import { cueAt, expressionAt, mouthAt, parseExpressionCues, parseMouthCues, parseSpeech, amplitudeCues, safeMediaUrl } from '../src/features/scene3d/speech/track'
 import { facePackCell, validFacePackSize } from '../src/features/scene3d/speech/facePack'
-import { talkingMascot } from '../src/features/scene3d/speech/facePackExamples'
+import { FACE_PACK_IDS, talkingMascot } from '../src/features/scene3d/speech/facePackExamples'
 import { speechFromLabConfig } from '../src/features/scene3d/speech/kit'
 import { voiceSchedule } from '../src/features/scene3d/speech/audio'
 import { applyScene3DTemplate, remountScene3DTemplate } from '../src/features/scene3d/templates'
@@ -105,4 +105,8 @@ test('face packs are 9×6 and talking mascots round-trip on hangar-talk', () => 
   assert.equal(expressionAt(doc.slots[0].speech!, 1), 'happy')
   assert.equal(expressionAt(doc.slots[1].speech!, 5), 'angry')
   assert.equal(mouthAt(doc.slots[0].speech!, 0.5).b, 2)
+  assert.equal(FACE_PACK_IDS.length, 5)
+  const voxel = applyScene3DTemplate('voxel-talk')
+  assert.equal(voxel.slots[0].speech?.facePack?.url, '/examples/face-pack/voxel-pack.png')
+  assert.equal(voxel.slots[1].speech?.facePack?.url, '/examples/face-pack/cubeskull-pack.png')
 })

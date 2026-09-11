@@ -88,6 +88,15 @@
     "offset": "Trim audio start (s)",
     "gain": "Volume",
     "needsPlacement": "Add lips to this subject before previewing its voice on the model.",
+    "facePack": "Mascot face",
+    "facePackHint": "Bundled faces for a TV-head screen: visemes and expressions. Experimental.",
+    "pack": {
+      "tv": "CRT",
+      "skull": "Skull",
+      "voxel": "Cube",
+      "anime": "Anime",
+      "cubeskull": "Voxel skull"
+    },
     "busy": "Preparing voice or kit…",
     "adjust": "Adjust mouth and expressions",
     "adjustHint": "X: left/right; Y: up/down; Z: depth. Face the model forward (+Z), adjust width/height, then Play. The GLB stays intact.",
@@ -724,6 +733,10 @@
     "sea-talk": {
       "title": "Sea talk",
       "description": "The same CRT-head and skull mascots lipsync on the boat deck with a closer two-shot."
+    },
+    "voxel-talk": {
+      "title": "Voxel talk",
+      "description": "A cube-head and a voxel skull take turns on the roof, anime eyes on blocky faces."
     }
   },
   "gallerySearch": "Search the catalog",

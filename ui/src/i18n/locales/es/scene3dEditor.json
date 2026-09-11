@@ -88,6 +88,15 @@
     "offset": "Recortar inicio del audio (s)",
     "gain": "Volumen",
     "needsPlacement": "Añade labios a este sujeto antes de visualizar su voz sobre el modelo.",
+    "facePack": "Cara mascota",
+    "facePackHint": "Caras incluidas para una pantalla de cabeza CRT: visemas y expresiones. Experimental.",
+    "pack": {
+      "tv": "CRT",
+      "skull": "Cráneo",
+      "voxel": "Cubo",
+      "anime": "Anime",
+      "cubeskull": "Cráneo voxel"
+    },
     "busy": "Preparando voz o kit…",
     "adjust": "Ajustar boca y expresiones",
     "adjustHint": "X: izquierda/derecha; Y: arriba/abajo; Z: profundidad. Orienta la cara hacia delante (+Z), ajusta anchura/altura y reproduce. El GLB se conserva.",
@@ -724,6 +733,10 @@
     "sea-talk": {
       "title": "Charla en cubierta",
       "description": "Los mismos mascotas CRT y cráneo hacen lipsync en la cubierta, en un plano más cerrado."
+    },
+    "voxel-talk": {
+      "title": "Charla voxel",
+      "description": "Una cabeza cubo y un cráneo voxel se turnan en la azotea, ojos anime sobre caras de bloques."
     }
   },
   "gallerySearch": "Buscar en el catálogo",

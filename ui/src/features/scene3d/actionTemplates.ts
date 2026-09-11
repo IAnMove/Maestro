@@ -50,6 +50,7 @@ export const ACTION_TEMPLATE_IDS = [
   'volcano-ridge',
   'hangar-talk',
   'sea-talk',
+  'voxel-talk',
 ] as const
 
 export type ActionTemplateId = typeof ACTION_TEMPLATE_IDS[number]
@@ -822,6 +823,26 @@ const SPECS: Record<ActionTemplateId, ActionSpec> = {
     copy: copy(
       { title: 'Sea talk', description: 'The same CRT-head and skull mascots lipsync on the boat deck with a closer two-shot.', requirements: ['Bundled CRT-head GLB (both roles)', 'Experimental face pack', 'Neutral synthetic vowels', 'Optional title'] },
       { title: 'Charla en cubierta', description: 'Los mismos mascotas CRT y cráneo hacen lipsync en la cubierta, en un plano más cerrado.', requirements: ['GLB CRT-head incluido (ambos papeles)', 'Face pack experimental', 'Vocales sintéticas neutras', 'Título opcional'] },
+    ),
+  },
+  'voxel-talk': {
+    category: 'action', duration: 8, dressing: 'rooftop',
+    light: light([-0.28, -0.76, 0.18], 2.35, '#ffe8c8'),
+    camera: cam('encounter', [0.12, 1.48, 4.85], [0.02, 1.2, 0.08], 36),
+    slots: [
+      talkingMascot('subject_1', 'subject_1', [-1.55, 0, 0.55], 'voxel', { rotationY: 0.2, motion: { to: [-0.8, 0, 0.18], turnTo: 0.16, easing: 'smooth' } }),
+      talkingMascot('subject_2', 'subject_2', [1.6, 0, 0.5], 'cubeskull', { rotationY: -0.2, scale: 0.98, motion: { to: [0.85, 0, 0.14], turnTo: -0.16, easing: 'smooth' } }),
+    ],
+    aliases: { cube: 'subject_1', skull: 'subject_2' },
+    texts: [title('voxel-label', 'BLOCK TALK', 'typewriter', 50, 14, 8, '#ffe3a0', 6.2)],
+    worldSfx: [
+      { id: 'city-glow', kind: 'aurora', start: 0.2, end: 7.8, position: { x: 0, y: 2.4, z: -6 }, color: '#ffb070' },
+    ],
+    sfx: [{ id: 'scan', kind: 'scanline', start: 0.2, end: 8, x: 50, y: 38 }],
+    soundtrack: FACE_PACK_SOUNDTRACK,
+    copy: copy(
+      { title: 'Voxel talk', description: 'A cube-head and a voxel skull take turns on the roof, anime eyes on blocky faces.', requirements: ['Bundled CRT-head GLB (both roles)', 'Voxel face packs', 'Neutral synthetic vowels', 'Optional title'] },
+      { title: 'Charla voxel', description: 'Una cabeza cubo y un cráneo voxel se turnan en la azotea, ojos anime sobre caras de bloques.', requirements: ['GLB CRT-head incluido (ambos papeles)', 'Face packs voxel', 'Vocales sintéticas neutras', 'Título opcional'] },
     ),
   },
 }

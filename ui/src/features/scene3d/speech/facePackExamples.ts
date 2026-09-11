@@ -4,22 +4,27 @@ import { defaultSpeech, type ExpressionCue, type MouthCue, type Scene3DSpeech, t
 
 export const FACE_PACK_GLB = '/examples/tv-head-humanoid.glb'
 export const FACE_PACK_AUDIO_URL = '/examples/face-pack/neutral-vowels.wav'
-export const TV_FACE_PACK_URL = '/examples/face-pack/tv-pack.png'
-export const SKULL_FACE_PACK_URL = '/examples/face-pack/skull-pack.png'
+export const FACE_PACK_IDS = ['tv', 'skull', 'voxel', 'anime', 'cubeskull'] as const
+export type FacePackId = typeof FACE_PACK_IDS[number]
 
 const bundled = (filename: string, url: string): Scene3DSourceRef => (
   { workspaceId: 'bundled', filename, url }
 )
 
 export const FACE_PACK_AUDIO = bundled('neutral-vowels.wav', FACE_PACK_AUDIO_URL)
-export const TV_FACE_PACK = bundled('tv-pack.png', TV_FACE_PACK_URL)
-export const SKULL_FACE_PACK = bundled('skull-pack.png', SKULL_FACE_PACK_URL)
-
 export const FACE_PACK_SOUNDTRACK: Scene3DSoundtrack[] = [
   { id: 'neutral-vowels', audio: FACE_PACK_AUDIO, start: 0, offset: 0, gain: 0.9, end: 8 },
 ]
 
-const TV_MOUTH: MouthCue[] = [
+export const FACE_PACKS: Record<FacePackId, { id: FacePackId; url: string; source: Scene3DSourceRef; visemes: string }> = {
+  tv: { id: 'tv', url: '/examples/face-pack/tv-pack.png', source: bundled('tv-pack.png', '/examples/face-pack/tv-pack.png'), visemes: '/examples/face-pack/tv-visemes.png' },
+  skull: { id: 'skull', url: '/examples/face-pack/skull-pack.png', source: bundled('skull-pack.png', '/examples/face-pack/skull-pack.png'), visemes: '/examples/face-pack/skull-visemes.png' },
+  voxel: { id: 'voxel', url: '/examples/face-pack/voxel-pack.png', source: bundled('voxel-pack.png', '/examples/face-pack/voxel-pack.png'), visemes: '/examples/face-pack/voxel-visemes.png' },
+  anime: { id: 'anime', url: '/examples/face-pack/anime-pack.png', source: bundled('anime-pack.png', '/examples/face-pack/anime-pack.png'), visemes: '/examples/face-pack/anime-visemes.png' },
+  cubeskull: { id: 'cubeskull', url: '/examples/face-pack/cubeskull-pack.png', source: bundled('cubeskull-pack.png', '/examples/face-pack/cubeskull-pack.png'), visemes: '/examples/face-pack/cubeskull-visemes.png' },
+}
+
+const LEAD_MOUTH: MouthCue[] = [
   { start: 0, end: 0.35, viseme: 'rest' },
   { start: 0.35, end: 0.85, viseme: 'A' },
   { start: 0.85, end: 1.05, viseme: 'rest' },
@@ -33,7 +38,7 @@ const TV_MOUTH: MouthCue[] = [
   { start: 3.65, end: 8, viseme: 'rest' },
 ]
 
-const SKULL_MOUTH: MouthCue[] = [
+const REPLY_MOUTH: MouthCue[] = [
   { start: 0, end: 4.35, viseme: 'rest' },
   { start: 4.35, end: 4.85, viseme: 'A' },
   { start: 4.85, end: 5.05, viseme: 'rest' },
@@ -47,21 +52,25 @@ const SKULL_MOUTH: MouthCue[] = [
   { start: 7.65, end: 8, viseme: 'rest' },
 ]
 
-const TV_FACE: ExpressionCue[] = [
+const LEAD_FACE: ExpressionCue[] = [
   { start: 0, end: 0.35, expression: 'neutral' },
   { start: 0.35, end: 2.25, expression: 'happy' },
   { start: 2.25, end: 3.65, expression: 'surprised' },
   { start: 3.65, end: 8, expression: 'sleepy' },
 ]
 
-const SKULL_FACE: ExpressionCue[] = [
+const REPLY_FACE: ExpressionCue[] = [
   { start: 0, end: 4.35, expression: 'neutral' },
   { start: 4.35, end: 6.25, expression: 'angry' },
   { start: 6.25, end: 7.65, expression: 'worried' },
   { start: 7.65, end: 8, expression: 'sleepy' },
 ]
 
-function demoSpeech(pack: Scene3DSourceRef, cues: MouthCue[], expressionCues: ExpressionCue[]): Scene3DSpeech {
+export function facePackIdOf(url: string | undefined): FacePackId | undefined {
+  return FACE_PACK_IDS.find(id => FACE_PACKS[id].url === url || FACE_PACKS[id].source.url === url)
+}
+
+function demoSpeech(pack: Scene3DSourceRef, role: 'lead' | 'reply'): Scene3DSpeech {
   return {
     ...defaultSpeech(),
     enabled: true,
@@ -74,8 +83,38 @@ function demoSpeech(pack: Scene3DSourceRef, cues: MouthCue[], expressionCues: Ex
     blink: false,
     eyes: false,
     facePack: pack,
-    cues,
-    expressionCues,
+    cues: role === 'lead' ? LEAD_MOUTH : REPLY_MOUTH,
+    expressionCues: role === 'lead' ? LEAD_FACE : REPLY_FACE,
+  }
+}
+
+export function applyBundledFacePack(speech: Scene3DSpeech, id: FacePackId): Scene3DSpeech {
+  const pack = FACE_PACKS[id].source
+  return {
+    ...speech,
+    enabled: true,
+    blink: false,
+    eyes: false,
+    facePack: pack,
+    cues: speech.cues.length ? speech.cues : LEAD_MOUTH,
+    expressionCues: speech.expressionCues ?? LEAD_FACE,
+  }
+}
+
+export function talkingScreen(id: FacePackId) {
+  const pack = FACE_PACKS[id]
+  return {
+    ...defaultModelScreen(['headfront', 'Head', 'tv_frame']),
+    sourceUrl: pack.url,
+    sourceRef: pack.source,
+    media: 'image' as const,
+    fit: 'cover' as const,
+    pitch: 0,
+    yaw: 0,
+    roll: 0,
+    offset: [0, 0, 0.03] as [number, number, number],
+    width: 0.30,
+    height: 0.22,
   }
 }
 
@@ -83,24 +122,11 @@ export function talkingMascot(
   id: string,
   slot: Scene3DSlotId,
   position: Vec3,
-  kind: 'tv' | 'skull',
+  kind: FacePackId,
   patch: Partial<Scene3DSlot> = {},
 ): Scene3DSlot {
-  const pack = kind === 'tv' ? TV_FACE_PACK : SKULL_FACE_PACK
-  const screen = {
-    ...defaultModelScreen(['headfront', 'Head', 'tv_frame']),
-    sourceUrl: pack.url,
-    sourceRef: pack,
-    media: 'image' as const,
-    fit: 'cover' as const,
-    // Bundled CRT walker: headfront +Z is out of the glass (not Meshy +Y).
-    pitch: 0,
-    yaw: 0,
-    roll: 0,
-    offset: [0, 0, 0.03],
-    width: 0.30,
-    height: 0.22,
-  }
+  const pack = FACE_PACKS[kind]
+  const role = patch.speech ? 'lead' : (id === 'subject_2' ? 'reply' : 'lead')
   return {
     id,
     slot,
@@ -112,8 +138,8 @@ export function talkingMascot(
     rotationY: 0,
     scale: 1,
     grounded: true,
-    screen,
-    speech: demoSpeech(pack, kind === 'tv' ? TV_MOUTH : SKULL_MOUTH, kind === 'tv' ? TV_FACE : SKULL_FACE),
+    screen: talkingScreen(kind),
+    speech: demoSpeech(pack.source, role),
     ...patch,
   }
 }

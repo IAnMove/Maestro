@@ -26,9 +26,9 @@ const SOURCE = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../sr
 const SETS = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../src/features/scene3d/actionSets.ts'), 'utf8')
 const audio = { workspaceId: 'demo', filename: 'vo.wav', url: '/api/v1/uploads/vo.wav' }
 
-test('thirty-four action ids are native, catalogued and free of private cinema/GLB imports', () => {
-  assert.equal(ACTION_TEMPLATE_IDS.length, 34)
-  assert.equal(new Set(ACTION_TEMPLATE_IDS).size, 34)
+test('thirty-five action ids are native, catalogued and free of private cinema/GLB imports', () => {
+  assert.equal(ACTION_TEMPLATE_IDS.length, 35)
+  assert.equal(new Set(ACTION_TEMPLATE_IDS).size, 35)
   assert.doesNotMatch(SOURCE, /tools\/cinema/)
   assert.doesNotMatch(SOURCE, /from ['"][^'"]+\.glb['"]/)
   assert.doesNotMatch(SETS, /from ['"][^'"]+\.glb['"]/)
@@ -96,7 +96,7 @@ test('apply, bind roles, optional audio/text and H/V variants reopen as native s
   }
 })
 
-test('the thirty-four shots use distinct cameras and distinct in/out actions', () => {
+test('the thirty-five shots use distinct cameras and distinct in/out actions', () => {
   const cameras = new Set<string>()
   const actions = new Set<string>()
   const dressings = new Set<string>()
@@ -133,8 +133,8 @@ test('the thirty-four shots use distinct cameras and distinct in/out actions', (
       assert.ok(Math.hypot(...eye.map((value, index) => value - look[index])) > 0.2, id)
     }
   }
-  assert.equal(cameras.size, 34, 'cameras are not the same shot with another label')
-  assert.equal(actions.size, 34, 'actions are not the same blocking with another label')
+  assert.equal(cameras.size, 35, 'cameras are not the same shot with another label')
+  assert.equal(actions.size, 35, 'actions are not the same blocking with another label')
   assert.ok(dressings.has('open-sea') && dressings.has('lunar') && dressings.has('space-lane') && dressings.has('chase-street'))
   assert.ok(dressings.has('jungle') && dressings.has('snow') && dressings.has('casino'))
 })
@@ -160,7 +160,7 @@ test('shot library filters by action category, set and search', () => {
   assert.equal(templateSetting('casino-heist'), 'casino')
   const titleOf = (id: typeof ACTION_TEMPLATE_IDS[number]) => id
   const action = filterScene3DTemplates({ category: 'action', setting: 'all', query: '', locale: 'en', titleOf })
-  assert.equal(action.length, 34)
+  assert.equal(action.length, 35)
   const sea = filterScene3DTemplates({ category: 'action', setting: 'sea', query: '', locale: 'en', titleOf })
   assert.ok(sea.some(item => item.id === 'sea-deck'))
   assert.ok(sea.every(item => templateSetting(item.id) === 'sea'))

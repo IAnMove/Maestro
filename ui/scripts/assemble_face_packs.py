@@ -22,6 +22,12 @@ TV_VISEMES = {'rest': 1, 'M': 11, 'A': 7, 'E': 6, 'I': 13, 'O': 9, 'U': 16, 'F':
 TV_EXPR = {'neutral': 1, 'happy': 18, 'angry': 23, 'worried': 22, 'surprised': 24, 'sleepy': 25}
 SK_VISEMES = {'rest': 2, 'M': 3, 'A': 5, 'E': 8, 'I': 12, 'O': 10, 'U': 17, 'F': 14, 'L': 21}
 SK_EXPR = {'neutral': 2, 'happy': 28, 'angry': 26, 'worried': 29, 'surprised': 27, 'sleepy': 30}
+VOXEL_VISEMES = {'rest': 32, 'M': 32, 'A': 39, 'E': 43, 'I': 43, 'O': 41, 'U': 41, 'F': 32, 'L': 39}
+VOXEL_EXPR = {'neutral': 32, 'happy': 49, 'angry': 48, 'worried': 58, 'surprised': 53, 'sleepy': 55}
+ANIME_VISEMES = {'rest': 33, 'M': 35, 'A': 36, 'E': 44, 'I': 44, 'O': 45, 'U': 45, 'F': 35, 'L': 36}
+ANIME_EXPR = {'neutral': 33, 'happy': 51, 'angry': 50, 'worried': 59, 'surprised': 56, 'sleepy': 52}
+CUBE_VISEMES = {'rest': 31, 'M': 37, 'A': 38, 'E': 40, 'I': 40, 'O': 42, 'U': 42, 'F': 37, 'L': 38}
+CUBE_EXPR = {'neutral': 31, 'happy': 46, 'angry': 47, 'worried': 60, 'surprised': 57, 'sleepy': 54}
 
 
 def run(cmd: list[str]) -> None:
@@ -133,9 +139,19 @@ def main() -> int:
     OUT.mkdir(parents=True, exist_ok=True)
     assemble('tv', TV_VISEMES, TV_EXPR, crop='crop=520:600:252:210', mouth=(64, 84, 36, 22))
     assemble('skull', SK_VISEMES, SK_EXPR, crop='crop=iw*0.72:ih*0.72:(iw-iw*0.72)/2:(ih-ih*0.72)/2', mouth=(64, 90, 44, 32))
-    synth_vowels(OUT / 'neutral-vowels.wav')
-    for name in ('tv-pack.png', 'skull-pack.png', 'tv-visemes.png', 'skull-visemes.png', 'neutral-vowels.wav'):
-        print(name, (OUT / name).stat().st_size)
+    assemble('voxel', VOXEL_VISEMES, VOXEL_EXPR, crop='crop=iw*0.78:ih*0.78:(iw-iw*0.78)/2:(ih-ih*0.78)/2', mouth=(72, 88, 34, 22))
+    assemble('anime', ANIME_VISEMES, ANIME_EXPR, crop='crop=iw*0.86:ih*0.86:(iw-iw*0.86)/2:(ih-ih*0.86)/2', mouth=(64, 92, 34, 18))
+    assemble('cubeskull', CUBE_VISEMES, CUBE_EXPR, crop='crop=iw*0.72:ih*0.72:(iw-iw*0.72)/2:(ih-ih*0.72)/2', mouth=(64, 92, 42, 30))
+    if not (OUT / 'neutral-vowels.wav').is_file():
+        synth_vowels(OUT / 'neutral-vowels.wav')
+    for name in (
+        'tv-pack.png', 'skull-pack.png', 'voxel-pack.png', 'anime-pack.png', 'cubeskull-pack.png',
+        'tv-visemes.png', 'skull-visemes.png', 'voxel-visemes.png', 'anime-visemes.png', 'cubeskull-visemes.png',
+        'neutral-vowels.wav',
+    ):
+        path = OUT / name
+        if path.is_file():
+            print(name, path.stat().st_size)
     return 0
 
 
