@@ -8,6 +8,7 @@ import { createNarrativeScene, getNarrativeTemplate, NARRATIVE_SCENE_TEMPLATES }
 import type { NarrativeSceneControls, NarrativeSceneId, NarrativeTemplateInput } from './sceneNarrative'
 import { parseSceneGenerationPolicy, sceneGenerationPolicyFields, SCENE_GENERATION_POLICIES } from './sceneGenerationPolicy'
 import type { SceneGenerationPolicy } from './sceneGenerationPolicy'
+import { canonicalSceneFps } from './sceneFps.ts'
 
 const GRADE_MOODS: readonly SceneGradeMood[] = ['calm', 'tense', 'dreamy', 'heroic']
 const GRADE_PALETTES: readonly SceneGradePalette[] = ['natural', 'cool', 'warm', 'neon']
@@ -213,7 +214,7 @@ export interface SceneRecipe {
     texts?: KineticText[]
     width?: number
     height?: number
-    fps?: 30 | 60
+    fps?: 24 | 30 | 60
     duration?: number
     /**
      * Emotional and colour temperature for the whole scene. Without these the
@@ -624,7 +625,7 @@ export const SCENE_RECIPE_JSON_SCHEMA: Record<string, unknown> = {
         texts: KINETIC_TEXT_SCHEMA,
         width: { type: 'integer', minimum: 256, maximum: 3840 },
         height: { type: 'integer', minimum: 256, maximum: 3840 },
-        fps: { enum: [30, 60] },
+        fps: { enum: [24, 30, 60] },
         duration: { type: 'number', minimum: 0.5, maximum: 60 },
         mood: { enum: ['calm', 'tense', 'dreamy', 'heroic'] },
         palette: { enum: ['natural', 'cool', 'warm', 'neon'] },
@@ -1279,7 +1280,7 @@ export function parseSceneRecipe(value: unknown): SceneRecipe {
       ...kineticTextFields(sceneRaw.texts),
       width: Math.round(boundedNumber(sceneRaw.width, 1280, 256, 3840)),
       height: Math.round(boundedNumber(sceneRaw.height, 720, 256, 3840)),
-      fps: sceneRaw.fps === 60 ? 60 : 30,
+      fps: canonicalSceneFps(sceneRaw.fps),
       duration: boundedNumber(sceneRaw.duration, shots?.[0]?.duration || 5, 0.5, 60),
       // Unknown values fall through as undefined rather than throwing: a
       // mistyped mood should cost the grade, not the whole recipe.
@@ -1615,7 +1616,7 @@ export function compileSceneRecipe(
   // track before compilation, so a remaining unresolved source is a hard
   // failure with a nameable cause rather than a silently mute export.
   const audioTracks = compileRecipeAudio(recipe, resolved, duration)
-  const dialogue = compileRecipeDialogue(layers, recipe.dialogueBeats, recipe.scene.fps === 60 ? 60 : 30, duration)
+  const dialogue = compileRecipeDialogue(layers, recipe.dialogueBeats, canonicalSceneFps(recipe.scene.fps), duration)
   return {
     version: 1,
     name: recipe.name,
@@ -1624,7 +1625,7 @@ export function compileSceneRecipe(
     ...sceneGenerationPolicyFields(recipe.generationPolicy),
     width: recipe.scene.width || 1280,
     height: recipe.scene.height || 720,
-    fps: recipe.scene.fps === 60 ? 60 : 30,
+    fps: canonicalSceneFps(recipe.scene.fps),
     duration,
     composition: { showGrid: false, gridSize: 10, snap: false, safeArea: 'none' },
     layers: dialogue.layers,

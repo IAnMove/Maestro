@@ -448,9 +448,9 @@
     "fullHdLandscape": "Full HD horizontal",
     "fourKLandscape": "4K horizontal",
     "square": "Cuadrado",
-    "hdPortrait": "HD vertical",
-    "fullHdPortrait": "Full HD vertical",
-    "fourKPortrait": "4K vertical"
+    "hdPortrait": "HD vertical · móvil 9:16",
+    "fullHdPortrait": "Full HD vertical · móvil 9:16",
+    "fourKPortrait": "4K vertical · móvil 9:16"
   },
   "layerTypes": {
     "camera": "cámara",
@@ -954,6 +954,10 @@
     "exportProgress": "Fotograma 3D {{index}} / {{total}}",
     "exported": "MP4 3D guardado en Vídeos como {{name}}",
     "exportFailed": "No se pudo exportar la escena 3D.",
+    "exportCancel": "Cancelar exportación 3D",
+    "exportCancelled": "Exportación 3D cancelada. El plano vuelve a ser editable.",
+    "previewQuality": "Vista previa · menor resolución, sin sombras",
+    "exportQualityHint": "La vista previa es más ligera. La exportación usa el encuadre completo, sombras, 24/30/60 fps y audio estéreo. Puedes cancelar; este plano permanece bloqueado hasta que termine.",
     "assetsNotReady": "Los recursos 3D no terminaron de cargar.",
     "stageNotReady": "El escenario 3D no está listo para exportar.",
     "cannotEncode": "Este navegador no puede codificar un MP4 H.264 determinista.",

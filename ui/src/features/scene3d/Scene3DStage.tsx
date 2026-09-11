@@ -29,6 +29,7 @@ import {
   pruneSlots,
   resizeWorld,
   renderWorld,
+  setWorldExportQuality,
   setWorldSize,
   slotNeedsReload,
   syncSlotClip,
@@ -53,6 +54,7 @@ export type Scene3DStageHandle = {
   paint: (seconds: number, document?: Scene3DDocument) => HTMLCanvasElement | null
   ready: (slots: readonly Scene3DSlot[]) => boolean
   setExportSize: (width: number, height: number) => void
+  setExportQuality: (enabled: boolean) => void
   restoreSize: () => void
   beginExport: (document: Scene3DDocument) => void
   endExport: () => void
@@ -187,6 +189,10 @@ export const Scene3DStage = forwardRef<Scene3DStageHandle, Props>(function Scene
     setExportSize(width, height) {
       const world = worldRef.current
       if (world) setWorldSize(world, width, height)
+    },
+    setExportQuality(enabled) {
+      const world = worldRef.current
+      if (world) setWorldExportQuality(world, enabled)
     },
     restoreSize() {
       const world = worldRef.current

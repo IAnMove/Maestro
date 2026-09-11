@@ -123,6 +123,7 @@ export function Scene3DWorkspace({ width, height, initialDocument }: Props) {
   const generationRef = useRef(0)
   const workspaceRef = useRef('')
   const stageRef = useRef<Scene3DStageHandle>(null)
+  const exportAbortRef = useRef<AbortController | null>(null)
   const fps = sceneDoc.fps
   const speed = scene3dPlaybackSpeed(sceneDoc.playbackSpeed)
   const count = scene3dFrameCount(sceneDoc.duration, fps)
@@ -311,18 +312,22 @@ export function Scene3DWorkspace({ width, height, initialDocument }: Props) {
     const stage = stageRef.current
     if (!stage || exportingRef.current || playing) return
     const target = session.captureForSave()
+    const abort = new AbortController()
+    exportAbortRef.current = abort
     setExportingFlag(true)
     setExportNote(t('stage.exporting'))
     try {
       const result = await exportWorld3DDocument(stage, target.document, target.identity.workspace, (index, total) => {
         setExportNote(t('stage.exportProgress', { index, total }))
-      })
+      }, abort.signal)
       ;(window as Window & { __world3dLastMp4?: Blob }).__world3dLastMp4 = result.blob
       if (result.saved) setExportNote(t('stage.exported', { name: result.saved.name }))
       else setExportNote(result.error?.message ?? t('stage.exportFailed'))
     } catch (error) {
-      setExportNote(error instanceof Error ? error.message : t('stage.exportFailed'))
+      const aborted = abort.signal.aborted || (error instanceof DOMException && error.name === 'AbortError')
+      setExportNote(aborted ? t('stage.exportCancelled') : error instanceof Error ? error.message : t('stage.exportFailed'))
     } finally {
+      exportAbortRef.current = null
       setExportingFlag(false)
     }
   }
@@ -428,6 +433,7 @@ export function Scene3DWorkspace({ width, height, initialDocument }: Props) {
         {sceneDoc.clipNumber && <div className="pointer-events-none absolute right-3 top-3 z-[901] rounded bg-black/80 px-3 py-2 font-mono text-sm text-cyan-50">CLIP {String(sceneDoc.clipNumber).padStart(2, '0')}</div>}
         <div className="pointer-events-none absolute left-3 top-3 rounded-lg bg-black/75 px-3 py-2 text-xs text-cyan-200">
           {t('stage.badge')} · {editorT(`template.${sceneDoc.templateId}.title`)}
+          <span className="mt-1 block text-[10px] text-amber-100/90">{t('stage.previewQuality')}</span>
         </div>
       </Scene3DInteraction>
       <SceneObjectInspector
@@ -477,7 +483,14 @@ export function Scene3DWorkspace({ width, height, initialDocument }: Props) {
         >
           {exporting ? t('stage.exporting') : t('stage.export')}
         </button>
+        {exporting && <button
+          type="button"
+          data-testid="world3d-export-cancel"
+          onClick={() => exportAbortRef.current?.abort()}
+          className="min-h-11 rounded-lg border border-amber-400/50 bg-amber-400/10 px-4 text-xs font-semibold text-amber-100"
+        >{t('stage.exportCancel')}</button>}
       </div>
+      <p className="text-xs text-text-muted">{t('stage.exportQualityHint')}</p>
       {selected && !selectedWorldSfxId && <Scene3DTransformPanel slot={selected} mode={transformMode} disabled={editingLocked} onMode={setTransformMode}
         onChange={patch => applyScene(current => patchScene3DSlot(current, selected.id, patch))}
         onReset={() => {

@@ -1,4 +1,5 @@
 import { cloneScene3DDocument, parseScene3DDocument } from './document.ts'
+import { adaptAuthoredCameraToFrame, fromPortraitCamera, scene3dFrameFormat } from './frameFormat.ts'
 import type { MediaScreen } from './mediaScreen.ts'
 import { applyKeptSlotAssets, takeKeptSlot } from './templates.ts'
 import type { Scene3DDocument, Scene3DSlot } from './types.ts'
@@ -132,6 +133,12 @@ export function remountUserTemplate(pack: World3DUserTemplate, previous: Scene3D
   next.width = previous.width
   next.height = previous.height
   next.fps = previous.fps
+  const packFormat = scene3dFrameFormat(pack.document.width, pack.document.height)
+  const nextFormat = scene3dFrameFormat(next.width, next.height)
+  if (packFormat !== nextFormat) {
+    const authored = packFormat === 'portrait' ? fromPortraitCamera(pack.document.camera) : pack.document.camera
+    next.camera = adaptAuthoredCameraToFrame(authored, next.width, next.height)
+  }
   next.production = previous.production ? structuredClone(previous.production) : undefined
   if (previous.production) next.duration = previous.duration
   if (keepAssets && previous.soundtrack && !next.soundtrack) next.soundtrack = structuredClone(previous.soundtrack)

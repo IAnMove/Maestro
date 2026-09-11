@@ -152,6 +152,8 @@ export type Scene3DCamera = {
   targetOffset?: Vec3
   eyeOffset?: Vec3
   framing?: Scene3DFraming
+  /** Authored cameras are landscape; portrait shots store the adapted camera. */
+  frameFormat?: 'landscape' | 'portrait'
 }
 
 export type Scene3DFraming = {

@@ -58,6 +58,7 @@ import { applySceneCopilotProposal, buildSceneCopilotSystemPrompt, buildSceneSco
 import { evaluateSceneLayer, getSceneEvents, getSceneKeyframes, getSceneLayerTiming, mapSceneAnimationPoints, normalizeSceneEvents, normalizeSceneKeyframes, sceneLayerMotionProgress, sceneProgressFromSeconds, sceneTimeToLayerTime, withNormalizedSceneTiming, withSceneKeyframes } from '../../lib/sceneTimeline'
 import { normalizeSeamOccluder, paintSeamOccluder, seamOccluderDataUri, type SeamOccluderKind } from '../../lib/seamOccluder'
 import type { AudioAnalysisResult, Scene, SceneAnimationEvent, SceneAtmosphereKind, SceneBlendMode, SceneCurve, SceneFrameRate, SceneKeyframe, SceneLayer, SceneLayerType, SceneMask } from '../../types'
+import { canonicalSceneFps } from '../../lib/sceneFps.ts'
 import { SceneTimeline } from './SceneTimeline'
 import { CylinderPanoramaComparison } from './CylinderPanoramaComparison'
 import { CharacterKitLibraryPanel } from '../../features/characters/CharacterKitLibraryPanel'
@@ -645,7 +646,7 @@ export function SceneAnimatorPanel() {
     return [t('animator.suggestionDefault1'), t('animator.suggestionDefault2')]
   })() : []
   const composition = { ...DEFAULT_COMPOSITION, ...scene.composition }
-  const fps: SceneFrameRate = scene.fps === 60 ? 60 : 30
+  const fps: SceneFrameRate = canonicalSceneFps(scene.fps)
   const snapCoordinate = (value: number) => composition.snap ? Math.round(value / Math.max(1, composition.gridSize)) * Math.max(1, composition.gridSize) : value
   const generatedModels = outputs.filter(output => output.type === 'model3d' && /\.glb$/i.test(output.name))
   const generatedMedia = outputs.filter(output => output.type === 'image' || output.type === 'video')
@@ -1781,7 +1782,7 @@ export function SceneAnimatorPanel() {
       const previousObjectUrls = new Set(sceneRef.current.layers.flatMap(layer => [layer.source, layer.thumbnail].filter((value): value is string => Boolean(value?.startsWith('blob:')))))
       previousObjectUrls.forEach(url => URL.revokeObjectURL(url))
       const missingAssets = layers.filter(layer => layer.type !== 'camera' && layer.missingAsset).length
-      generationRef.current += 1; pendingBindRef.current = null; localFilesRef.current = {}; pastScenesRef.current = []; futureScenesRef.current = []; lastHistoryAtRef.current = 0; replaceScene({ ...blankScene(), ...incoming, texts: parseKineticTexts(incoming.texts), name: typeof incoming.name === 'string' && incoming.name.trim() ? incoming.name : 'Imported scene', width, height, fps: incoming.fps === 60 ? 60 : 30, duration, layers, composition }); setHistoryRevision(value => value + 1); setSelectedId(layers[0]?.id ?? null); setSelectedKeyframeId(null); setSelectedEventId(null); setProgress(0); setMessage(successMessage ?? `${t('animator.imported', { count: layers.length })}${missingAssets ? t('animator.reassignMissing', { count: missingAssets }) : ''}`); setJsonOpen(false)
+      generationRef.current += 1; pendingBindRef.current = null; localFilesRef.current = {}; pastScenesRef.current = []; futureScenesRef.current = []; lastHistoryAtRef.current = 0; replaceScene({ ...blankScene(), ...incoming, texts: parseKineticTexts(incoming.texts), name: typeof incoming.name === 'string' && incoming.name.trim() ? incoming.name : 'Imported scene', width, height, fps: canonicalSceneFps(incoming.fps), duration, layers, composition }); setHistoryRevision(value => value + 1); setSelectedId(layers[0]?.id ?? null); setSelectedKeyframeId(null); setSelectedEventId(null); setProgress(0); setMessage(successMessage ?? `${t('animator.imported', { count: layers.length })}${missingAssets ? t('animator.reassignMissing', { count: missingAssets }) : ''}`); setJsonOpen(false)
       return true
     } catch (error) { setMessage(error instanceof Error ? error.message : t('animator.invalidSceneJson')); return false }
   }
@@ -1914,7 +1915,7 @@ export function SceneAnimatorPanel() {
     if (playing) { const error = new Error(t('animator.waitPreview')); setMessage(error.message); reject(error); return }
     prepareFacePlayback()
     const current = sceneRef.current
-    const currentFps: SceneFrameRate = current.fps === 60 ? 60 : 30
+    const currentFps: SceneFrameRate = canonicalSceneFps(current.fps)
     if (!current.sfx?.length && !current.layers.some(layer => layer.visible && isVisualLayer(layer))) { const error = new Error(t('animator.addVisibleLayer')); setMessage(error.message); reject(error); return }
     if (!('MediaRecorder' in window)) { const error = new Error(t('animator.cannotRecord')); setMessage(error.message); reject(error); return }
     const canvas = document.createElement('canvas'); canvas.width = current.width; canvas.height = current.height; const context = canvas.getContext('2d'); if (!context) { reject(new Error('Could not create a recording canvas.')); return }
@@ -2119,7 +2120,7 @@ export function SceneAnimatorPanel() {
       return recordCompatibilityWebm()
     }
     const current = sceneRef.current
-    const fps: SceneFrameRate = current.fps === 60 ? 60 : 30
+    const fps: SceneFrameRate = canonicalSceneFps(current.fps)
     if (!current.sfx?.length && !current.layers.some(layer => layer.visible && isVisualLayer(layer))) throw new Error(t('animator.addVisibleLayer'))
     const canvas = document.createElement('canvas')
     canvas.width = current.width
@@ -2138,11 +2139,12 @@ export function SceneAnimatorPanel() {
       throw new Error('This browser cannot encode a deterministic H.264 MP4 at the selected resolution.')
     }
 
-    const fxAudio = await supportsSceneAac() ? await mixFxAudio(current.sfx, current.duration) : undefined
+    const mixedFx = await mixFxAudio(current.sfx, current.duration)
+    const fxAudio = mixedFx && (await supportsSceneAac(mixedFx.numberOfChannels >= 2 ? 2 : 1)) ? mixedFx : undefined
     const target = new ArrayBufferTarget()
     const muxer = new Muxer({
       target,
-      ...(fxAudio ? { audio: { codec: 'aac' as const, sampleRate: fxAudio.sampleRate, numberOfChannels: 1 } } : {}),
+      ...(fxAudio ? { audio: { codec: 'aac' as const, sampleRate: fxAudio.sampleRate, numberOfChannels: Math.min(2, Math.max(1, fxAudio.numberOfChannels || 1)) } } : {}),
       video: { codec: 'avc', width: current.width, height: current.height, frameRate: fps },
       fastStart: 'in-memory',
       firstTimestampBehavior: 'strict',
@@ -2198,7 +2200,8 @@ export function SceneAnimatorPanel() {
   })
   const publishRecording = async (blob: Blob, current: Scene) => {
     const context = recipeContextRef.current
-    const buffer = !(await supportsSceneAac()) ? await mixFxAudio(current.sfx, current.duration) : undefined
+    const mixedPublish = await mixFxAudio(current.sfx, current.duration)
+    const buffer = mixedPublish && !(await supportsSceneAac(mixedPublish.numberOfChannels >= 2 ? 2 : 1)) ? mixedPublish : undefined
     const serverAudio = buffer ? sceneAudioWav(buffer) : undefined
     const saved = await saveSceneRecording(blob, {
       scene: current,
@@ -3059,7 +3062,7 @@ export function SceneAnimatorPanel() {
     <section className="flex min-w-0 flex-1 flex-col p-3 md:p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div className="flex items-center gap-1.5 text-xs font-medium"><Film size={15} className="text-accent-blue" /><input value={scene.name} onChange={event => updateScene(current => ({ ...current, name: event.target.value }))} aria-label={t('animator.sceneNameAria')} className="w-44 rounded border border-transparent bg-transparent px-1 py-0.5 text-xs font-medium hover:border-border focus:border-accent-blue focus:outline-none" /><span className="text-[10px] font-normal text-text-muted">{scene.width}×{scene.height}</span></div><div className="flex flex-wrap gap-2"><button type="button" onClick={() => setLibraryOpen(true)} disabled={playing || recording || publishing} className="rounded border border-border bg-bg-primary px-2.5 py-1.5 text-[10px] flex items-center gap-1 disabled:opacity-50"><FolderOpen size={12} /> {t('animator.openScene')}</button><button type="button" onClick={() => void persistScene()} disabled={saving || emptyScene || playing || recording || publishing} className="rounded border border-accent-blue/40 bg-accent-blue/10 px-2.5 py-1.5 text-[10px] text-accent-blue flex items-center gap-1 disabled:opacity-50">{saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}{saving ? t('animator.saving') : t('animator.saveScene')}</button><button onClick={play} disabled={emptyScene || playing || recording || publishing} className="min-h-12 min-w-36 rounded-lg bg-cyan-300 px-5 py-3 text-sm font-bold text-slate-950 shadow-lg flex items-center justify-center gap-2 hover:bg-cyan-200 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan-200 disabled:opacity-50"><Play size={22} fill="currentColor" /> {t('animator.preview')}</button><button onClick={record} disabled={recording || playing || publishing} className="rounded bg-cta px-2.5 py-1.5 text-[10px] text-white flex items-center gap-1 disabled:opacity-50">{recording || publishing ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}{recording ? t('animator.recording') : publishing ? t('animator.savingMp4') : t('animator.exportMp4')}</button></div></div>
       <div className="mb-2 flex items-center justify-end gap-1.5"><button type="button" onClick={undoScene} disabled={!canUndo} title={t('animator.undoTitle')} className="rounded border border-border bg-bg-primary p-1.5 disabled:opacity-30"><Undo2 size={12} /></button><button type="button" onClick={redoScene} disabled={!canRedo} title={t('animator.redoTitle')} className="rounded border border-border bg-bg-primary p-1.5 disabled:opacity-30"><Redo2 size={12} /></button><span className="ml-1 text-[8px] text-text-muted">{lastAutosaveAt ? t('animator.autosaved', { time: new Date(lastAutosaveAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }) : t('animator.autosaveWaiting')}</span></div>
-      <div className="mb-3 flex flex-wrap items-center gap-1">{RESOLUTIONS.map(([label, width, height]) => <button key={label} disabled={playing || recording} onClick={() => updateScene(current => ({ ...current, width, height }))} className={`rounded border px-1.5 py-1 text-[9px] disabled:opacity-40 ${scene.width === width && scene.height === height ? 'border-accent-blue bg-accent-blue/15 text-accent-blue' : 'border-border bg-bg-primary text-text-muted'}`}>{t(`resolutions.${label === 'HD landscape' ? 'hdLandscape' : label === 'Full HD landscape' ? 'fullHdLandscape' : label === '4K landscape' ? 'fourKLandscape' : label === 'Square' ? 'square' : label === 'HD portrait' ? 'hdPortrait' : label === 'Full HD portrait' ? 'fullHdPortrait' : 'fourKPortrait'}`)}</button>)}<span className="ml-auto flex items-center gap-1 pl-2 text-[8px] text-text-muted">{t('animator.frameRate')}{([30, 60] as SceneFrameRate[]).map(rate => <button key={rate} type="button" disabled={playing || recording} onClick={() => updateScene(current => ({ ...current, fps: rate }))} className={`rounded border px-1.5 py-1 text-[9px] disabled:opacity-40 ${fps === rate ? 'border-purple-300 bg-purple-400/10 text-purple-200' : 'border-border bg-bg-primary text-text-muted'}`}>{t('animator.fps', { rate })}</button>)}</span></div>
+      <div className="mb-3 flex flex-wrap items-center gap-1">{RESOLUTIONS.map(([label, width, height]) => <button key={label} disabled={playing || recording} onClick={() => updateScene(current => ({ ...current, width, height }))} className={`rounded border px-1.5 py-1 text-[9px] disabled:opacity-40 ${scene.width === width && scene.height === height ? 'border-accent-blue bg-accent-blue/15 text-accent-blue' : 'border-border bg-bg-primary text-text-muted'}`}>{t(`resolutions.${label === 'HD landscape' ? 'hdLandscape' : label === 'Full HD landscape' ? 'fullHdLandscape' : label === '4K landscape' ? 'fourKLandscape' : label === 'Square' ? 'square' : label === 'HD portrait' ? 'hdPortrait' : label === 'Full HD portrait' ? 'fullHdPortrait' : 'fourKPortrait'}`)}</button>)}<span className="ml-auto flex items-center gap-1 pl-2 text-[8px] text-text-muted">{t('animator.frameRate')}{([24, 30, 60] as SceneFrameRate[]).map(rate => <button key={rate} type="button" disabled={playing || recording} onClick={() => updateScene(current => ({ ...current, fps: rate }))} className={`rounded border px-1.5 py-1 text-[9px] disabled:opacity-40 ${fps === rate ? 'border-purple-300 bg-purple-400/10 text-purple-200' : 'border-border bg-bg-primary text-text-muted'}`}>{t('animator.fps', { rate })}</button>)}</span></div>
       <div className="mb-3 flex flex-wrap items-center gap-1.5 rounded border border-border bg-bg-secondary p-1.5">
         <button type="button" onClick={() => updateScene(current => ({ ...current, composition: { ...composition, showGrid: !composition.showGrid } }))} className={`flex items-center gap-1 rounded border px-1.5 py-1 text-[9px] ${composition.showGrid ? 'border-accent-blue bg-accent-blue/10 text-accent-blue' : 'border-border text-text-muted'}`}><Grid3X3 size={10} /> {t('animator.grid')}</button>
         <button type="button" onClick={() => updateScene(current => ({ ...current, composition: { ...composition, snap: !composition.snap } }))} className={`flex items-center gap-1 rounded border px-1.5 py-1 text-[9px] ${composition.snap ? 'border-purple-300 bg-purple-400/10 text-purple-200' : 'border-border text-text-muted'}`}><Magnet size={10} /> {t('animator.snap')}</button>
