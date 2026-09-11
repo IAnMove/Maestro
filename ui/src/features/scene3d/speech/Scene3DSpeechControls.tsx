@@ -112,6 +112,8 @@ export function Scene3DSpeechControls({ slot, workspace, disabled, calibrate, on
         </select>
       </label>
       <p className="text-xs leading-5 text-text-muted">{t('speech.expressionHoldHint')}</p>
+      <p className="text-xs leading-5"><a className="text-cyan-300 underline" href="/face-pack-maker.html" target="_blank" rel="noreferrer">{t('speech.facePackMaker')}</a>
+        {' '}{t('speech.facePackMakerHint')}</p>
     </fieldset>
     <fieldset disabled={locked} className="space-y-3 disabled:opacity-60">
       <LipsPlacementControls speech={speech} hasModel={Boolean(slot.sourceUrl)} calibrate={calibrate} onChange={onChange} onPick={onPick} />

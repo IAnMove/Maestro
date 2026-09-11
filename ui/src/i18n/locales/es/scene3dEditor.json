@@ -92,6 +92,8 @@
     "facePackHint": "Caras incluidas para una pantalla de cabeza CRT: visemas y expresiones. Experimental.",
     "expressionHold": "Expresión al hablar",
     "expressionHoldHint": "Las vocales solo cambian la boca. Esta expresión se mantiene en toda la frase salvo que añadas cues de expresión.",
+    "facePackMaker": "Montar un pack con stills",
+    "facePackMakerHint": "Copia los prompts de plano-cubo en cualquier generador, suelta reposo / visemas / expresiones. La herramienta ancla el color y arma el PNG 9×6.",
     "pack": {
       "tv": "CRT",
       "skull": "Cráneo",
