@@ -90,6 +90,7 @@
         "tests/test_runtime_profiles.py",
         "tests/test_scail2_dedicated_model.py",
         "tests/test_scene3d_profiles.py",
+        "tests/test_scene3d_speech_profile_digest.py",
         "tests/test_scene_library.py",
         "tests/test_scene_packages.py",
         "tests/test_scene_recording.py",
