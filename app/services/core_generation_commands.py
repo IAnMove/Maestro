@@ -15,6 +15,7 @@ from typing import Any
 from services import core_remote_image, core_workspace as core, execution_mode
 from services.image_generation_commands import command_error
 from services.image_generation_spec import ImageGenerationSpecError, freeze_image_generation_spec
+from services.minimax_image_service import MiniMaxImageError, prepare_prompt
 from services.task_command_admission import TaskCommandConflict
 from services.task_manager import ACTIVE_STATUSES, TERMINAL_STATUSES, TaskRegistry
 from routers.system_capabilities import require_capability_http
@@ -205,6 +206,23 @@ class CoreGenerationCommands:
         except (OSError, sqlite3.Error) as error:
             raise command_error(503, "storage_unavailable", "Command storage is unavailable") from error
 
+    def _ensure_job(self, workspace: str, job_id: str, params: dict[str, Any]) -> None:
+        if core_remote_image.get_job(job_id) is not None:
+            return
+        core_remote_image.start_job(
+            {
+                "model_type": params.get("model_type") or core_remote_image.MODEL_ID,
+                "generation_mode": "image",
+                "prompt": params.get("prompt") or "",
+                "resolution": params.get("resolution") or "1024x1024",
+                "aspect_ratio": params.get("aspect_ratio") or "",
+                "subject_reference": _subject_reference(params),
+                "workspace": workspace,
+            },
+            workspace=workspace,
+            job_id=job_id,
+        )
+
     async def submit(self, command, *, trusted_tool=None, submission_context=None):
         del trusted_tool, submission_context
         try:
@@ -212,6 +230,9 @@ class CoreGenerationCommands:
             workspace = str(params.get("workspace") or "")
             _require_minimax_image(params)
             execution_mode.validate_remote_provider(workspace, "minimax-image")
+            # Fail closed before admission so a transport retry can reuse intent_id.
+            prepare_prompt(str(params.get("prompt") or ""))
+            core_remote_image.encode_subject_reference(_subject_reference(params), workspace)
             registry = _registry(workspace)
             job_id = uuid.uuid4().hex
             admitted = registry.admit_command_task(
@@ -223,21 +244,13 @@ class CoreGenerationCommands:
                 task_fields=_task_fields(workspace, job_id, params),
                 fingerprint_version=frozen["fingerprint_version"],
             )
-            if admitted.get("replayed"):
-                return admitted
-            body = {
-                "model_type": params.get("model_type") or core_remote_image.MODEL_ID,
-                "generation_mode": "image",
-                "prompt": params.get("prompt") or "",
-                "resolution": params.get("resolution") or "1024x1024",
-                "aspect_ratio": params.get("aspect_ratio") or "",
-                "subject_reference": _subject_reference(params),
-                "workspace": workspace,
-            }
-            core_remote_image.start_job(body, workspace=workspace, job_id=job_id)
+            self._ensure_job(workspace, admitted["receipt"]["result"]["job_id"], params)
             return admitted
         except ImageGenerationSpecError as error:
             raise command_error(422, "invalid_command", str(error)) from error
+        except MiniMaxImageError as error:
+            status = error.status_code if error.status_code in {400, 413} else 422
+            raise command_error(status, "invalid_command", str(error)) from error
         except TaskCommandConflict as error:
             raise command_error(409, "intent_conflict", str(error)) from error
         except execution_mode.ExecutionModeError as error:

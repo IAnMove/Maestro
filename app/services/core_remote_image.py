@@ -12,9 +12,11 @@ from services.minimax_image_service import (
     SUPPORTED_ASPECT_RATIOS,
     aspect_ratio_for_resolution,
     generate_image,
+    local_image_data_uri,
     prepare_prompt,
 )
 from services.provider_profile import resolve_minimax_key
+from services.wangp_submission import resolve_wangp_media
 
 MODEL_ID = "minimax:image-01"
 _JOBS: dict[str, dict[str, Any]] = {}
@@ -141,6 +143,27 @@ def _patch(job_id: str, **fields: Any) -> None:
             job.update(fields)
 
 
+def encode_subject_reference(source: str, workspace: str) -> str:
+    """Encode a Studio upload/file URL the same way Comic/Director feed Image-01."""
+    value = str(source or "").strip()
+    if not value:
+        return ""
+    if value.startswith("data:image/"):
+        if len(value) > 25 * 1024 * 1024:
+            raise MiniMaxImageError("MiniMax identity reference is too large", 413)
+        return value
+    try:
+        path = resolve_wangp_media(
+            value,
+            workspace,
+            uploads_dir=core.uploads_dir(),
+            workspace_dir=core.workspace_dir(workspace),
+        )
+    except ValueError as error:
+        raise MiniMaxImageError("MiniMax identity reference is unavailable", 400) from error
+    return local_image_data_uri(path)
+
+
 def start_job(body: dict[str, Any], *, workspace: str, job_id: str | None = None) -> dict[str, Any]:
     from services import execution_mode
 
@@ -149,18 +172,22 @@ def start_job(body: dict[str, Any], *, workspace: str, job_id: str | None = None
     if ratio not in SUPPORTED_ASPECT_RATIOS:
         ratio = aspect_ratio_for_resolution(str(body.get("resolution") or "1024x1024"))
     execution_mode.validate_remote_provider(workspace, "minimax-image")
+    subject = encode_subject_reference(str(body.get("subject_reference") or ""), workspace)
     job_id = str(job_id or "").strip() or uuid.uuid4().hex
     now = time.time()
-    job = {
-        "id": job_id, "task_id": job_id, "root_task_id": job_id,
-        "status": "queued", "progress": 0, "step": 0, "total_steps": 1,
-        "phase": "queued", "message": "MiniMax image request queued",
-        "output_files": [], "error": None, "workspace": workspace,
-        "created_at": now, "started_at": None, "finished_at": None,
-        "_cancel_requested": False,
-        "request": {"prompt": prompt, "aspect_ratio": ratio, "subject_reference": body.get("subject_reference") or ""},
-    }
     with _LOCK:
+        existing = _JOBS.get(job_id)
+        if existing is not None:
+            return _public(existing)
+        job = {
+            "id": job_id, "task_id": job_id, "root_task_id": job_id,
+            "status": "queued", "progress": 0, "step": 0, "total_steps": 1,
+            "phase": "queued", "message": "MiniMax image request queued",
+            "output_files": [], "error": None, "workspace": workspace,
+            "created_at": now, "started_at": None, "finished_at": None,
+            "_cancel_requested": False,
+            "request": {"prompt": prompt, "aspect_ratio": ratio, "subject_reference": subject},
+        }
         _JOBS[job_id] = job
         initial = _public(job)
     threading.Thread(target=_run, args=(job_id,), daemon=True, name=f"minimax-image-{job_id[:8]}").start()
