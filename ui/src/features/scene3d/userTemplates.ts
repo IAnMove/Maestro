@@ -18,14 +18,22 @@ export type World3DUserTemplate = {
   document: Scene3DDocument
 }
 
+function hasDurableUrl(url: string | undefined) {
+  return typeof url === 'string' && url.length > 0 && !url.startsWith('blob:')
+}
+
+function slotHasDurableAsset(slot: Scene3DSlot) {
+  return hasDurableUrl(slot.sourceUrl) || hasDurableUrl(slot.screen?.sourceUrl)
+}
+
 function stripScreen(screen: MediaScreen | undefined, includeAssets: boolean): MediaScreen | undefined {
   if (!screen) return undefined
-  if (includeAssets && screen.sourceUrl && !screen.sourceUrl.startsWith('blob:')) return screen
+  if (includeAssets && hasDurableUrl(screen.sourceUrl)) return screen
   return { ...screen, sourceUrl: '', sourceRef: undefined }
 }
 
 function stripSlot(slot: Scene3DSlot, includeAssets: boolean): Scene3DSlot {
-  const keep = includeAssets && slot.sourceUrl && !slot.sourceUrl.startsWith('blob:')
+  const keep = includeAssets && hasDurableUrl(slot.sourceUrl)
   return {
     ...slot,
     sourceUrl: keep ? slot.sourceUrl : '',
@@ -45,7 +53,7 @@ export function scenarioDocumentFromShot(document: Scene3DDocument, includeAsset
   next.slots = next.slots.map(slot => stripSlot(slot, includeAssets))
   if (!includeAssets) delete next.soundtrack
   else if (next.soundtrack) {
-    next.soundtrack = next.soundtrack.filter(track => track.audio?.url && !track.audio.url.startsWith('blob:'))
+    next.soundtrack = next.soundtrack.filter(track => hasDurableUrl(track.audio?.url))
     if (!next.soundtrack.length) delete next.soundtrack
   }
   return next
@@ -102,7 +110,8 @@ export function parseUserTemplate(raw: unknown): World3DUserTemplate | undefined
   return createUserTemplate({
     document,
     title: document.production?.title || document.templateId,
-    includeAssets: document.slots.some(slot => Boolean(slot.sourceUrl) && !slot.sourceUrl.startsWith('blob:')),
+    includeAssets: document.slots.some(slotHasDurableAsset)
+      || Boolean(document.soundtrack?.some(track => hasDurableUrl(track.audio?.url))),
   })
 }
 
@@ -110,9 +119,13 @@ function newTemplateId() {
   return `user-${globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`}`
 }
 
+function slotHasKeepableAsset(slot: Scene3DSlot) {
+  return Boolean(slot.sourceUrl || slot.screen?.sourceUrl)
+}
+
 function mergeKeptSlot(slot: Scene3DSlot, previous: Scene3DDocument): Scene3DSlot {
-  const old = previous.slots.find(item => item.id === slot.id && item.media === slot.media && item.sourceUrl)
-    || previous.slots.find(item => item.slot === slot.slot && item.media === slot.media && item.sourceUrl)
+  const old = previous.slots.find(item => item.id === slot.id && item.media === slot.media && slotHasKeepableAsset(item))
+    || previous.slots.find(item => item.slot === slot.slot && item.media === slot.media && slotHasKeepableAsset(item))
   if (!old) return slot
   const screen = slot.screen
     ? { ...slot.screen, sourceUrl: slot.screen.sourceUrl || old.screen?.sourceUrl || '', sourceRef: slot.screen.sourceRef || old.screen?.sourceRef, media: slot.screen.media || old.screen?.media || slot.screen.media }

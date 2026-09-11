@@ -121,6 +121,59 @@ test('keep-objects does not attach the current character or speech onto a templa
   assert.equal(kept.slots[0].speech, undefined)
 })
 
+test('keep-objects restores standalone screen media that export stripped', () => {
+  const document = applyScene3DTemplate('billboard-plaza')
+  const screen = document.slots.find(slot => slot.media === 'screen')
+  assert.ok(screen?.screen)
+  screen.screen.sourceUrl = '/api/v1/uploads/ad.mp4'
+  screen.screen.sourceRef = { workspaceId: 'demo', filename: 'ad.mp4', url: '/api/v1/uploads/ad.mp4' }
+  screen.screen.media = 'video'
+  document.slots[0].sourceUrl = gallery.url
+  document.slots[0].sourceRef = gallery
+
+  const pack = createUserTemplate({ document, title: 'Night plaza', includeAssets: false, id: 'user-plaza' })
+  assert.ok(pack)
+  const packedScreen = pack.document.slots.find(slot => slot.media === 'screen')
+  assert.equal(packedScreen.screen.sourceUrl, '')
+  assert.equal(packedScreen.screen.sourceRef, undefined)
+  assert.equal(pack.document.slots[0].sourceUrl, '')
+
+  const kept = remountUserTemplate(pack, document, true)
+  const keptScreen = kept.slots.find(slot => slot.id === screen.id)
+  assert.equal(keptScreen.screen.sourceUrl, '/api/v1/uploads/ad.mp4')
+  assert.equal(keptScreen.screen.sourceRef.filename, 'ad.mp4')
+  assert.equal(keptScreen.screen.media, 'video')
+  assert.equal(kept.slots[0].sourceUrl, gallery.url)
+})
+
+test('keep-objects restores each control-room screen by slot id', () => {
+  const document = applyScene3DTemplate('control-room')
+  const screens = document.slots.filter(slot => slot.media === 'screen')
+  assert.equal(screens.length, 6)
+  screens.forEach((slot, index) => {
+    slot.screen.sourceUrl = `/api/v1/uploads/wall-${index}.mp4`
+    slot.screen.sourceRef = { workspaceId: 'demo', filename: `wall-${index}.mp4`, url: slot.screen.sourceUrl }
+    slot.screen.media = 'video'
+  })
+  const pack = createUserTemplate({ document, title: 'Walls', includeAssets: false, id: 'user-walls' })
+  const kept = remountUserTemplate(pack, document, true)
+  for (const slot of screens) {
+    const next = kept.slots.find(item => item.id === slot.id)
+    assert.equal(next.screen.sourceUrl, slot.screen.sourceUrl)
+  }
+})
+
+test('wrapping a screen-only shot keeps the durable screen URL', () => {
+  const shot = applyScene3DTemplate('monitor-detail')
+  shot.slots[0].screen.sourceUrl = '/api/v1/uploads/spot.mp4'
+  shot.slots[0].screen.sourceRef = { workspaceId: 'demo', filename: 'spot.mp4', url: '/api/v1/uploads/spot.mp4' }
+  shot.slots[0].screen.media = 'video'
+  const wrapped = parseUserTemplate(shot)
+  assert.ok(wrapped)
+  assert.equal(wrapped.includeAssets, true)
+  assert.equal(wrapped.document.slots[0].screen.sourceUrl, '/api/v1/uploads/spot.mp4')
+})
+
 test('applying a scenario keeps clip size and can reuse the current GLBs', () => {
   const previous = createDefaultScene3DDocument()
   previous.clipNumber = 8
