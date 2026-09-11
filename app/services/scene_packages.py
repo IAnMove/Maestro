@@ -19,6 +19,7 @@ from services.asset_manifest import (
     build_asset_manifest,
     infer_asset_kind,
     read_asset_manifest,
+    sidecar_path,
     write_asset_manifest,
 )
 from services.scene_commands import DocumentInput
@@ -572,6 +573,33 @@ def _media_suffix(filename: str, fallback: str) -> str:
     return other if other in ALLOWED_MEDIA_EXT else ".bin"
 
 
+def _ref_lookup_keys(ref: Mapping[str, Any], workspace: str) -> list[tuple[str, str, str]]:
+    url = str(ref.get("url") or "")
+    filename = str(ref.get("filename") or "")
+    scoped = str(ref.get("workspaceId") or workspace or "")
+    keys = [(scoped, filename, url)]
+    if url:
+        parsed_ws, parsed_name = parse_media_locator(url, scoped or None)
+        parsed_ws = str(parsed_ws or scoped)
+        parsed_name = parsed_name or filename
+        keys.extend((
+            (parsed_ws, parsed_name, url),
+            (scoped, "", url),
+            (parsed_ws, parsed_name, ""),
+            ("", "", url),
+        ))
+    if filename:
+        keys.append((scoped, filename, ""))
+    seen: set[tuple[str, str, str]] = set()
+    unique: list[tuple[str, str, str]] = []
+    for key in keys:
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(key)
+    return unique
+
+
 def _register_packed_asset(
     use: Mapping[str, Any],
     data: bytes,
@@ -598,7 +626,8 @@ def _register_packed_asset(
         }
     else:
         current["uses"].append(f"{use['doc_id']}:{use['role']}")
-    hash_by_key[(str(use.get("workspaceId") or workspace), str(use.get("filename") or ""), str(use.get("url") or ""))] = digest
+    for key in _ref_lookup_keys(use, workspace):
+        hash_by_key[key] = digest
 
 
 def _packed_locator(workspace: str, assets_by_hash: dict[str, dict[str, Any]], hash_by_key: dict[tuple[str, str, str], str]):
@@ -607,7 +636,7 @@ def _packed_locator(workspace: str, assets_by_hash: dict[str, dict[str, Any]], h
         filename = str(ref.get("filename") or "")
         if not url and not filename:
             return None
-        digest = hash_by_key.get((str(ref.get("workspaceId") or workspace), filename, url))
+        digest = next((hash_by_key[key] for key in _ref_lookup_keys(ref, workspace) if key in hash_by_key), None)
         if not digest:
             return None
         asset = assets_by_hash[digest]
@@ -943,18 +972,25 @@ def find_existing_by_hash(root: Path, digest: str, size: int | None = None) -> P
     return None
 
 
+def _name_is_free(root: Path, name: str, digest: str) -> bool:
+    dest = root / name
+    if dest.exists():
+        try:
+            return sha256_file(dest) == digest
+        except OSError:
+            return False
+    return not sidecar_path(dest).exists()
+
+
 def _unique_name(root: Path, filename: str, digest: str) -> str:
     safe = safe_export_filename(filename)
-    candidate = root / safe
-    if not candidate.exists():
-        return safe
-    try:
-        if sha256_file(candidate) == digest:
-            return safe
-    except OSError:
-        pass
     stem, suffix = Path(safe).stem, Path(safe).suffix
-    return f"{stem}-{digest[:8]}{suffix}"
+    candidates = [safe, f"{stem}-{digest[:8]}{suffix}"]
+    candidates.extend(f"{stem}-{digest[:8]}-{index}{suffix}" for index in range(2, 16))
+    for name in candidates:
+        if _name_is_free(root, name, digest):
+            return name
+    raise ScenePackageError(f"Could not allocate a unique name for {safe}")
 
 
 def _write_bytes(path: Path, data: bytes) -> None:
@@ -1050,6 +1086,11 @@ def _publish_one_asset(
         return digest, _published_ref(workspace, existing.name, gallery_url(workspace, existing.name), asset_id), True
     dest_name = _unique_name(root, filename, digest)
     dest = root / dest_name
+    if dest.exists():
+        manifest = read_asset_manifest(dest) or {}
+        asset_block = manifest.get("asset") if isinstance(manifest, Mapping) else None
+        asset_id = str(asset_block.get("id") or "") if isinstance(asset_block, Mapping) else ""
+        return digest, _published_ref(workspace, dest.name, gallery_url(workspace, dest.name), asset_id), True
     _write_bytes(dest, data)
     written.append(dest)
     manifest = build_asset_manifest(
@@ -1067,7 +1108,12 @@ def _imported_name(rewritten: Mapping[str, Any], body: Mapping[str, Any]) -> str
     return str(title or production.get("title") or body.get("templateId") or "Imported scene")
 
 
-def _locate_published(published_by_hash: Mapping[str, Mapping[str, Any]]):
+def _locate_published(
+    published_by_hash: Mapping[str, Mapping[str, Any]],
+    published_by_filename: Mapping[str, Mapping[str, Any]] | None = None,
+):
+    by_filename = published_by_filename or {}
+
     def locate(ref: dict[str, Any]) -> dict[str, Any] | None:
         url = str(ref.get("url") or "")
         asset_id = str(ref.get("assetId") or "")
@@ -1075,6 +1121,11 @@ def _locate_published(published_by_hash: Mapping[str, Mapping[str, Any]]):
         if not digest and classify_url(url) == "relative":
             digest = Path(url).stem[:64]
         published = published_by_hash.get(digest)
+        if not published:
+            filename = str(ref.get("filename") or "")
+            if not filename and url:
+                _, filename = parse_media_locator(url)
+            published = by_filename.get(filename)
         if not published:
             return None
         return {
@@ -1111,16 +1162,20 @@ def import_package(
     root = Path(workspace_dir(workspace))
     root.mkdir(parents=True, exist_ok=True)
     published_by_hash: dict[str, dict[str, Any]] = {}
+    published_by_filename: dict[str, dict[str, Any]] = {}
     written: list[Path] = []
     reused = created = 0
     try:
         for asset in packed["assets"]:
             digest, published, was_reused = _publish_one_asset(asset, packed, replacements, workspace, root, written)
             published_by_hash[digest] = published
+            original_name = str(asset.get("filename") or published["filename"] or "")
+            if original_name:
+                published_by_filename[original_name] = published
             reused += int(was_reused)
             created += int(not was_reused)
         published_scenes = []
-        locate = _locate_published(published_by_hash)
+        locate = _locate_published(published_by_hash, published_by_filename)
         for document in packed["documents"]:
             rewritten = rewrite_document_refs(document, locate)
             body = unwrap_document(rewritten)
