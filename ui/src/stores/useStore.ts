@@ -40,6 +40,10 @@ import {
 import { storyDirectorSubmissionProvenance } from '../features/stories/provenance'
 import type { GenerationReceiptLike } from '../api/generationCommandClient'
 import { prepareStudioSubmission, studioUploadReference } from '../features/studio/studioSubmission'
+import {
+  startStudioImageGenerationFromStore,
+  type StudioImageStoreHost,
+} from '../features/studio/startGeneration'
 import { audioReferenceParams, restoreAudioReferences, stashAudioReferences, type AudioReferenceStash } from '../features/studio/audioReferenceState'
 import { beginOutputSettingsRestore, type OutputSettingsSource } from '../features/studio/outputSettingsRestore'
 
@@ -4123,6 +4127,13 @@ export const useStore = create<AppState>((set, get) => {
   jobs: [],
   isGenerating: false,
   startGeneration: async (scheduledPrompt, submissionContext) => {
+    if (get().generationMode === 'image') {
+      return startStudioImageGenerationFromStore(
+        { get, set } as unknown as StudioImageStoreHost,
+        scheduledPrompt,
+        submissionContext,
+      )
+    }
     const initialState = get()
     if (initialState.generationMode === 'audio' && initialState.audioSubMode === 'mixer') {
       throw new Error(i18n.t('studio:commands.audioNotGenerative'))

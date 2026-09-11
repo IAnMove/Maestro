@@ -220,11 +220,8 @@ export function ingestRemotePayload(history: Scene3DHistory, raw: string | null,
 
 export function persistHistoryDraft(history: Scene3DHistory, storage: DraftStorage): Scene3DHistory {
   if (history.group || history.conflict) return history
-  const payload = serializeDraft(history)
-  const result = writeDraftRecord(storage, history.identity, payload)
+  const result = commitDraft(storage, history.identity, serializeDraft(history), true)
   if (result === 'ok') {
-    writeLastIdentity(storage, history.identity)
-    pruneDraftIndex(storage, draftStorageKey(history.identity))
     return history.persistError ? { ...history, persistError: false } : history
   }
   return history.persistError ? history : { ...history, persistError: true }
@@ -255,6 +252,19 @@ export function switchHistoryDocument(
   return persistHistoryDraft(next, storage)
 }
 
+export function switchHistoryWorkspace(
+  history: Scene3DHistory,
+  storage: DraftStorage,
+  nextWorkspace: string,
+  ownerId: string,
+  fallback: Scene3DDocument,
+): Scene3DHistory {
+  const workspace = boundId(nextWorkspace || 'default', 120) || 'default'
+  if (history.identity.workspace === workspace) return history
+  persistHistoryDraft(endHistoryGroup(history), storage)
+  return persistHistoryDraft(withHistoryLock(restoreOrCreateHistory(fallback, workspace, ownerId, storage), history.locked), storage)
+}
+
 export function restoreOrCreateHistory(
   initial: Scene3DDocument,
   workspace: string,
@@ -274,14 +284,13 @@ export function acknowledgeGallerySave(
   storage: DraftStorage,
   saved: { document: Scene3DDocument; identity: Scene3DDocumentRef; revision: number },
 ): Scene3DHistory {
+  const sameLive = history.identity.documentId === saved.identity.documentId
+    && history.identity.workspace === saved.identity.workspace
+    && documentsEqual(history.present, saved.document)
+  if (sameLive) return persistHistoryDraft(bindSavedRevision(history, saved.revision), storage)
   const nextIdentity = normalizeDocumentRef({ ...saved.identity, revision: saved.revision })
-  const frozen = createHistory(saved.document, nextIdentity, history.ownerId)
-  persistHistoryDraft(frozen, storage)
-  if (history.identity.documentId !== saved.identity.documentId || history.identity.workspace !== saved.identity.workspace) {
-    return history
-  }
-  if (!documentsEqual(history.present, saved.document)) return history
-  return persistHistoryDraft(bindSavedRevision(history, saved.revision), storage)
+  commitDraft(storage, nextIdentity, serializeDraft(createHistory(saved.document, nextIdentity, history.ownerId)), false)
+  return history
 }
 
 export function applyScene3DGizmoPatch(
@@ -311,6 +320,7 @@ export function browserDraftStorage(): DraftStorage {
 export function useScene3DHistory(initialDocument: Scene3DDocument, workspace: string, locked: boolean) {
   const ownerId = useMemo(() => createOwnerId(), [])
   const storage = useMemo(() => browserDraftStorage(), [])
+  const fallbackDocument = useRef(initialDocument)
   const [history, setHistory] = useState(() => restoreOrCreateHistory(initialDocument, workspace || 'default', ownerId, storage))
   const historyRef = useRef(history)
   const commit = useCallback((updater: (current: Scene3DHistory) => Scene3DHistory) => {
@@ -333,8 +343,8 @@ export function useScene3DHistory(initialDocument: Scene3DDocument, workspace: s
     const nextWorkspace = workspace || 'default'
     commit(current => current.identity.workspace === nextWorkspace
       ? current
-      : { ...current, identity: { ...current.identity, workspace: nextWorkspace } })
-  }, [workspace, commit])
+      : switchHistoryWorkspace(current, storage, nextWorkspace, ownerId, fallbackDocument.current))
+  }, [workspace, commit, storage, ownerId])
 
   useEffect(() => {
     const next = persistHistoryDraft(history, storage)
@@ -457,6 +467,20 @@ function validDraftPayload(value: Partial<DraftPayload> | null): DraftPayload | 
     document,
     checkpoint,
   }
+}
+
+function commitDraft(
+  storage: DraftStorage,
+  identity: Scene3DDocumentRef,
+  payload: DraftPayload,
+  rememberLast: boolean,
+): 'ok' | 'quota' | 'too-large' {
+  const result = writeDraftRecord(storage, identity, payload)
+  if (result === 'ok') {
+    if (rememberLast) writeLastIdentity(storage, identity)
+    pruneDraftIndex(storage, draftStorageKey(identity))
+  }
+  return result
 }
 
 function writeDraftRecord(storage: DraftStorage, identity: Scene3DDocumentRef, payload: DraftPayload): 'ok' | 'quota' | 'too-large' {

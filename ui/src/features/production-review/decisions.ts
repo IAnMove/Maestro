@@ -59,6 +59,9 @@ function shotCommands(desk: ReviewDesk, shot: ReviewShot): PersistCommand[] {
   return commands
 }
 
-export function persistCommandsFor(desk: ReviewDesk): PersistCommand[] {
-  return desk.shots.flatMap(shot => shotCommands(desk, shot))
+export function persistCommandsFor(desk: ReviewDesk, shotIds?: Iterable<string>): PersistCommand[] {
+  const allow = shotIds ? new Set(shotIds) : null
+  return desk.shots
+    .filter(shot => !allow || allow.has(shot.id))
+    .flatMap(shot => shotCommands(desk, shot))
 }

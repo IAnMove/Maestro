@@ -181,6 +181,42 @@ test('review notes round-trip through pipeline state without rewriting generatio
   assert.throws(() => assertRecordProjection(records[0], { generation_id: 'other' }))
 })
 
+test('generation records stay on their own shot and do not overwrite an empty clip', () => {
+  const { pipeline, records } = tenPack()
+  pipeline.clips.push({
+    index: 10,
+    shot_id: 'shot-11',
+    video_filename: null,
+    selected_video_filename: null,
+    video_attempts: [],
+    video_prompt: 'pending lantern',
+  })
+  records.push(record('gen-orphan-11', 's11-only.mp4', 'completed', { clip_index: 10, shot_id: 'shot-11' }))
+  const desk = projectReviewDesk({ pipeline, records, productionId: 'prod-1' })
+  assert.deepEqual(desk.shots[0].takes.map(take => take.id).sort(), ['gen-1a', 'gen-1b'])
+  assert.equal(desk.shots[0].takes.some(take => take.id.startsWith('gen-2')), false)
+  assert.equal(desk.shots[10].selectedTakeId, 'gen-orphan-11')
+  assert.deepEqual(desk.shots[10].takes.map(take => take.id), ['gen-orphan-11'])
+  const noted = persistCommandsFor(setShotNotes(desk, 'shot-1', 'keep the lantern'), ['shot-1'])
+  const saved = applyPersistCommands(pipeline, noted)
+  assert.equal(saved.clips[0].review_notes, 'keep the lantern')
+  assert.equal(saved.clips[10].video_filename, null)
+  assert.equal(saved.clips[10].selected_video_filename, null)
+  assert.equal(noted.every(command => command.clipIndex === 0), true)
+})
+
+test('re-persisting the current take does not clear a stale clip', () => {
+  const { pipeline, records } = tenPack()
+  pipeline.clips[1].video_stale = true
+  const desk = projectReviewDesk({ pipeline, records })
+  const saved = applyPersistCommands(pipeline, persistCommandsFor(desk, ['shot-2']))
+  assert.equal(saved.clips[1].video_stale, true)
+  assert.equal(saved.clips[1].selected_video_filename, 's2b.mp4')
+  const moved = applyPersistCommands(pipeline, persistCommandsFor(selectExactTake(desk, 'shot-2', 'gen-2a'), ['shot-2']))
+  assert.equal(moved.clips[1].selected_video_filename, 's2a.mp4')
+  assert.equal(moved.clips[1].video_stale, false)
+})
+
 test('generation records are read as a projection including queued status and duration', () => {
   const generated = takeRecordFromGeneration(projectFromAssetManifest({
     asset: { id: 'asset_clip', filename: 's1a.mp4' },

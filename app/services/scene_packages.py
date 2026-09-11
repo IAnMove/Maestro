@@ -352,6 +352,31 @@ def _uses_from_slot(slot: Any, index: int, doc_id: str, uses: list[dict[str, Any
         _uses_from_speech(speech, index, doc_id, uses)
 
 
+def _world_media_kind(url: str) -> str:
+    kind = _kind_from_name(_basename(url.split("?", 1)[0]))
+    return kind if kind in {"image", "video"} else "image"
+
+
+def _packable_world_media(url: str, ref: Any) -> bool:
+    classified = classify_url(url) if url else "empty"
+    if classified in {"gallery", "uploads"}:
+        return True
+    return classified in {"empty", "relative"} and isinstance(ref, Mapping)
+
+
+def _uses_from_world_sfx(cues: Any, doc_id: str, uses: list[dict[str, Any]]) -> None:
+    if not isinstance(cues, list):
+        return
+    for index, cue in enumerate(cues):
+        if not isinstance(cue, Mapping):
+            continue
+        url = str(cue.get("sourceUrl") or "")
+        ref = cue.get("sourceRef")
+        if not _packable_world_media(url, ref):
+            continue
+        _add_use(uses, ref, doc_id=doc_id, role=f"worldSfx[{index}]", kind=_world_media_kind(url), url=url)
+
+
 def iter_asset_uses(document: Mapping[str, Any], *, doc_id: str = "") -> list[dict[str, Any]]:
     uses: list[dict[str, Any]] = []
     body = unwrap_document(document)
@@ -362,6 +387,7 @@ def iter_asset_uses(document: Mapping[str, Any], *, doc_id: str = "") -> list[di
     for index, track in enumerate(tracks):
         if isinstance(track, Mapping):
             _add_use(uses, track.get("audio"), doc_id=doc_id, role=f"soundtrack[{index}]", kind="audio")
+    _uses_from_world_sfx(body.get("worldSfx"), doc_id, uses)
     return uses
 
 
@@ -424,6 +450,17 @@ def _rewrite_track(track: Any, locator: Callable[[dict[str, Any]], dict[str, Any
         _rewrite_ref(track, "audio", locator)
 
 
+def _rewrite_world_cue(cue: Any, locator: Callable[[dict[str, Any]], dict[str, Any] | None]) -> None:
+    if not isinstance(cue, dict):
+        return
+    updated = locator(_source_payload(cue))
+    if updated is None:
+        return
+    # Keep sourceUrl only. WorldFxCue forbids extra keys such as sourceRef, and
+    # additive apply revalidates every existing world cue against that model.
+    cue["sourceUrl"] = updated["url"]
+
+
 def _rewrite_list(entries: Any, locator: Callable[[dict[str, Any]], dict[str, Any] | None], rewrite_item: Callable) -> None:
     if not isinstance(entries, list):
         return
@@ -446,6 +483,7 @@ def rewrite_document_refs(
     body = _document_body(packed)
     _rewrite_list(body.get("slots"), locator, _rewrite_slot)
     _rewrite_list(body.get("soundtrack"), locator, _rewrite_track)
+    _rewrite_list(body.get("worldSfx"), locator, _rewrite_world_cue)
     return packed
 
 

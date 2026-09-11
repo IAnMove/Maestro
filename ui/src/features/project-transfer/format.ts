@@ -174,6 +174,19 @@ function pushUse(uses: AssetUse[], raw: unknown, docId: string, role: string, ki
   uses.push({ ...ref, docId, role, kind })
 }
 
+function collectWorldSfxUses(body: Record<string, unknown>, docId: string, uses: AssetUse[]) {
+  const cues = Array.isArray(body.worldSfx) ? body.worldSfx : []
+  cues.forEach((cue, index) => {
+    if (!cue || typeof cue !== 'object') return
+    const record = cue as Record<string, unknown>
+    const url = String(record.sourceUrl || '')
+    const kind = classifyUrl(url)
+    if (kind !== 'gallery' && kind !== 'uploads') return
+    const media = /\.(mp4|webm|mov)$/i.test(url.split('?')[0]) ? 'video' : 'image'
+    pushUse(uses, record.sourceRef, docId, `worldSfx[${index}]`, media, url)
+  })
+}
+
 function collectSlotUses(slot: unknown, index: number, docId: string, uses: AssetUse[]) {
   if (!slot || typeof slot !== 'object') return
   const record = slot as Record<string, unknown>
@@ -209,6 +222,7 @@ export function collectAssetUses(document: unknown, docId = 'shot'): AssetUse[] 
       pushUse(uses, (track as Record<string, unknown>).audio, docId, `soundtrack[${index}]`, 'audio')
     }
   })
+  collectWorldSfxUses(body, docId, uses)
   return uses
 }
 
