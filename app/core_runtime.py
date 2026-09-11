@@ -26,7 +26,7 @@ from routers.scene_commands import create_scene_commands_router
 from routers.style_library import create_style_library_router
 from routers.system_capabilities import create_system_capabilities_router, require_capability_http
 from routers.workspace_collections import create_workspace_collections_router
-from services import core_editor, core_production, core_remote_image, core_scene_recording, core_workspace as core
+from services import core_editor, core_production, core_remote_image, core_scene_recording, core_upload, core_workspace as core
 from services.platform_capabilities import platform_capabilities
 from services.scene_commands import SceneCommands
 from services.style_library import StyleLibrary
@@ -520,13 +520,23 @@ def video_export_status(job_id: str):
 
 @api.post("/api/v1/upload")
 async def upload_file(request: Request, filename: str = "upload.bin"):
-    folder = core.uploads_dir()
-    name = os.path.basename(filename or "upload.bin")
-    dest = os.path.join(folder, name)
-    with open(dest, "wb") as handle:
-        async for chunk in request.stream():
-            handle.write(chunk)
-    return {"filename": name, "url": f"/api/v1/file/{name}?workspace=__uploads__"}
+    chunks: list[bytes] = []
+    total = 0
+    async for chunk in request.stream():
+        total += len(chunk)
+        if total > core_upload.MAX_UPLOAD_BYTES:
+            raise HTTPException(status_code=413, detail="File too large (max 500 MB)")
+        chunks.append(chunk)
+    try:
+        data, original = core_upload.extract_upload(
+            b"".join(chunks),
+            request.headers.get("content-type") or "",
+            filename,
+        )
+        return core_upload.save_upload(core.uploads_dir(), data, original)
+    except ValueError as error:
+        status = 413 if "too large" in str(error).lower() else 400
+        raise HTTPException(status_code=status, detail=str(error)) from error
 
 
 @api.get("/api/v1/uploads/{filename:path}")
