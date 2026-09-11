@@ -12,6 +12,16 @@ from fastapi.testclient import TestClient
 from core_runtime import api
 from services.platform_capabilities import FEATURE_UNAVAILABLE
 from services.scene_commands import SceneCommands
+from services.core_remote_image import catalog_entry
+
+
+class ImmediateThread:
+    def __init__(self, target=None, args=(), kwargs=None, daemon=None, name=None):
+        self._target = target
+        self._args = args
+
+    def start(self):
+        self._target(*self._args)
 
 
 class CoreRuntimeTests(unittest.TestCase):
@@ -43,7 +53,11 @@ class CoreRuntimeTests(unittest.TestCase):
         self.assertEqual(listed.status_code, 200)
         self.assertEqual(listed.json()["profile"], "macos-arm64-core-remote")
         self.assertFalse(listed.json()["ui"]["show_cuda_controls"])
-        self.assertEqual(self.client.get("/api/v1/models").json()["models"][0]["model_type"], "minimax:image-01")
+        model = self.client.get("/api/v1/models").json()["models"][0]
+        self.assertEqual(model["model_type"], "minimax:image-01")
+        self.assertFalse(model["is_t2v"])
+        self.assertEqual(model["family"], "minimax")
+        self.assertFalse(catalog_entry()["is_t2v"])
         self.assertIn("workspaces", self.client.get("/api/v1/workspaces").json())
         self.assertEqual(self.client.get("/api/v1/system-config").status_code, 200)
         self.assertEqual(self.client.get("/api/v1/services-config").status_code, 200)
@@ -243,14 +257,6 @@ class CoreRuntimeTests(unittest.TestCase):
         }
         library = {"seriesById": {"series_mac": series}}
 
-        class ImmediateThread:
-            def __init__(self, target=None, args=(), kwargs=None, daemon=None, name=None):
-                self._target = target
-                self._args = args
-
-            def start(self):
-                self._target(*self._args)
-
         folder, previous = self._in_temp_workspace()
         try:
             Path("outputs").mkdir()
@@ -268,6 +274,108 @@ class CoreRuntimeTests(unittest.TestCase):
             folder.cleanup()
         self.assertEqual(started.status_code, 200, started.text)
         self.assertTrue(str(started.json()["jobId"]).startswith("series-plan-"))
+
+    def test_series_known_series_bootstrap_auto_applies(self):
+        folder, previous = self._in_temp_workspace()
+        try:
+            Path("outputs").mkdir()
+            created = self.client.post("/api/v1/series", json={"workspace": "default", "title": "Untitled series"})
+            self.assertEqual(created.status_code, 200, created.text)
+            series_id = created.json()["id"]
+            raw = {
+                "setup": {
+                    "title": "Harbour Lights",
+                    "premise": "A lantern wakes the harbour every dusk.",
+                    "visualStyle": "Wet cobbles, amber lamps",
+                    "format": "episodic",
+                    "defaultEpisodeDurationSeconds": 75,
+                },
+                "canon": {
+                    "worldSummary": "A coastal town that bargains with the tide.",
+                    "immutableRules": [{"id": "rule_tide", "description": "The lantern must be lit at dusk."}],
+                    "currentFacts": [],
+                    "forbiddenChanges": [],
+                    "themes": ["duty"],
+                    "longArcs": [],
+                    "timeline": [],
+                },
+                "characters": [{"id": "mara", "name": "Mara", "role": "keeper"}],
+                "locations": [{"id": "harbour", "name": "Harbour"}],
+                "relationships": [],
+                "props": [],
+            }
+            with patch("services.core_series_plan._generate_json", return_value=raw), patch(
+                "services.core_series_plan._writing_override", return_value=None,
+            ), patch("services.core_series_plan.threading.Thread", ImmediateThread):
+                started = self.client.post(
+                    f"/api/v1/series/{series_id}/canon/prepare/start",
+                    json={
+                        "workspace": "default",
+                        "instruction": "Continue Harbour Lights",
+                        "bootstrapKnownSeries": True,
+                        "autoApply": True,
+                    },
+                )
+            self.assertEqual(started.status_code, 200, started.text)
+            job_id = started.json()["jobId"]
+            job = self.client.get(f"/api/v1/series/plan/jobs/{job_id}")
+            self.assertEqual(job.status_code, 200, job.text)
+            body = job.json()
+            self.assertEqual(body["status"], "completed")
+            self.assertTrue(body["autoApplied"])
+            self.assertEqual(body["seriesResult"]["title"], "Harbour Lights")
+            self.assertEqual(body["seriesResult"]["canon"]["immutableRules"][0]["description"], "The lantern must be lit at dusk.")
+            stored = self.client.get(f"/api/v1/series/{series_id}", params={"workspace": "default"})
+            self.assertEqual(stored.status_code, 200, stored.text)
+            project = stored.json()
+            self.assertEqual(project["title"], "Harbour Lights")
+            self.assertEqual(project["characters"][0]["name"], "Mara")
+            self.assertEqual(project["characters"][0]["approval"], "draft")
+        finally:
+            self._leave_temp_workspace(folder, previous)
+
+    def test_series_canon_prepare_normalizes_before_review(self):
+        folder, previous = self._in_temp_workspace()
+        try:
+            Path("outputs").mkdir()
+            created = self.client.post("/api/v1/series", json={
+                "workspace": "default",
+                "title": "Harbour Lights",
+            })
+            self.assertEqual(created.status_code, 200, created.text)
+            series_id = created.json()["id"]
+            raw = {
+                "canon": {
+                    "worldSummary": "A coastal town that bargains with the tide.",
+                    "immutableRules": [{"id": "rule_tide", "description": "The lantern must be lit at dusk."}],
+                    "forbiddenChanges": ["No daylight lantern"],
+                    "themes": ["duty"],
+                    "longArcs": [],
+                },
+                "characters": [{"id": "mara", "name": "Mara"}],
+                "locations": [{"id": "harbour", "name": "Harbour"}],
+                "relationships": [],
+            }
+            with patch("services.core_series_plan._generate_json", return_value=raw), patch(
+                "services.core_series_plan._writing_override", return_value=None,
+            ), patch("services.core_series_plan.threading.Thread", ImmediateThread):
+                started = self.client.post(
+                    f"/api/v1/series/{series_id}/canon/prepare/start",
+                    json={"workspace": "default", "instruction": "Tighten the bible"},
+                )
+            self.assertEqual(started.status_code, 200, started.text)
+            job = self.client.get(f"/api/v1/series/plan/jobs/{started.json()['jobId']}")
+            self.assertEqual(job.status_code, 200, job.text)
+            proposal = job.json()["seriesResult"]
+            self.assertEqual(job.json()["status"], "completed")
+            self.assertFalse(job.json().get("autoApplied"))
+            self.assertEqual(proposal["characters"][0]["approval"], "draft")
+            self.assertEqual(proposal["canon"]["immutableRules"][0]["status"], "draft")
+            applied = self.client.post(f"/api/v1/series/plan/jobs/{started.json()['jobId']}/apply-canon")
+            self.assertEqual(applied.status_code, 200, applied.text)
+            self.assertEqual(applied.json()["characters"][0]["name"], "Mara")
+        finally:
+            self._leave_temp_workspace(folder, previous)
 
     def test_local_llm_load_is_blocked(self):
         blocked = self.client.post("/api/v1/llm/load", json={"provider": "local"})
