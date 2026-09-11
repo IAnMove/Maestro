@@ -20,7 +20,11 @@ from services.series_planning import (
     apply_planning_stage,
     canon_preparation_prompt,
     canon_preparation_schema,
+    known_series_bootstrap_prompt,
+    known_series_bootstrap_schema,
     merge_series_canon_proposal,
+    normalize_canon_preparation,
+    normalize_known_series_bootstrap,
     normalize_planning_result,
     planning_output_token_budget,
     planning_prompt,
@@ -35,7 +39,8 @@ _PUBLIC = (
     "jobId", "jobType", "kind", "workspace", "seriesId", "episodeId",
     "status", "stage", "current", "total", "message", "completedStages",
     "episodeResult", "seriesResult", "generateImages", "bootstrapKnownSeries",
-    "autoApply", "autoApplied", "result", "error", "createdAt", "updatedAt",
+    "autoApply", "autoApplied", "appliedSeriesRevision", "applyError",
+    "result", "error", "createdAt", "updatedAt",
     "finishedAt", "appliedAt", "taskId", "rootTaskId",
 )
 
@@ -278,13 +283,7 @@ def apply_episode(job_id: str, edited: dict | None) -> dict[str, Any]:
     return stored["seriesById"][series_id]["episodesById"][episode_id]
 
 
-def apply_canon(job_id: str) -> dict[str, Any]:
-    job = load_job(job_id)
-    if not job:
-        raise KeyError("Series canon planning job not found")
-    proposal = job.get("seriesResult")
-    if job.get("jobType") != "canon" or job.get("status") != "completed" or not isinstance(proposal, dict):
-        raise ValueError("Complete the canon preparation job before applying it")
+def _commit_canon_proposal(job: dict[str, Any], proposal: dict[str, Any]) -> dict[str, Any]:
     workspace, series_id = str(job["workspace"]), str(job["seriesId"])
     with _LOCK:
         series, library = _series_or_404(workspace, series_id)
@@ -297,8 +296,19 @@ def apply_canon(job_id: str) -> dict[str, Any]:
         series["updatedAt"] = _iso_now()
         library["seriesById"][series_id] = series
         stored = write_series_library(core.workspace_dir(workspace), library, workspace)
-    _patch(job_id, appliedAt=time.time(), message="Canon proposal applied as a draft for review.")
     return stored["seriesById"][series_id]
+
+
+def apply_canon(job_id: str) -> dict[str, Any]:
+    job = load_job(job_id)
+    if not job:
+        raise KeyError("Series canon planning job not found")
+    proposal = job.get("seriesResult")
+    if job.get("jobType") != "canon" or job.get("status") != "completed" or not isinstance(proposal, dict):
+        raise ValueError("Complete the canon preparation job before applying it")
+    stored = _commit_canon_proposal(job, proposal)
+    _patch(job_id, appliedAt=time.time(), message="Canon proposal applied as a draft for review.")
+    return stored
 
 
 def _run_episode(job_id: str) -> None:
@@ -354,16 +364,75 @@ def _run_canon(job_id: str) -> None:
         if latest.get("status") in {"cancelling", "cancelled"}:
             _patch(job_id, status="cancelled", stage="cancelled", finishedAt=time.time())
             return
-        _patch(job_id, status="running", stage="canon", current=0, message="Preparing Series canon…")
-        prompt, system_prompt = canon_preparation_prompt(series, str(request.get("instruction") or ""))
-        raw = _generate_json(
-            prompt=prompt, system_prompt=system_prompt, schema=canon_preparation_schema(),
-            max_new_tokens=6000, override=_writing_override(request),
+        bootstrap = job.get("bootstrapKnownSeries") is True
+        _patch(
+            job_id, status="running",
+            stage="known_series_research" if bootstrap else "canon",
+            current=0, total=1,
+            message=(
+                "Building an editable known-series bible from the writing model's general knowledge…"
+                if bootstrap else "Preparing a reviewable Series canon proposal…"
+            ),
         )
+        if bootstrap:
+            prompt, system_prompt = known_series_bootstrap_prompt(
+                series, str(request.get("instruction") or ""),
+            )
+            schema = known_series_bootstrap_schema()
+            max_new_tokens = 14000
+        else:
+            prompt, system_prompt = canon_preparation_prompt(
+                series, str(request.get("instruction") or ""),
+            )
+            schema = canon_preparation_schema()
+            max_new_tokens = 6000
+        raw = _generate_json(
+            prompt=prompt, system_prompt=system_prompt, schema=schema,
+            max_new_tokens=max_new_tokens, override=_writing_override(request),
+        )
+        latest = load_job(job_id) or {}
+        if latest.get("status") in {"cancelling", "cancelled"}:
+            _patch(job_id, status="cancelled", stage="cancelled", finishedAt=time.time())
+            return
+        proposal = (
+            normalize_known_series_bootstrap(raw, series)
+            if bootstrap else normalize_canon_preparation(raw, series)
+        )
+        if bootstrap and job.get("autoApply") is True:
+            _patch(
+                job_id, stage="applying_draft", seriesResult=proposal,
+                result={"seriesProposal": proposal},
+                message="Known-series bible generated; applying it as an editable draft…",
+            )
+            latest = load_job(job_id) or {}
+            if latest.get("status") in {"cancelling", "cancelled"}:
+                _patch(job_id, status="cancelled", stage="cancelled", finishedAt=time.time())
+                return
+            try:
+                applied = _commit_canon_proposal(job, proposal)
+            except (PermissionError, ValueError, KeyError) as exc:
+                _patch(
+                    job_id, status="completed", stage="completed", current=1, total=1,
+                    autoApplied=False, applyError=str(exc), error=None,
+                    seriesResult=proposal, result={"seriesProposal": proposal},
+                    message="Known-series proposal generated, but the project changed before it could be applied.",
+                    finishedAt=time.time(),
+                )
+                return
+            _patch(
+                job_id, status="completed", stage="completed", current=1, total=1,
+                autoApplied=True, appliedSeriesRevision=int(applied.get("revision") or 1),
+                appliedAt=time.time(), error=None, seriesResult=proposal,
+                result={"seriesProposal": proposal},
+                message="Known-series bible filled as a draft. Verify facts and approve canon when ready.",
+                finishedAt=time.time(),
+            )
+            return
         _patch(
             job_id, status="completed", stage="completed", current=1, total=1,
-            seriesResult=raw, result={"series": raw}, error=None, finishedAt=time.time(),
-            message="Canon proposal generated. Review and apply it when ready.",
+            seriesResult=proposal, result={"seriesProposal": proposal}, error=None,
+            message="Canon proposal generated. Review it before applying.",
+            finishedAt=time.time(),
         )
     except Exception as exc:
         _patch(job_id, status="failed", error=str(exc), finishedAt=time.time(),
