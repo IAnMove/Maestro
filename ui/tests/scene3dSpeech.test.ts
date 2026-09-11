@@ -1,7 +1,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { defaultSpeech } from '../src/features/scene3d/speech/types'
-import { cueAt, mouthAt, parseMouthCues, parseSpeech, amplitudeCues, safeMediaUrl } from '../src/features/scene3d/speech/track'
+import { cueAt, expressionAt, mouthAt, parseExpressionCues, parseMouthCues, parseSpeech, amplitudeCues, safeMediaUrl } from '../src/features/scene3d/speech/track'
+import { facePackCell, validFacePackSize } from '../src/features/scene3d/speech/facePack'
+import { talkingMascot } from '../src/features/scene3d/speech/facePackExamples'
 import { speechFromLabConfig } from '../src/features/scene3d/speech/kit'
 import { voiceSchedule } from '../src/features/scene3d/speech/audio'
 import { applyScene3DTemplate, remountScene3DTemplate } from '../src/features/scene3d/templates'
@@ -71,4 +73,36 @@ test('export voice schedule uses scene speed exactly once and clips to scene end
 test('volume fallback is explicitly approximate and detects silence', () => {
   const buffer = { sampleRate: 300, duration: 1, getChannelData: () => new Float32Array(300) } as unknown as AudioBuffer
   assert.deepEqual(amplitudeCues(buffer), [{ start: 0, end: 1, viseme: 'rest' }])
+})
+test('expression cues sample like mouth cues and fall back to the static expression', () => {
+  const value = parseSpeech({
+    ...speech(),
+    expression: 'neutral',
+    expressionCues: [{ start: 0.2, end: 1, expression: 'happy' }, { start: 1.2, end: 2, expression: 'angry' }],
+  })!
+  assert.equal(expressionAt(value, 0), 'neutral')
+  assert.equal(expressionAt(value, 0.5), 'happy')
+  assert.equal(expressionAt(value, 1), 'neutral')
+  assert.equal(expressionAt(value, 1.5), 'angry')
+  assert.equal(expressionAt({ ...value, enabled: false }, 0.5), 'neutral')
+  assert.throws(() => parseExpressionCues([{ start: 0, end: 1, expression: 'happy' }, { start: 0.5, end: 2, expression: 'angry' }]))
+})
+test('face packs are 9×6 and talking mascots round-trip on hangar-talk', () => {
+  assert.equal(validFacePackSize(1152, 768), true)
+  assert.equal(validFacePackSize(1152, 128), false)
+  assert.deepEqual(facePackCell(2, 3, 1152, 768), { sx: 256, sy: 384, sw: 128, sh: 128 })
+  const mascot = talkingMascot('subject_1', 'subject_1', [0, 0, 0], 'tv')
+  assert.equal(mascot.sourceUrl, '/examples/tv-head-humanoid.glb')
+  assert.ok(mascot.speech?.facePack?.url.endsWith('tv-pack.png'))
+  const doc = applyScene3DTemplate('hangar-talk')
+  assert.equal(doc.slots.length, 2)
+  assert.equal(doc.slots[0].speech?.facePack?.url, '/examples/face-pack/tv-pack.png')
+  assert.equal(doc.slots[1].speech?.facePack?.url, '/examples/face-pack/skull-pack.png')
+  assert.equal(doc.soundtrack?.[0]?.audio.url, '/examples/face-pack/neutral-vowels.wav')
+  const parsed = parseScene3DDocument(JSON.parse(JSON.stringify(doc)))
+  assert.deepEqual(parsed?.slots.map(slot => slot.speech?.facePack?.url), doc.slots.map(slot => slot.speech?.facePack?.url))
+  assert.deepEqual(parsed?.slots.map(slot => slot.speech?.expressionCues), doc.slots.map(slot => slot.speech?.expressionCues))
+  assert.equal(expressionAt(doc.slots[0].speech!, 1), 'happy')
+  assert.equal(expressionAt(doc.slots[1].speech!, 5), 'angry')
+  assert.equal(mouthAt(doc.slots[0].speech!, 0.5).b, 2)
 })

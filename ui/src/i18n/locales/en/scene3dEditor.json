@@ -716,6 +716,14 @@
     "volcano-ridge": {
       "title": "Volcano ridge",
       "description": "A crane over two figures on the ridge as the caldera breathes fire."
+    },
+    "hangar-talk": {
+      "title": "Hangar talk",
+      "description": "CRT-head and a basic skull face take turns on synthetic vowels, with visemes and expressions."
+    },
+    "sea-talk": {
+      "title": "Sea talk",
+      "description": "The same CRT-head and skull mascots lipsync on the boat deck with a closer two-shot."
     }
   },
   "gallerySearch": "Search the catalog",

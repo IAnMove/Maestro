@@ -66,7 +66,7 @@ export type Scene3DStageHandle = {
 
 function loadScreen(world: GpuWorld, slot: Scene3DSlot, onError: (message: string) => void, onReady: () => void) {
   const gpu = world.slots.get(slot.id), screen = slot.screen
-  if (!gpu || !screen?.sourceUrl) return
+  if (!gpu || !screen?.sourceUrl || slot.speech?.facePack) return
   const abort = new AbortController(); gpu.screenAbort = abort
   void bindScreenMedia(gpu.root, screen, slot.media === 'screen', abort.signal, () => {
     if (!abort.signal.aborted && world.slots.get(slot.id) === gpu) renderWorld(world)

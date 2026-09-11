@@ -110,6 +110,8 @@ export const SCENE3D_TEMPLATE_IDS = [
   'jungle-river',
   'red-carpet',
   'volcano-ridge',
+  'hangar-talk',
+  'sea-talk',
 ] as const
 
 export type Scene3DTemplateId = (typeof SCENE3D_TEMPLATE_IDS)[number]

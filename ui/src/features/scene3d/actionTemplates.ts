@@ -12,6 +12,8 @@ import type {
   Scene3DSourceRef,
   Vec3,
 } from './types.ts'
+import type { Scene3DSoundtrack } from './speech/types.ts'
+import { FACE_PACK_SOUNDTRACK, talkingMascot } from './speech/facePackExamples.ts'
 
 export const ACTION_TEMPLATE_IDS = [
   'sea-deck',
@@ -46,6 +48,8 @@ export const ACTION_TEMPLATE_IDS = [
   'jungle-river',
   'red-carpet',
   'volcano-ridge',
+  'hangar-talk',
+  'sea-talk',
 ] as const
 
 export type ActionTemplateId = typeof ACTION_TEMPLATE_IDS[number]
@@ -70,6 +74,7 @@ type ActionSpec = {
   texts: KineticText[]
   worldSfx: Array<Record<string, unknown>>
   sfx: Array<Record<string, unknown>>
+  soundtrack?: Scene3DSoundtrack[]
   copy: { en: ActionCardCopy; es: ActionCardCopy }
 }
 
@@ -779,6 +784,46 @@ const SPECS: Record<ActionTemplateId, ActionSpec> = {
       { title: 'Cresta del volcán', description: 'Una grúa sobre dos figuras en la cresta mientras la caldera respira fuego.', requirements: ['GLB trepador (protagonista)', 'GLB rival', 'Título / banda sonora opcionales'] },
     ),
   },
+  'hangar-talk': {
+    category: 'action', duration: 8, dressing: 'hangar',
+    light: light([-0.4, -0.78, -0.12], 2.4, '#fff0d9'),
+    camera: cam('encounter', [0, 1.55, 5.6], [0, 1.28, 0.1], 38),
+    slots: [
+      talkingMascot('subject_1', 'subject_1', [-1.7, 0, 0.7], 'tv', { rotationY: 0.22, motion: { to: [-0.85, 0, 0.25], turnTo: 0.18, easing: 'smooth' } }),
+      talkingMascot('subject_2', 'subject_2', [1.8, 0, 0.65], 'skull', { rotationY: -0.22, scale: 0.98, motion: { to: [0.9, 0, 0.2], turnTo: -0.18, easing: 'smooth' } }),
+    ],
+    aliases: { crt: 'subject_1', skull: 'subject_2' },
+    texts: [title('talk-label', 'SAY IT', 'typewriter', 50, 14, 8, '#c8f4ff', 6.4)],
+    worldSfx: [
+      { id: 'weld', kind: 'sparks', start: 0.4, end: 7.6, position: { x: -7.4, y: 1.3, z: -3.6 }, color: '#ffbb55' },
+    ],
+    sfx: [{ id: 'scan', kind: 'scanline', start: 0.2, end: 8, x: 50, y: 42 }],
+    soundtrack: FACE_PACK_SOUNDTRACK,
+    copy: copy(
+      { title: 'Hangar talk', description: 'CRT-head and a basic skull face take turns on synthetic vowels, with visemes and expressions.', requirements: ['Bundled CRT-head GLB (both roles)', 'Experimental face pack', 'Neutral synthetic vowels', 'Optional title'] },
+      { title: 'Charla en hangar', description: 'Cabeza CRT y un cráneo básico se turnan con vocales sintéticas, visemas y expresiones.', requirements: ['GLB CRT-head incluido (ambos papeles)', 'Face pack experimental', 'Vocales sintéticas neutras', 'Título opcional'] },
+    ),
+  },
+  'sea-talk': {
+    category: 'action', duration: 8, dressing: 'open-sea',
+    light: light([-0.32, -0.82, 0.22], 2.55, '#ffe2b0'),
+    camera: cam('establishment', [0.15, 1.85, 10.4], [0.04, 1.25, 5.1], 40),
+    slots: [
+      talkingMascot('subject_1', 'subject_1', [-1.2, 0, 5.3], 'tv', { rotationY: 0.16, motion: { to: [-0.65, 0, 4.9], turnTo: 0.12, easing: 'smooth' } }),
+      talkingMascot('subject_2', 'subject_2', [1.25, 0, 5.2], 'skull', { rotationY: -0.16, scale: 0.96, motion: { to: [0.7, 0, 4.85], turnTo: -0.12, easing: 'smooth' } }),
+    ],
+    aliases: { crt: 'subject_1', skull: 'subject_2' },
+    texts: [title('sea-talk-label', 'OPEN MIC', 'rise', 50, 14, 8, '#d7f4ff', 6.6)],
+    worldSfx: [
+      { id: 'spray', kind: 'splash', start: 0, end: 8, position: { x: 0, y: 0.02, z: -5.4 }, scale: 1.4, color: '#9ad8ff' },
+    ],
+    sfx: [{ id: 'horizon', kind: 'aurora', start: 0.2, end: 7.6, x: 50, y: 20 }],
+    soundtrack: FACE_PACK_SOUNDTRACK,
+    copy: copy(
+      { title: 'Sea talk', description: 'The same CRT-head and skull mascots lipsync on the boat deck with a closer two-shot.', requirements: ['Bundled CRT-head GLB (both roles)', 'Experimental face pack', 'Neutral synthetic vowels', 'Optional title'] },
+      { title: 'Charla en cubierta', description: 'Los mismos mascotas CRT y cráneo hacen lipsync en la cubierta, en un plano más cerrado.', requirements: ['GLB CRT-head incluido (ambos papeles)', 'Face pack experimental', 'Vocales sintéticas neutras', 'Título opcional'] },
+    ),
+  },
 }
 
 function uniqueRoles(slots: Scene3DSlot[]): Scene3DSlotId[] {
@@ -849,6 +894,7 @@ function buildDocument(spec: ActionSpec, id: ActionTemplateId, options: ActionAp
   doc.worldSfx = parseWorldSfx(spec.worldSfx)
   doc.sfx = parseSceneFx(spec.sfx)
   doc.texts = chooseTexts(spec.texts, options.text)
+  if (spec.soundtrack) doc.soundtrack = spec.soundtrack.map(track => ({ ...track, audio: { ...track.audio } }))
   attachAudio(doc, options.audio)
   return doc
 }

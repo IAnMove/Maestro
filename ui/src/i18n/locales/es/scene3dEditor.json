@@ -716,6 +716,14 @@
     "volcano-ridge": {
       "title": "Cresta del volcán",
       "description": "Una grúa sobre dos figuras en la cresta mientras la caldera respira fuego."
+    },
+    "hangar-talk": {
+      "title": "Charla en hangar",
+      "description": "Cabeza CRT y un cráneo básico se turnan con vocales sintéticas, visemas y expresiones."
+    },
+    "sea-talk": {
+      "title": "Charla en cubierta",
+      "description": "Los mismos mascotas CRT y cráneo hacen lipsync en la cubierta, en un plano más cerrado."
     }
   },
   "gallerySearch": "Buscar en el catálogo",
