@@ -1,3 +1,5 @@
+import type { TFunction } from 'i18next'
+
 export function isRemoteMiniMaxImage(
   generationMode: string,
   modelType: string | undefined,
@@ -10,12 +12,12 @@ export function isRemoteMiniMaxImage(
 }
 
 export function generateBlockedCopy(input: {
-  localUnavailable: boolean
-  needsImage: boolean
-  needsReference: boolean
-  needsOutpaintSource: boolean
-  needsOutpaintArea: boolean
-  t: (key: string) => string
+  localUnavailable?: boolean
+  needsImage?: boolean
+  needsReference?: boolean
+  needsOutpaintSource?: boolean
+  needsOutpaintArea?: boolean
+  t: TFunction<'studio'>
 }): { label: string; title?: string } {
   if (input.localUnavailable) {
     return { label: input.t('generate.localUnavailable'), title: input.t('generate.localUnavailableHint') }
