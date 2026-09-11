@@ -434,6 +434,68 @@ def test_wrapper_is_accepted_inside_a_package_but_not_as_the_package(tmp_path: P
     assert document.get("kind") != TEMPLATE_KIND
 
 
+def test_source_url_only_slots_rebind_on_import(tmp_path: Path):
+    client, roots = _client(tmp_path)
+    (roots["film"] / "hero.glb").write_bytes(b"glb-shared")
+    (roots["film"] / "screen.png").write_bytes(_png() + b"-screen")
+    shot = _shot(
+        title="Bare",
+        glb=_source("film", "hero.glb", "asset_hero"),
+        voice=_source("film", "voice.wav", "asset_voice"),
+        screen=_source("film", "screen.png", "asset_screen"),
+        environment=_source("film", "env.png", "asset_env"),
+    )
+    shot["slots"][0].pop("sourceRef")
+    shot["slots"][0]["screen"].pop("sourceRef")
+    shot["slots"][0].pop("speech")
+    shot["soundtrack"] = []
+    (roots["film"] / "voice.wav").write_bytes(b"RIFF-voice")
+    (roots["film"] / "env.png").write_bytes(_png() + b"-env")
+    exported = client.post("/api/v1/scene-packages/export", json={"workspace": "film", "documents": [shot]})
+    assert exported.status_code == 200, exported.text
+    with zipfile.ZipFile(io.BytesIO(exported.content)) as archive:
+        packed = json.loads(archive.read("documents/shot-1.json"))
+    assert packed["slots"][0]["sourceUrl"].startswith("media/")
+    assert packed["slots"][0]["sourceRef"]["assetId"].startswith("sha256:")
+    assert packed["slots"][0]["screen"]["sourceUrl"].startswith("media/")
+    imported = _post_zip(client, "/api/v1/scene-packages/import", exported.content, workspace="lab")
+    assert imported.status_code == 200, imported.text
+    document = json.loads(next(roots["lab"].glob("*.world3d.scene.json")).read_text())
+    assert document["slots"][0]["sourceUrl"].startswith("/api/v1/file/")
+    assert "workspace=lab" in document["slots"][0]["sourceUrl"]
+    assert document["slots"][0]["screen"]["sourceUrl"].startswith("/api/v1/file/")
+    assert "workspace=lab" in document["slots"][0]["screen"]["sourceUrl"]
+    assert (roots["lab"] / document["slots"][0]["sourceRef"]["filename"]).is_file()
+
+
+def test_import_avoids_sidecar_stem_collision(tmp_path: Path):
+    client, roots = _client(tmp_path)
+    refs = _seed_film(roots["film"])
+    (roots["lab"] / "hero.glb").write_bytes(b"existing-lab-glb")
+    from services.asset_manifest import build_asset_manifest, write_asset_manifest
+    dest = roots["lab"] / "hero.glb"
+    write_asset_manifest(dest, build_asset_manifest(
+        dest, kind="model3d", workspace_id="lab", tool="seed", actor="user",
+        execution_mode="import", technical={"sha256": "0" * 64},
+    ))
+    shot = _shot(title="Stem", glb=refs["glb"], voice=refs["voice"], screen={
+        **_source("film", "hero.png", "asset_screen"),
+    }, environment=refs["env"])
+    (roots["film"] / "hero.png").write_bytes(_png() + b"-hero-screen")
+    shot["slots"][0]["screen"]["sourceUrl"] = "/api/v1/file/hero.png?workspace=film"
+    shot["slots"][0]["screen"]["sourceRef"] = _source("film", "hero.png", "asset_screen")
+    exported = client.post("/api/v1/scene-packages/export", json={"workspace": "film", "documents": [shot]})
+    assert exported.status_code == 200, exported.text
+    imported = _post_zip(client, "/api/v1/scene-packages/import", exported.content, workspace="lab")
+    assert imported.status_code == 200, imported.text
+    assert (roots["lab"] / "hero.glb").read_bytes() == b"existing-lab-glb"
+    document = json.loads(next(roots["lab"].glob("*.world3d.scene.json")).read_text())
+    screen_name = document["slots"][0]["screen"]["sourceRef"]["filename"]
+    assert screen_name != "hero.glb"
+    assert (roots["lab"] / screen_name).is_file()
+    assert screen_name.endswith(".png")
+
+
 def test_service_helpers_without_http(tmp_path: Path):
     film = tmp_path / "film"
     lab = tmp_path / "lab"
