@@ -4,6 +4,7 @@ import { parseScene3DDocument } from './document.ts'
 import { reviewClipNumber } from './performance.ts'
 import type { Scene3DDocument } from './types.ts'
 import { Scene3DLibraryControls } from './Scene3DLibraryControls'
+import { isWorld3DTemplateRaw } from './userTemplates.ts'
 
 export function Scene3DDocumentControls({ document, disabled, workspace, preview, onChange, onLoad }: {
   document: Scene3DDocument
@@ -42,17 +43,19 @@ export function Scene3DDocumentControls({ document, disabled, workspace, preview
     </label>
     <button type="button" disabled={disabled} onClick={save} className="min-h-10 rounded-lg border border-border px-3">{t('saveDocument')}</button>
     <button type="button" disabled={disabled} onClick={() => input.current?.click()} className="min-h-10 rounded-lg border border-border px-3">{t('loadDocument')}</button>
-    <input ref={input} type="file" accept=".json,application/json" aria-label={t('loadDocument')} disabled={disabled} className="hidden"
+    <input ref={input} type="file" accept=".json,application/json" data-testid="world3d-load-shot" aria-label={t('loadDocument')} disabled={disabled} className="hidden"
       onChange={async event => {
         const file = event.target.files?.[0]
         event.target.value = ''
         if (!file) return
         try {
           if (file.size > 8 * 1024 * 1024) throw new Error('size')
-          const next = parseScene3DDocument(JSON.parse(await file.text()))
+          const raw = JSON.parse(await file.text())
+          if (isWorld3DTemplateRaw(raw)) throw new Error('template')
+          const next = parseScene3DDocument(raw)
           if (!next) throw new Error('document')
           onLoad(next); setError('')
-        } catch { setError(t('invalidDocument')) }
+        } catch (cause) { setError(cause instanceof Error && cause.message === 'template' ? t('userTemplates.openAsShot') : t('invalidDocument')) }
       }} />
     {error && <p role="alert">{error}</p>}
   </div>

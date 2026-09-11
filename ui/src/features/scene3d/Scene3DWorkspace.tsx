@@ -29,6 +29,8 @@ import { AssetInput } from '../../features/asset-picker/AssetInput.tsx'
 import { useUiTranslation } from '../../i18n'
 import { useStore } from '../../stores/useStore'
 import { Scene3DTemplateBrowser } from './Scene3DTemplateBrowser'
+import { Scene3DUserTemplates } from './Scene3DUserTemplates'
+import { remountUserTemplate, type World3DUserTemplate } from './userTemplates.ts'
 import { Scene3DAnimationControls } from './Scene3DAnimationControls'
 import { Scene3DDocumentControls } from './Scene3DDocumentControls'
 import { Scene3DTransport } from './Scene3DTransport'
@@ -83,6 +85,7 @@ export function Scene3DWorkspace({ width, height, initialDocument }: Props) {
   const { t: editorT } = useUiTranslation('scene3dEditor')
   const [transformMode, setTransformMode] = useState<TransformMode>('translate')
   const [keepAssets, setKeepAssets] = useState(true)
+  const [selectedUserTemplateId, setSelectedUserTemplateId] = useState<string>()
   const [speechOpen, setSpeechOpen] = useState(Boolean(initialDocument?.slots.some(slot => slot.speech)))
   const [pickTarget, setPickTarget] = useState<string>()
   const [sceneDoc, setSceneDoc] = useState<Scene3DDocument>(() => initialDocument ? structuredClone(initialDocument) : ({ ...applyScene3DTemplate('two-shot'), width, height }))
@@ -273,18 +276,26 @@ export function Scene3DWorkspace({ width, height, initialDocument }: Props) {
     return () => window.removeEventListener(SPEECH_HANDOFF_EVENT, receive)
   }, [workspace, exporting])
 
-  const mountTemplate = (id: Scene3DTemplateId) => {
+  const adoptMountedScene = (next: Scene3DDocument, userTemplateId?: string) => {
     if (!canMutateWorld3DScene(exportingRef.current)) return
     generationRef.current += 1
-    const next = remountScene3DTemplate(id, sceneDoc, keepAssets)
-    if (id.startsWith('speech-')) setSpeechOpen(true)
     const keptUrls = new Set(next.slots.map(slot => slot.sourceUrl))
     for (const slot of sceneDoc.slots) if (!keptUrls.has(slot.sourceUrl)) revokeIfBlob(slot.sourceUrl)
+    if (next.templateId.startsWith('speech-') || next.slots.some(slot => Boolean(slot.speech))) setSpeechOpen(true)
     setPlaying(false)
     applyScene(next)
     setCatalogs(current => retainSlotClipCatalogs(sceneDoc.slots, next.slots, current))
     setFrame(0)
     selectSlot(next.slots.find(slot => slot.media === 'model3d')?.id ?? next.slots[0]?.id ?? 'subject_1')
+    setSelectedUserTemplateId(userTemplateId)
+  }
+
+  const mountTemplate = (id: Scene3DTemplateId) => {
+    adoptMountedScene(remountScene3DTemplate(id, sceneDoc, keepAssets))
+  }
+
+  const mountUserTemplate = (pack: World3DUserTemplate) => {
+    adoptMountedScene(remountUserTemplate(pack, sceneDoc, keepAssets), pack.id)
   }
 
   const roundtrip = Boolean(parseScene3DDocument(JSON.parse(JSON.stringify(sceneDoc))))
@@ -331,7 +342,8 @@ export function Scene3DWorkspace({ width, height, initialDocument }: Props) {
         onChange={soundtrack => applyScene(current => ({ ...current, soundtrack }))} />
       <details className="rounded-xl border border-border bg-bg-secondary">
         <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-text-primary">{editorT('templates')} · {editorT(`template.${sceneDoc.templateId}.title`)}</summary>
-      <Scene3DTemplateBrowser selected={sceneDoc.templateId} disabled={exporting} onSelect={mountTemplate} />
+      <Scene3DTemplateBrowser selected={selectedUserTemplateId ? undefined : sceneDoc.templateId} disabled={exporting} onSelect={mountTemplate} />
+      <Scene3DUserTemplates document={sceneDoc} disabled={editingLocked} selectedId={selectedUserTemplateId} onApply={mountUserTemplate} />
       <label className="flex min-h-10 items-center gap-2 px-1 text-xs text-text-secondary"><input type="checkbox" checked={keepAssets} disabled={exporting} onChange={event => setKeepAssets(event.target.checked)} />{editorT('keepAssets')}</label>
       </details>
       <Scene3DDocumentControls document={sceneDoc} disabled={editingLocked}
@@ -346,6 +358,7 @@ export function Scene3DWorkspace({ width, height, initialDocument }: Props) {
           setPlaying(false); setFrame(0); applyScene(next)
           selectSlot(next.slots[0]?.id ?? 'subject_1')
           setSpeechOpen(next.slots.some(slot => Boolean(slot.speech)))
+          setSelectedUserTemplateId(undefined)
         }} />
       <Scene3DSpeechSelector slots={sceneDoc.slots} selected={selected} open={speechOpen}
         onToggle={() => { setPickTarget(undefined); setSpeechOpen(open => !open) }} onSelect={selectSlot} />
