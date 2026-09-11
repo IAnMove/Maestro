@@ -119,10 +119,18 @@ try {
   await page.waitForFunction(() => !!window.__world3dStage, null, { timeout: 60000 });
   const plan = snapshot.plan;
   const doc = snapshot.document;
+  await page.waitForFunction(slots => window.__world3dStage?.ready?.(slots), doc.slots, { timeout: 90000 });
+  await page.evaluate(({ document: scene, plan: size }) => {
+    const handle = window.__world3dStage;
+    handle.beginExport?.(scene);
+    handle.setExportSize?.(size.width, size.height);
+  }, { document: doc, plan });
   for (let index = 0; index < plan.count; index += 1) {
     const png = await page.evaluate(async ({ document: scene, plan: size, index: frame }) => {
       const handle = window.__world3dStage;
-      const time = Math.min(size.duration, frame / size.fps);
+      const { scene3dPlaybackSpeed } = await import('/src/features/scene3d/clock.ts');
+      const outputTime = Math.min(size.duration, frame / size.fps);
+      const time = outputTime * scene3dPlaybackSpeed(scene.playbackSpeed);
       await handle.prepareFrame?.(time, scene);
       const source = handle.paint(time, scene);
       if (!source) throw new Error('The Video 3D stage was not ready');
@@ -134,10 +142,8 @@ try {
       const { paintSceneFx } = await import('/src/features/sceneFx/paint.ts');
       const { paintKineticTexts } = await import('/src/lib/kineticText.ts');
       const { paintClipNumber } = await import('/src/features/scene3d/performance.ts');
-      const { scene3dPlaybackSpeed } = await import('/src/features/scene3d/clock.ts');
-      const clock = time * scene3dPlaybackSpeed(scene.playbackSpeed);
-      paintSceneFx(context, size.width, size.height, clock, scene.sfx);
-      paintKineticTexts(context, size.width, size.height, clock, scene.texts);
+      paintSceneFx(context, size.width, size.height, time, scene.sfx);
+      paintKineticTexts(context, size.width, size.height, time, scene.texts);
       paintClipNumber(context, size.width, size.height, scene.clipNumber);
       return canvas.toDataURL('image/png');
     }, { document: doc, plan, index });
@@ -146,6 +152,7 @@ try {
     fs.writeFileSync(`${staging}/progress.json`, JSON.stringify({ current: index + 1, total: plan.count }));
   }
 } finally {
+  await page.evaluate(() => { window.__world3dStage?.endExport?.(); }).catch(() => {});
   await browser.close();
 }
 """
@@ -187,7 +194,7 @@ def export_capabilities() -> dict:
         "ffmpeg": ffmpeg, "playwright": playwright,
         "realRender": "ready" if ffmpeg and playwright else "pending",
         "renderer": "world3d-export-flow",
-        "fps": [30, 60], "maxDuration": 600, "maxVoicedDuration": 180,
+        "fps": [30, 60], "maxDuration": 600, "maxVoicedDuration": 0,
     }
 
 
@@ -313,8 +320,8 @@ def unsupported_capabilities(document: dict) -> list[str]:
     reasons = []
     if any(_blocked_url(item) for item in _walk_strings(document)):
         reasons.append("ephemeral_url")
-    if _has_sound(document) and output_duration(document) > 180:
-        reasons.append("voiced_duration")
+    if _has_sound(document):
+        reasons.append("voiced_duration" if output_duration(document) > 180 else "voiced_audio")
     for slot in document.get("slots") or []:
         media = slot.get("media") if isinstance(slot, dict) else None
         if media not in MEDIA_KINDS:
@@ -453,7 +460,8 @@ def command_handlers(service):
 
 
 def staging_dir(workspace_path: str, intent_id: str) -> Path:
-    token = intent_id if INTENT_RE.fullmatch(intent_id) else hashlib.sha256(intent_id.encode("utf-8")).hexdigest()[:32]
+    safe = bool(INTENT_RE.fullmatch(intent_id)) and intent_id not in {".", ".."} and ".." not in intent_id
+    token = intent_id if safe else hashlib.sha256(intent_id.encode("utf-8")).hexdigest()[:32]
     path = Path(workspace_path) / ".world3d-export" / token
     path.mkdir(parents=True, exist_ok=True)
     return path
@@ -649,6 +657,8 @@ class World3DExportService:
 
     def _publish(self, snapshot, staging, frames, workspace, registry, task_id, token) -> dict:
         self._ensure_active(token, registry, task_id)
+        if _has_sound(snapshot["document"]):
+            raise RuntimeError("Voiced World3D export cannot publish a silent MP4")
         plan = snapshot["plan"]
         encoded = staging / "encoded.mp4"
         mux_frame_sequence(frames, encoded, fps=plan["fps"], duration=plan["duration"])
