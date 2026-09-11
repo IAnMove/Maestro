@@ -178,6 +178,10 @@
   "templates": "Shot library",
   "search": "Search templates",
   "all": "All",
+  "allSettings": "Any set",
+  "filterCategory": "Shot type",
+  "filterSetting": "Set",
+  "filterCount": "{{shown}} / {{total}}",
   "noResults": "No templates match your search.",
   "play": "Play",
   "pause": "Pause",
@@ -231,6 +235,22 @@
     "music": "Music video",
     "space": "Space",
     "drive": "Driving"
+  },
+  "setting": {
+    "sea": "Sea",
+    "city": "City",
+    "rooftop": "Rooftop",
+    "hangar": "Hangar",
+    "desert": "Desert",
+    "train": "Train",
+    "moon": "Moon",
+    "space": "Space",
+    "jungle": "Jungle",
+    "snow": "Snow",
+    "casino": "Casino",
+    "studio": "Studio",
+    "street": "Street",
+    "stage": "Stage"
   },
   "template": {
     "speech-portrait": {
@@ -632,6 +652,70 @@
     "canyon-run": {
       "title": "Canyon run",
       "description": "Two vehicles thread a desert canyon with sand exploding off the walls."
+    },
+    "jungle-ambush": {
+      "title": "Jungle ambush",
+      "description": "Two figures close in a ruined clearing while the canopy swallows the light."
+    },
+    "snow-compound": {
+      "title": "Snow compound",
+      "description": "An agent crosses the drift toward a lodge while snow eats the horizon."
+    },
+    "casino-heist": {
+      "title": "Casino heist",
+      "description": "Two players close on a felt table under gold light."
+    },
+    "bank-vault": {
+      "title": "Bank vault",
+      "description": "A crane drops onto the vault as the cracksman steps in with a torch."
+    },
+    "skyscraper-ledge": {
+      "title": "Skyscraper ledge",
+      "description": "A pursuit along the parapet with the city falling away."
+    },
+    "oil-rig": {
+      "title": "Oil rig",
+      "description": "A crane over open water as fire licks the derrick."
+    },
+    "subway-brawl": {
+      "title": "Subway brawl",
+      "description": "Two fighters close in a rocking carriage as the rails spit sparks."
+    },
+    "freeway-overpass": {
+      "title": "Freeway overpass",
+      "description": "A high side track of two vehicles under sodium lamps."
+    },
+    "prison-break": {
+      "title": "Prison break",
+      "description": "The lead sprints the yard while a guard turns too late."
+    },
+    "arctic-chase": {
+      "title": "Arctic chase",
+      "description": "Two vehicles cut a white waste while snow blinds the tail."
+    },
+    "clock-tower": {
+      "title": "Clock tower",
+      "description": "An orbit around a climber on the tower as the city turns below."
+    },
+    "mansion-infil": {
+      "title": "Mansion infil",
+      "description": "The infiltrator crosses a marble hall toward the inner door."
+    },
+    "cargo-hold": {
+      "title": "Cargo hold",
+      "description": "A head-on rush down the bay as the ramp yawns behind."
+    },
+    "jungle-river": {
+      "title": "Jungle river",
+      "description": "A side track of two craft sliding a misty river under the canopy."
+    },
+    "red-carpet": {
+      "title": "Red carpet",
+      "description": "A slow orbit as the star walks the gold floor into a close-up."
+    },
+    "volcano-ridge": {
+      "title": "Volcano ridge",
+      "description": "A crane over two figures on the ridge as the caldera breathes fire."
     }
   },
   "gallerySearch": "Search the catalog",

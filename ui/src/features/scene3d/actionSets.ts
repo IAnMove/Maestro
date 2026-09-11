@@ -21,12 +21,13 @@ import {
 } from 'three'
 import type { Scene3DDressing } from './types.ts'
 
-export const ACTION_DRESSINGS = ['open-sea', 'lunar', 'rooftop', 'hangar', 'desert', 'train', 'space-lane'] as const
+export const ACTION_DRESSINGS = ['open-sea', 'lunar', 'rooftop', 'hangar', 'desert', 'train', 'space-lane', 'jungle', 'snow', 'casino'] as const
 export type ActionDressing = typeof ACTION_DRESSINGS[number]
 
 export function isActionDressing(kind: Scene3DDressing | undefined): kind is ActionDressing {
   return kind === 'open-sea' || kind === 'lunar' || kind === 'rooftop' || kind === 'hangar'
     || kind === 'desert' || kind === 'train' || kind === 'space-lane'
+    || kind === 'jungle' || kind === 'snow' || kind === 'casino'
 }
 
 const SKY: Record<ActionDressing, number> = {
@@ -37,6 +38,9 @@ const SKY: Record<ActionDressing, number> = {
   desert: 0xe0b575,
   train: 0x2a3648,
   'space-lane': 0x03040a,
+  jungle: 0x1a2e18,
+  snow: 0xb8c8d8,
+  casino: 0x120810,
 }
 
 function mat(color: number, extra?: { roughness?: number; metalness?: number; emissive?: number; opacity?: number }) {
@@ -109,7 +113,10 @@ export function actionGroup(kind: ActionDressing): Group {
   if (kind === 'hangar') return hangarGroup()
   if (kind === 'desert') return desertGroup()
   if (kind === 'train') return trainGroup()
-  return spaceLaneGroup()
+  if (kind === 'space-lane') return spaceLaneGroup()
+  if (kind === 'jungle') return jungleGroup()
+  if (kind === 'snow') return snowGroup()
+  return casinoGroup()
 }
 
 export function applyActionAtmosphere(scene: Scene, kind: Scene3DDressing | undefined) {
@@ -128,6 +135,9 @@ export function applyActionAtmosphere(scene: Scene, kind: Scene3DDressing | unde
   else if (kind === 'desert') scene.fog = new Fog(SKY[kind], 16, 70)
   else if (kind === 'rooftop') scene.fog = new Fog(SKY[kind], 18, 80)
   else if (kind === 'train') scene.fog = new Fog(SKY[kind], 12, 48)
+  else if (kind === 'jungle') scene.fog = new Fog(SKY[kind], 8, 28)
+  else if (kind === 'snow') scene.fog = new Fog(SKY[kind], 12, 40)
+  else if (kind === 'casino') scene.fog = new Fog(SKY[kind], 10, 32)
   else scene.fog = null
 }
 
@@ -396,6 +406,84 @@ function spaceLaneGroup() {
   return root
 }
 
+function jungleGroup() {
+  const root = new Group(); root.name = 'jungle'
+  const ground = new Mesh(new CircleGeometry(28, 40), mat(0x2a4a22, { roughness: 0.96 }))
+  ground.rotation.x = -Math.PI / 2
+  root.add(ground)
+  const trunk = mat(0x4a2e18, { roughness: 0.88 })
+  const leaf = mat(0x1f5a28, { roughness: 0.9 })
+  for (let i = 0; i < 14; i++) {
+    const a = i * 0.45
+    const x = Math.cos(a) * (6 + (i % 4) * 1.8)
+    const z = Math.sin(a) * (7 + (i % 3) * 1.4)
+    addBox(root, x, 1.2, z, 0.28, 2.4, 0.28, trunk)
+    const cone = new Mesh(new CylinderGeometry(0.08, 1.6, 3.2, 8), leaf)
+    cone.position.set(x, 3.2, z)
+    cone.name = 'jungle-leaf'
+    root.add(cone)
+  }
+  const ruin = mat(0x6a5a48, { roughness: 0.86 })
+  addBox(root, -3.2, 0.7, -4.4, 2.4, 1.4, 1.1, ruin)
+  addBox(root, 4.1, 0.45, 3.2, 1.8, 0.9, 1.4, ruin)
+  const fill = new PointLight(0x7dff9a, 10, 22, 2); fill.position.set(0, 5, 2); root.add(fill)
+  return root
+}
+
+function snowGroup() {
+  const root = new Group(); root.name = 'snow'
+  const ground = new Mesh(new CircleGeometry(32, 40), mat(0xe8eef4, { roughness: 0.92 }))
+  ground.rotation.x = -Math.PI / 2
+  root.add(ground)
+  const pine = mat(0x1f4a38, { roughness: 0.9 })
+  const trunk = mat(0x4a2e18, { roughness: 0.85 })
+  for (let i = 0; i < 10; i++) {
+    const x = -12 + i * 2.6
+    const z = i % 2 ? -7.4 : 8.2
+    addBox(root, x, 0.8, z, 0.2, 1.6, 0.2, trunk)
+    const cone = new Mesh(new CylinderGeometry(0.05, 1.3, 2.8, 8), pine)
+    cone.position.set(x, 2.4, z)
+    root.add(cone)
+  }
+  const lodge = mat(0x6a3a22, { roughness: 0.78 })
+  addBox(root, 3.4, 1.1, -2.2, 4.2, 2.2, 3.2, lodge)
+  addBox(root, 3.4, 2.5, -2.2, 4.6, 0.18, 3.6, mat(0xdde6ee, { roughness: 0.7 }))
+  const drift = mat(0xf4f8fc, { roughness: 0.95 })
+  for (let i = 0; i < 6; i++) {
+    const mesh = new Mesh(new IcosahedronGeometry(0.9 + (i % 3) * 0.3, 0), drift)
+    mesh.position.set(-6 + i * 2.4, 0.25, 2.4 - (i % 2))
+    mesh.scale.y = 0.35
+    mesh.name = 'snow-drift'
+    root.add(mesh)
+  }
+  const sun = new PointLight(0xe8f4ff, 22, 40, 2); sun.position.set(-8, 10, 6); root.add(sun)
+  return root
+}
+
+function casinoGroup() {
+  const root = new Group(); root.name = 'casino'
+  const floor = mat(0x1a1210, { roughness: 0.55, metalness: 0.35 })
+  addBox(root, 0, -0.06, 0, 24, 0.12, 18, floor)
+  const gold = glow(0xf2d36b)
+  for (let i = -6; i <= 6; i++) addBox(root, i * 1.6, 0.01, 0, 0.06, 0.01, 16, gold)
+  const column = mat(0xc9a15b, { roughness: 0.35, metalness: 0.65 })
+  for (const x of [-7.4, 7.4]) for (const z of [-5.2, 1.2, 6.4]) {
+    addBox(root, x, 2.2, z, 0.55, 4.4, 0.55, column)
+  }
+  const felt = mat(0x145a32, { roughness: 0.8 })
+  addBox(root, 0, 0.55, 0, 3.4, 0.12, 1.6, felt)
+  addBox(root, -3.8, 0.55, 2.4, 2.6, 0.12, 1.4, felt)
+  addBox(root, 3.8, 0.55, 2.4, 2.6, 0.12, 1.4, felt)
+  const wall = mat(0x3a1020, { roughness: 0.7 })
+  addBox(root, 0, 2.6, -8.6, 22, 5.2, 0.3, wall)
+  const lamp = new PointLight(0xffc16a, 18, 16, 2)
+  lamp.position.set(0, 3.6, 0)
+  lamp.name = 'casino-glow'
+  root.add(lamp)
+  const fill = new PointLight(0xff6a9a, 10, 18, 2); fill.position.set(-4, 3.2, 3); root.add(fill)
+  return root
+}
+
 export function paintActionSet(root: Object3D | null, seconds: number) {
   if (!root) return
   const water = root.getObjectByName('sea-water') as Mesh | undefined
@@ -420,5 +508,8 @@ export function paintActionSet(root: Object3D | null, seconds: number) {
       child.rotation.x = seconds * 0.08
     }
     if (child.name === 'station-ring') child.rotation.z = seconds * 0.25
+    if (child.name === 'jungle-leaf') child.rotation.z = Math.sin(seconds * 0.8 + child.position.x) * 0.06
+    if (child.name === 'snow-drift') child.position.x += Math.sin(seconds * 0.4 + child.position.z) * 0.002
+    if (child.name === 'casino-glow') child.position.y = 3.4 + Math.sin(seconds * 2.2) * 0.15
   })
 }

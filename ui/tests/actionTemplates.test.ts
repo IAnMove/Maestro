@@ -19,15 +19,16 @@ import { ACTION_DRESSINGS, actionGroup, isActionDressing, paintActionSet } from 
 import { parseScene3DDocument } from '../src/features/scene3d/document.ts'
 import { parseDressing } from '../src/features/scene3d/documentSlot.ts'
 import { applyScene3DTemplate, SCENE3D_TEMPLATES, TEMPLATE_CATEGORIES } from '../src/features/scene3d/templates.ts'
+import { filterScene3DTemplates, templateSetting } from '../src/features/scene3d/templateFilters.ts'
 import { SCENE3D_TEMPLATE_IDS } from '../src/features/scene3d/types.ts'
 
 const SOURCE = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../src/features/scene3d/actionTemplates.ts'), 'utf8')
 const SETS = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../src/features/scene3d/actionSets.ts'), 'utf8')
 const audio = { workspaceId: 'demo', filename: 'vo.wav', url: '/api/v1/uploads/vo.wav' }
 
-test('sixteen action ids are native, catalogued and free of private cinema/GLB imports', () => {
-  assert.equal(ACTION_TEMPLATE_IDS.length, 16)
-  assert.equal(new Set(ACTION_TEMPLATE_IDS).size, 16)
+test('thirty-two action ids are native, catalogued and free of private cinema/GLB imports', () => {
+  assert.equal(ACTION_TEMPLATE_IDS.length, 32)
+  assert.equal(new Set(ACTION_TEMPLATE_IDS).size, 32)
   assert.doesNotMatch(SOURCE, /tools\/cinema/)
   assert.doesNotMatch(SOURCE, /from ['"][^'"]+\.glb['"]/)
   assert.doesNotMatch(SETS, /from ['"][^'"]+\.glb['"]/)
@@ -95,7 +96,7 @@ test('apply, bind roles, optional audio/text and H/V variants reopen as native s
   }
 })
 
-test('the sixteen shots use distinct cameras and distinct in/out actions', () => {
+test('the thirty-two shots use distinct cameras and distinct in/out actions', () => {
   const cameras = new Set<string>()
   const actions = new Set<string>()
   const dressings = new Set<string>()
@@ -132,13 +133,14 @@ test('the sixteen shots use distinct cameras and distinct in/out actions', () =>
       assert.ok(Math.hypot(...eye.map((value, index) => value - look[index])) > 0.2, id)
     }
   }
-  assert.equal(cameras.size, 16, 'cameras are not the same shot with another label')
-  assert.equal(actions.size, 16, 'actions are not the same blocking with another label')
+  assert.equal(cameras.size, 32, 'cameras are not the same shot with another label')
+  assert.equal(actions.size, 32, 'actions are not the same blocking with another label')
   assert.ok(dressings.has('open-sea') && dressings.has('lunar') && dressings.has('space-lane') && dressings.has('chase-street'))
+  assert.ok(dressings.has('jungle') && dressings.has('snow') && dressings.has('casino'))
 })
 
 test('action dressings build named geometry without external media', () => {
-  assert.equal(ACTION_DRESSINGS.length, 7)
+  assert.equal(ACTION_DRESSINGS.length, 10)
   for (const kind of ACTION_DRESSINGS) {
     assert.equal(isActionDressing(kind), true)
     assert.equal(parseDressing(kind), kind)
@@ -150,4 +152,19 @@ test('action dressings build named geometry without external media', () => {
   }
   assert.equal(isActionDressing('citadel'), false)
   assert.equal(parseDressing('open-sea'), 'open-sea')
+})
+
+test('shot library filters by action category, set and search', () => {
+  assert.equal(templateSetting('sea-deck'), 'sea')
+  assert.equal(templateSetting('jungle-ambush'), 'jungle')
+  assert.equal(templateSetting('casino-heist'), 'casino')
+  const titleOf = (id: typeof ACTION_TEMPLATE_IDS[number]) => id
+  const action = filterScene3DTemplates({ category: 'action', setting: 'all', query: '', locale: 'en', titleOf })
+  assert.equal(action.length, 32)
+  const sea = filterScene3DTemplates({ category: 'action', setting: 'sea', query: '', locale: 'en', titleOf })
+  assert.ok(sea.some(item => item.id === 'sea-deck'))
+  assert.ok(sea.every(item => templateSetting(item.id) === 'sea'))
+  const lunar = filterScene3DTemplates({ category: 'action', setting: 'all', query: 'lunar', locale: 'en', titleOf })
+  assert.ok(lunar.some(item => item.id === 'lunar-outpost'))
+  assert.ok(!lunar.some(item => item.id === 'sea-deck'))
 })

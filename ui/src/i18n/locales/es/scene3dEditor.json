@@ -178,6 +178,10 @@
   "templates": "Biblioteca de planos",
   "search": "Buscar plantillas",
   "all": "Todas",
+  "allSettings": "Cualquier decorado",
+  "filterCategory": "Tipo de plano",
+  "filterSetting": "Decorado",
+  "filterCount": "{{shown}} / {{total}}",
   "noResults": "No hay plantillas para esta búsqueda.",
   "play": "Reproducir",
   "pause": "Pausar",
@@ -231,6 +235,22 @@
     "music": "Videoclip",
     "space": "Espacio",
     "drive": "Conducción"
+  },
+  "setting": {
+    "sea": "Mar",
+    "city": "Ciudad",
+    "rooftop": "Azotea",
+    "hangar": "Hangar",
+    "desert": "Desierto",
+    "train": "Tren",
+    "moon": "Luna",
+    "space": "Espacio",
+    "jungle": "Selva",
+    "snow": "Nieve",
+    "casino": "Casino",
+    "studio": "Estudio",
+    "street": "Calle",
+    "stage": "Escenario"
   },
   "template": {
     "speech-portrait": {
@@ -632,6 +652,70 @@
     "canyon-run": {
       "title": "Carrera en el cañón",
       "description": "Dos vehículos se cuelan por un cañón del desierto con la arena saltando de las paredes."
+    },
+    "jungle-ambush": {
+      "title": "Emboscada en la selva",
+      "description": "Dos figuras se cierran en un claro en ruinas mientras la copa se traga la luz."
+    },
+    "snow-compound": {
+      "title": "Complejo en la nieve",
+      "description": "Un agente cruza el ventisquero hacia el refugio mientras la nieve se come el horizonte."
+    },
+    "casino-heist": {
+      "title": "Atraco al casino",
+      "description": "Dos jugadores se cierran sobre una mesa de tapete bajo luz dorada."
+    },
+    "bank-vault": {
+      "title": "Cámara acorazada",
+      "description": "Una grúa baja a la cámara mientras el ladrón entra con el soplete."
+    },
+    "skyscraper-ledge": {
+      "title": "Cornisa del rascacielos",
+      "description": "Una persecución por el pretil con la ciudad cayendo al vacío."
+    },
+    "oil-rig": {
+      "title": "Plataforma petrolífera",
+      "description": "Una grúa sobre mar abierto mientras el fuego lame la torre."
+    },
+    "subway-brawl": {
+      "title": "Pelea en el metro",
+      "description": "Dos luchadores se cierran en un vagón mientras los raíles echan chispas."
+    },
+    "freeway-overpass": {
+      "title": "Autopista y paso elevado",
+      "description": "Un travelling alto de dos vehículos bajo lámparas de sodio."
+    },
+    "prison-break": {
+      "title": "Fuga de prisión",
+      "description": "El protagonista cruza el patio mientras el guardia gira demasiado tarde."
+    },
+    "arctic-chase": {
+      "title": "Persecución ártica",
+      "description": "Dos vehículos cortan un páramo blanco mientras la nieve ciega al que sigue."
+    },
+    "clock-tower": {
+      "title": "Torre del reloj",
+      "description": "Una órbita alrededor del trepador en la torre mientras la ciudad gira abajo."
+    },
+    "mansion-infil": {
+      "title": "Infiltración en la mansión",
+      "description": "El infiltrado cruza un salón de mármol hacia la puerta interior."
+    },
+    "cargo-hold": {
+      "title": "Bodega de carga",
+      "description": "Una carrera de frente por la bodega mientras la rampa se abre detrás."
+    },
+    "jungle-river": {
+      "title": "Río en la selva",
+      "description": "Un travelling de dos embarcaciones en un río de niebla bajo la copa."
+    },
+    "red-carpet": {
+      "title": "Alfombra roja",
+      "description": "Una órbita lenta mientras la estrella recorre el suelo dorado hasta el primer plano."
+    },
+    "volcano-ridge": {
+      "title": "Cresta del volcán",
+      "description": "Una grúa sobre dos figuras en la cresta mientras la caldera respira fuego."
     }
   },
   "gallerySearch": "Buscar en el catálogo",
