@@ -46,22 +46,11 @@ function issue(code: string, message: string, extra: Partial<PackageIssue> = {})
   return { code, message, ...extra }
 }
 
-export async function preflightBytes(data: Uint8Array, filename = 'package.zip'): Promise<PreflightReport> {
-  if (data.byteLength > MAX_ZIP_BYTES) {
-    return { ok: false, canImport: false, title: '', issues: [issue('too_large', 'zip')], unknownFields: [], assets: [], documents: [], warnings: [] }
-  }
-  const head = new TextDecoder().decode(data.slice(0, 32)).trimStart()
-  if (head.startsWith('{') || head.startsWith('[')) {
-    try {
-      const raw = JSON.parse(new TextDecoder().decode(data))
-      if (isTemplateWrapper(raw)) {
-        return { ok: false, canImport: false, title: '', issues: [issue('template', TEMPLATE_KIND)], unknownFields: [], assets: [], documents: [], warnings: [] }
-      }
-    } catch { /* not JSON */ }
-    return { ok: false, canImport: false, title: '', issues: [issue('not_zip', filename)], unknownFields: [], assets: [], documents: [], warnings: [] }
-  }
-  const zip = await JSZip.loadAsync(data)
-  const issues: PackageIssue[] = []
+function failed(code: string, message: string): PreflightReport {
+  return { ok: false, canImport: false, title: '', issues: [issue(code, message)], unknownFields: [], assets: [], documents: [], warnings: [] }
+}
+
+function scanZipMembers(zip: JSZip, issues: PackageIssue[]) {
   let uncompressed = 0
   for (const [name, entry] of Object.entries(zip.files)) {
     if (entry.dir) continue
@@ -78,22 +67,20 @@ export async function preflightBytes(data: Uint8Array, filename = 'package.zip')
     }
   }
   if (uncompressed > MAX_UNCOMPRESSED_BYTES) issues.push(issue('too_large', 'uncompressed'))
-  const manifestEntry = zip.file(MANIFEST_NAME)
-  if (!manifestEntry) {
-    issues.push(issue('missing_manifest', MANIFEST_NAME))
-    return { ok: false, canImport: false, title: '', issues, unknownFields: [], assets: [], documents: [], warnings: [] }
-  }
-  const manifestBytes = await manifestEntry.async('uint8array')
-  if (manifestBytes.byteLength > MAX_DOCUMENT_BYTES) issues.push(issue('too_large', MANIFEST_NAME))
-  let manifest: Record<string, unknown>
+}
+
+function rejectJsonPayload(data: Uint8Array, filename: string): PreflightReport | undefined {
+  const head = new TextDecoder().decode(data.slice(0, 32)).trimStart()
+  if (!head.startsWith('{') && !head.startsWith('[')) return undefined
   try {
-    manifest = JSON.parse(new TextDecoder().decode(manifestBytes)) as Record<string, unknown>
-  } catch {
-    return { ok: false, canImport: false, title: '', issues: [...issues, issue('invalid_manifest', MANIFEST_NAME)], unknownFields: [], assets: [], documents: [], warnings: [] }
-  }
-  if (manifest.kind === TEMPLATE_KIND) {
-    issues.push(issue('template', TEMPLATE_KIND))
-  }
+    const raw = JSON.parse(new TextDecoder().decode(data))
+    if (isTemplateWrapper(raw)) return failed('template', TEMPLATE_KIND)
+  } catch { /* not JSON */ }
+  return failed('not_zip', filename)
+}
+
+function inspectManifest(manifest: Record<string, unknown>, issues: PackageIssue[]) {
+  if (manifest.kind === TEMPLATE_KIND) issues.push(issue('template', TEMPLATE_KIND))
   if (manifest.kind !== PACKAGE_KIND && manifest.schema !== PACKAGE_KIND) {
     issues.push(issue('unsupported_kind', String(manifest.kind || manifest.schema || '')))
   }
@@ -102,11 +89,10 @@ export async function preflightBytes(data: Uint8Array, filename = 'package.zip')
   }
   const cinema = cinemaExtensionOf(manifest)
   if (cinema) issues.push(issue('cinema_extension', cinema))
-  const documentsMeta = Array.isArray(manifest.documents) ? manifest.documents : []
-  const assetsMeta = Array.isArray(manifest.assets) ? manifest.assets : []
-  const unknownFields: string[] = []
-  const documents: PreflightReport['documents'] = []
-  for (const [index, entry] of documentsMeta.entries()) {
+}
+
+async function inspectDocuments(zip: JSZip, entries: unknown[], issues: PackageIssue[], unknownFields: string[], documents: PreflightReport['documents']) {
+  for (const [index, entry] of entries.entries()) {
     const record = entry && typeof entry === 'object' ? entry as Record<string, unknown> : {}
     documents.push({ id: String(record.id || ''), role: String(record.role || ''), name: String(record.name || '') })
     const path = String(record.path || '')
@@ -124,8 +110,10 @@ export async function preflightBytes(data: Uint8Array, filename = 'package.zip')
     unknownFields.push(...collectUnknownFields(parsed, `documents[${index + 1}].`))
     issues.push(...documentIssues(parsed, index + 1))
   }
-  const assets: PackedAsset[] = []
-  for (const entry of assetsMeta) {
+}
+
+async function inspectAssets(zip: JSZip, entries: unknown[], issues: PackageIssue[], assets: PackedAsset[]) {
+  for (const entry of entries) {
     const record = entry && typeof entry === 'object' ? entry as Record<string, unknown> : {}
     const path = String(record.path || '')
     const digest = String(record.sha256 || '')
@@ -135,14 +123,41 @@ export async function preflightBytes(data: Uint8Array, filename = 'package.zip')
     if (!path.startsWith(`${MEDIA_DIR}/`) || !file) status = 'missing'
     else if (!isContentHashName(path)) issues.push(issue('traversal', path, { path }))
     else {
-      const bytes = await file.async('uint8array')
-      const hash = await sha256Hex(bytes)
+      const hash = await sha256Hex(await file.async('uint8array'))
       if (hash !== digest) status = 'tampered'
     }
     if (status === 'missing') issues.push(issue('missing_asset', filename || digest, { repair: true, path }))
     if (status === 'tampered') issues.push(issue('tampered_asset', filename || digest, { repair: true, path }))
     assets.push({ sha256: digest, filename, path, kind: String(record.kind || ''), size: Number(record.size || 0), status })
   }
+}
+
+export async function preflightBytes(data: Uint8Array, filename = 'package.zip'): Promise<PreflightReport> {
+  if (data.byteLength > MAX_ZIP_BYTES) return failed('too_large', 'zip')
+  const rejected = rejectJsonPayload(data, filename)
+  if (rejected) return rejected
+  const zip = await JSZip.loadAsync(data)
+  const issues: PackageIssue[] = []
+  scanZipMembers(zip, issues)
+  const manifestEntry = zip.file(MANIFEST_NAME)
+  if (!manifestEntry) {
+    issues.push(issue('missing_manifest', MANIFEST_NAME))
+    return { ok: false, canImport: false, title: '', issues, unknownFields: [], assets: [], documents: [], warnings: [] }
+  }
+  const manifestBytes = await manifestEntry.async('uint8array')
+  if (manifestBytes.byteLength > MAX_DOCUMENT_BYTES) issues.push(issue('too_large', MANIFEST_NAME))
+  let manifest: Record<string, unknown>
+  try {
+    manifest = JSON.parse(new TextDecoder().decode(manifestBytes)) as Record<string, unknown>
+  } catch {
+    return { ok: false, canImport: false, title: '', issues: [...issues, issue('invalid_manifest', MANIFEST_NAME)], unknownFields: [], assets: [], documents: [], warnings: [] }
+  }
+  inspectManifest(manifest, issues)
+  const unknownFields: string[] = []
+  const documents: PreflightReport['documents'] = []
+  const assets: PackedAsset[] = []
+  await inspectDocuments(zip, Array.isArray(manifest.documents) ? manifest.documents : [], issues, unknownFields, documents)
+  await inspectAssets(zip, Array.isArray(manifest.assets) ? manifest.assets : [], issues, assets)
   const blocking = issues.some(item => ['cinema_extension', 'external_link', 'invalid_document', 'template', 'traversal', 'unsupported_kind', 'unsupported_version', 'too_large'].includes(item.code))
   const repairable = issues.some(item => item.repair)
   return {

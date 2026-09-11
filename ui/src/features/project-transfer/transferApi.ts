@@ -31,9 +31,11 @@ export async function exportScenePackage(input: {
 }
 
 export async function preflightScenePackage(file: File): Promise<PreflightReport> {
-  const body = new FormData()
-  body.set('file', file)
-  const response = await fetch(`${BASE}/api/v1/scene-packages/preflight`, { method: 'POST', body })
+  const response = await fetch(`${BASE}/api/v1/scene-packages/preflight`, {
+    method: 'POST',
+    headers: { 'Content-Type': file.type || 'application/zip' },
+    body: file,
+  })
   if (!response.ok) throw new Error(await readError(response))
   return response.json() as Promise<PreflightReport>
 }
@@ -43,11 +45,15 @@ export async function importScenePackage(input: {
   file: File
   reassign?: ReassignEntry[]
 }): Promise<{ ok: boolean; scenes: Array<{ name: string }>; unknown_fields: string[] }> {
-  const body = new FormData()
-  body.set('workspace', input.workspace)
-  body.set('file', input.file)
-  body.set('reassign', JSON.stringify(input.reassign || []))
-  const response = await fetch(`${BASE}/api/v1/scene-packages/import`, { method: 'POST', body })
+  const query = new URLSearchParams({
+    workspace: input.workspace,
+    reassign: JSON.stringify(input.reassign || []),
+  })
+  const response = await fetch(`${BASE}/api/v1/scene-packages/import?${query}`, {
+    method: 'POST',
+    headers: { 'Content-Type': input.file.type || 'application/zip' },
+    body: input.file,
+  })
   if (!response.ok) throw new Error(await readError(response))
   return response.json()
 }

@@ -8,7 +8,7 @@ from collections.abc import Callable, Iterable, Mapping
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import Response
 
 from services.scene_packages import (
@@ -23,7 +23,6 @@ from services.scene_packages import (
     require_workspace,
     write_package_zip,
 )
-from services.upload_stream import UploadTooLargeError, stream_upload_file
 
 _SLUG = re.compile(r"[^A-Za-z0-9._-]+")
 
@@ -36,8 +35,8 @@ def _slug(value: str) -> str:
 def _raise(error: Exception) -> None:
     if isinstance(error, ScenePackageError):
         raise HTTPException(error.status, str(error)) from error
-    if isinstance(error, UploadTooLargeError):
-        raise HTTPException(413, "Package zip exceeds the size limit") from error
+    if isinstance(error, ScenePackageTooLarge):
+        raise HTTPException(413, str(error)) from error
     raise HTTPException(422, str(error)) from error
 
 
@@ -54,13 +53,17 @@ def _parse_reassign(raw: str) -> list[dict[str, Any]]:
     return [item for item in value if isinstance(item, Mapping)]
 
 
-async def _spool_upload(upload: UploadFile, directory: Path) -> Path:
+async def _spool_request(request: Request, directory: Path) -> Path:
     destination = directory / "upload.scene-package.zip"
-    try:
-        await stream_upload_file(upload, destination, max_bytes=MAX_ZIP_BYTES)
-    except FileExistsError:
-        destination.unlink(missing_ok=True)
-        await stream_upload_file(upload, destination, max_bytes=MAX_ZIP_BYTES)
+    written = 0
+    with destination.open("wb") as handle:
+        async for chunk in request.stream():
+            written += len(chunk)
+            if written > MAX_ZIP_BYTES:
+                raise HTTPException(413, "Package zip exceeds the size limit")
+            handle.write(chunk)
+    if written <= 0:
+        raise HTTPException(422, "Package zip is empty")
     return destination
 
 
@@ -136,25 +139,21 @@ def create_scene_packages_router(
         )
 
     @router.post("/api/v1/scene-packages/preflight")
-    async def preflight(file: UploadFile = File(...)):
+    async def preflight(request: Request):
         with tempfile.TemporaryDirectory(prefix="scene-package-") as tmp:
             try:
-                stored = await _spool_upload(file, Path(tmp))
+                stored = await _spool_request(request, Path(tmp))
                 return preflight_package(stored)
-            except (ScenePackageError, UploadTooLargeError, OSError, ValueError) as error:
+            except (ScenePackageError, ScenePackageTooLarge, OSError, ValueError) as error:
                 _raise(error)
                 raise
 
     @router.post("/api/v1/scene-packages/import")
-    async def import_scene_package(
-        workspace: str = Form(...),
-        file: UploadFile = File(...),
-        reassign: str = Form("[]"),
-    ):
+    async def import_scene_package(request: Request, workspace: str, reassign: str = "[]"):
         replacements = _parse_reassign(reassign)
         with tempfile.TemporaryDirectory(prefix="scene-package-") as tmp:
             try:
-                stored = await _spool_upload(file, Path(tmp))
+                stored = await _spool_request(request, Path(tmp))
                 target = _known_workspace(workspace)
                 return import_package(
                     stored,
@@ -163,7 +162,7 @@ def create_scene_packages_router(
                     reader=reader,
                     reassign=replacements,
                 )
-            except (ScenePackageError, UploadTooLargeError, OSError, ValueError) as error:
+            except (ScenePackageError, ScenePackageTooLarge, OSError, ValueError) as error:
                 _raise(error)
                 raise
 

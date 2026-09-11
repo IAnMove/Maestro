@@ -46,6 +46,15 @@ def _client(tmp_path: Path) -> tuple[TestClient, dict[str, Path]]:
     return TestClient(app), roots
 
 
+def _post_zip(client: TestClient, path: str, content: bytes, *, workspace: str | None = None, reassign: str | None = None):
+    params: dict[str, str] = {}
+    if workspace:
+        params["workspace"] = workspace
+    if reassign is not None:
+        params["reassign"] = reassign
+    return client.post(path, params=params, content=content, headers={"Content-Type": "application/zip"})
+
+
 def _png() -> bytes:
     return b"\x89PNG\r\n\x1a\npreview"
 
@@ -200,8 +209,9 @@ def test_import_preserves_lips_screen_animation_text_environment_sfx(tmp_path: P
     })
     imported = client.post(
         "/api/v1/scene-packages/import",
-        data={"workspace": "lab", "reassign": "[]"},
-        files={"file": ("pair.scene-package.zip", exported.content, "application/zip")},
+        params={"workspace": "lab"},
+        content=exported.content,
+        headers={"Content-Type": "application/zip"},
     )
     assert imported.status_code == 200, imported.text
     body = imported.json()
@@ -237,10 +247,8 @@ def test_repeat_import_reuses_hashed_media(tmp_path: Path):
     exported = client.post("/api/v1/scene-packages/export", json={
         "workspace": "film", "documents": shots,
     }).content
-    first = client.post("/api/v1/scene-packages/import", data={"workspace": "lab", "reassign": "[]"},
-                        files={"file": ("a.zip", exported, "application/zip")})
-    second = client.post("/api/v1/scene-packages/import", data={"workspace": "lab", "reassign": "[]"},
-                         files={"file": ("a.zip", exported, "application/zip")})
+    first = _post_zip(client, "/api/v1/scene-packages/import", exported, workspace="lab")
+    second = _post_zip(client, "/api/v1/scene-packages/import", exported, workspace="lab")
     assert first.status_code == 200 and second.status_code == 200, second.text
     assert second.json()["assets_reused"] == 4
     assert second.json()["assets_created"] == 0
@@ -268,18 +276,18 @@ def test_tampered_asset_is_detected_and_replaced(tmp_path: Path):
                     data = b"not-the-glb"
                 dirty.writestr(info, data)
     tampered = rewritten.getvalue()
-    report = client.post("/api/v1/scene-packages/preflight",
-                         files={"file": ("bad.zip", tampered, "application/zip")}).json()
+    report = _post_zip(client, "/api/v1/scene-packages/preflight", tampered).json()
     assert report["ok"] is False
     assert any(issue["code"] == "tampered_asset" and issue["repair"] for issue in report["issues"])
-    blocked = client.post("/api/v1/scene-packages/import", data={"workspace": "lab", "reassign": "[]"},
-                          files={"file": ("bad.zip", tampered, "application/zip")})
+    blocked = _post_zip(client, "/api/v1/scene-packages/import", tampered, workspace="lab")
     assert blocked.status_code == 422
     (roots["lab"] / "hero.glb").write_bytes(b"glb-shared")
-    repaired = client.post(
+    repaired = _post_zip(
+        client,
         "/api/v1/scene-packages/import",
-        data={"workspace": "lab", "reassign": json.dumps([{"sha256": glb["sha256"], "filename": "hero.glb", "workspace": "lab"}])},
-        files={"file": ("bad.zip", tampered, "application/zip")},
+        tampered,
+        workspace="lab",
+        reassign=json.dumps([{"sha256": glb["sha256"], "filename": "hero.glb", "workspace": "lab"}]),
     )
     assert repaired.status_code == 200, repaired.text
     scene = json.loads(next(roots["lab"].glob("*.world3d.scene.json")).read_text())
@@ -312,8 +320,7 @@ def test_failed_import_leaves_previous_project_intact(tmp_path: Path):
                     document["duration"] = 0
                     data = json.dumps(document).encode()
                 dirty.writestr(info, data)
-    failed = client.post("/api/v1/scene-packages/import", data={"workspace": "lab", "reassign": "[]"},
-                         files={"file": ("bad.zip", rewritten.getvalue(), "application/zip")})
+    failed = _post_zip(client, "/api/v1/scene-packages/import", rewritten.getvalue(), workspace="lab")
     assert failed.status_code == 422
     after = {path.name: path.read_bytes() for path in roots["lab"].iterdir() if path.is_file()}
     assert after == before
@@ -333,8 +340,7 @@ def test_reject_path_traversal_symlink_and_absolute_members(tmp_path: Path):
                 "kind": PACKAGE_KIND, "schema_version": 1, "documents": [], "assets": [],
             }))
             archive.writestr(payload[0], payload[1])
-        response = client.post("/api/v1/scene-packages/preflight",
-                               files={"file": (name, buffer.getvalue(), "application/zip")})
+        response = _post_zip(client, "/api/v1/scene-packages/preflight", buffer.getvalue())
         assert response.status_code == 422, response.text
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w") as archive:
@@ -345,8 +351,7 @@ def test_reject_path_traversal_symlink_and_absolute_members(tmp_path: Path):
         info.create_system = 3
         info.external_attr = (stat.S_IFLNK | 0o777) << 16
         archive.writestr(info, b"target")
-    response = client.post("/api/v1/scene-packages/preflight",
-                           files={"file": ("link.zip", buffer.getvalue(), "application/zip")})
+    response = _post_zip(client, "/api/v1/scene-packages/preflight", buffer.getvalue())
     assert response.status_code == 422
 
 
@@ -366,8 +371,11 @@ def test_reject_external_links_oversized_zip_unknown_cinema_and_template(tmp_pat
         "description": "", "includeAssets": False, "createdAt": "2026-09-11T00:00:00Z",
         "document": _shot(title="Cafe", glb=refs["glb"], voice=refs["voice"], screen=refs["screen"], environment=refs["env"]),
     }
-    response = client.post("/api/v1/scene-packages/preflight",
-                           files={"file": ("cafe.world3d.template.json", json.dumps(template).encode(), "application/json")})
+    response = client.post(
+        "/api/v1/scene-packages/preflight",
+        content=json.dumps(template).encode(),
+        headers={"Content-Type": "application/json"},
+    )
     assert response.status_code == 422
     assert "template" in response.json()["detail"].lower()
     monkey_zip = tmp_path / "tiny.zip"
@@ -392,13 +400,11 @@ def test_unknown_fields_are_listed_and_kept(tmp_path: Path):
     shot["slots"][0]["mysteryRig"] = {"bones": 2}
     exported = client.post("/api/v1/scene-packages/export", json={"workspace": "film", "documents": [shot]})
     assert exported.status_code == 200, exported.text
-    report = client.post("/api/v1/scene-packages/preflight",
-                         files={"file": ("flags.zip", exported.content, "application/zip")}).json()
+    report = _post_zip(client, "/api/v1/scene-packages/preflight", exported.content).json()
     joined = " ".join(report["unknown_fields"])
     assert "customRendererFlag" in joined
     assert "mysteryRig" in joined
-    imported = client.post("/api/v1/scene-packages/import", data={"workspace": "lab", "reassign": "[]"},
-                           files={"file": ("flags.zip", exported.content, "application/zip")})
+    imported = _post_zip(client, "/api/v1/scene-packages/import", exported.content, workspace="lab")
     assert imported.status_code == 200, imported.text
     document = json.loads(next(roots["lab"].glob("*.world3d.scene.json")).read_text())
     assert document["customRendererFlag"] is True
@@ -421,8 +427,7 @@ def test_wrapper_is_accepted_inside_a_package_but_not_as_the_package(tmp_path: P
         packed = json.loads(archive.read(manifest["documents"][0]["path"]))
     assert manifest["kind"] == PACKAGE_KIND
     assert packed["kind"] == TEMPLATE_KIND
-    imported = client.post("/api/v1/scene-packages/import", data={"workspace": "lab", "reassign": "[]"},
-                           files={"file": ("wrap.zip", exported.content, "application/zip")})
+    imported = _post_zip(client, "/api/v1/scene-packages/import", exported.content, workspace="lab")
     assert imported.status_code == 200, imported.text
     document = json.loads(next(roots["lab"].glob("*.world3d.scene.json")).read_text())
     assert document["texts"][0]["text"] == "Wrap"
