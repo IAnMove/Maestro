@@ -19,6 +19,7 @@ import { BrandIdentity } from './components/BrandIdentity'
 import { HocusPocusIntro } from './components/HocusPocusIntro'
 import { LanAuthGate } from './components/LanAuthGate'
 import { ExecutionModeBanner } from './components/ExecutionModeBanner'
+import { catalogFromOutputs, GenerationInspectorHost } from './features/generation-inspector'
 import { useStore } from './stores/useStore'
 import { useIsMobile } from './lib/useIsMobile'
 
@@ -83,6 +84,9 @@ function AppContent() {
   const runtimeIdentity = useStore(s => s.systemStats?.runtime)
   const toggleSettings = useStore(s => s.toggleSettings)
   const appVersion = useStore(s => s.systemConfig?.app_version)
+  const activeWorkspace = useStore(s => s.activeWorkspace)
+  const outputs = useStore(s => s.outputs)
+  const params = useStore(s => s.params)
   const isMobile = useIsMobile()
 
   useEffect(() => {
@@ -221,6 +225,11 @@ function AppContent() {
       <LazyDirectorOverlay open={dashboardOpen} />
       <StorageDashboard />
       <RecipesOverlay />
+      <GenerationInspectorHost
+        workspace={activeWorkspace}
+        catalog={catalogFromOutputs(outputs || [])}
+        currentModel={{ id: params.model_type }}
+      />
       <RetakeDialog />
       {/* OomRecoveryBanner is a fixed-position overlay — renders nothing
           unless the latest job/pipeline failure has oom_info attached.

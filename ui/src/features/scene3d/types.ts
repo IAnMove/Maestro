@@ -70,6 +70,14 @@ export const SCENE3D_TEMPLATE_IDS = [
   'reflective-stage',
   'character-materialization',
   'blast-stage',
+  'server-inspection',
+  'coding-desk',
+  'tracking-chase',
+  'character-presentation',
+  'screen-alert',
+  'product-comparison',
+  'topic-travelling',
+  'heroic-close',
 ] as const
 
 export type Scene3DTemplateId = (typeof SCENE3D_TEMPLATE_IDS)[number]

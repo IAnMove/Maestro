@@ -535,6 +535,38 @@
     "blast-stage": {
       "title": "Explosión en suelo",
       "description": "Explosión cinematográfica sobre el metal: destello, bola de fuego, onda, escombros y humo."
+    },
+    "server-inspection": {
+      "title": "Inspección de servidor",
+      "description": "Una grúa baja hacia el rack mientras el inspector entra por el pasillo."
+    },
+    "coding-desk": {
+      "title": "Mesa de código",
+      "description": "El programador se sienta en el taller; el monitor es una pantalla intercambiable."
+    },
+    "tracking-chase": {
+      "title": "Persecución en travelling",
+      "description": "Un travelling lateral sigue a dos corredores; entran por la izquierda y salen por la derecha."
+    },
+    "character-presentation": {
+      "title": "Presentación de personaje",
+      "description": "Una órbita alrededor del héroe que materializa sobre una tarima reflectante."
+    },
+    "screen-alert": {
+      "title": "Alerta en pantalla",
+      "description": "El operador corre hacia el mural de alerta cuando el rayo golpea el cristal."
+    },
+    "product-comparison": {
+      "title": "Comparación de producto",
+      "description": "Dos productos entran desde lados opuestos mientras la cámara orbita el par."
+    },
+    "topic-travelling": {
+      "title": "Travelling temático",
+      "description": "La guía recorre un pasillo de plaza junto a pantallas de tema intercambiables."
+    },
+    "heroic-close": {
+      "title": "Cierre heroico",
+      "description": "Un empuje bajo a la cara mientras el héroe entra en primer plano."
     }
   },
   "gallerySearch": "Buscar en el catálogo",

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Search } from 'lucide-react'
 import { useUiTranslation } from '../../i18n'
+import { campaignCard } from './campaignTemplates'
 import { SCENE3D_TEMPLATES, TEMPLATE_CATEGORIES, type Scene3DTemplateCategory, type Scene3DTemplateId } from './templates'
 
 const categories = ['cinema', 'product', 'music', 'space', 'drive'] as const
@@ -8,11 +9,16 @@ const categories = ['cinema', 'product', 'music', 'space', 'drive'] as const
 export function Scene3DTemplateBrowser({ selected, disabled, onSelect }: {
   selected?: Scene3DTemplateId; disabled: boolean; onSelect: (id: Scene3DTemplateId) => void
 }) {
-  const { t } = useUiTranslation('scene3dEditor')
+  const { t, i18n } = useUiTranslation('scene3dEditor')
   const [category, setCategory] = useState<'all' | Scene3DTemplateCategory>('all')
   const [query, setQuery] = useState('')
-  const templates = SCENE3D_TEMPLATES.filter(item => (category === 'all' || TEMPLATE_CATEGORIES[item.id] === category)
-    && `${t(`template.${item.id}.title`)} ${t(`template.${item.id}.description`)}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()))
+  const locale = i18n.language.startsWith('es') ? 'es' : 'en'
+  const templates = SCENE3D_TEMPLATES.filter(item => {
+    const card = campaignCard(item.id, locale)
+    const haystack = `${t(`template.${item.id}.title`)} ${t(`template.${item.id}.description`)} ${card?.requirements.join(' ') ?? ''}`
+    return (category === 'all' || TEMPLATE_CATEGORIES[item.id] === category)
+      && haystack.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())
+  })
   return <section className="rounded-xl border border-border bg-bg-secondary p-3" aria-label={t('templates')}>
     <div className="flex flex-wrap items-center justify-between gap-3">
       <h2 className="text-sm font-semibold text-text-primary">{t('templates')} <span className="ml-1 text-text-muted">{SCENE3D_TEMPLATES.length}</span></h2>
@@ -27,12 +33,16 @@ export function Scene3DTemplateBrowser({ selected, disabled, onSelect }: {
       </button>)}
     </div>
     <div className="grid max-h-72 grid-cols-1 gap-2 overflow-y-auto p-1 sm:grid-cols-2 xl:grid-cols-3">
-      {templates.map(item => <button key={item.id} type="button" disabled={disabled} onClick={() => onSelect(item.id)} aria-pressed={selected === item.id}
-        data-testid={`world3d-template-${item.id}`}
-        className={`rounded-lg border p-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-cyan-200 disabled:opacity-40 ${selected === item.id ? 'border-cyan-300 bg-cyan-300/10' : 'border-border bg-bg-primary hover:border-cyan-300/50'}`}>
-        <span className="flex items-center justify-between gap-2 text-sm font-semibold text-text-primary">{t(`template.${item.id}.title`)}<span className="whitespace-nowrap text-xs font-normal tabular-nums text-text-muted">{item.duration} s</span></span>
-        <span className="mt-1 block text-xs leading-5 text-text-secondary">{t(`template.${item.id}.description`)}</span>
-      </button>)}
+      {templates.map(item => {
+        const card = campaignCard(item.id, locale)
+        return <button key={item.id} type="button" disabled={disabled} onClick={() => onSelect(item.id)} aria-pressed={selected === item.id}
+          data-testid={`world3d-template-${item.id}`}
+          className={`rounded-lg border p-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-cyan-200 disabled:opacity-40 ${selected === item.id ? 'border-cyan-300 bg-cyan-300/10' : 'border-border bg-bg-primary hover:border-cyan-300/50'}`}>
+          <span className="flex items-center justify-between gap-2 text-sm font-semibold text-text-primary">{t(`template.${item.id}.title`)}<span className="whitespace-nowrap text-xs font-normal tabular-nums text-text-muted">{item.duration} s</span></span>
+          <span className="mt-1 block text-xs leading-5 text-text-secondary">{t(`template.${item.id}.description`)}</span>
+          {card?.requirements.map(req => <span key={req} className="mt-1 block text-[10px] leading-4 text-text-muted">{req}</span>)}
+        </button>
+      })}
     </div>
     {templates.length === 0 && <p role="status" className="p-4 text-sm text-text-secondary">{t('noResults')}</p>}
   </section>
