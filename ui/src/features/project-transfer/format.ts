@@ -139,39 +139,46 @@ function refFrom(value: unknown, url = ''): AssetUse | undefined {
   return { docId: '', role: '', kind: '', workspaceId, filename: filename || basename(refUrl.split('?')[0]), url: refUrl, assetId }
 }
 
-export function collectAssetUses(document: unknown, docId = 'shot'): AssetUse[] {
-  const uses: AssetUse[] = []
-  const add = (raw: unknown, role: string, kind: string, url = '') => {
-    const ref = refFrom(raw, url)
-    if (!ref || (!ref.url && !ref.filename)) return
-    uses.push({ ...ref, docId, role, kind })
+function pushUse(uses: AssetUse[], raw: unknown, docId: string, role: string, kind: string, url = '') {
+  const ref = refFrom(raw, url)
+  if (!ref || (!ref.url && !ref.filename)) return
+  uses.push({ ...ref, docId, role, kind })
+}
+
+function collectSlotUses(slot: unknown, index: number, docId: string, uses: AssetUse[]) {
+  if (!slot || typeof slot !== 'object') return
+  const record = slot as Record<string, unknown>
+  const media = String(record.media || 'model3d')
+  const kind = media === 'image' || media === 'screen' ? 'image' : 'model3d'
+  pushUse(uses, record.sourceRef, docId, `slots[${index}]`, kind, String(record.sourceUrl || ''))
+  const screen = record.screen
+  if (screen && typeof screen === 'object') {
+    const screenRecord = screen as Record<string, unknown>
+    pushUse(uses, screenRecord.sourceRef, docId, `slots[${index}].screen`, screenRecord.media === 'video' ? 'video' : 'image', String(screenRecord.sourceUrl || ''))
   }
-  const body = unwrapDocument(document)
-  const slots = Array.isArray(body.slots) ? body.slots : []
-  slots.forEach((slot, index) => {
-    if (!slot || typeof slot !== 'object') return
-    const record = slot as Record<string, unknown>
-    const media = String(record.media || 'model3d')
-    add(record.sourceRef, `slots[${index}]`, media === 'image' || media === 'screen' ? 'image' : 'model3d', String(record.sourceUrl || ''))
-    const screen = record.screen
-    if (screen && typeof screen === 'object') {
-      const screenRecord = screen as Record<string, unknown>
-      add(screenRecord.sourceRef, `slots[${index}].screen`, screenRecord.media === 'video' ? 'video' : 'image', String(screenRecord.sourceUrl || ''))
-    }
-    const speech = record.speech
-    if (speech && typeof speech === 'object') {
-      const speechRecord = speech as Record<string, unknown>
-      add(speechRecord.audio, `slots[${index}].speech.audio`, 'audio')
-      add(speechRecord.atlas, `slots[${index}].speech.atlas`, 'image')
-      const clips = Array.isArray(speechRecord.clips) ? speechRecord.clips : []
-      clips.forEach((clip, clipIndex) => {
-        if (clip && typeof clip === 'object') add((clip as Record<string, unknown>).audio, `slots[${index}].speech.clips[${clipIndex}].audio`, 'audio')
-      })
+  const speech = record.speech
+  if (!speech || typeof speech !== 'object') return
+  const speechRecord = speech as Record<string, unknown>
+  pushUse(uses, speechRecord.audio, docId, `slots[${index}].speech.audio`, 'audio')
+  pushUse(uses, speechRecord.atlas, docId, `slots[${index}].speech.atlas`, 'image')
+  const clips = Array.isArray(speechRecord.clips) ? speechRecord.clips : []
+  clips.forEach((clip, clipIndex) => {
+    if (clip && typeof clip === 'object') {
+      pushUse(uses, (clip as Record<string, unknown>).audio, docId, `slots[${index}].speech.clips[${clipIndex}].audio`, 'audio')
     }
   })
+}
+
+export function collectAssetUses(document: unknown, docId = 'shot'): AssetUse[] {
+  const uses: AssetUse[] = []
+  const body = unwrapDocument(document)
+  const slots = Array.isArray(body.slots) ? body.slots : []
+  slots.forEach((slot, index) => collectSlotUses(slot, index, docId, uses))
   const tracks = Array.isArray(body.soundtrack) ? body.soundtrack : []
   tracks.forEach((track, index) => {
-    if (track && typeof track === 'object') add((track as Record<string, unknown>).audio, `soundtrack[${index}]`, 'audio')
+    if (track && typeof track === 'object') {
+      pushUse(uses, (track as Record<string, unknown>).audio, docId, `soundtrack[${index}]`, 'audio')
+    }
   })
   return uses
 }
@@ -211,7 +218,9 @@ export function isContentHashName(name: string): boolean {
 export async function sha256Hex(data: Uint8Array): Promise<string> {
   const subtle = globalThis.crypto?.subtle
   if (!subtle) throw new Error('SHA-256 is unavailable')
-  const hash = await subtle.digest('SHA-256', data)
+  const copy = new ArrayBuffer(data.byteLength)
+  new Uint8Array(copy).set(data)
+  const hash = await subtle.digest('SHA-256', copy)
   return [...new Uint8Array(hash)].map(byte => byte.toString(16).padStart(2, '0')).join('')
 }
 
