@@ -2,7 +2,7 @@ import { CinematicRuntime } from './cinematicRuntime'
 import { MaterializationRuntime } from './materialization'
 import { framingPose } from './framing'
 import { SpeechFaceRuntime } from './speech/runtime'
-import { FacePackRuntime } from './speech/facePack'
+import { FACE_PACK_SCREEN_ERROR, FacePackRuntime } from './speech/facePack'
 import { screenGeometry } from './screenGeometry'
 import type { ScreenMediaRuntime } from './screenMediaRuntime'
 import { framingAnchor } from './framingAnchor'
@@ -317,6 +317,7 @@ function speechAssetsReady(gpu: SlotGpu | undefined, slot: Scene3DSlot): boolean
   if (!slot.speech?.enabled) return true
   if (!slot.sourceUrl) throw new Error('Choose a 3D model before exporting a speech scene.')
   if (slot.speech.facePack) {
+    if (!slot.screen) throw new Error(FACE_PACK_SCREEN_ERROR)
     if (gpu?.facePack?.error) throw gpu.facePack.error
     return Boolean(gpu?.facePack?.ready)
   }

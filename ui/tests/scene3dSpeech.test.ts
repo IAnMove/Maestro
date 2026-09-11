@@ -1,13 +1,15 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { Object3D } from 'three'
 import { defaultSpeech, VISEMES } from '../src/features/scene3d/speech/types'
 import { cueAt, expressionAt, mouthAt, parseExpressionCues, parseMouthCues, parseSpeech, amplitudeCues, safeMediaUrl } from '../src/features/scene3d/speech/track'
-import { facePackCell, validFacePackSize } from '../src/features/scene3d/speech/facePack'
+import { FACE_PACK_SCREEN_ERROR, FacePackRuntime, facePackCell, validFacePackSize } from '../src/features/scene3d/speech/facePack'
 import { FACE_PACK_IDS, talkingMascot } from '../src/features/scene3d/speech/facePackExamples'
 import { speechFromLabConfig } from '../src/features/scene3d/speech/kit'
 import { voiceSchedule } from '../src/features/scene3d/speech/audio'
 import { applyScene3DTemplate, remountScene3DTemplate } from '../src/features/scene3d/templates'
 import { parseScene3DDocument } from '../src/features/scene3d/document'
+import { worldAssetsReady } from '../src/features/scene3d/gpu'
 
 const face = { meshIndex: 0, center: [0, 1.5, .1], size: [.1, .08], skin: [.5, .3, .2],
   eyes: { left: [-.04, 1.55, .1], right: [.04, 1.55, .1], size: [.04, .02], skinLeft: [.5, .3, .2], skinRight: [.5, .3, .2] } }
@@ -113,4 +115,21 @@ test('face packs are 9×6 and talking mascots round-trip on hangar-talk', () => 
   const voxel = applyScene3DTemplate('voxel-talk')
   assert.equal(voxel.slots[0].speech?.facePack?.url, '/examples/face-pack/voxel-pack.png')
   assert.equal(voxel.slots[1].speech?.facePack?.url, '/examples/face-pack/cubeskull-pack.png')
+})
+test('face pack attach failures stay on the runtime so live thumbs and export cannot crash', () => {
+  const hangar = applyScene3DTemplate('hangar-talk')
+  const mascot = hangar.slots[0]
+  const runtime = new FacePackRuntime()
+  assert.doesNotThrow(() => runtime.sync(new Object3D(), mascot.speech, mascot.screen, 0.5))
+  assert.equal(runtime.ready, false)
+  assert.equal(runtime.error?.message, FACE_PACK_SCREEN_ERROR)
+  const missingScreen = new FacePackRuntime()
+  assert.doesNotThrow(() => missingScreen.sync(new Object3D(), mascot.speech, undefined, 0.5))
+  assert.equal(missingScreen.error?.message, FACE_PACK_SCREEN_ERROR)
+  const world = { dressingReady: true, slots: new Map() }
+  assert.throws(() => worldAssetsReady(world, [{ ...mascot, screen: undefined }]), new RegExp(FACE_PACK_SCREEN_ERROR))
+  const remounted = remountScene3DTemplate('two-shot', hangar, true)
+  assert.equal(remounted.slots[0].speech?.facePack?.url, mascot.speech?.facePack?.url)
+  assert.equal(remounted.slots[0].screen?.sourceUrl, mascot.screen?.sourceUrl)
+  assert.equal(remounted.slots[0].screen?.anchor, mascot.screen?.anchor)
 })

@@ -16,6 +16,8 @@ export function validFacePackSize(width: number, height: number) {
   return width > 0 && height > 0 && width * FACE_PACK_ROWS === height * FACE_PACK_COLS && height / FACE_PACK_ROWS <= 256
 }
 
+export const FACE_PACK_SCREEN_ERROR = 'Face pack needs a screen plane on the head.'
+
 export class FacePackRuntime {
   ready = false
   error?: Error
@@ -58,12 +60,20 @@ export class FacePackRuntime {
 
   private attach(root: Object3D, speech: Scene3DSpeech, screen: MediaScreen) {
     const plane = screenUsesPlane(screen, false)
-    const mesh = plane ? attachScreenPlane(root, screen) : undefined
+    let mesh: Mesh | undefined
+    try {
+      mesh = plane ? attachScreenPlane(root, screen) : undefined
+    } catch (error) {
+      this.error = error instanceof Error && error.message.startsWith('screen-anchor')
+        ? new Error(FACE_PACK_SCREEN_ERROR)
+        : error instanceof Error ? error : new Error(FACE_PACK_SCREEN_ERROR)
+      return
+    }
     const targets: Mesh[] = []
     const name = plane ? SCREEN_PLANE_NAME : screen.targetMesh
     root.traverse(child => { if (child instanceof Mesh && child.name === name) targets.push(child) })
     const target = mesh ?? (targets.length === 1 ? targets[0] : undefined)
-    if (!target) { this.error = new Error('Face pack needs a screen plane on the head.'); return }
+    if (!target) { this.error = new Error(FACE_PACK_SCREEN_ERROR); return }
     const canvas = document.createElement('canvas')
     canvas.width = 256
     canvas.height = 256
@@ -122,11 +132,14 @@ export class FacePackRuntime {
 
   sync(root: Object3D, speech: Scene3DSpeech | undefined, screen: MediaScreen | undefined, seconds: number) {
     const url = speech?.enabled && speech.facePack?.url
-    const key = url && screen ? `${url}|${screen.anchor}|${screen.width}|${screen.height}|${screen.flipY}` : ''
+    const key = !url ? '' : screen
+      ? `${url}|${screen.anchor}|${screen.width}|${screen.height}|${screen.flipY}`
+      : `${url}|missing-screen`
     if (key !== this.key) {
       this.clear()
       this.key = key
       if (url && screen && speech) this.attach(root, speech, screen)
+      else if (url) this.error = new Error(FACE_PACK_SCREEN_ERROR)
     }
     if (this.ready && speech) this.paint(speech, seconds)
   }
