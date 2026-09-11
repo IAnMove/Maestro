@@ -7,6 +7,9 @@ export type ClipTag = 'good' | 'needs_work' | null
 export interface TakeRecord {
   generation_id: string
   production_id?: string | null
+  clip_index?: number | null
+  shot_id?: string | null
+  cue_id?: string | null
   status: TakeStatus
   location?: { filename?: string | null }
   timestamps?: { duration_ms?: number | null }

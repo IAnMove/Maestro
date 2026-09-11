@@ -78,15 +78,43 @@ export function takeFromAttempt(
   }
 }
 
+export function clipOwnedFilenames(clip: PipelineClipLike): Set<string> {
+  const names = new Set<string>()
+  const selected = selectedFilename(clip)
+  if (selected) names.add(selected)
+  const current = filenameOf(clip.video_filename)
+  if (current) names.add(current)
+  for (const attempt of attemptsOf(clip)) {
+    const name = filenameOf(attempt.filename)
+    if (name) names.add(name)
+  }
+  return names
+}
+
+function recordBelongsToClip(
+  record: TakeRecord,
+  filename: string,
+  productionId: string,
+  clip: PipelineClipLike,
+): boolean {
+  const owner = text(record.production_id)
+  if (owner && owner !== productionId) return false
+  if (clipOwnedFilenames(clip).has(filename)) return true
+  if (record.clip_index != null && record.clip_index === clip.index) return true
+  const shotId = shotIdOf(clip)
+  const recordShot = firstText(record.shot_id, record.cue_id)
+  return Boolean(shotId && recordShot && recordShot === shotId)
+}
+
 export function extraTakeFromRecord(
   record: TakeRecord,
   productionId: string,
   usedFilenames: Set<string>,
+  clip: PipelineClipLike,
 ): ReviewTake | null {
   const filename = filenameOf(record.location?.filename)
   if (!filename || usedFilenames.has(filename)) return null
-  const owner = text(record.production_id)
-  if (owner && owner !== productionId) return null
+  if (!recordBelongsToClip(record, filename, productionId, clip)) return null
   usedFilenames.add(filename)
   return {
     id: record.generation_id,
