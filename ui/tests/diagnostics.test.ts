@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { explainAvailability, modelsOf, operationsOf } from '../src/features/diagnostics/availability.ts'
-import { packContainsSecret, sanitizePack } from '../src/features/diagnostics/redact.ts'
+import { packContainsSecret } from '../src/features/diagnostics/redact.ts'
 import { fetchReportPack, fetchSnapshot } from '../src/features/diagnostics/api.ts'
 import { parsePack, reportFilename, serializeReportPack } from '../src/features/diagnostics/report.ts'
 import { DIAGNOSTICS_SCHEMA, type AvailabilityItem, type ReportPack } from '../src/features/diagnostics/types.ts'
