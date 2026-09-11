@@ -1,3 +1,4 @@
+import { filenameOf } from './fields.ts'
 import { REVIEW_AUTHORITY } from './types.ts'
 import type { PersistCommand, PipelineClipLike, PipelineLike, TakeRecord } from './types.ts'
 
@@ -22,10 +23,11 @@ function applySelect(pipeline: PipelineLike, command: Extract<PersistCommand, { 
   if (!attempts.some(item => item.filename === command.filename)) {
     attempts.push({ id: command.takeId, filename: command.filename, source: 'regenerated' })
   }
+  const alreadySelected = filenameOf(clip.selected_video_filename || clip.video_filename) === command.filename
   return withClip(pipeline, command.clipIndex, {
     selected_video_filename: command.filename,
     video_filename: command.filename,
-    video_stale: false,
+    video_stale: alreadySelected ? Boolean(clip.video_stale) : false,
     video_attempts: attempts,
   })
 }

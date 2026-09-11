@@ -154,10 +154,10 @@ export function ProductionReviewDesk({
   const pair = useMemo(() => shot ? comparePair(shot) : { a: null, b: null }, [shot])
   const media = fileUrl || ((filename: string) => `#${filename}`)
   const fromActivity = isSameProduction(current, activityTarget)
-  const persist = (next: ReviewDesk) => {
+  const persist = (next: ReviewDesk, shotIds?: string[], extra: PersistCommand[] = []) => {
     setCurrent(next)
     onChange(next)
-    void onPersist?.(persistCommandsFor(next))
+    void onPersist?.([...persistCommandsFor(next, shotIds), ...extra])
   }
 
   const togglePick = (id: string, checked: boolean) => {
@@ -177,8 +177,7 @@ export function ProductionReviewDesk({
       ? await onRegenerate(plan)
       : plan.jobs.map(job => ({ shotId: job.shotId, ok: true, take: queuedTakeFromJob(job, `queued:${job.shotId}`) }))
     const next = applyRegenPlan(current, plan, outcomes, { copy })
-    persist(next)
-    void onPersist?.(rerunCommands(current, plan))
+    persist(next, plan.jobs.map(job => job.shotId), rerunCommands(current, plan))
     setConfirm(false)
     setPicked([])
   }
@@ -202,8 +201,8 @@ export function ProductionReviewDesk({
         <div className="p-2">
           <p className="mb-2 text-[11px]">{copy.compare}</p>
           <div className="grid gap-2 sm:grid-cols-2">
-            <TakeStage label={copy.takeA} take={pair.a} copy={copy} fileUrl={media} selected={pair.a?.id === shot.selectedTakeId} onSelect={() => pair.a && persist(selectExactTake(current, shot.id, pair.a.id))} />
-            <TakeStage label={copy.takeB} take={pair.b} copy={copy} fileUrl={media} selected={pair.b?.id === shot.selectedTakeId} onSelect={() => pair.b && persist(selectExactTake(current, shot.id, pair.b.id))} />
+            <TakeStage label={copy.takeA} take={pair.a} copy={copy} fileUrl={media} selected={pair.a?.id === shot.selectedTakeId} onSelect={() => pair.a && persist(selectExactTake(current, shot.id, pair.a.id), [shot.id])} />
+            <TakeStage label={copy.takeB} take={pair.b} copy={copy} fileUrl={media} selected={pair.b?.id === shot.selectedTakeId} onSelect={() => pair.b && persist(selectExactTake(current, shot.id, pair.b.id), [shot.id])} />
           </div>
           <div className="mt-2 flex flex-wrap gap-1" aria-label={copy.selectTake}>
             {shot.takes.map(take => (
@@ -213,8 +212,8 @@ export function ProductionReviewDesk({
                 data-take-id={take.id}
                 className={`${chip} ${take.id === shot.selectedTakeId ? 'bg-emerald-500/20' : ''}`}
                 aria-pressed={take.id === shot.selectedTakeId}
-                onClick={() => persist(selectExactTake(current, shot.id, take.id))}
-                onContextMenu={event => { event.preventDefault(); persist(setCompareTake(current, shot.id, take.id)) }}
+                onClick={() => persist(selectExactTake(current, shot.id, take.id), [shot.id])}
+                onContextMenu={event => { event.preventDefault(); persist(setCompareTake(current, shot.id, take.id), [shot.id]) }}
               >
                 {take.id}{isTakeCompleted(take) ? '' : ` · ${copy[take.status]}`}
               </button>
@@ -223,9 +222,9 @@ export function ProductionReviewDesk({
           <DecisionBar
             shot={shot}
             copy={copy}
-            onApprove={() => persist(approveShot(current, shot.id))}
-            onReject={() => persist(rejectShot(current, shot.id))}
-            onNotes={value => persist(setShotNotes(current, shot.id, value))}
+            onApprove={() => persist(approveShot(current, shot.id), [shot.id])}
+            onReject={() => persist(rejectShot(current, shot.id), [shot.id])}
+            onNotes={value => persist(setShotNotes(current, shot.id, value), [shot.id])}
           />
         </div>
       </div>

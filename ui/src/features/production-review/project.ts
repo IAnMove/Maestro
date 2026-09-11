@@ -24,6 +24,7 @@ export function takeRecordFromGeneration(record: GenerationRecord): TakeRecord {
   return {
     generation_id: record.generation_id,
     production_id: record.production_id,
+    cue_id: record.cue_id,
     status: isTakeStatus(record.status) ? record.status : 'planned',
     location: { filename: record.location.filename },
     timestamps: { duration_ms: record.timestamps.duration_ms },
@@ -54,7 +55,7 @@ export function takesForClip(
     return take
   })
   for (const record of records) {
-    const extra = extraTakeFromRecord(record, productionId, used)
+    const extra = extraTakeFromRecord(record, productionId, used, clip)
     if (extra) takes.push(extra)
   }
   return takes
