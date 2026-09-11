@@ -16,6 +16,10 @@ class TestPinokioGpuCompatibility(unittest.TestCase):
         self.assertNotIn("if (kernel.gpu", launcher)
         self.assertIn('text: "Start"', launcher)
         self.assertIn('href: "start.js"', launcher)
+        self.assertNotIn("Start (Classic UI)", launcher)
+        self.assertNotIn("Open Classic UI", launcher)
+        self.assertNotIn("Classic Compiled", launcher)
+        self.assertNotIn("start_classic.js", launcher)
 
     def test_fresh_install_still_uses_pinokios_documented_gpu_variable(self):
         installer = (_ROOT / "install.js").read_text(encoding="utf-8")
