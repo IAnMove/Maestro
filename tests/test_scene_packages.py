@@ -467,6 +467,55 @@ def test_import_keeps_empty_companion_slots(tmp_path: Path):
     assert "workspace=lab" in document["slots"][0]["sourceUrl"]
 
 
+def test_media_portal_source_url_is_packed_and_rebound(tmp_path: Path):
+    client, roots = _client(tmp_path)
+    refs = _seed_film(roots["film"])
+    (roots["__uploads__"] / "portal.png").write_bytes(_png() + b"-portal")
+    shot = _shot(title="Portal", glb=refs["glb"], voice=refs["voice"], screen=refs["screen"], environment=refs["env"])
+    shot["worldSfx"] = [{
+        "id": "tv", "kind": "media_portal", "start": 0, "end": 3,
+        "position": {"x": 0, "y": 1.15, "z": -1.2},
+        "rotation": {"x": 0, "y": 0, "z": 0},
+        "scale": 1.7, "intensity": 1, "color": "#88ccff", "seed": 1,
+        "sound": True, "volume": 0.25,
+        "sourceUrl": "/api/v1/uploads/portal.png",
+    }]
+    exported = client.post("/api/v1/scene-packages/export", json={"workspace": "film", "documents": [shot]})
+    assert exported.status_code == 200, exported.text
+    with zipfile.ZipFile(io.BytesIO(exported.content)) as archive:
+        manifest = json.loads(archive.read("package.json"))
+        packed = json.loads(archive.read("documents/shot-1.json"))
+    portal_asset = next(item for item in manifest["assets"] if item["filename"] == "portal.png")
+    assert "worldSfx[0]" in "".join(portal_asset["uses"])
+    assert packed["worldSfx"][0]["sourceUrl"].startswith("media/")
+    assert "sourceRef" not in packed["worldSfx"][0]
+    imported = _post_zip(client, "/api/v1/scene-packages/import", exported.content, workspace="lab")
+    assert imported.status_code == 200, imported.text
+    document = json.loads(next(roots["lab"].glob("*.world3d.scene.json")).read_text())
+    portal = document["worldSfx"][0]
+    assert portal["kind"] == "media_portal"
+    assert portal["sourceUrl"].startswith("/api/v1/file/")
+    assert "workspace=lab" in portal["sourceUrl"]
+    assert "sourceRef" not in portal
+    filename = portal["sourceUrl"].split("/file/", 1)[1].split("?", 1)[0]
+    assert (roots["lab"] / filename).read_bytes() == _png() + b"-portal"
+
+
+def test_example_portal_url_is_left_in_place(tmp_path: Path):
+    client, roots = _client(tmp_path)
+    refs = _seed_film(roots["film"])
+    shot = _shot(title="Stock", glb=refs["glb"], voice=refs["voice"], screen=refs["screen"], environment=refs["env"])
+    shot["worldSfx"][0]["kind"] = "media_portal"
+    shot["worldSfx"][0]["sourceUrl"] = "/examples/tv-head-face.png"
+    exported = client.post("/api/v1/scene-packages/export", json={"workspace": "film", "documents": [shot]})
+    assert exported.status_code == 200, exported.text
+    with zipfile.ZipFile(io.BytesIO(exported.content)) as archive:
+        manifest = json.loads(archive.read("package.json"))
+        packed = json.loads(archive.read("documents/shot-1.json"))
+    assert all(item["filename"] != "tv-head-face.png" for item in manifest["assets"])
+    assert packed["worldSfx"][0]["sourceUrl"] == "/examples/tv-head-face.png"
+
+
 def test_source_url_only_slots_rebind_on_import(tmp_path: Path):
     client, roots = _client(tmp_path)
     (roots["film"] / "hero.glb").write_bytes(b"glb-shared")
