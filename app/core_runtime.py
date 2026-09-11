@@ -11,6 +11,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from routers.assets import create_assets_router
+from routers.canonical_tasks import create_canonical_tasks_router
 from routers.character_kit_face import create_character_kit_face_router
 from routers.comics import create_comics_router
 from routers.core_labs import create_core_labs_router
@@ -30,6 +31,7 @@ from routers.wizard_workflow_executor import create_wizard_workflow_executor_rou
 from routers.world3d_export import create_world3d_export_router
 from routers.workspace_collections import create_workspace_collections_router
 from services import (
+    core_canonical_tasks,
     core_editor,
     core_generation_commands,
     core_production,
@@ -113,6 +115,15 @@ api.include_router(create_wizard_workflow_executor_router(WizardWorkflowExecutor
 api.include_router(create_character_kit_face_router(
     workspace_dir=core.workspace_dir,
     uploads_root=core.uploads_dir,
+))
+api.include_router(create_canonical_tasks_router(
+    get_active_workspace=core.active_workspace,
+    validate_workspace=core.workspace_dir,
+    registry_for_workspace=core_generation_commands.registry_for,
+    sync_tasks=core_canonical_tasks.sync_tasks,
+    task_status=core_canonical_tasks.task_status,
+    upsert_task=core_canonical_tasks.upsert_task,
+    control_task=core_canonical_tasks.control_task,
 ))
 
 BLOCKED = (
@@ -331,11 +342,6 @@ def downloads_active():
 @api.get("/api/v1/loras/installed")
 def loras_installed():
     return {"loras": [], "manifest_last_check_at": None}
-
-
-@api.get("/api/v1/tasks")
-def tasks():
-    return {"workspace": core.active_workspace(), "tasks": [], "latest_event_id": 0}
 
 
 def _wizard_workspace(value: object) -> str:

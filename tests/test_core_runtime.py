@@ -549,6 +549,40 @@ class CoreRuntimeTests(unittest.TestCase):
         self.assertEqual(local.status_code, 409, local.text)
         self.assertEqual(local.json()["detail"]["code"], FEATURE_UNAVAILABLE)
 
+    def test_canonical_tasks_list_minimax_jobs_instead_of_an_empty_stub(self):
+        command = self._studio_image_command("mac-task-list")
+        folder, previous = self._in_temp_workspace()
+        try:
+            Path("outputs").mkdir()
+            fake = {"name": "minimax.jpg", "path": "minimax.jpg", "prompt": "a lantern", "aspect_ratio": "1:1"}
+            with patch("services.minimax_image_service.generate_image", return_value=fake), patch(
+                "services.execution_mode.validate_remote_provider",
+            ), patch("services.core_remote_image.threading.Thread", ImmediateThread):
+                admitted = self.client.post("/api/v1/generation/commands", json=command)
+                listed = self.client.get("/api/v1/tasks", params={"workspace": "default", "status": "all"})
+                task_ids = admitted.json()["receipt"].get("taskIds") or []
+                task_id = str(task_ids[0]) if task_ids else ""
+                fetched = self.client.get(f"/api/v1/tasks/{task_id}", params={"workspace": "default"})
+                cancelled = self.client.post(
+                    f"/api/v1/tasks/{task_id}/cancel",
+                    params={"workspace": "default"},
+                )
+                events = self.client.get(
+                    f"/api/v1/tasks/{task_id}/events",
+                    params={"workspace": "default"},
+                )
+        finally:
+            self._leave_temp_workspace(folder, previous)
+        self.assertEqual(admitted.status_code, 200, admitted.text)
+        self.assertTrue(task_id)
+        self.assertEqual(listed.status_code, 200, listed.text)
+        self.assertIn(task_id, {item.get("id") for item in listed.json().get("tasks") or []})
+        self.assertNotEqual(listed.json().get("tasks"), [])
+        self.assertEqual(fetched.status_code, 200, fetched.text)
+        self.assertEqual(fetched.json()["task"]["id"], task_id)
+        self.assertEqual(cancelled.status_code, 200, cancelled.text)
+        self.assertEqual(events.status_code, 200, events.text)
+
     def test_studio_image_command_canonicalizes_upload_references(self):
         folder, previous = self._in_temp_workspace()
         try:
