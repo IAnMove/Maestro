@@ -3,9 +3,12 @@ from __future__ import annotations
 
 import copy
 import os
+import shutil
 import threading
+import uuid
 from datetime import datetime, timezone
 from typing import Any
+from urllib.parse import unquote
 
 from fastapi import APIRouter, HTTPException
 
@@ -88,6 +91,57 @@ def _series_or_404(library: dict, series_id: str) -> dict:
     if not isinstance(series, dict):
         raise HTTPException(status_code=404, detail="Series Lab project not found")
     return series
+
+
+def _story_import_upload_path(value: str) -> str:
+    upload_dir = os.path.realpath(core.uploads_dir())
+    candidate = os.path.realpath(str(value or ""))
+    if candidate != upload_dir and not candidate.startswith(upload_dir + os.sep):
+        raise HTTPException(status_code=400, detail="Imported Story assets must come from HocusPocus Lab uploads")
+    if not os.path.isfile(candidate):
+        raise HTTPException(status_code=400, detail="One imported asset is no longer available")
+    return candidate
+
+
+def _prepare_story_uploads_for_series_import(story: dict, workspace: str) -> dict:
+    """Copy Story Lab upload files into the workspace so import_story_project keeps them."""
+    prepared = copy.deepcopy(story)
+    upload_sources: dict[str, str] = {}
+    assets = prepared.get("assets") if isinstance(prepared.get("assets"), dict) else {}
+    for asset_key, asset in assets.items():
+        if not isinstance(asset, dict):
+            continue
+        source = str(asset.get("source") or "")
+        local_source = None
+        if source.startswith("/api/v1/uploads/"):
+            upload_name = unquote(source.split("/api/v1/uploads/", 1)[1])
+            local_candidate = core.safe_join(core.uploads_dir(), upload_name)
+            local_source = _story_import_upload_path(local_candidate or "")
+        elif os.path.isabs(source):
+            try:
+                local_source = _story_import_upload_path(source)
+            except HTTPException:
+                continue
+        if not local_source:
+            continue
+        asset_id = str(asset.get("id") or asset_key)
+        upload_sources[asset_id] = local_source
+        # A valid workspace placeholder lets the pure importer retain entity links.
+        asset["source"] = f"assets/story-import/{uuid.uuid4().hex}.bin"
+    imported = import_story_project(prepared, workspace)
+    for asset_id, local_source in upload_sources.items():
+        imported_asset = imported.get("assets", {}).get(asset_id)
+        if not isinstance(imported_asset, dict):
+            continue
+        extension = os.path.splitext(local_source)[1].lower()[:12]
+        relative = f"assets/{imported['id']}/{uuid.uuid4().hex[:16]}{extension}"
+        destination = core.safe_join(_dir(workspace), relative)
+        if not destination:
+            raise ValueError("Invalid imported Story asset destination")
+        os.makedirs(os.path.dirname(destination), exist_ok=True)
+        shutil.copy2(local_source, destination)
+        imported_asset["uri"] = relative
+    return imported
 
 
 def create_core_labs_router() -> APIRouter:
@@ -243,7 +297,7 @@ def create_core_labs_router() -> APIRouter:
             if not isinstance(story, dict):
                 raise HTTPException(status_code=404, detail="Story Lab source project not found")
         try:
-            imported = import_story_project(copy.deepcopy(story), workspace)
+            imported = _prepare_story_uploads_for_series_import(story, workspace)
             with _LOCK:
                 library = _read_series(workspace)
                 library["seriesById"][imported["id"]] = imported

@@ -189,6 +189,90 @@ class CoreRuntimeTests(unittest.TestCase):
         self.assertEqual(created.status_code, 200)
         self.assertTrue(str(created.json()["id"]).startswith("series_"))
 
+    def test_series_import_copies_story_uploads_into_the_workspace(self):
+        folder, previous = self._in_temp_workspace()
+        try:
+            Path("outputs").mkdir()
+            Path("uploads").mkdir()
+            Path("uploads", "hero.png").write_bytes(b"png-bytes")
+            saved = self.client.put("/api/v1/stories/library", json={
+                "workspace": "default",
+                "baseRevision": 0,
+                "library": {
+                    "version": 2,
+                    "revision": 0,
+                    "activeId": "story_mac",
+                    "projects": {
+                        "story_mac": {
+                            "id": "story_mac",
+                            "title": "Harbour",
+                            "premise": "A lantern wakes the harbour.",
+                            "assets": {
+                                "asset_hero": {
+                                    "id": "asset_hero",
+                                    "name": "Hero",
+                                    "source": "/api/v1/uploads/hero.png",
+                                }
+                            },
+                            "characters": [{
+                                "id": "char_keeper",
+                                "name": "Keeper",
+                                "referenceAssetIds": ["asset_hero"],
+                                "primaryReferenceAssetId": "asset_hero",
+                            }],
+                        }
+                    },
+                },
+            })
+            imported = self.client.post("/api/v1/series/import-story", json={
+                "workspace": "default",
+                "storyId": "story_mac",
+            })
+            series = imported.json() if imported.status_code == 200 else {}
+            copied_bytes = b""
+            copied_count = 0
+            if series.get("id"):
+                assets_dir = Path("outputs") / "assets" / series["id"]
+                copied = list(assets_dir.glob("*")) if assets_dir.is_dir() else []
+                copied_count = len(copied)
+                copied_bytes = copied[0].read_bytes() if copied else b""
+        finally:
+            self._leave_temp_workspace(folder, previous)
+        self.assertEqual(saved.status_code, 200, saved.text)
+        self.assertEqual(imported.status_code, 200, imported.text)
+        assets = series.get("assets") or {}
+        self.assertIn("asset_hero", assets)
+        self.assertTrue(str(assets["asset_hero"]["uri"]).startswith(f"assets/{series['id']}/"))
+        self.assertTrue(str(assets["asset_hero"]["uri"]).endswith(".png"))
+        self.assertEqual(series["characters"][0]["referenceAssetIds"], ["asset_hero"])
+        self.assertEqual(series["characters"][0]["primaryReferenceAssetId"], "asset_hero")
+        self.assertEqual(copied_count, 1)
+        self.assertEqual(copied_bytes, b"png-bytes")
+
+    def test_series_import_rejects_a_missing_story_upload(self):
+        folder, previous = self._in_temp_workspace()
+        try:
+            Path("outputs").mkdir()
+            Path("uploads").mkdir()
+            denied = self.client.post("/api/v1/series/import-story", json={
+                "workspace": "default",
+                "story": {
+                    "id": "story_missing",
+                    "title": "Missing hero",
+                    "assets": {
+                        "asset_hero": {
+                            "id": "asset_hero",
+                            "name": "Hero",
+                            "source": "/api/v1/uploads/missing.png",
+                        }
+                    },
+                },
+            })
+        finally:
+            self._leave_temp_workspace(folder, previous)
+        self.assertEqual(denied.status_code, 400, denied.text)
+        self.assertIn("no longer available", denied.json()["detail"])
+
     def test_meshy_generate_starts_a_remote_job(self):
         folder, previous = self._in_temp_workspace()
         try:
