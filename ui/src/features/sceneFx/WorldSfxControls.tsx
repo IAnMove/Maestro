@@ -1,4 +1,6 @@
+import { useEffect, useRef, useState } from 'react'
 import { useUiTranslation } from '../../i18n'
+import { createUploadSession } from '../asset-picker/upload'
 import { WORLD_BEAM_KINDS, WORLD_SFX_KINDS, createWorldSfx, parseWorldSfx, type WorldSfx, type WorldSfxKind } from './world'
 import type { WorldSfxDemoId } from './worldDemo'
 
@@ -12,7 +14,22 @@ export function WorldSfxControls({ cues = [], duration, selectedId, disabled, on
   onDemo: (id: WorldSfxDemoId) => void
 }) {
   const { t } = useUiTranslation('sceneFx')
+  const cuesRef = useRef(cues)
+  const upload = useRef(createUploadSession())
+  const [mediaError, setMediaError] = useState('')
+  cuesRef.current = cues
+  useEffect(() => () => upload.current.abort(), [])
   const update = (id: string, patch: Partial<WorldSfx>) => onChange(parseWorldSfx(cues.map(cue => cue.id === id ? { ...cue, ...patch } : cue)))
+  const assignPortalMedia = (id: string, file?: File) => {
+    if (!file) return
+    setMediaError('')
+    void upload.current.run(file).then(uploaded => {
+      onChange(parseWorldSfx(cuesRef.current.map(cue => cue.id === id ? { ...cue, sourceUrl: uploaded.url } : cue)))
+    }).catch(error => {
+      if (error instanceof DOMException && error.name === 'AbortError') return
+      setMediaError(t('worldMediaFailed'))
+    })
+  }
   const setAxis = (id: string, field: 'position' | 'rotation', axis: 'x' | 'y' | 'z', value: number) => {
     const cue = cues.find(item => item.id === id)
     if (!cue || !Number.isFinite(value)) return
@@ -39,7 +56,8 @@ export function WorldSfxControls({ cues = [], duration, selectedId, disabled, on
             onChange={e => update(cue.id, { sourceUrl: e.target.value.trim() || undefined })}
             className="ml-2 min-h-9 min-w-[12rem] rounded border border-border bg-bg-tertiary px-2" /></label>
           <input type="file" accept="image/*,video/*" aria-label={t('worldMedia')} disabled={disabled}
-            onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; if (file) update(cue.id, { sourceUrl: URL.createObjectURL(file) }) }} />
+            onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; assignPortalMedia(cue.id, file) }} />
+          {mediaError && <p role="alert" className="text-xs text-red-300">{mediaError}</p>}
         </>}
         </div>
         <div className="grid grid-cols-2 gap-2 md:grid-cols-4">

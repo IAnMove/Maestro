@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import { Scene } from 'three'
 import { effectsTemplateDocument } from '../src/features/scene3d/effectsTemplates'
 import { parseScene3DDocument } from '../src/features/scene3d/document'
-import { parseWorldSfx, WORLD_SFX_KINDS, createWorldSfx } from '../src/features/sceneFx/world'
+import { parseWorldSfx, WORLD_SFX_KINDS, createWorldSfx, worldMediaUrl } from '../src/features/sceneFx/world'
 import { syncWorldSfx } from '../src/features/sceneFx/worldRuntime'
 import { parseSceneFx } from '../src/features/sceneFx/types'
 import { paintSceneFx } from '../src/features/sceneFx/paint'
@@ -54,6 +54,23 @@ test('new cinematic world kinds parse and mount', () => {
   assert.equal(nodes.size, 11)
   const portal = parseWorldSfx([{ id: 'p', kind: 'media_portal', start: 0, end: 2, sourceUrl: '/examples/tv-head-face.png' }])[0]
   assert.equal(portal.sourceUrl, '/examples/tv-head-face.png')
+})
+
+test('portal media keeps durable URLs and drops blob or javascript', () => {
+  assert.equal(worldMediaUrl('/api/v1/uploads/face.png'), '/api/v1/uploads/face.png')
+  assert.equal(worldMediaUrl('  /examples/tv-head-face.png  '), '/examples/tv-head-face.png')
+  assert.equal(worldMediaUrl('blob:http://localhost/abc'), undefined)
+  assert.equal(worldMediaUrl('FILE:///tmp/secret.png'), undefined)
+  assert.equal(worldMediaUrl('JavaScript:alert(1)'), undefined)
+  const dropped = parseWorldSfx([{
+    id: 'tv', kind: 'media_portal', start: 0, end: 2, sourceUrl: 'blob:http://localhost/abc',
+  }])[0]
+  assert.equal(dropped.kind, 'media_portal')
+  assert.equal(dropped.sourceUrl, undefined)
+  const kept = parseWorldSfx([{
+    id: 'tv', kind: 'media_portal', start: 0, end: 2, sourceUrl: '/api/v1/uploads/portal.mp4',
+  }])[0]
+  assert.equal(kept.sourceUrl, '/api/v1/uploads/portal.mp4')
 })
 
 test('2D explosion painter is seeded and draws fire, debris and smoke without stroked rings', () => {

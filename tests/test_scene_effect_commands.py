@@ -215,10 +215,16 @@ def test_additive_world_apply_keeps_explosion_and_portal_media(service):
                 if cue['kind'] == 'media_portal')['sourceUrl'] == '/examples/tv-head-face.png'
 
 
-def test_world_portal_media_strips_javascript_url(service):
+@pytest.mark.parametrize('url', [
+    'JavaScript:alert(1)',
+    'blob:http://localhost/abc',
+    'file:///tmp/portal.png',
+    'filesystem:http://localhost/tmp',
+])
+def test_world_portal_media_strips_transient_urls(service, url):
     doc = showcase(service)
     cue = {'id': 'tv', 'kind': 'media_portal', 'start': 0, 'end': 2,
-           'sourceUrl': 'JavaScript:alert(1)'}
+           'sourceUrl': url}
     result = service.execute({'version': 1, 'operation': 'scenes.effects.apply',
                               'input': {'document': doc, 'worldCues': [cue]}})['result']['document']
     assert result['worldSfx'][0]['kind'] == 'media_portal'
