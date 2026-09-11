@@ -96,6 +96,16 @@ class CoreRuntimeTests(unittest.TestCase):
         blob = json.dumps(packed)
         self.assertNotIn("sk-", blob)
 
+    def test_mcp_settings_status_on_the_core_profile(self):
+        listed = self.client.get("/api/v1/settings/mcp")
+        self.assertEqual(listed.status_code, 200, listed.text)
+        body = listed.json()
+        self.assertEqual(body["endpoint"], "/api/v1/wangp/mcp")
+        self.assertEqual(body["authentication"], "Bearer")
+        self.assertNotIn("token", body)
+        blocked = self.client.put("/api/v1/settings/mcp", json={"enabled": True})
+        self.assertEqual(blocked.status_code, 403)
+
     def test_remote_llm_load_is_not_blocked_as_local_engine(self):
         with patch("services.llm_service.load_model"), patch(
             "services.llm_service.get_status", return_value={"loaded": False, "provider": "minimax"},
