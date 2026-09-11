@@ -104,6 +104,7 @@
         "tests/test_series_reference_router.py",
         "tests/test_series_render.py",
         "tests/test_sex_act_leet_strip.py",
+        "tests/test_speech_analysis_cache.py",
         "tests/test_spoken_language_contract.py",
         "tests/test_story_lab_id_repair.py",
         "tests/test_story_lab_music_plan.py",
