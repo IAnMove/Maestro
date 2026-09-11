@@ -1112,5 +1112,46 @@
       "background": "Fondo",
       "prop_1": "Accesorio 1"
     }
+  },
+  "history": {
+    "undo": "Deshacer",
+    "redo": "Rehacer",
+    "checkpoint": "Marcar como guardado",
+    "saved": "Guardado",
+    "unsaved": "Cambios sin guardar",
+    "saving": "Guardando…",
+    "locked": "Bloqueado durante la exportación",
+    "conflict": "Esta escena se editó en otra pestaña.",
+    "keepMine": "Conservar esta pestaña",
+    "takeTheirs": "Cargar la otra pestaña",
+    "persist-error": "No se pudo guardar el borrador local; se conservó la última copia válida."
+  },
+  "inspector": {
+    "object": "Objeto",
+    "scene": "Escena",
+    "previewHint": "La vista previa 3D permanece encima de este panel. Ocúltalo para dejarle más espacio.",
+    "showPreview": "Mostrar vista previa",
+    "hidePreview": "Ocultar vista previa",
+    "empty": "Selecciona un objeto para inspeccionarlo.",
+    "position": "Posición",
+    "yaw": "Giro Y (°)",
+    "scale": "Escala",
+    "source": "URL de GLB o medio",
+    "mouth": "Boca del inspector",
+    "addLips": "Añadir labios",
+    "addScreen": "Añadir pantalla al objeto",
+    "addSfx": "Añadir SFX",
+    "advanced": "Avanzado",
+    "advancedHint": "Los detalles de pantalla, luz y entorno quedan plegados hasta que los necesites.",
+    "screenEmpty": "Todavía no hay medio en la pantalla.",
+    "camera": "Cámara",
+    "cameraEye": "Posición de cámara",
+    "cameraLook": "Mirar a",
+    "fov": "Campo de visión",
+    "environment": "Entorno cinematográfico",
+    "floor": "Suelo reflectante",
+    "platform": "Plataforma",
+    "bloom": "Bloom",
+    "light": "Color de luz"
   }
 }

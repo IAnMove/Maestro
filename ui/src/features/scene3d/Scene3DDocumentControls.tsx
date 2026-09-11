@@ -1,18 +1,22 @@
 import { useRef, useState } from 'react'
+import type { ApiOutput } from '../../api/outputs'
 import { useUiTranslation } from '../../i18n'
 import { parseScene3DDocument } from './document.ts'
+import type { Scene3DDocumentRef } from './documentHistory.ts'
 import { reviewClipNumber } from './performance.ts'
-import type { Scene3DDocument } from './types.ts'
 import { Scene3DLibraryControls } from './Scene3DLibraryControls'
+import type { Scene3DDocument } from './types.ts'
 import { isWorld3DTemplateRaw } from './userTemplates.ts'
 
-export function Scene3DDocumentControls({ document, disabled, workspace, preview, onChange, onLoad }: {
+export function Scene3DDocumentControls({ document, disabled, workspace, preview, identity, onChange, onLoad, onSaved }: {
   document: Scene3DDocument
   disabled: boolean
   workspace: string
   preview: () => string | undefined
+  identity?: Scene3DDocumentRef
   onChange: (document: Scene3DDocument) => void
-  onLoad: (document: Scene3DDocument) => void
+  onLoad: (document: Scene3DDocument, source?: Scene3DDocumentRef) => void
+  onSaved?: (output: ApiOutput, document: Scene3DDocument, identity: Scene3DDocumentRef) => void
 }) {
   const { t } = useUiTranslation('scene3dEditor')
   const [error, setError] = useState('')
@@ -27,7 +31,7 @@ export function Scene3DDocumentControls({ document, disabled, workspace, preview
     setTimeout(() => URL.revokeObjectURL(url), 1000)
   }
   return <div className="flex flex-wrap items-center gap-3 text-xs text-text-secondary">
-    <Scene3DLibraryControls document={document} workspace={workspace} disabled={disabled} preview={preview} onLoad={onLoad} />
+    <Scene3DLibraryControls document={document} workspace={workspace} disabled={disabled} preview={preview} identity={identity} onLoad={onLoad} onSaved={onSaved} />
     <label>{t('clipNumber')}
       <input type="number" min="1" step="1" aria-label={t('clipNumber')} disabled={disabled}
         className="ml-2 min-h-10 w-20 rounded-lg border border-border bg-bg-primary px-2"

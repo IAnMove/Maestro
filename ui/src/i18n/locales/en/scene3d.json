@@ -1112,5 +1112,46 @@
       "background": "Background",
       "prop_1": "Prop 1"
     }
+  },
+  "history": {
+    "undo": "Undo",
+    "redo": "Redo",
+    "checkpoint": "Mark saved",
+    "saved": "Saved",
+    "unsaved": "Unsaved changes",
+    "saving": "Saving…",
+    "locked": "Locked while exporting",
+    "conflict": "This scene was edited in another tab.",
+    "keepMine": "Keep this tab",
+    "takeTheirs": "Load the other tab",
+    "persist-error": "Could not store the local draft; the last valid copy was kept."
+  },
+  "inspector": {
+    "object": "Object",
+    "scene": "Scene",
+    "previewHint": "The 3D preview stays above this panel. Hide this inspector to give it more room.",
+    "showPreview": "Show preview",
+    "hidePreview": "Hide preview",
+    "empty": "Select an object to inspect it.",
+    "position": "Position",
+    "yaw": "Rotation Y (°)",
+    "scale": "Scale",
+    "source": "GLB or media URL",
+    "mouth": "Inspector mouth",
+    "addLips": "Add lips",
+    "addScreen": "Add object screen",
+    "addSfx": "Add SFX",
+    "advanced": "Advanced",
+    "advancedHint": "Screen, light and environment details stay folded until you need them.",
+    "screenEmpty": "No screen media yet.",
+    "camera": "Camera",
+    "cameraEye": "Camera position",
+    "cameraLook": "Look at",
+    "fov": "Field of view",
+    "environment": "Cinematic environment",
+    "floor": "Reflective floor",
+    "platform": "Platform",
+    "bloom": "Bloom",
+    "light": "Light color"
   }
 }
