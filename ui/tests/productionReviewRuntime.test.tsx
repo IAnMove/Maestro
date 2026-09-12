@@ -167,6 +167,29 @@ test('saving in the mounted dashboard updates the selected pipeline immediately'
   } finally { cleanup(); useStore.setState(previous, true) }
 })
 
+test('notes blur then approve persist both decisions while the first save is in flight', async () => {
+  const { render, screen, fireEvent, act, cleanup, waitFor } = await import('@testing-library/react')
+  const { ProductionReviewDesk } = await import('../src/features/production-review/ProductionReviewDesk')
+  let desk = projectReviewDesk({ pipeline: pipeline() })
+  const saves: Array<{ commands: unknown[]; resolve: () => void }> = []
+  try {
+    render(<ProductionReviewDesk desk={desk} onChange={next => { desk = next }}
+      onPersist={commands => new Promise<void>(resolve => { saves.push({ commands, resolve }) })} />)
+    fireEvent.change(screen.getByLabelText('Notes'), { target: { value: 'keep the lantern' } })
+    fireEvent.blur(screen.getByLabelText('Notes'))
+    fireEvent.click(screen.getByRole('button', { name: 'Approve' }))
+    assert.equal(saves.length, 1)
+    await act(async () => { saves[0].resolve() })
+    await waitFor(() => assert.equal(saves.length, 2))
+    const commands = saves[1].commands as Array<{ type: string; notes?: string; tag?: string | null }>
+    assert.equal(commands.find(item => item.type === 'note_clip')?.notes, 'keep the lantern')
+    assert.equal(commands.find(item => item.type === 'tag_clip')?.tag, 'good')
+    await act(async () => { saves[1].resolve() })
+    assert.equal(desk.shots[0].notes, 'keep the lantern')
+    assert.equal(desk.shots[0].decision, 'approved')
+  } finally { cleanup() }
+})
+
 test('a late save after leaving review cannot replace another dashboard selection', async context => {
   const { render, screen, fireEvent, act, cleanup } = await import('@testing-library/react')
   const { ProductionReviewHost } = await import('../src/features/production-review/ProductionReviewHost')
