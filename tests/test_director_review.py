@@ -39,8 +39,10 @@ def test_review_persists_exact_take_tag_and_notes_and_preserves_other_shots(tmp_
     assert saved['clips'][0]['selected_video_filename'] == 'old.mp4'
     assert saved['clips'][0]['review_notes'] == '  literal\nnotes  '
     assert {item['filename'] for item in saved['clips'][0]['video_attempts']} == {'old.mp4', 'new.mp4'}
-    assert saved['clips'][1]['tag'] == 'good'
-    assert saved['clips'][1]['video_filename'] == 'approved.mp4'
+    for original in state['clips'][0]['video_attempts']:
+        actual = next(item for item in saved['clips'][0]['video_attempts'] if item['filename'] == original['filename'])
+        assert {key: actual[key] for key in original} == original
+    assert {key: saved['clips'][1][key] for key in state['clips'][1]} == state['clips'][1]
 
 
 def test_review_rejects_invalid_batch_without_partial_save(tmp_path):
@@ -120,3 +122,28 @@ def test_review_notes_keep_recovered_takes_in_the_saved_pipeline(tmp_path):
     assert names == {"old.mp4", "new.mp4"}
     assert saved["clips"][0]["review_notes"] == "keep history"
     assert saved["clips"][0]["video_filename"] == "new.mp4"
+
+
+def test_review_cannot_select_a_sidecar_from_another_production(tmp_path):
+    path = _sidecar_history(tmp_path)
+    sidecar = tmp_path / 'old.mp4.meta.json'
+    metadata = json.loads(sidecar.read_text())
+    metadata['director_pipeline_id'] = 'another-production'
+    sidecar.write_text(json.dumps(metadata))
+    before = path.read_bytes()
+    with pytest.raises(ValueError, match='existing take'):
+        save_review(str(tmp_path), 'review-test', [
+            {'type': 'select_take', 'pipelineId': 'review-test', 'clipIndex': 0, 'filename': 'old.mp4'},
+        ])
+    assert path.read_bytes() == before
+
+
+def test_invalid_review_does_not_persist_hydrated_history_or_partial_notes(tmp_path):
+    path = _sidecar_history(tmp_path)
+    before = path.read_bytes()
+    with pytest.raises(ValueError, match='Invalid review decision'):
+        save_review(str(tmp_path), 'review-test', [
+            {'type': 'note_clip', 'pipelineId': 'review-test', 'clipIndex': 0, 'notes': 'not committed'},
+            {'type': 'tag_clip', 'pipelineId': 'review-test', 'clipIndex': 0, 'tag': 'invalid'},
+        ])
+    assert path.read_bytes() == before
