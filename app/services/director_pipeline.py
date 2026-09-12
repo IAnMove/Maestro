@@ -2192,8 +2192,10 @@ def _backfill_clip_video_attempts(state: dict, state_dir: str) -> dict:
             selected = ""
         clip["selected_video_filename"] = selected or None
         if selected:
+            # A Studio selection is the playback authority, but it does not
+            # refresh inputs. Image reruns keep video_stale so Rejoin/export
+            # cannot assemble a take that no longer matches the start frame.
             clip["video_filename"] = selected
-            clip["video_stale"] = False
         clip["video_attempts"] = sorted(
             attempts_by_clip[index].values(),
             key=lambda item: (float(item.get("created_at") or 0), item["filename"]),
