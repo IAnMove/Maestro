@@ -41,6 +41,8 @@ la misma suite completa. No se omiten tests ni se modifican umbrales de checks.
 También se corrigen los dos avisos de Bugbot: actualización del dashboard y
 duración individual de las tomas, incluyendo metadata del vídeo y protección
 frente a respuestas de guardado tardías.
+El inventario de arquitectura registra el nuevo test del dashboard como lector
+de comportamiento de la fachada pública Zustand; las entradas previas se conservan.
 
 El codec de comandos de vídeo pasa a `ui/src/lib/videoGenerationCommand.ts`.
 Wizard conserva sus exports y el inspector utiliza `ui/src/api`; ninguna
