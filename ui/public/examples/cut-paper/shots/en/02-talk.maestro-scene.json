@@ -209,7 +209,7 @@
           "x": 36.3612,
           "y": 54.629,
           "scale": 0.05039999999999999,
-          "opacity": 0,
+          "opacity": 1,
           "rotation": 0
         },
         "end": {
@@ -222,6 +222,16 @@
         "duration": 40,
         "curve": "hold",
         "keyframes": [
+          {
+            "id": "puppet-nilo-mouth-closed-dialogue-0",
+            "time": 0,
+            "x": 36.3612,
+            "y": 54.629,
+            "scale": 0.05039999999999999,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          },
           {
             "id": "puppet-nilo-mouth-closed-dialogue-6000",
             "time": 6,
@@ -488,6 +498,16 @@
         "curve": "hold",
         "keyframes": [
           {
+            "id": "puppet-nilo-mouth-small-dialogue-0",
+            "time": 0,
+            "x": 36.3612,
+            "y": 54.629,
+            "scale": 0.05039999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
             "id": "puppet-nilo-mouth-small-dialogue-6000",
             "time": 6,
             "x": 36.3612,
@@ -739,7 +759,7 @@
           "x": 36.3612,
           "y": 54.629,
           "scale": 0.05039999999999999,
-          "opacity": 1,
+          "opacity": 0,
           "rotation": 0
         },
         "end": {
@@ -752,6 +772,16 @@
         "duration": 40,
         "curve": "hold",
         "keyframes": [
+          {
+            "id": "puppet-nilo-mouth-wide-dialogue-0",
+            "time": 0,
+            "x": 36.3612,
+            "y": 54.629,
+            "scale": 0.05039999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          },
           {
             "id": "puppet-nilo-mouth-wide-dialogue-6000",
             "time": 6,
@@ -1017,6 +1047,16 @@
         "duration": 40,
         "curve": "hold",
         "keyframes": [
+          {
+            "id": "puppet-nilo-mouth-round-dialogue-0",
+            "time": 0,
+            "x": 36.3612,
+            "y": 54.629,
+            "scale": 0.05039999999999999,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          },
           {
             "id": "puppet-nilo-mouth-round-dialogue-6000",
             "time": 6,
@@ -1338,7 +1378,7 @@
           "x": 62.0646,
           "y": 57.711,
           "scale": 0.041800000000000004,
-          "opacity": 0,
+          "opacity": 1,
           "rotation": 0
         },
         "end": {
@@ -1351,6 +1391,16 @@
         "duration": 40,
         "curve": "hold",
         "keyframes": [
+          {
+            "id": "puppet-berta-mouth-closed-dialogue-0",
+            "time": 0,
+            "x": 62.0646,
+            "y": 57.711,
+            "scale": 0.041800000000000004,
+            "opacity": 1,
+            "rotation": 0,
+            "curve": "hold"
+          },
           {
             "id": "puppet-berta-mouth-closed-dialogue-17000",
             "time": 17,
@@ -1567,6 +1617,16 @@
         "curve": "hold",
         "keyframes": [
           {
+            "id": "puppet-berta-mouth-small-dialogue-0",
+            "time": 0,
+            "x": 62.0646,
+            "y": 57.711,
+            "scale": 0.041800000000000004,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          },
+          {
             "id": "puppet-berta-mouth-small-dialogue-17000",
             "time": 17,
             "x": 62.0646,
@@ -1768,7 +1828,7 @@
           "x": 62.0646,
           "y": 57.711,
           "scale": 0.041800000000000004,
-          "opacity": 1,
+          "opacity": 0,
           "rotation": 0
         },
         "end": {
@@ -1781,6 +1841,16 @@
         "duration": 40,
         "curve": "hold",
         "keyframes": [
+          {
+            "id": "puppet-berta-mouth-wide-dialogue-0",
+            "time": 0,
+            "x": 62.0646,
+            "y": 57.711,
+            "scale": 0.041800000000000004,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          },
           {
             "id": "puppet-berta-mouth-wide-dialogue-17000",
             "time": 17,
@@ -1996,6 +2066,16 @@
         "duration": 40,
         "curve": "hold",
         "keyframes": [
+          {
+            "id": "puppet-berta-mouth-round-dialogue-0",
+            "time": 0,
+            "x": 62.0646,
+            "y": 57.711,
+            "scale": 0.041800000000000004,
+            "opacity": 0,
+            "rotation": 0,
+            "curve": "hold"
+          },
           {
             "id": "puppet-berta-mouth-round-dialogue-17000",
             "time": 17,

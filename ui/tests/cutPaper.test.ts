@@ -14,7 +14,7 @@ import { createTijeralStoryProject, TIJERAL_STORY_ID } from '../src/features/cut
 import { normalizeStoryProject } from '../src/features/stories/model.ts'
 import { assertCutPaperKitHasNoPrivateGlb, cutPaperKitManifest, cutPaperPuppetLayers } from '../src/features/cutPaper/puppet.ts'
 import { parseSceneFile, serializeSceneFile } from '../src/lib/sceneFile.ts'
-import { normalizeSceneKeyframes, withSceneKeyframes } from '../src/lib/sceneTimeline.ts'
+import { evaluateSceneLayer, normalizeSceneKeyframes, withSceneKeyframes } from '../src/lib/sceneTimeline.ts'
 
 test('Tijeral kit ids are stable, original and not a private GLB body', () => {
   assert.equal(CUT_PAPER_KIT_ID, 'tijeral-cut-paper')
@@ -94,6 +94,15 @@ test('Story Lab chapter roundtrips and each beat links to Video 2D', () => {
   assert.equal(talkEn.audioTracks?.[0]?.filename, 'vo-nilo-nilo-1-en.wav')
   assert.ok(talkEn.dialogueBeats?.some(beat => /fountain|frozen/i.test(beat.text)))
   assert.equal(CUT_PAPER_PILOT_SCRIPT_EN.length, CUT_PAPER_PILOT_SCRIPT.length)
+  const niloWide = talk.layers.find(layer => layer.id === 'puppet-nilo-mouth-wide')
+  const niloClosed = talk.layers.find(layer => layer.id === 'puppet-nilo-mouth-closed')
+  const bertaWide = talk.layers.find(layer => layer.id === 'puppet-berta-mouth-wide')
+  const kitoWide = sticker.layers.find(layer => layer.id === 'puppet-kito-mouth-wide')
+  assert.equal(evaluateSceneLayer(niloClosed, 1).opacity, 1)
+  assert.equal(evaluateSceneLayer(niloWide, 1).opacity, 0)
+  assert.equal(evaluateSceneLayer(niloWide, 6.05).opacity, 1)
+  assert.equal(evaluateSceneLayer(bertaWide, 1).opacity, 0)
+  assert.equal(evaluateSceneLayer(kitoWide, 1).opacity, 0)
 })
 
 test('Tijeral character kits are 2D cutouts with Qwen voices and optional bodies', () => {

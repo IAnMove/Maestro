@@ -2875,7 +2875,8 @@ export function SceneAnimatorPanel() {
       const units = segments.flatMap(segment => segment.words?.length
         ? segment.words.map(word => ({ text: word.text, start: word.start, end: word.end }))
         : [{ text: segment.text, start: segment.start, end: segment.end }])
-        .filter(unit => unit.end > unit.start && unit.start + track.startTime < scene.duration)
+        .filter(unit => unit.text.trim() && unit.end > unit.start && unit.start + track.startTime < scene.duration)
+      if (!units.length) throw new Error('No spoken regions were found in this track.')
       const plan = planAlignedCutoutDialogue(units.map(unit => ({
         text: unit.text,
         start: Math.max(0, unit.start + track.startTime),

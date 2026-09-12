@@ -229,17 +229,23 @@ export function planAlignedCutoutDialogue(
   const frame = 1 / Math.max(1, fps)
   const start = Math.max(0, usable[0].start)
   const end = Math.max(start + frame, usable[usable.length - 1].end)
-  const visemes: CutoutDialoguePlan['visemes'] = [{ start, end: start, state: 'closed' }]
+  // Rest closed must occupy a distinct time before the first spoken viseme.
+  // A zero-length closed at `start` shares a timestamp with the first word;
+  // rebuild keeps the later (open) frame, so evaluateSceneLayer holds that
+  // open mouth from t=0 until speech begins.
+  const visemes: CutoutDialoguePlan['visemes'] = start > 0
+    ? [{ start: 0, end: start, state: 'closed' }]
+    : []
   let cursor = start
   for (const unit of usable) {
     const unitStart = Math.max(start, unit.start)
     const unitEnd = Math.max(unitStart + frame, unit.end)
-    if (unitStart > cursor + frame) visemes.push({ start: cursor, end: unitStart, state: 'closed' })
+    if (unitStart > cursor) visemes.push({ start: cursor, end: unitStart, state: 'closed' })
     const spoken = visemeForToken(unit.text)
     visemes.push({ start: unitStart, end: unitEnd, state: spoken === 'closed' ? 'small' : spoken })
     cursor = unitEnd
   }
-  visemes.push({ start: cursor, end, state: 'closed' })
+  visemes.push({ start: cursor, end: Math.max(cursor, end), state: 'closed' })
   return { start, end, visemes }
 }
 

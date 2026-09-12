@@ -40,10 +40,37 @@ test('aligned words stay open during speech and close in the gaps', () => {
     { text: 'sticker', start: 10.52, end: 10.96 },
   ], 30)
   const at = time => plan.visemes.find(beat => time >= beat.start && time < beat.end)?.state
+  assert.equal(at(1), 'closed')
   assert.equal(at(10.15), 'wide')
   assert.equal(at(10.4), 'round')
   assert.equal(at(10.7), 'wide')
   assert.equal(plan.visemes.at(-1).state, 'closed')
+  const starts = plan.visemes.map(beat => beat.start)
+  assert.equal(new Set(starts).size, starts.length)
+})
+
+test('aligned rest closed is a distinct keyframe so playback does not hold the first word open', () => {
+  const closed = {
+    id: 'mouth-closed', name: 'Closed', type: 'overlay',
+    transform: { x: 50, y: 48, scale: .12, opacity: 0, rotation: 0 },
+    animation: { start: { x: 50, y: 48, scale: .12, opacity: 0 }, end: { x: 50, y: 48, scale: .12, opacity: 0 }, duration: 20, curve: 'hold' },
+    faceBinding: { poseLayerId: 'pose', role: 'mouth', state: 'closed' },
+  }
+  const wide = {
+    ...closed, id: 'mouth-wide', name: 'Wide',
+    faceBinding: { poseLayerId: 'pose', role: 'mouth', state: 'wide' },
+  }
+  const beats = [
+    { id: 'w0', text: 'La', start: 6, end: 6.14, mouthLayerIds: [closed.id, wide.id], confidence: 'aligned-audio' },
+    { id: 'w1', text: 'fuente', start: 6.14, end: 6.56, mouthLayerIds: [closed.id, wide.id], confidence: 'aligned-audio' },
+  ]
+  const rebuilt = rebuildCutoutDialogueLayers([closed, wide], beats, 30, 20)
+  const closedLayer = rebuilt.find(item => item.id === closed.id)
+  const wideLayer = rebuilt.find(item => item.id === wide.id)
+  assert.equal(evaluateSceneLayer(closedLayer, 1).opacity, 1)
+  assert.equal(evaluateSceneLayer(wideLayer, 1).opacity, 0)
+  assert.equal(evaluateSceneLayer(wideLayer, 6.05).opacity, 1)
+  assert.equal(evaluateSceneLayer(closedLayer, 6.05).opacity, 0)
 })
 
 test('a long mixed-vowel line retains every available mouth family', () => {
