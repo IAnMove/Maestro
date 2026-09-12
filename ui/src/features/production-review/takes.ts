@@ -203,6 +203,19 @@ export function restoreSelections(current: ReviewDesk, projected: ReviewDesk): R
   }
 }
 
+/** Comparison is local UI state; persisted selections, decisions and notes stay authoritative. */
+export function restoreCompareChoices(current: ReviewDesk, projected: ReviewDesk): ReviewDesk {
+  if (current.pipelineId !== projected.pipelineId || current.workspace !== projected.workspace) return projected
+  return {
+    ...projected,
+    shots: projected.shots.map(shot => {
+      const previous = current.shots.find(item => item.id === shot.id)
+      const compare = keepTakeId(shot, previous?.compareTakeId)
+      return compare ? { ...shot, compareTakeId: compare } : shot
+    }),
+  }
+}
+
 function restoreShot(previous: ReviewShot | undefined, shot: ReviewShot): ReviewShot {
   if (!previous) return shot
   const selected = keepTakeId(shot, previous.selectedTakeId) || shot.selectedTakeId

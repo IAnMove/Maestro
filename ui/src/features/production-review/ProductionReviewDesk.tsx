@@ -6,7 +6,7 @@ import { approveShot, persistCommandsFor, rejectShot, setShotNotes } from './dec
 import { exportApprovedSelection } from './exportSelection.ts'
 import { applyRegenPlan, planSubsetRegeneration } from './regenerate.ts'
 import { canApproveTake, isTakeCompleted } from './status.ts'
-import { comparePair, selectExactTake, setCompareTake } from './takes.ts'
+import { comparePair, restoreCompareChoices, selectExactTake, setCompareTake } from './takes.ts'
 import type {
   ActivityOpenSource, ExportSelection, PersistCommand, RegenOutcome, RegenPlan, ReviewDesk, ReviewShot, ReviewTake,
 } from './types.ts'
@@ -17,7 +17,7 @@ const action = `${chip} inline-flex items-center gap-1 hover:bg-bg-hover disable
 export interface ProductionReviewDeskProps {
   desk: ReviewDesk
   onChange?: (desk: ReviewDesk) => void
-  onPersist?: (commands: PersistCommand[]) => void | Promise<void>
+  onPersist?: (commands: PersistCommand[]) => void | ReviewDesk | Promise<void | ReviewDesk>
   onRegenerate?: (plan: RegenPlan) => Promise<RegenOutcome[]>
   onExport?: (selection: ExportSelection) => Promise<void>
   activityTarget?: ActivityOpenSource | null
@@ -97,10 +97,11 @@ function ShotRail({
 }
 
 function DecisionBar({
-  shot, copy, onApprove, onReject, onNotes,
+  shot, copy, busy, onApprove, onReject, onNotes,
 }: {
   shot: ReviewShot
   copy: ReviewCopy
+  busy: boolean
   onApprove: () => void
   onReject: () => void
   onNotes: (value: string) => void
@@ -121,6 +122,7 @@ function DecisionBar({
           defaultValue={shot.notes}
           placeholder={copy.notesPlaceholder}
           aria-label={copy.notes}
+          disabled={busy}
           onBlur={event => { if (event.target.value !== shot.notes) onNotes(event.target.value) }}
         />
       </label>
@@ -161,25 +163,52 @@ export function ProductionReviewDesk({
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const pending = useRef(false)
-  useEffect(() => { setCurrent(desk) }, [desk])
+  const queued = useRef<Array<() => Promise<void>>>([])
+  const desired = useRef(desk)
+  const committed = useRef(desk)
+  useEffect(() => {
+    if (pending.current) return
+    const refreshed = restoreCompareChoices(committed.current, desk)
+    desired.current = refreshed
+    committed.current = refreshed
+    setCurrent(refreshed)
+  }, [desk])
   const shot = current.shots.find(item => item.id === focusId) || current.shots[0]
   const pair = useMemo(() => shot ? comparePair(shot) : { a: null, b: null }, [shot])
   const media = fileUrl || ((filename: string) => `#${filename}`)
   const fromActivity = isSameProduction(current, activityTarget)
   const run = async (operation: () => Promise<void>) => {
-    if (pending.current) return
-    pending.current = true; setBusy(true); setError('')
-    try { await operation() } catch (reason) {
-      setError(reason instanceof Error ? reason.message : String(reason))
-    } finally { pending.current = false; setBusy(false) }
+    if (pending.current) {
+      queued.current.push(operation)
+      return
+    }
+    pending.current = true; setBusy(true)
+    let currentOp: (() => Promise<void>) | undefined = operation
+    try {
+      while (currentOp) {
+        try { await currentOp(); setError('') } catch (reason) {
+          setError(reason instanceof Error ? reason.message : String(reason))
+        }
+        currentOp = queued.current.shift()
+      }
+    } finally {
+      desired.current = committed.current
+      pending.current = false; setBusy(false)
+    }
   }
   const save = async (next: ReviewDesk, shotIds?: string[]) => {
     if (!onPersist) throw new Error(copy.unavailable)
-    await onPersist(persistCommandsFor(next, shotIds))
-    setCurrent(next); onChange?.(next)
+    const saved = restoreCompareChoices(next, await onPersist(persistCommandsFor(next, shotIds)) || next)
+    committed.current = saved
+    desired.current = saved
+    setCurrent(saved); onChange?.(saved)
   }
-  const persist = (next: ReviewDesk, shotIds?: string[]) => {
-    void run(() => save(next, shotIds))
+  const persist = (mutate: (desk: ReviewDesk) => ReviewDesk, shotIds?: string[]) => {
+    void run(async () => {
+      const next = mutate(desired.current)
+      desired.current = next
+      await save(next, shotIds)
+    })
   }
 
   const togglePick = (id: string, checked: boolean) => {
@@ -187,7 +216,7 @@ export function ProductionReviewDesk({
   }
 
   const runExport = () => void run(async () => {
-    const selection = exportApprovedSelection(current)
+    const selection = exportApprovedSelection(committed.current)
     if (!selection.clips.length) { setExportNote(copy.exportEmpty); return }
     if (!onExport) throw new Error(copy.unavailable)
     await onExport(selection)
@@ -195,10 +224,11 @@ export function ProductionReviewDesk({
   })
 
   const runRegen = () => run(async () => {
-    const plan = planSubsetRegeneration(current, picked, { confirm: true, copy })
+    const plan = planSubsetRegeneration(desired.current, picked, { confirm: true, copy })
     if (!onRegenerate) throw new Error(copy.unavailable)
     const outcomes = await onRegenerate(plan)
-    const next = applyRegenPlan(current, plan, outcomes, { copy })
+    const next = applyRegenPlan(desired.current, plan, outcomes, { copy })
+    desired.current = next
     await save(next, plan.jobs.map(job => job.shotId))
     setConfirm(false)
     setPicked([])
@@ -211,23 +241,23 @@ export function ProductionReviewDesk({
   return (
     <section role="region" className="rounded-xl border border-border bg-bg-secondary p-3 text-text-primary" aria-label={copy.title} data-production-id={current.productionId}>
       {error && <p role="alert" className="mb-2 text-sm text-red-300">{error}</p>}
-      {busy && <p role="status" className="mb-2 text-sm">{copy.working}</p>}
-      <fieldset disabled={busy || !onPersist}>
+      <div className="mb-2 min-h-5">{busy && <p role="status" className="text-sm">{copy.working}</p>}</div>
+      <fieldset disabled={!onPersist}>
       <header className="mb-2 flex flex-wrap items-center gap-2">
         <h2 className="text-sm font-semibold">{copy.title}</h2>
         {fromActivity && <span className="text-[10px] text-violet-300">{copy.openedFromActivity}</span>}
-        <button type="button" className={action} onClick={() => setConfirm(true)} disabled={!picked.length || !onRegenerate}><RefreshCw size={12} />{copy.regenerate}</button>
-        <button type="button" className={action} onClick={runExport} disabled={!onExport}><Download size={12} />{copy.export}</button>
+        <button type="button" className={action} onClick={() => setConfirm(true)} disabled={busy || !picked.length || !onRegenerate}><RefreshCw size={12} />{copy.regenerate}</button>
+        <button type="button" className={action} onClick={runExport} disabled={busy || !onExport}><Download size={12} />{copy.export}</button>
       </header>
       {exportNote && <p role="status" className="mb-2 text-[10px]">{exportNote}</p>}
-      {confirm && <ConfirmRegen copy={copy} count={picked.length} onCancel={() => setConfirm(false)} onConfirm={() => void runRegen()} />}
+      {confirm && <fieldset disabled={busy}><ConfirmRegen copy={copy} count={picked.length} onCancel={() => setConfirm(false)} onConfirm={() => void runRegen()} /></fieldset>}
       <div className="grid min-h-72 overflow-hidden rounded-lg border border-border lg:grid-cols-[16rem_minmax(0,1fr)]">
-        <ShotRail desk={current} copy={copy} focusId={shot.id} picked={picked} onFocus={setFocusId} onToggle={togglePick} />
+        <fieldset disabled={busy}><ShotRail desk={current} copy={copy} focusId={shot.id} picked={picked} onFocus={setFocusId} onToggle={togglePick} /></fieldset>
         <div className="p-2">
           <p className="mb-2 text-[11px]">{copy.compare}</p>
           <div className="grid gap-2 sm:grid-cols-2">
-            <TakeStage label={copy.takeA} take={pair.a} copy={copy} fileUrl={media} selected={pair.a?.id === shot.selectedTakeId} onSelect={() => pair.a && persist(selectExactTake(current, shot.id, pair.a.id), [shot.id])} />
-            <TakeStage label={copy.takeB} take={pair.b} copy={copy} fileUrl={media} selected={pair.b?.id === shot.selectedTakeId} onSelect={() => pair.b && persist(selectExactTake(current, shot.id, pair.b.id), [shot.id])} />
+            <TakeStage label={copy.takeA} take={pair.a} copy={copy} fileUrl={media} selected={pair.a?.id === shot.selectedTakeId} onSelect={() => { const take = pair.a; if (take) persist(desk => selectExactTake(desk, shot.id, take.id), [shot.id]) }} />
+            <TakeStage label={copy.takeB} take={pair.b} copy={copy} fileUrl={media} selected={pair.b?.id === shot.selectedTakeId} onSelect={() => { const take = pair.b; if (take) persist(desk => selectExactTake(desk, shot.id, take.id), [shot.id]) }} />
           </div>
           <div className="mt-2 flex flex-wrap gap-1" aria-label={copy.selectTake}>
             {shot.takes.map(take => (
@@ -237,8 +267,8 @@ export function ProductionReviewDesk({
                 data-take-id={take.id}
                 className={`${chip} ${take.id === shot.selectedTakeId ? 'bg-emerald-500/20' : ''}`}
                 aria-pressed={take.id === shot.selectedTakeId}
-                onClick={() => persist(selectExactTake(current, shot.id, take.id), [shot.id])}
-                onContextMenu={event => { event.preventDefault(); persist(setCompareTake(current, shot.id, take.id), [shot.id]) }}
+                onClick={() => persist(desk => selectExactTake(desk, shot.id, take.id), [shot.id])}
+                onContextMenu={event => { event.preventDefault(); persist(desk => setCompareTake(desk, shot.id, take.id), [shot.id]) }}
               >
                 {take.id}{isTakeCompleted(take) ? '' : ` · ${copy[take.status]}`}
               </button>
@@ -247,9 +277,10 @@ export function ProductionReviewDesk({
           <DecisionBar
             shot={shot}
             copy={copy}
-            onApprove={() => persist(approveShot(current, shot.id), [shot.id])}
-            onReject={() => persist(rejectShot(current, shot.id), [shot.id])}
-            onNotes={value => persist(setShotNotes(current, shot.id, value), [shot.id])}
+            busy={busy}
+            onApprove={() => persist(desk => approveShot(desk, shot.id), [shot.id])}
+            onReject={() => persist(desk => rejectShot(desk, shot.id), [shot.id])}
+            onNotes={value => persist(desk => setShotNotes(desk, shot.id, value), [shot.id])}
           />
         </div>
       </div>

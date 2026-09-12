@@ -4,7 +4,7 @@ import React from 'react'
 import { JSDOM } from 'jsdom'
 import { applyPersistCommands } from '../src/features/production-review/persist'
 import { projectReviewDesk } from '../src/features/production-review/project'
-import { selectExactTake } from '../src/features/production-review/takes'
+import { restoreCompareChoices, selectExactTake } from '../src/features/production-review/takes'
 import { exportApprovedSelection } from '../src/features/production-review/exportSelection'
 import { regenerateReview } from '../src/features/production-review/runtime'
 import type { SavedPipelineState } from '../src/types'
@@ -165,6 +165,126 @@ test('saving in the mounted dashboard updates the selected pipeline immediately'
     await act(async () => fireEvent.click(panel.getByRole('button', { name: 'Reject', hidden: true })))
     assert.equal(useStore.getState().dashboardSelectedPipeline?.clips[0].tag, 'needs_work')
   } finally { cleanup(); useStore.setState(previous, true) }
+})
+
+test('notes blur then approve persist both decisions while the first save is in flight', async () => {
+  const { render, screen, fireEvent, act, cleanup, waitFor } = await import('@testing-library/react')
+  const { ProductionReviewDesk } = await import('../src/features/production-review/ProductionReviewDesk')
+  let desk = projectReviewDesk({ pipeline: pipeline() })
+  const saves: Array<{ commands: unknown[]; resolve: () => void }> = []
+  try {
+    render(<ProductionReviewDesk desk={desk} onChange={next => { desk = next }}
+      onPersist={commands => new Promise<void>(resolve => { saves.push({ commands, resolve }) })} />)
+    fireEvent.change(screen.getByLabelText('Notes'), { target: { value: 'keep the lantern' } })
+    fireEvent.blur(screen.getByLabelText('Notes'))
+    assert.equal(screen.getByRole('button', { name: 'Approve' }).matches(':disabled'), false,
+      'blur must not disable the button before the browser dispatches its click')
+    fireEvent.click(screen.getByRole('button', { name: 'Approve' }))
+    assert.equal(saves.length, 1)
+    await act(async () => { saves[0].resolve() })
+    await waitFor(() => assert.equal(saves.length, 2))
+    const commands = saves[1].commands as Array<{ type: string; notes?: string; tag?: string | null }>
+    assert.equal(commands.find(item => item.type === 'note_clip')?.notes, 'keep the lantern')
+    assert.equal(commands.find(item => item.type === 'tag_clip')?.tag, 'good')
+    await act(async () => { saves[1].resolve() })
+    assert.equal(desk.shots[0].notes, 'keep the lantern')
+    assert.equal(desk.shots[0].decision, 'approved')
+  } finally { cleanup() }
+})
+
+test('queued take selection and approval are applied in order after notes', async () => {
+  const { render, screen, fireEvent, act, cleanup } = await import('@testing-library/react')
+  const { ProductionReviewDesk } = await import('../src/features/production-review/ProductionReviewDesk')
+  let desk = projectReviewDesk({ pipeline: pipeline() })
+  const saves: Array<{ commands: unknown[]; resolve: () => void }> = []
+  try {
+    render(<ProductionReviewDesk desk={desk} onChange={next => { desk = next }}
+      onPersist={commands => new Promise<void>(resolve => { saves.push({ commands, resolve }) })} />)
+    fireEvent.change(screen.getByLabelText('Notes'), { target: { value: 'use the earlier take' } })
+    fireEvent.blur(screen.getByLabelText('Notes'))
+    fireEvent.click(screen.getByRole('button', { name: 'old-id' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Approve' }))
+    assert.equal(saves.length, 1)
+    await act(async () => { saves[0].resolve() })
+    assert.equal(saves.length, 2)
+    await act(async () => { saves[1].resolve() })
+    assert.equal(saves.length, 3)
+    await act(async () => { saves[2].resolve() })
+    assert.equal(desk.shots[0].selectedTakeId, 'old-id')
+    assert.equal(desk.shots[0].notes, 'use the earlier take')
+    assert.equal(desk.shots[0].decision, 'approved')
+  } finally { cleanup() }
+})
+
+test('an approval that failed to save never enters the exported selection', async () => {
+  const { render, screen, fireEvent, act, cleanup } = await import('@testing-library/react')
+  const { ProductionReviewDesk } = await import('../src/features/production-review/ProductionReviewDesk')
+  const exported: string[][] = []
+  try {
+    render(<ProductionReviewDesk desk={projectReviewDesk({ pipeline: pipeline() })}
+      onPersist={async () => { throw new Error('Production is busy') }}
+      onExport={async selection => { exported.push(selection.clips.map(clip => clip.filename)) }} />)
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Approve' })))
+    assert.match(screen.getByRole('alert').textContent || '', /Production is busy/)
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Export approved selection' })))
+    assert.deepEqual(exported, [['approved.mp4']])
+  } finally { cleanup() }
+})
+
+test('a saved hydrated response remains available to the next review operation', async context => {
+  const { render, screen, fireEvent, act, cleanup } = await import('@testing-library/react')
+  const { ProductionReviewHost } = await import('../src/features/production-review/ProductionReviewHost')
+  const saved = pipeline()
+  context.mock.method(globalThis, 'fetch', async () => {
+    saved.clips[0].video_attempts!.push({ id: 'recovered-id', filename: 'recovered.mp4' })
+    return response(saved)
+  })
+  try {
+    render(<ProductionReviewHost workspace="original" pipeline={pipeline() as SavedPipelineState} />)
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Approve' })))
+    assert.equal(screen.queryAllByRole('button', { name: 'recovered-id' }).length, 1)
+  } finally { cleanup() }
+})
+
+test('a custom comparison survives hydrated saves and parent dashboard refreshes', async context => {
+  const { render, screen, fireEvent, act, cleanup } = await import('@testing-library/react')
+  const { ProductionReviewHost } = await import('../src/features/production-review/ProductionReviewHost')
+  let saved = pipeline()
+  saved.clips[0].video_attempts!.unshift({ id: 'archive-id', filename: 'archive.mp4' })
+  context.mock.method(globalThis, 'fetch', async (_url: string, options: RequestInit = {}) => {
+    saved = applyPersistCommands(saved, JSON.parse(String(options.body)).commands)
+    return response(saved)
+  })
+  function Dashboard() {
+    const [source, setSource] = React.useState(saved as SavedPipelineState)
+    return <ProductionReviewHost workspace="original" pipeline={source} onSaved={setSource} />
+  }
+  try {
+    render(<Dashboard />)
+    await act(async () => fireEvent.contextMenu(screen.getByRole('button', { name: 'archive-id' })))
+    const compared = () => screen.getByTestId('take-b').querySelector('video')?.getAttribute('data-take-id')
+    assert.equal(compared(), 'archive-id')
+    fireEvent.change(screen.getByLabelText('Notes'), { target: { value: 'compare against archive' } })
+    await act(async () => fireEvent.blur(screen.getByLabelText('Notes')))
+    assert.equal(compared(), 'archive-id')
+    assert.equal(saved.clips[0].review_notes, 'compare against archive')
+  } finally { cleanup() }
+})
+
+test('preserving comparison choices never restores unconfirmed approval, notes or a removed take', () => {
+  const previous = projectReviewDesk({ pipeline: pipeline() })
+  previous.shots[0] = { ...previous.shots[0], selectedTakeId: 'old-id', approvedTakeId: 'old-id',
+    decision: 'approved', notes: 'unconfirmed', compareTakeId: 'old-id' }
+  const projected = projectReviewDesk({ pipeline: pipeline() })
+  const restored = restoreCompareChoices(previous, projected)
+  assert.equal(restored.shots[0].selectedTakeId, 'new-id')
+  assert.equal(restored.shots[0].approvedTakeId, null)
+  assert.equal(restored.shots[0].decision, 'pending')
+  assert.equal(restored.shots[0].notes, '')
+  projected.shots[0].takes = projected.shots[0].takes.filter(take => take.id !== 'old-id')
+  projected.shots[0].compareTakeId = null
+  assert.equal(restoreCompareChoices(previous, projected).shots[0].compareTakeId, null)
+  assert.equal(restoreCompareChoices(previous, { ...projected, workspace: 'another' }).shots[0].compareTakeId, null)
 })
 
 test('a late save after leaving review cannot replace another dashboard selection', async context => {
