@@ -40,38 +40,32 @@ export function createTijeralCharacterKits(): CharacterKit[] {
   return CUT_PAPER_CAST.map(character => {
     const id = tijeralCharacterKitId(character.id)
     const voice = CUT_PAPER_TTS[character.id]
-    const kit = createCharacterKit(character.name, 'cutout', [])
-    const speaking = SPEAKING.has(character.id)
-    const anchor = CUT_PAPER_MOUTH_ANCHOR[character.id]
-    return {
-      ...kit,
+    const kit: CharacterKit = {
+      ...createCharacterKit(character.name, 'cutout', []),
       id,
       name: character.name,
       lookNotes: `${character.silhouette}. ${character.hat}. ${character.notes}`,
       voice,
-      identityReference: speaking
-        ? imageAsset(`${id}-identity`, `${character.name} still`, `${CUT_PAPER_PUBLIC_ROOT}/puppets/${character.id}-canonical.jpg`)
-        : undefined,
-      base: speaking
-        ? imageAsset(`${id}-body`, `${character.name} body`, `${CUT_PAPER_PUBLIC_ROOT}/puppets/${character.id}-body.png`)
-        : undefined,
-      mouth: speaking
-        ? Object.fromEntries(CUT_PAPER_VISEMES.map(state => [
-          state,
-          imageAsset(`${id}-mouth-${state}`, `${character.name} ${state}`, `${CUT_PAPER_PUBLIC_ROOT}/mouths/paper-${state}.png`, 'overlay'),
-        ]))
-        : {},
-      anchors: speaking && anchor ? { base: { mouth: { ...anchor, rotation: 0 } } } : {},
       provenance: [
         {
           method: 'tijeral-cut-paper',
           characterId: character.id,
-          ...(speaking ? { voiceSample: `${CUT_PAPER_PUBLIC_ROOT}/voices/vo-${character.id}-${character.id}-1.wav` } : {}),
+          ...(SPEAKING.has(character.id) ? { voiceSample: `${CUT_PAPER_PUBLIC_ROOT}/voices/vo-${character.id}-${character.id}-1.wav` } : {}),
         },
       ],
       createdAt: now,
       updatedAt: now,
     }
+    if (!SPEAKING.has(character.id)) return kit
+    const anchor = CUT_PAPER_MOUTH_ANCHOR[character.id]
+    kit.identityReference = imageAsset(`${id}-identity`, `${character.name} still`, `${CUT_PAPER_PUBLIC_ROOT}/puppets/${character.id}-canonical.jpg`)
+    kit.base = imageAsset(`${id}-body`, `${character.name} body`, `${CUT_PAPER_PUBLIC_ROOT}/puppets/${character.id}-body.png`)
+    kit.mouth = Object.fromEntries(CUT_PAPER_VISEMES.map(state => [
+      state,
+      imageAsset(`${id}-mouth-${state}`, `${character.name} ${state}`, `${CUT_PAPER_PUBLIC_ROOT}/mouths/paper-${state}.png`, 'overlay'),
+    ]))
+    if (anchor) kit.anchors = { base: { mouth: { offsetX: anchor.offsetX, offsetY: anchor.offsetY, scale: anchor.scale, rotation: 0 } } }
+    return kit
   })
 }
 
