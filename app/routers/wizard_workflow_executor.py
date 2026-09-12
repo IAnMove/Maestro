@@ -11,11 +11,12 @@ from fastapi import APIRouter, HTTPException, Request
 from services.image_generation_commands import command_error
 from services.wizard_workflow_executor import catalog, command_handlers
 from services.wizard_workflows import WizardWorkflowRevisionConflict
+from services.wizard_workflow_supervisor import workflow_lifespan
 
 
-def create_wizard_workflow_executor_router(executor) -> APIRouter:
+def create_wizard_workflow_executor_router(executor, *, list_workspaces=None, interval: float = 1.0) -> APIRouter:
     """Build the isolated executor router with an injected service."""
-    router = APIRouter()
+    router = APIRouter(lifespan=workflow_lifespan(executor, list_workspaces, interval) if list_workspaces else None)
 
     def _translate(error: Exception) -> HTTPException:
         if isinstance(error, HTTPException):

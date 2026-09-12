@@ -5,6 +5,7 @@ import {
   persistInspectedAttempt,
 } from './persistence'
 import type { CatalogItem, CurrentModel, InspectedAttempt } from './types'
+import { submitInspectorPlan } from './submit'
 
 export function GenerationInspectorHost({
   workspace,
@@ -40,6 +41,7 @@ export function GenerationInspectorHost({
   if (!attempt) return null
   return (
     <GenerationInspectorDialog
+      key={`${workspace}:${attempt.attemptId}`}
       open={open}
       onClose={() => {
         setOpen(false)
@@ -50,6 +52,7 @@ export function GenerationInspectorHost({
       catalog={catalog}
       currentModel={currentModel}
       candidates={candidates}
+      onGenerate={submitInspectorPlan}
     />
   )
 }

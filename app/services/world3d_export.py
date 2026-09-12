@@ -88,7 +88,9 @@ def frame_count(duration: float, fps: int) -> int:
 
 def export_plan(document: dict) -> dict:
     duration = output_duration(document)
-    fps = 60 if document.get("fps") == 60 else 30
+    fps = document.get("fps", 30)
+    if fps not in (24, 30, 60):
+        raise ValueError("Export fps must be 24, 30 or 60")
     width, height = export_size(document.get("width"), document.get("height"))
     return {"width": width, "height": height, "fps": fps, "duration": duration,
             "count": frame_count(duration, fps)}
@@ -96,7 +98,8 @@ def export_plan(document: dict) -> dict:
 
 def playwright_module() -> Path | None:
     path = Path(__file__).resolve().parents[2] / "ui" / "node_modules" / "playwright"
-    return path if (path / "package.json").is_file() else None
+    entry = path / "index.mjs"
+    return entry if entry.is_file() else None
 
 
 # Drives the existing Video 3D stage.paint path in a process-owned Chromium.
@@ -115,44 +118,19 @@ const page = await browser.newPage();
 const frames = `${staging}/frames`;
 fs.mkdirSync(frames, { recursive: true });
 try {
-  await page.goto(appUrl, { waitUntil: 'domcontentloaded' });
-  await page.waitForFunction(() => !!window.__world3dStage, null, { timeout: 60000 });
+  await page.goto(new URL('/world3d-render.html', appUrl).href, { waitUntil: 'domcontentloaded' });
+  await page.waitForFunction(() => !!window.__world3dExport, null, { timeout: 60000 });
   const plan = snapshot.plan;
   const doc = snapshot.document;
-  await page.waitForFunction(slots => window.__world3dStage?.ready?.(slots), doc.slots, { timeout: 90000 });
-  await page.evaluate(({ document: scene, plan: size }) => {
-    const handle = window.__world3dStage;
-    handle.beginExport?.(scene);
-    handle.setExportSize?.(size.width, size.height);
-  }, { document: doc, plan });
+  await page.evaluate(({ document: scene, plan: size }) => window.__world3dExport.load(scene, size), { document: doc, plan });
   for (let index = 0; index < plan.count; index += 1) {
-    const png = await page.evaluate(async ({ document: scene, plan: size, index: frame }) => {
-      const handle = window.__world3dStage;
-      const { scene3dPlaybackSpeed } = await import('/src/features/scene3d/clock.ts');
-      const outputTime = Math.min(size.duration, frame / size.fps);
-      const time = outputTime * scene3dPlaybackSpeed(scene.playbackSpeed);
-      await handle.prepareFrame?.(time, scene);
-      const source = handle.paint(time, scene);
-      if (!source) throw new Error('The Video 3D stage was not ready');
-      const canvas = document.createElement('canvas');
-      canvas.width = size.width;
-      canvas.height = size.height;
-      const context = canvas.getContext('2d');
-      context.drawImage(source, 0, 0, size.width, size.height);
-      const { paintSceneFx } = await import('/src/features/sceneFx/paint.ts');
-      const { paintKineticTexts } = await import('/src/lib/kineticText.ts');
-      const { paintClipNumber } = await import('/src/features/scene3d/performance.ts');
-      paintSceneFx(context, size.width, size.height, time, scene.sfx);
-      paintKineticTexts(context, size.width, size.height, time, scene.texts);
-      paintClipNumber(context, size.width, size.height, scene.clipNumber);
-      return canvas.toDataURL('image/png');
-    }, { document: doc, plan, index });
+    const png = await page.evaluate(seconds => window.__world3dExport.frame(seconds), Math.min(plan.duration, index / plan.fps));
     const name = String(index + 1).padStart(6, '0');
     fs.writeFileSync(`${frames}/frame_${name}.png`, Buffer.from(png.split(',')[1], 'base64'));
     fs.writeFileSync(`${staging}/progress.json`, JSON.stringify({ current: index + 1, total: plan.count }));
   }
 } finally {
-  await page.evaluate(() => { window.__world3dStage?.endExport?.(); }).catch(() => {});
+  await page.evaluate(() => { window.__world3dExport?.dispose(); }).catch(() => {});
   await browser.close();
 }
 """
@@ -187,15 +165,20 @@ def run_owned_browser(snapshot: dict, staging: Path, cancelled, *, app_url: str,
     return frames
 
 
-def export_capabilities() -> dict:
+def export_capabilities(app_url: str | None = None) -> dict:
     ffmpeg = bool(shutil.which("ffmpeg") and shutil.which("ffprobe"))
     playwright = playwright_module() is not None
     return {
         "ffmpeg": ffmpeg, "playwright": playwright,
-        "realRender": "ready" if ffmpeg and playwright else "pending",
+        "realRender": "ready" if ffmpeg and playwright and renderer_available(app_url) else "pending",
         "renderer": "world3d-export-flow",
-        "fps": [30, 60], "maxDuration": 600, "maxVoicedDuration": 0,
+        "fps": [24, 30, 60], "maxDuration": 600, "maxVoicedDuration": 0,
     }
+
+
+def renderer_available(app_url: str | None) -> bool:
+    from services.world3d_renderer_support import renderer_available as available
+    return available(app_url or os.environ.get("HOCUS_APP_URL", ""), playwright_module())
 
 
 def write_png(path: Path, width: int, height: int, rgb: tuple[int, int, int]) -> None:
@@ -479,6 +462,9 @@ class World3DExportService:
         self._lock = threading.RLock()
         self._workers: dict[str, threading.Thread] = {}
 
+    def capabilities(self) -> dict:
+        return export_capabilities(self.app_url)
+
     def _registry(self, workspace: str):
         if not isinstance(workspace, str) or not WORKSPACE_RE.fullmatch(workspace):
             raise http_error(422, "invalid_workspace", "Use an explicit valid output workspace")
@@ -521,7 +507,7 @@ class World3DExportService:
                             message="Retrying Video 3D export", error=None)
         self._dispatch(registry, previous["intent_id"])
         current = registry.command_admission(previous["intent_id"])
-        return {"receipt": deepcopy(current["receipt"]), "replayed": True, "capabilities": export_capabilities()}
+        return {"receipt": deepcopy(current["receipt"]), "replayed": True, "capabilities": self.capabilities()}
 
     def _task_fields(self, *, task_id, job_id, workspace, plan) -> dict:
         return {
@@ -545,7 +531,7 @@ class World3DExportService:
             task_fields=self._task_fields(task_id=task_id, job_id=job_id, workspace=workspace, plan=snapshot["plan"]),
         )
         self._dispatch(registry, frozen["original"]["intent_id"])
-        return {**admitted, "capabilities": export_capabilities()}
+        return {**admitted, "capabilities": self.capabilities()}
 
     def _dispatch(self, registry, intent_id: str) -> None:
         entry = registry.command_admission(intent_id)
@@ -574,7 +560,7 @@ class World3DExportService:
             if entry is None:
                 raise http_error(404, "receipt_not_found", "No admission exists for this intention in this workspace")
             task = registry.get(entry["task_id"])
-            return {"receipt": entry["receipt"], "task": task, "capabilities": export_capabilities()}
+            return {"receipt": entry["receipt"], "task": task, "capabilities": self.capabilities()}
         except (OSError, sqlite3.Error) as error:
             raise http_error(503, "storage_unavailable", "Command storage is unavailable") from error
 

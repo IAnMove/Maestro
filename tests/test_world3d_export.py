@@ -192,11 +192,10 @@ def test_publish_refuses_a_voiced_snapshot_even_if_preflight_is_bypassed(tmp_pat
 
 
 def test_owned_browser_script_uses_scene_clock_and_waits_for_assets():
-    assert "scene3dPlaybackSpeed(scene.playbackSpeed)" in _OWNED_BROWSER_JS
-    assert "outputTime * scene3dPlaybackSpeed" in _OWNED_BROWSER_JS
-    assert "window.__world3dStage?.ready?.(slots)" in _OWNED_BROWSER_JS
-    assert "handle.beginExport?.(scene)" in _OWNED_BROWSER_JS
-    assert "handle.setExportSize?.(size.width, size.height)" in _OWNED_BROWSER_JS
+    assert "world3d-render.html" in _OWNED_BROWSER_JS
+    assert "window.__world3dExport.load(scene, size)" in _OWNED_BROWSER_JS
+    assert "window.__world3dExport.frame(seconds)" in _OWNED_BROWSER_JS
+    assert "/src/" not in _OWNED_BROWSER_JS
 
 
 def test_staging_dir_does_not_treat_dotdot_as_workspace_root(tmp_path):
@@ -376,6 +375,23 @@ def test_capabilities_endpoint_matches_worker_preflight(tmp_path):
     assert listed["realRender"] in {"ready", "pending"}
     assert listed["ffmpeg"] is export_capabilities()["ffmpeg"]
     assert listed["maxVoicedDuration"] == 0
+    assert listed["fps"] == [24, 30, 60]
+
+
+def test_renderer_origin_uses_socket_address_and_preserves_explicit_configuration(tmp_path):
+    from routers.world3d_export import bind_world3d_renderer_origin
+    service = _service(tmp_path, renderer=_paint)
+    service.app_url = ''
+    app = FastAPI()
+    bind_world3d_renderer_origin(app, service)
+    app.include_router(create_world3d_export_router(service))
+    client = TestClient(app, base_url='http://localhost:4192')
+    response = client.get('/api/v1/scenes/world3d/export/capabilities', headers={'host': 'untrusted.example'})
+    assert response.status_code == 200
+    assert service.app_url == 'http://127.0.0.1:4192'
+    service.app_url = 'http://127.0.0.1:8888'
+    client.get('/api/v1/scenes/world3d/export/capabilities')
+    assert service.app_url == 'http://127.0.0.1:8888'
 
 
 def test_mux_validates_before_replacing_destination(tmp_path):

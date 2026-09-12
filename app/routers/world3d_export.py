@@ -16,7 +16,6 @@ from services.world3d_export import (
     RECEIPT_OPERATION,
     command_catalog,
     command_handlers,
-    export_capabilities,
     http_error,
 )
 
@@ -30,7 +29,7 @@ def create_world3d_export_router(service) -> APIRouter:
 
     @router.get("/api/v1/scenes/world3d/export/capabilities")
     def capabilities():
-        return export_capabilities()
+        return service.capabilities()
 
     @router.post("/api/v1/scenes/world3d/export")
     async def submit(request: Request):
@@ -59,6 +58,15 @@ def create_world3d_export_router(service) -> APIRouter:
 
     return router
 
+
+def bind_world3d_renderer_origin(api, service) -> None:
+    @api.middleware("http")
+    async def bind_renderer_origin(request: Request, call_next):
+        # Use the listening socket, never a client-controlled Host header.
+        server = request.scope.get("server")
+        if not service.app_url and server:
+            service.app_url = f"http://127.0.0.1:{server[1]}"
+        return await call_next(request)
 
 __all__ = [
     "CANCEL_OPERATION",

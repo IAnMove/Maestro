@@ -33,6 +33,8 @@ _JOB_STATUS = {
 
 _REGISTRIES: dict[str, TaskRegistry] = {}
 _LOCK = threading.Lock()
+_DISPATCH_OWNER = f"core-{uuid.uuid4().hex}"
+_DISPATCH_LOCK = threading.Lock()
 
 
 def registry_for(workspace: str) -> TaskRegistry:
@@ -211,7 +213,7 @@ class CoreGenerationCommands:
         except (OSError, sqlite3.Error) as error:
             raise command_error(503, "storage_unavailable", "Command storage is unavailable") from error
 
-    def _ensure_job(self, workspace: str, job_id: str, params: dict[str, Any]) -> None:
+    def _ensure_job(self, workspace: str, job_id: str, params: dict[str, Any], task_id: str) -> None:
         if core_remote_image.get_job(job_id) is not None:
             return
         core_remote_image.start_job(
@@ -226,6 +228,7 @@ class CoreGenerationCommands:
             },
             workspace=workspace,
             job_id=job_id,
+            on_update=lambda: get_task(workspace, task_id),
         )
 
     async def submit(self, command, *, trusted_tool=None, submission_context=None):
@@ -249,7 +252,19 @@ class CoreGenerationCommands:
                 task_fields=_task_fields(workspace, job_id, params),
                 fingerprint_version=frozen["fingerprint_version"],
             )
-            self._ensure_job(workspace, admitted["receipt"]["result"]["job_id"], params)
+            result = admitted["receipt"]["result"]
+            # A concurrent replay must not mistake claim → job creation for a
+            # previous process losing its provider outcome.
+            with _DISPATCH_LOCK:
+                if registry.claim_command_dispatch(command["intent_id"], _DISPATCH_OWNER):
+                    self._ensure_job(workspace, result["job_id"], params, result["task_id"])
+                elif core_remote_image.get_job(result["job_id"]) is None:
+                    task = registry.get(result["task_id"])
+                    if task and task["status"] in ACTIVE_STATUSES:
+                        task = registry.update(task["id"], status="interrupted", force=True,
+                                               message="Provider outcome unknown; create a new attempt to retry")
+                    if task:
+                        core_remote_image.restore_job(task)
             return admitted
         except ImageGenerationSpecError as error:
             raise command_error(422, "invalid_command", str(error)) from error
