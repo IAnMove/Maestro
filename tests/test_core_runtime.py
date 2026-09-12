@@ -10,6 +10,7 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
+import core_runtime
 from core_runtime import api
 from services import core_upload
 from services.platform_capabilities import FEATURE_UNAVAILABLE
@@ -74,7 +75,7 @@ class CoreRuntimeTests(unittest.TestCase):
         self.assertEqual(self.client.post("/api/v1/director/pipeline/start").status_code, 409)
         self.assertEqual(self.client.post("/api/v1/rig/generate").status_code, 409)
         mcp = self.client.post("/api/v1/wangp/mcp", json={"params": {"name": "generate"}})
-        self.assertEqual(mcp.status_code, 409)
+        self.assertEqual(mcp.status_code, 503)
         self.assertEqual(self.client.post("/api/v1/tools/remove-background").status_code, 409)
         missing = self.client.post("/api/v1/video-editor/probe", json={"source": "missing.mp4"})
         self.assertEqual(missing.status_code, 400)
@@ -105,6 +106,32 @@ class CoreRuntimeTests(unittest.TestCase):
         self.assertNotIn("token", body)
         blocked = self.client.put("/api/v1/settings/mcp", json={"enabled": True})
         self.assertEqual(blocked.status_code, 403)
+        closed = self.client.post("/api/v1/wangp/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "ping"})
+        self.assertEqual(closed.status_code, 503)
+
+    def test_settings_token_gates_core_mcp_and_closes_when_disabled(self):
+        folder = tempfile.TemporaryDirectory()
+        original_path = core_runtime._mcp_access.path
+        client = TestClient(api, base_url="http://127.0.0.1:8080")
+        origin = {"Origin": "http://127.0.0.1:8080"}
+        ping = {"jsonrpc": "2.0", "id": 1, "method": "ping"}
+        try:
+            core_runtime._mcp_access.path = Path(folder.name) / "mcp-access.json"
+            self.assertEqual(client.post("/api/v1/wangp/mcp", json=ping).status_code, 503)
+            created = client.put("/api/v1/settings/mcp", json={"enabled": True}, headers=origin)
+            self.assertEqual(created.status_code, 200, created.text)
+            token = created.json()["token"]
+            self.assertGreaterEqual(len(token), 40)
+            authorized = {"Authorization": f"Bearer {token}"}
+            opened = client.post("/api/v1/wangp/mcp", headers=authorized, json=ping)
+            self.assertEqual(opened.status_code, 200, opened.text)
+            leaked = client.post("/api/v1/wangp/mcp", json=ping)
+            self.assertEqual(leaked.status_code, 401)
+            client.put("/api/v1/settings/mcp", json={"enabled": False}, headers=origin)
+            self.assertEqual(client.post("/api/v1/wangp/mcp", headers=authorized, json=ping).status_code, 503)
+        finally:
+            core_runtime._mcp_access.path = original_path
+            folder.cleanup()
 
     def test_remote_llm_load_is_not_blocked_as_local_engine(self):
         with patch("services.llm_service.load_model"), patch(
@@ -395,13 +422,24 @@ class CoreRuntimeTests(unittest.TestCase):
         self.assertEqual(profile["model3d"]["provider"], "meshy")
 
     def test_mcp_lists_read_tools_and_omits_local_generate(self):
-        response = self.client.post("/api/v1/wangp/mcp", json={
-            "jsonrpc": "2.0", "id": 1, "method": "tools/list",
-        })
+        headers = {"Authorization": "Bearer core-mcp-token"}
+        with patch.object(core_runtime._mcp_access, "token", return_value="core-mcp-token"):
+            denied = self.client.post("/api/v1/wangp/mcp", json={
+                "jsonrpc": "2.0", "id": 1, "method": "tools/list",
+            })
+            self.assertEqual(denied.status_code, 401)
+            response = self.client.post("/api/v1/wangp/mcp", headers=headers, json={
+                "jsonrpc": "2.0", "id": 1, "method": "tools/list",
+            })
+            generate = self.client.post(
+                "/api/v1/wangp/mcp", headers=headers, json={"params": {"name": "generate"}},
+            )
         self.assertEqual(response.status_code, 200)
         names = {tool["name"] for tool in response.json()["result"]["tools"]}
         self.assertIn("assets", names)
         self.assertNotIn("generate", names)
+        self.assertEqual(generate.status_code, 409)
+        self.assertEqual(generate.json()["detail"]["code"], FEATURE_UNAVAILABLE)
 
     def test_story_and_series_libraries_persist(self):
         folder, previous = self._in_temp_workspace()

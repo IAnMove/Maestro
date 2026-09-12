@@ -1,6 +1,8 @@
 """MCP surface for the core/remote profile: advertise reads, 409 local engines."""
 from __future__ import annotations
 
+import secrets
+
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 
@@ -72,11 +74,22 @@ def _jsonrpc(body: dict) -> dict:
     return {"jsonrpc": "2.0", "id": request_id, "result": result}
 
 
-def create_core_mcp_router() -> APIRouter:
+def _require_mcp_bearer(request: Request, token: str) -> None:
+    if not token:
+        raise HTTPException(503, "External agent access is disabled; configure HOCUS_MCP_TOKEN")
+    if not secrets.compare_digest(request.headers.get("authorization", ""), f"Bearer {token}"):
+        raise HTTPException(401, "Invalid MCP credentials")
+    origin = request.headers.get("origin")
+    if origin and origin != f"{request.url.scheme}://{request.url.netloc}":
+        raise HTTPException(403, "Origin is not permitted")
+
+
+def create_core_mcp_router(access) -> APIRouter:
     router = APIRouter()
 
     @router.post("/api/v1/wangp/mcp")
     async def wangp_mcp(request: Request):
+        _require_mcp_bearer(request, access.token())
         body = await request.json()
         if isinstance(body, dict) and body.get("jsonrpc") == "2.0":
             try:

@@ -131,10 +131,11 @@ api.include_router(create_series_assembly_router(
 ))
 api.include_router(create_core_series_plan_router())
 api.include_router(create_core_remote_router())
-api.include_router(create_core_mcp_router())
-api.include_router(create_mcp_access_router(McpAccess(
+_mcp_access = McpAccess(
     os.path.join(os.path.dirname(__file__), "settings", "mcp-access.json"),
-)))
+)
+api.include_router(create_core_mcp_router(_mcp_access))
+api.include_router(create_mcp_access_router(_mcp_access))
 _core_image_commands = core_generation_commands.service()
 api.include_router(create_image_generation_commands_router(_core_image_commands))
 api.include_router(create_wizard_workflow_executor_router(WizardWorkflowExecutor(
