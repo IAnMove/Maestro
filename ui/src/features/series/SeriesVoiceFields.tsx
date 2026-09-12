@@ -3,6 +3,10 @@ import { inputClass, textareaClass } from './styles'
 import type { SeriesProject } from './types'
 import { useUiTranslation } from '../../i18n'
 import { CharacterKitLink } from '../characters/CharacterKitLink'
+import { CharacterKitSummary } from '../characters/CharacterKitSummary'
+import { useCharacterKitLibrary } from '../characters/useCharacterKitLibrary'
+import { useStore } from '../../stores/useStore'
+import { resolvedCharacterTts } from '../../lib/characterKit'
 
 export function SeriesVoiceFields({
   series, onPatchVoice,
@@ -11,18 +15,36 @@ export function SeriesVoiceFields({
   onPatchVoice: (index: number, patch: Record<string, unknown>) => void
 }) {
   const { t } = useUiTranslation('seriesLab')
+  const workspace = useStore(s => s.activeWorkspace)
+  const { kits } = useCharacterKitLibrary(workspace)
   return (
     <div className="space-y-3">
-      {series.characters.map((character, index) => (
+      {series.characters.map((character, index) => {
+        const kit = kits.find(item => item.id === character.voiceProfile?.characterKitRef?.id)
+        const tts = resolvedCharacterTts(kit, character.voiceProfile)
+        const kitOwnsTts = tts.source === 'kit'
+        return (
         <div key={character.id} className="rounded-lg border border-border p-3">
           <strong className="text-xs text-text-primary">{character.name || t('canon.character')}</strong>
-          <CharacterKitLink value={character.voiceProfile?.characterKitRef} onChange={characterKitRef => onPatchVoice(index, { characterKitRef })} />
+          <CharacterKitLink
+            value={character.voiceProfile?.characterKitRef}
+            kits={kits}
+            onChange={characterKitRef => {
+              const next = kits.find(item => item.id === characterKitRef?.id)
+              onPatchVoice(index, {
+                characterKitRef,
+                ...(next?.voice ? { provider: next.voice.provider, voiceId: next.voice.voiceId } : {}),
+              })
+            }}
+          />
+          <CharacterKitSummary kit={kit} />
+          <p className="mt-2 text-[10px] text-text-muted">{kitOwnsTts ? t('canon.kitTtsHint') : t('canon.unlinkedTtsHint')}</p>
           <div className="mt-2 grid gap-2 md:grid-cols-3">
             <SeriesField label={t('canon.provider')}>
-              <input className={inputClass} value={String(character.voiceProfile?.provider || '')} onChange={event => onPatchVoice(index, { provider: event.target.value })} />
+              <input className={inputClass} value={String(kitOwnsTts ? tts.provider || '' : character.voiceProfile?.provider || '')} disabled={kitOwnsTts} onChange={event => onPatchVoice(index, { provider: event.target.value })} />
             </SeriesField>
             <SeriesField label={t('canon.voiceId')} hint={t('canon.voiceIdHint')}>
-              <input className={inputClass} value={String(character.voiceProfile?.voiceId || '')} onChange={event => onPatchVoice(index, { voiceId: event.target.value })} />
+              <input className={inputClass} value={String(kitOwnsTts ? tts.voiceId || '' : character.voiceProfile?.voiceId || '')} disabled={kitOwnsTts} onChange={event => onPatchVoice(index, { voiceId: event.target.value })} />
             </SeriesField>
             <SeriesField label={t('canon.language')}>
               <input className={inputClass} value={String(character.voiceProfile?.language || '')} onChange={event => onPatchVoice(index, { language: event.target.value })} />
@@ -44,7 +66,8 @@ export function SeriesVoiceFields({
             </SeriesField>
           </div>
         </div>
-      ))}
+        )
+      })}
     </div>
   )
 }

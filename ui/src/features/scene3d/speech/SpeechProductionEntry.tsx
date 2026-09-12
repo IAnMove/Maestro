@@ -51,7 +51,7 @@ function ScopedSpeechProductionEntry({ kind, title, sourceId, audio, cast: initi
       <ProductionCharacterSelect options={castOptions} value={storyCharacter}
         onChange={id => { setStoryCharacter(id); setLinks({}); setModels({}) }} />
       {cast.length > 2 ? <p role="alert">{t('speech.twoSpeakers')}</p> : cast.map(character => <div key={character.id} className="space-y-2">
-        <CharacterKitLink workspace={workspace} value={Object.hasOwn(links, character.id) ? links[character.id] : character.characterKitRef}
+        <CharacterKitLink workspace={workspace} requireSpeech3d value={Object.hasOwn(links, character.id) ? links[character.id] : character.characterKitRef}
           disabled={busy} onChange={ref => { setLinks(previous => ({ ...previous, [character.id]: ref })); setModels(previous => ({ ...previous, [character.id]: undefined })) }} />
         <AssetInput
         label={character.name || t('speech.character')} placeholder={t('speech.chooseModel')} items={items.filter(i => i.type === 'model3d')} value={models[character.id]}

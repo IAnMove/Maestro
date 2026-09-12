@@ -72,6 +72,47 @@ export interface CharacterKitLibrary {
 
 export const emptyCharacterKitLibrary = (): CharacterKitLibrary => ({ version: 1, revision: 0, activeId: '', kits: {} })
 
+/** Story/Series cast lists every kit. Video 3D talkers may require a saved GLB. */
+export function listCharacterKitsFrom(
+  kits: CharacterKit[],
+  options: { requireSpeech3d?: boolean } = {},
+): CharacterKit[] {
+  const listed = options.requireSpeech3d ? kits.filter(kit => Boolean(kit.speech3d)) : [...kits]
+  return listed.sort((left, right) => left.name.localeCompare(right.name) || left.id.localeCompare(right.id))
+}
+
+export function listCharacterKits(
+  library: CharacterKitLibrary,
+  options: { requireSpeech3d?: boolean } = {},
+): CharacterKit[] {
+  return listCharacterKitsFrom(Object.values(library.kits), options)
+}
+
+/** Canonical still for MiniMax / Story identity: identity photo, else the base pose. */
+export function characterKitStillSource(kit: CharacterKit): string | undefined {
+  const asset = kit.identityReference ?? kit.base
+  return asset?.source || undefined
+}
+
+/** TTS lives on the kit. Series provider/voiceId are fallbacks when nothing is linked. */
+export function resolvedCharacterTts(
+  kit?: CharacterKit,
+  fallback?: { provider?: string; voiceId?: string },
+): { source: 'kit' | 'profile' | 'none'; voiceId?: string; provider?: string; instructions?: string } {
+  if (kit?.voice) {
+    return {
+      source: 'kit',
+      voiceId: kit.voice.voiceId,
+      provider: kit.voice.provider,
+      instructions: kit.voice.instructions,
+    }
+  }
+  if (fallback?.voiceId) {
+    return { source: 'profile', voiceId: fallback.voiceId, provider: fallback.provider }
+  }
+  return { source: 'none' }
+}
+
 const cleanId = (value: string) => value.trim().toLocaleLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 120)
 
 // getRandomValues is also available on plain-HTTP LAN sessions; randomUUID is not.
