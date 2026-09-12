@@ -1,7 +1,6 @@
 import { rebuildCutoutDialogueLayers } from '../../lib/cutoutDialogue'
 import type { Scene, SceneKeyframe, SceneLayer } from '../../types'
 import {
-  applyPuppetSpeech,
   assertCutPaperKitHasNoPrivateGlb,
   cutPaperCamera,
   cutPaperLocationLayer,
@@ -9,6 +8,7 @@ import {
   emptyCutPaperScene,
   slidePuppet,
 } from './puppet.ts'
+import { cutPaperDialogueBeats } from './voiceAlign.ts'
 
 export const CUT_PAPER_PILOT_DURATION = 78
 
@@ -50,14 +50,7 @@ export function compileCutPaperPilotScene(): Scene {
     parallax: 0.4,
   })
   scene.layers = slidePuppet(scene.layers, 'kito', { x: 118, y: 70 }, { x: 52, y: 70 }, 54, 61)
-  for (const line of CUT_PAPER_PILOT_SCRIPT) {
-    scene.layers = applyPuppetSpeech(scene.layers, line.speaker, line.text, line.start, line.end, 30)
-  }
-  scene.dialogueBeats = CUT_PAPER_PILOT_SCRIPT.map(line => ({
-    id: line.id, text: line.text, start: line.start, end: line.end,
-    mouthLayerIds: ['closed', 'small', 'wide', 'round'].map(state => `puppet-${line.speaker}-mouth-${state}`),
-    confidence: 'known-text' as const,
-  }))
+  scene.dialogueBeats = CUT_PAPER_PILOT_SCRIPT.flatMap(line => cutPaperDialogueBeats(line))
   scene.layers = rebuildCutoutDialogueLayers(scene.layers, scene.dialogueBeats ?? [], 30, duration)
   scene.texts = [
     { id: 'title', text: 'Tijeral', start: 0.4, end: 3.6, preset: 'rise', x: 50, y: 12, size: 7, color: '#1d2b5a', rotation: 0 },
@@ -161,12 +154,8 @@ export function compileCutPaperShot(shot: CutPaperShotId): Scene {
     }
   }
   scene.layers = slidePuppet(scene.layers, 'kito', { x: 118, y: 70 }, { x: 52, y: 70 }, 2, 9)
-  scene.layers = applyPuppetSpeech(scene.layers, 'kito', '¡Era un sticker!', 10, 16, 30)
-  scene.dialogueBeats = [{
-    id: 'kito-1', text: '¡Era un sticker!', start: 10, end: 16,
-    mouthLayerIds: ['closed', 'small', 'wide', 'round'].map(state => `puppet-kito-mouth-${state}`),
-    confidence: 'known-text' as const,
-  }]
+  const kito = CUT_PAPER_PILOT_SCRIPT.find(line => line.id === 'kito-1')!
+  scene.dialogueBeats = cutPaperDialogueBeats(kito, 10)
   scene.layers = rebuildCutoutDialogueLayers(scene.layers, scene.dialogueBeats ?? [], 30, duration)
     .map(layer => clampLayerToShotDuration(layer, duration))
   scene.audioTracks = [{ id: 'vo-kito-1', filename: 'vo-kito-kito-1.wav', name: 'kito · sticker', kind: 'speech', startTime: 10, volume: 1 }]
