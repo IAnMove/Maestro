@@ -50,7 +50,7 @@ import { assessNarrativeAsset } from '../../lib/assetSuitability'
 import { getSceneClipTime } from '../../lib/sceneClip'
 import { sanitizeSceneMotion } from '../../lib/sceneMotion'
 import { applySceneRhythmToLayer, buildSceneRhythmMap, type SceneRhythmCueSource, type SceneRhythmProfile } from '../../lib/sceneRhythm'
-import { applyCutoutDialogue, bindCutoutFaceToPose, ensureCutoutFacePlayback, findCutoutMouthLayers, isCutoutFaceLayer, normalizeFaceBinding, planAlignedCutoutDialogue, planCutoutDialogue, rebuildCutoutDialogueLayers, type SceneDialogueBeat } from '../../lib/cutoutDialogue'
+import { applyCutoutDialogue, bindCutoutFaceToPose, ensureCutoutFacePlayback, findCutoutMouthLayers, isCutoutFaceLayer, normalizeAlignedCutoutUnits, normalizeFaceBinding, planAlignedCutoutDialogue, planCutoutDialogue, rebuildCutoutDialogueLayers, type SceneDialogueBeat } from '../../lib/cutoutDialogue'
 import { captureCharacterFaceAnchor, characterKitAssetFromLayer, claimUnusedCharacterKitId, createCharacterKit, emptyCharacterKitLibrary, mountCharacterKitLayers, syncMountedCharacterKitLayers, syncSceneCharacterKits, type CharacterKit, type CharacterKitAlphaStatus, type CharacterMouthState } from '../../lib/characterKit'
 import { consumeFaceRigHandoff, FACE_RIG_HANDOFF_EVENT, kitFromFaceRigHandoff } from '../../lib/characterKitHandoff'
 import { rememberCharacterKitLibrary, rememberVideo3dScene } from '../../features/agent/wizardLabSession'
@@ -2872,22 +2872,17 @@ export function SceneAnimatorPanel() {
       if (!segments.length) throw new Error('No spoken regions were found in this track.')
       // Use actual word boundaries whenever Whisper provides them.  Older
       // analyses remain valid: they fall back to one plan per segment.
-      const units = segments.flatMap(segment => segment.words?.length
+      const units = normalizeAlignedCutoutUnits(segments.flatMap(segment => segment.words?.length
         ? segment.words.map(word => ({ text: word.text, start: word.start, end: word.end }))
-        : [{ text: segment.text, start: segment.start, end: segment.end }])
-        .filter(unit => unit.text.trim() && unit.end > unit.start && unit.start + track.startTime < scene.duration)
+        : [{ text: segment.text, start: segment.start, end: segment.end }]), track.startTime, scene.duration)
       if (!units.length) throw new Error('No spoken regions were found in this track.')
-      const plan = planAlignedCutoutDialogue(units.map(unit => ({
-        text: unit.text,
-        start: Math.max(0, unit.start + track.startTime),
-        end: Math.min(scene.duration, unit.end + track.startTime),
-      })), fps)
+      const plan = planAlignedCutoutDialogue(units, fps)
       const framesByLayer = applyCutoutDialogue(mouthLayers, plan)
       const beatIds = units.map(() => uid())
       updateScene(current => ({
         ...current,
         layers: current.layers.map(layer => framesByLayer[layer.id] ? { ...layer, animation: { ...layer.animation, keyframes: framesByLayer[layer.id], duration: current.duration, curve: 'hold' } } : layer),
-        dialogueBeats: [...(current.dialogueBeats ?? []).filter(beat => !beat.mouthLayerIds.some(id => Object.keys(framesByLayer).includes(id))), ...units.map((unit, index) => ({ id: beatIds[index], text: unit.text, start: Math.max(0, unit.start + track.startTime), end: Math.min(scene.duration, unit.end + track.startTime), mouthLayerIds: Object.keys(framesByLayer), audioTrackId: track.id, confidence: 'aligned-audio' as const }))],
+        dialogueBeats: [...(current.dialogueBeats ?? []).filter(beat => !beat.mouthLayerIds.some(id => Object.keys(framesByLayer).includes(id))), ...units.map((unit, index) => ({ id: beatIds[index], ...unit, mouthLayerIds: Object.keys(framesByLayer), audioTrackId: track.id, confidence: 'aligned-audio' as const }))],
       }))
       setCutoutDialogueText(segments.map(segment => segment.text).join(' ')); setCutoutDialogueStart(plan.start); setCutoutDialogueEnd(plan.end)
       setSelectedId(primary.id); setProgress(plan.start / scene.duration)

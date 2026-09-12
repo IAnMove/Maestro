@@ -219,16 +219,30 @@ export function planCutoutDialogue(text: string, start: number, end: number, fps
   return { start: safeStart, end: safeEnd, visemes }
 }
 
+export type AlignedCutoutUnit = { text: string; start: number; end: number }
+
+/** Keep source text literal and map only usable speech onto the scene clock. */
+export function normalizeAlignedCutoutUnits(
+  units: AlignedCutoutUnit[], offset = 0, duration = Infinity,
+): AlignedCutoutUnit[] {
+  return units.flatMap(unit => {
+    if (typeof unit.text !== 'string' || !unit.text.trim()
+      || !Number.isFinite(unit.start) || !Number.isFinite(unit.end)) return []
+    const start = Math.max(0, unit.start + offset)
+    const end = Math.min(duration, unit.end + offset)
+    return end > start ? [{ text: unit.text, start, end }] : []
+  }).sort((a, b) => a.start - b.start || a.end - b.end)
+}
+
 /** Word times from Hocus audio analysis: closed in gaps, one viseme per spoken word. */
 export function planAlignedCutoutDialogue(
-  units: Array<{ text: string; start: number; end: number }>,
+  units: AlignedCutoutUnit[],
   fps = 30,
 ): CutoutDialoguePlan {
-  const usable = units.filter(unit => unit.text.trim() && Number.isFinite(unit.start) && Number.isFinite(unit.end) && unit.end > unit.start)
+  const usable = normalizeAlignedCutoutUnits(units)
   if (!usable.length) return { start: 0, end: 1 / Math.max(1, fps), visemes: [{ start: 0, end: 1 / Math.max(1, fps), state: 'closed' }] }
-  const frame = 1 / Math.max(1, fps)
-  const start = Math.max(0, usable[0].start)
-  const end = Math.max(start + frame, usable[usable.length - 1].end)
+  const start = usable[0].start
+  const end = usable[usable.length - 1].end
   // Rest closed must occupy a distinct time before the first spoken viseme.
   // A zero-length closed at `start` shares a timestamp with the first word;
   // rebuild keeps the later (open) frame, so evaluateSceneLayer holds that
@@ -237,9 +251,10 @@ export function planAlignedCutoutDialogue(
     ? [{ start: 0, end: start, state: 'closed' }]
     : []
   let cursor = start
-  for (const unit of usable) {
-    const unitStart = Math.max(start, unit.start)
-    const unitEnd = Math.max(unitStart + frame, unit.end)
+  for (const [index, unit] of usable.entries()) {
+    const unitStart = unit.start
+    const unitEnd = Math.min(unit.end, usable[index + 1]?.start ?? unit.end)
+    if (unitEnd <= unitStart) continue
     if (unitStart > cursor) visemes.push({ start: cursor, end: unitStart, state: 'closed' })
     const spoken = visemeForToken(unit.text)
     visemes.push({ start: unitStart, end: unitEnd, state: spoken === 'closed' ? 'small' : spoken })
@@ -275,12 +290,10 @@ export function rebuildCutoutDialogueLayers(
     if (!targets.length) continue
     const mouthLayers = findCutoutMouthLayers(targets)
     if (!(mouthLayers.open ?? mouthLayers.small ?? mouthLayers.wide ?? mouthLayers.round)) continue
-    const plan = group[0].confidence === 'aligned-audio' && group.length >= 1
-      ? planAlignedCutoutDialogue(group.map(beat => ({
-        text: beat.text,
-        start: Math.max(0, Math.min(duration, beat.start)),
-        end: Math.max(beat.start, Math.min(duration, beat.end)),
-      })), fps)
+    const units = normalizeAlignedCutoutUnits(group, 0, duration)
+    if (!units.length) continue
+    const plan = group[0].confidence === 'aligned-audio'
+      ? planAlignedCutoutDialogue(units, fps)
       : planCutoutDialogue(
         group[0].text,
         Math.max(0, Math.min(duration, group[0].start)),
@@ -291,7 +304,10 @@ export function rebuildCutoutDialogueLayers(
     const generated = applyCutoutDialogue(mouthLayers, plan)
     for (const [layerId, frames] of Object.entries(generated)) {
       affected.add(layerId)
-      framesByLayer.set(layerId, [...(framesByLayer.get(layerId) ?? []), ...frames])
+      const previous = framesByLayer.get(layerId) ?? []
+      // A later turn's leading rest must not replace speech already at t=0.
+      const appended = previous.length && plan.start > 0 ? frames.filter(frame => frame.time > 0) : frames
+      framesByLayer.set(layerId, [...previous, ...appended])
     }
   }
   return layers.map(layer => {

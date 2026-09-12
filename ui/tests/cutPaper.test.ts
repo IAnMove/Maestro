@@ -72,6 +72,8 @@ test('pilot scene roundtrips, lasts 78s, talks, slides, and never mounts a GLB',
 test('Story Lab chapter roundtrips and each beat links to Video 2D', () => {
   const project = normalizeStoryProject(createTijeralStoryProject())
   assert.equal(project.id, TIJERAL_STORY_ID)
+  assert.equal(project.language, 'Español')
+  assert.equal(project.spokenLanguage, 'Español de España')
   assert.equal(project.beats.length, 3)
   assert.ok(project.beats.every(beat => beat.sceneLink?.editor === 'video2d' && beat.sceneLink.href.includes('/examples/cut-paper/shots/')))
   assert.equal(project.world.locations.length, 5)

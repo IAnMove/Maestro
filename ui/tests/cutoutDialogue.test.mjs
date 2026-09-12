@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { applyCutoutDialogue, bindCutoutFaceToPose, ensureCutoutFacePlayback, findCutoutMouthLayers, normalizeFaceBinding, planAlignedCutoutDialogue, planCutoutDialogue, rebuildCutoutDialogueLayers, visemeForToken } from '../src/lib/cutoutDialogue.ts'
+import { applyCutoutDialogue, bindCutoutFaceToPose, ensureCutoutFacePlayback, findCutoutMouthLayers, normalizeAlignedCutoutUnits, normalizeFaceBinding, planAlignedCutoutDialogue, planCutoutDialogue, rebuildCutoutDialogueLayers, visemeForToken } from '../src/lib/cutoutDialogue.ts'
 import { evaluateSceneLayer } from '../src/lib/sceneTimeline.ts'
 
 const layer = id => ({ id, animation: { start: { x: 50, y: 48, scale: .12, opacity: 1 }, end: { x: 50, y: 48, scale: .12, opacity: 1 }, duration: 5, curve: 'hold' } })
@@ -49,6 +49,42 @@ test('aligned words stay open during speech and close in the gaps', () => {
   assert.equal(new Set(starts).size, starts.length)
 })
 
+test('aligned word edits are ordered without extending a short word into silence', () => {
+  const source = [{ text: 'you', start: 4, end: 4.02 }, { text: 'la', start: 1, end: 1.2 }]
+  const plan = planAlignedCutoutDialogue(source, 30)
+  assert.equal(plan.start, 1)
+  assert.equal(plan.end, 4.02)
+  assert.equal(source[0].start, 4, 'source word order is not mutated')
+  assert.equal(plan.visemes[0].start, 0)
+  assert.equal(plan.visemes[0].state, 'closed')
+  assert.ok(plan.visemes.every(beat => beat.end <= 4.02))
+  assert.ok(plan.visemes.every((beat, index) => !index || beat.start >= plan.visemes[index - 1].end))
+})
+
+test('audio alignment uses the track offset once, preserves text and excludes unusable scene intervals', () => {
+  const units = normalizeAlignedCutoutUnits([
+    { text: '  Hola! ', start: 0, end: .4 },
+    { text: 'end', start: .8, end: 1.4 },
+    { text: 'beyond', start: 2, end: 3 },
+    { text: ' ', start: .2, end: .4 },
+    { text: 'invalid', start: NaN, end: .4 },
+    { text: 'empty', start: .2, end: .2 },
+  ], 5, 6)
+  assert.deepEqual(units, [{ text: '  Hola! ', start: 5, end: 5.4 }, { text: 'end', start: 5.8, end: 6 }])
+  assert.deepEqual(normalizeAlignedCutoutUnits([{ text: 'clipped', start: 0, end: .4 }], -.2, 6),
+    [{ text: 'clipped', start: 0, end: .2 }])
+})
+
+test('overlapping aligned words produce ordered, non-overlapping mouth states', () => {
+  const plan = planAlignedCutoutDialogue([
+    { text: 'la', start: 1, end: 1.5 }, { text: 'you', start: 1.2, end: 1.4 },
+  ])
+  assert.deepEqual(plan.visemes.filter(beat => beat.state !== 'closed'), [
+    { start: 1, end: 1.2, state: 'wide' }, { start: 1.2, end: 1.4, state: 'round' },
+  ])
+  assert.equal(plan.visemes.at(-1).state, 'closed')
+})
+
 test('aligned rest closed is a distinct keyframe so playback does not hold the first word open', () => {
   const closed = {
     id: 'mouth-closed', name: 'Closed', type: 'overlay',
@@ -71,6 +107,23 @@ test('aligned rest closed is a distinct keyframe so playback does not hold the f
   assert.equal(evaluateSceneLayer(wideLayer, 1).opacity, 0)
   assert.equal(evaluateSceneLayer(wideLayer, 6.05).opacity, 1)
   assert.equal(evaluateSceneLayer(closedLayer, 6.05).opacity, 0)
+})
+
+test('a later turn does not close the same speaker first word at scene zero', () => {
+  const mouths = ['a', 'b'].flatMap(pose => ['closed', 'wide'].map(state => ({
+    ...layer(`${pose}-mouth-${state}`), type: 'overlay',
+    faceBinding: { poseLayerId: pose, role: 'mouth', state },
+  })))
+  const beats = [
+    { id: 'a1', text: 'la', start: 0, end: .4, mouthLayerIds: ['a-mouth-closed', 'a-mouth-wide'], confidence: 'aligned-audio' },
+    { id: 'b1', text: 'la', start: 1, end: 1.4, mouthLayerIds: ['b-mouth-closed', 'b-mouth-wide'], confidence: 'aligned-audio' },
+    { id: 'a2', text: 'la', start: 2, end: 2.4, mouthLayerIds: ['a-mouth-closed', 'a-mouth-wide'], confidence: 'aligned-audio' },
+  ]
+  const result = rebuildCutoutDialogueLayers(mouths, beats, 30, 5)
+  const wide = result.find(item => item.id === 'a-mouth-wide')
+  assert.equal(evaluateSceneLayer(wide, .1).opacity, 1)
+  assert.equal(evaluateSceneLayer(wide, 1.1).opacity, 0)
+  assert.equal(evaluateSceneLayer(wide, 2.1).opacity, 1)
 })
 
 test('a long mixed-vowel line retains every available mouth family', () => {
