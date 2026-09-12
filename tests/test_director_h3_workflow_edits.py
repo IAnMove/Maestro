@@ -2,6 +2,8 @@ import json
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from app.services import director_pipeline
 
 
@@ -346,3 +348,51 @@ def test_explicit_whole_clip_selection_ignores_old_h3_segments(tmp_path: Path):
         director_pipeline.rejoin_clips(str(tmp_path), "h3-selection")
 
     assert joined == ["shot0_studio.mp4", "shot1.mp4"]
+
+
+def test_h3_rejoin_rejects_stale_clip_even_when_segments_are_playable(tmp_path: Path):
+    filenames = ("shot0_a.mp4", "shot0_b.mp4", "shot1.mp4")
+    for filename in filenames:
+        (tmp_path / filename).write_bytes(b"video")
+    _write_pipeline(tmp_path, {
+        "pipeline_id": "h3-stale-rejoin",
+        "created_at": 10.0,
+        "status": "completed",
+        "pipeline_type": "short_film_story",
+        "video_model": "minimax_h3",
+        "clips": [
+            {
+                "index": 0,
+                "video_filename": "shot0_b.mp4",
+                "video_stale": True,
+                "video_prompt": "Whole shot zero",
+                "h3_segments": [
+                    {"index": 0, "filename": "shot0_a.mp4", "stale": False},
+                    {"index": 1, "filename": "shot0_b.mp4", "stale": False},
+                ],
+            },
+            {
+                "index": 1,
+                "video_filename": "shot1.mp4",
+                "video_prompt": "Whole shot one",
+                "h3_segments": [
+                    {"index": 0, "filename": "shot1.mp4", "stale": False},
+                ],
+            },
+        ],
+        "output_files": list(filenames),
+        "workspace": "default",
+    })
+    joined = []
+
+    class FakeWgp:
+        @staticmethod
+        def concatenate_multi_clip_videos(paths, destination, _audio, **_kwargs):
+            joined.extend(Path(path).name for path in paths)
+            Path(destination).write_bytes(b"joined")
+            return True
+
+    with patch.object(director_pipeline, "_wgp", FakeWgp()):
+        with pytest.raises(ValueError, match="stale video clip.*1.*before rejoining"):
+            director_pipeline.rejoin_clips(str(tmp_path), "h3-stale-rejoin")
+    assert joined == []

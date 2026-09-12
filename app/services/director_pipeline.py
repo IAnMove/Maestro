@@ -4356,6 +4356,19 @@ def _rejoin_clips_impl(out_dir: str, pid: str) -> dict:
     state = _ensure_h3_segment_state(state)
     clips = state.get("clips", [])
     video_files = []
+    # Image reruns keep video_stale on the clip even when a Studio selection or
+    # H3 segment list still points at playable files. Gate Rejoin before the
+    # H3 branch, which otherwise treats those files as current.
+    stale_clip_numbers = [
+        str(index + 1)
+        for index, clip in enumerate(clips)
+        if clip.get("video_stale")
+    ]
+    if stale_clip_numbers:
+        raise ValueError(
+            "Regenerate stale video clip(s) "
+            f"{', '.join(stale_clip_numbers)} before rejoining."
+        )
     legacy_h3_segments = (
         _is_sequential_h3_model(state.get("video_model"))
         and any(clip.get("h3_segments") for clip in clips)
@@ -4390,17 +4403,6 @@ def _rejoin_clips_impl(out_dir: str, pid: str) -> dict:
         if stale:
             raise ValueError("Regenerate stale H3 continuations before rejoining the final video")
     else:
-        stale_clip_numbers = [
-            str(index + 1)
-            for index, clip in enumerate(clips)
-            if clip.get("video_stale")
-        ]
-        if stale_clip_numbers:
-            raise ValueError(
-                "Regenerate stale video clip(s) "
-                f"{', '.join(stale_clip_numbers)} before rejoining."
-            )
-
         if shot_images_required(_saved_pipeline_shot_image_policy(state)):
             invalid_start_numbers = _invalid_saved_media_numbers(
                 [clip.get("start_image_filename") for clip in clips],
