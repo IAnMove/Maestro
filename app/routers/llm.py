@@ -340,13 +340,13 @@ def create_llm_router(
         return {"status": "ok"}
 
     @router.get("/api/v1/llm/models")
-    def list_llm_models(provider: str = ""):
-        """Return available LLM model options. Pass provider to include remote models."""
+    def list_llm_models(provider: str = "", url: str = ""):
+        """Return available LLM model options. Pass provider and optional url to query that server (Ollama / OpenAI-compatible) without waiting for a saved profile."""
         from services import llm_service
         services = get_services_config()
         profile_provider, _profile_model, profile_remote_url = effective_llm_routing(services)
         p = provider or profile_provider
-        api_key, remote_url = llm_provider_credentials(p, services, profile_remote_url)
+        api_key, remote_url = llm_provider_credentials(p, services, url.strip() or profile_remote_url)
         return {"models": llm_service.get_available_models(provider=p, remote_url=remote_url, api_key=api_key)}
 
     @router.get("/api/v1/llm/stream-status")

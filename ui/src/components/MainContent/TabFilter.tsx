@@ -5,7 +5,8 @@ import {
 } from 'lucide-react'
 import { setUiLanguage, useUiTranslation, type UiLanguage } from '../../i18n'
 import {
-  categoryForMediaFilter, type NavigationCategory, WIZARD_NAVIGATION_EVENT,
+  categoryForMediaFilter, DIRECT_GENERATION_MEDIA,
+  revealDirectorWorkspace, type NavigationCategory, WIZARD_NAVIGATION_EVENT,
 } from '../../lib/navigationCategories'
 import { useStore } from '../../stores/useStore'
 import type { GenerationMode, MediaFilter } from '../../types'
@@ -25,15 +26,6 @@ interface MenuItem {
 const PRIMARY_DESTINATIONS = {
   workspaces: { value: 'workspaces' as const },
   activity: { value: 'runs' as const },
-}
-
-const DIRECT_GENERATION_MEDIA: Record<GenerationMode, MediaFilter> = {
-  image: 'images',
-  video: 'videos',
-  audio: 'audio',
-  model3d: 'model3d',
-  avatar: 'avatars',
-  tools: 'all',
 }
 
 function PrimaryButton({ active, expanded, icon, label, onClick, ariaLabel, category, buttonRef }: {
@@ -214,7 +206,7 @@ export function TabFilter() {
     const state = useStore.getState()
     state.setSettingsOpen(false)
     state.setDashboardOpen(false)
-    if (filter === 'character-replacement') state.setSidebarOpen(false)
+    state.setSidebarOpen(false)
     state.setMediaFilter(filter)
     setActiveCategory(category)
     setExpandedCategory(category)
@@ -228,6 +220,7 @@ export function TabFilter() {
     locallySelectedFilterRef.current = filter
     state.setMediaFilter(filter)
     state.setSidebarMode('studio')
+    state.setSidebarOpen(true)
     window.dispatchEvent(new Event('hocuspocus:studio-open'))
     setActiveCategory('direct-generation')
     setExpandedCategory('direct-generation')
@@ -255,7 +248,7 @@ export function TabFilter() {
       const state = useStore.getState()
       state.setSettingsOpen(false)
       state.setDashboardOpen(false)
-      state.setSidebarMode('director')
+      revealDirectorWorkspace(state)
       window.dispatchEvent(new Event('maestro:director-open'))
       setActiveCategory('production')
       setExpandedCategory('production')

@@ -9043,6 +9043,7 @@ _AUDIO_ANALYSIS_STEPS = {
     "extracting_vocals": 5,
     "loading_transcription_model": 5,
     "transcribing": 6,
+    "aligning_lyrics": 7,
     "loading_diarization_model": 7,
     "identifying_speakers": 8,
     "finalizing": 9,
@@ -9511,6 +9512,16 @@ async def director_classify_sections(request: Request):
         return {"sections": sections, "method": "heuristic"}
 
     try:
+        timed_structure = audio_analysis.structure_from_aligned_lyrics(
+            analysis.get("lyric_timeline") or []
+        )
+        if timed_structure:
+            updated = audio_analysis.replace_sections_with_structure(analysis, timed_structure)
+            return {
+                "sections": updated["sections"],
+                "song_structure": timed_structure,
+                "method": "lyrics_timeline",
+            }
         tagged_structure = llm_service.structure_from_tagged_lyrics(lyrics_hint, duration)
         if tagged_structure:
             updated = audio_analysis.replace_sections_with_structure(analysis, tagged_structure)
@@ -9935,6 +9946,9 @@ def director_pipeline_resume(pid: str):
 
 
 # ── Director Pipeline Dashboard ───────────────────────────────────────────
+
+from routers.director_review import create_director_review_router
+api.include_router(create_director_review_router(_workspace_dir))
 
 @api.get("/api/v1/director/pipelines")
 def list_saved_pipelines(limit: int = 0, offset: int = 0):
@@ -36913,6 +36927,15 @@ from services.scene_commands import SceneCommands, command_catalog as scene_comm
 from routers.scene_commands import create_scene_commands_router
 _scene_commands = SceneCommands(_workspace_dir)
 api.include_router(create_scene_commands_router(_scene_commands))
+from routers.world3d_export import create_world3d_export_router, bind_world3d_renderer_origin
+from services.world3d_export import World3DExportService, command_catalog as world3d_export_catalog, command_handlers as world3d_export_handlers
+_world3d_export = World3DExportService(
+    workspace_dir=_workspace_dir,
+    registry_for=_task_registry,
+    app_url=os.environ.get("HOCUS_APP_URL", ""),
+)
+bind_world3d_renderer_origin(api, _world3d_export)
+api.include_router(create_world3d_export_router(_world3d_export))
 
 from services.mcp_access import McpAccess
 from routers.mcp_access import create_mcp_access_router
@@ -36921,15 +36944,30 @@ api.include_router(create_mcp_access_router(_mcp_access))
 
 _image_generation_commands = create_image_generation_commands(globals())
 api.include_router(create_image_generation_commands_router(_image_generation_commands))
+from routers.wizard_workflow_executor import create_wizard_workflow_executor_router
+from services.wizard_workflow_executor import WizardWorkflowExecutor, catalog as wizard_workflow_catalog, command_handlers as wizard_workflow_command_handlers
+_wizard_workflow_executor = WizardWorkflowExecutor(
+    workspace_dir=_workspace_dir,
+    submit_command=_image_generation_commands.submit,
+    command_receipt=_image_generation_commands.receipt,
+    get_task=lambda workspace, task_id: _task_registry(workspace).get(task_id),
+)
+api.include_router(create_wizard_workflow_executor_router(_wizard_workflow_executor, list_workspaces=_list_workspaces))
 api.include_router(create_wangp_mcp_router(
     token_getter=_mcp_access.token,
     handlers={"models": lambda args: get_model_options(args['model_type']) if args.get('model_type') else list_models(), "processors": wangp_capabilities, "status": get_status,
               "generate": generate, "recast": recast_endpoint, "upscale": tools_upscale,
-              **wangp_agent_handlers(api), **image_command_handlers(_image_generation_commands), **_scene_commands.handlers()},
+              **wangp_agent_handlers(api), **image_command_handlers(_image_generation_commands), **wizard_workflow_command_handlers(_wizard_workflow_executor), **world3d_export_handlers(_world3d_export), **_scene_commands.handlers()},
     journal_path=os.path.join(os.path.dirname(__file__), "settings", "wangp-mcp-requests.sqlite3"),
     command_operations=[*scene_command_catalog(), *workspace_command_catalog()["operations"], *image_command_catalog(
-        adapter.catalog for adapter in _image_generation_commands.operations.values())],
+        adapter.catalog for adapter in _image_generation_commands.operations.values()), *wizard_workflow_catalog(), *world3d_export_catalog()],
 ))
+from routers.system_capabilities import create_system_capabilities_router
+api.include_router(create_system_capabilities_router())
+
+# Optional production renderer: pass a callable that drives the existing
+# Video 3D exportFlow through a process-owned headless browser. Closing a
+# user tab must not join or kill that worker.
 
 # ============================================================================
 # Serve React build at /

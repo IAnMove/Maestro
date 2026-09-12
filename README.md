@@ -102,6 +102,8 @@ The **Wizard** is an in-app director: “open the concert scene”, “prepare a
 
 **Video Editor** trims, splits and reorders clips you already like (H3 MP4s, compositor exports, series handoffs). Export is a queued FFmpeg job. Guide: [Video Editor](docs/video-editor/HOWUSEIT.md).
 
+**Studio Tools** post-process an existing image or clip (FlashVSR/Lanczos upscale, SeedVC revoice, rembg) and always write a new file. Guide: [Studio Tools](docs/tools/HOWUSEIT.md).
+
 **Edits** (experimental): retake a section, outpaint a frame, prompt-driven replace. **Multi-clip** is for longer prompt-by-prompt sequences with overlapping continuity.
 
 ### Housekeeping that actually matters

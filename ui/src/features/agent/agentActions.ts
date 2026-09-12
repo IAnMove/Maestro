@@ -478,8 +478,8 @@ export interface AgentCreateRhythmic3dVideoAction extends AgentLanguageAwareActi
 }
 
 export type AgentSceneWorkflowAction =
-  | { type: 'create_3d_scene'; sceneName: string; durationSeconds: number; width: number; height: number; fps: 30 | 60; confirm: true }
-  | { type: 'set_3d_scene_properties'; sceneName: string; durationSeconds?: number; width?: number; height?: number; fps?: 30 | 60; confirm: true }
+  | { type: 'create_3d_scene'; sceneName: string; durationSeconds: number; width: number; height: number; fps: 24 | 30 | 60; confirm: true }
+  | { type: 'set_3d_scene_properties'; sceneName: string; durationSeconds?: number; width?: number; height?: number; fps?: 24 | 30 | 60; confirm: true }
   | { type: 'add_3d_scene_layer'; sceneName: string; layerName: string; layerType: 'model3d' | 'image' | 'video' | 'overlay' | 'camera'; outputName: string; confirm: true }
   | { type: 'update_3d_scene_layer'; sceneName: string; layerName: string; visible?: boolean; locked?: boolean; confirm: true }
   | { type: 'remove_3d_scene_layer'; sceneName: string; layerName: string; confirm: true }
@@ -2755,7 +2755,7 @@ export const HOCUSPOCUS_AGENT_RESPONSE_SCHEMA: Record<string, unknown> = mergeRe
           output_name: { type: 'string', maxLength: 300 },
           width: { type: 'integer', minimum: 320, maximum: 7680 },
           height: { type: 'integer', minimum: 240, maximum: 4320 },
-          fps: { type: 'integer', enum: [30, 60] },
+          fps: { type: 'integer', enum: [24, 30, 60] },
           visible: { type: 'boolean' },
           locked: { type: 'boolean' },
           confirm: { type: 'boolean' },

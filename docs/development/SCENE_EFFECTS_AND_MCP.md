@@ -174,3 +174,32 @@ the media gallery as well. Saving references uploads/workspace resources; it is
 not a portable asset package. The server rejects transient blob/file references.
 The native save endpoint is `POST /api/v1/scenes/world3d` with `document`, `name`,
 `workspace` and PNG data-URL `preview`. Existing 2D scene persistence is unchanged.
+
+## Cinematic spatial effects
+
+Video3D's existing ten spatial kinds now use noisy energy surfaces, soft particles,
+branching lightning and a shared bloom pipeline. `smoke` and `sparks` also accept
+world coordinates. Existing IDs, anchors, timing and sound settings are preserved;
+screen overlays remain a separate track. Beam endpoints still use slot-local
+anchors, including normalized/scaled GLBs. All motion derives from scene time and
+seed, including backward seeks. Three pooled lights illuminate nearby geometry.
+
+The Cinema template browser includes **Reflective stage** and **Character
+materialization**. Both use the bundled animated TV robot; replace its GLB and
+choose an animation from that model. The second template adds two image screens,
+a lightning strike and a centered platform. Hold a living pose samples the chosen
+clip at its start offset with subtle yaw motion; it never retargets another rig.
+Set the character's Y position to `.235` meters for the supplied platform.
+
+**Cinematic environment** controls mirror floor, platform and bloom. A background
+image slot with `surface: environment` covers the frame with centered aspect-fill;
+it is an illustrated backdrop, not modeled architecture. The reflective brushed
+metal floor blends into the background at a distance. Reflections are bounded to
+1280×720. Other slots retain ordinary image/wall/floor behavior.
+
+Per-slot `appearance: {start, duration, color}` reveals the posed mesh upward with
+an energized edge. It composes with native speech shaders and supports lit and
+unlit GLTF materials. It does not create a voice or calculate phonetic cues.
+Preview, gizmo/media redraws and exported frames share the postprocessing path.
+Save/reopen preserves these native document fields; no external cinema extension
+is required for these templates or effects.

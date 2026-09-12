@@ -1,4 +1,30 @@
 {
+  "sheet": {
+    "stillAlt": "Library identity of {{name}}",
+    "ttsVoice": "TTS · Qwen3 {{voiceId}}",
+    "ttsNone": "No TTS voice on this character yet",
+    "linkedHint": "Look and TTS come from the library character. Acting notes stay on this story or series."
+  },
+  "facePackMaker": {
+    "title": "Lipsync face (cube plane)",
+    "intro": "For a talking character: generate a square face texture (skin fills the cube front — eyes, nose, rest mouth). Then edit only the mouth (visemes) or only the eyes (expressions). Drop the stills here to build the 9×6 pack. Skin color is locked to rest so talking does not flash.",
+    "skin": "Skin / material",
+    "restPrompt": "Rest plane prompt (1:1, any image generator)",
+    "copyRest": "Copy rest prompt",
+    "editPrompts": "Viseme and expression prompts",
+    "copyNamed": "Copy {{name}}",
+    "stills": "Stills (rest, A, happy…)",
+    "naming": "Files: rest.png, A.png, M.png, happy.png, angry.png. Missing visemes alias I=E, U=O, F=M, L=A.",
+    "empty": "empty",
+    "build": "Build 9×6 pack",
+    "download": "Download pack.png",
+    "previewAlt": "Assembled 9 visemes by 6 expressions",
+    "needRest": "Add rest.png first.",
+    "loaded": "Loaded {{name}}",
+    "unknownFile": "Unrecognized name: {{name}}",
+    "ready": "9×6 ready. Color locked to rest.",
+    "buildFailed": "Could not assemble the pack."
+  },
   "speechWorkshop": {
     "alternatives": "Methods and limitations",
     "title": "Prepare 2D speech",

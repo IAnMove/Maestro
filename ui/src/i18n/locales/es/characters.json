@@ -1,4 +1,30 @@
 {
+  "sheet": {
+    "stillAlt": "Identidad de biblioteca de {{name}}",
+    "ttsVoice": "TTS · Qwen3 {{voiceId}}",
+    "ttsNone": "Este personaje aún no tiene voz TTS",
+    "linkedHint": "El aspecto y el TTS salen del personaje de la biblioteca. Las notas de actuación se quedan en esta historia o serie."
+  },
+  "facePackMaker": {
+    "title": "Cara para lipsync (plano de cubo)",
+    "intro": "Para un personaje que hable: genera una textura cuadrada (la piel llena el frente del cubo: ojos, nariz, boca en reposo). Luego edita solo la boca (visemas) o solo los ojos (expresiones). Suelta las stills aquí y monta el pack 9×6. El color de piel se ancla al reposo para que no parpadee al hablar.",
+    "skin": "Piel / material",
+    "restPrompt": "Prompt de reposo (1:1, cualquier generador)",
+    "copyRest": "Copiar prompt de reposo",
+    "editPrompts": "Prompts de visemas y expresiones",
+    "copyNamed": "Copiar {{name}}",
+    "stills": "Stills (rest, A, happy…)",
+    "naming": "Archivos: rest.png, A.png, M.png, happy.png, angry.png. Si falta un visema: I=E, U=O, F=M, L=A.",
+    "empty": "vacío",
+    "build": "Montar pack 9×6",
+    "download": "Descargar pack.png",
+    "previewAlt": "Atlas montado 9 visemas por 6 expresiones",
+    "needRest": "Añade rest.png primero.",
+    "loaded": "Cargado {{name}}",
+    "unknownFile": "Nombre no reconocido: {{name}}",
+    "ready": "9×6 listo. Color anclado al reposo.",
+    "buildFailed": "No se pudo montar el pack."
+  },
   "speechWorkshop": {
     "alternatives": "Métodos y limitaciones",
     "title": "Preparar habla 2D",
