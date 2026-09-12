@@ -12,8 +12,9 @@ so you can edit the shot. The assembled episode is **not** an MP4 baked outside 
    - Plano 2 cola fría → Nilo / Berta dialogue
    - Plano 3 sticker → Kito slides in
 3. In **Video 2D** you can move layers, swap mouths, attach speech, export MP4.
-   Mouths are ordinary overlays (`closed` `small` `wide` `round`) parented to the puppet.
-   Talking must not change the brow card.
+   Each speaking puppet is **one transparent body** plus four small paper visemes
+   (`closed` `small` `wide` `round`) parented to that body. Do not stack opaque
+   full-face copies. Talking must not change the brows.
 4. Optional: a later beat can use **Video 3D** (`sceneLink.editor = video3d`) if a shot needs depth. This gag stays 2D.
 5. Voices: attach WAV/TTS from **Video 2D** audio tracks (Qwen TTS in Hocus, or the example WAVs in `voices/`). Do not clone actors.
 
