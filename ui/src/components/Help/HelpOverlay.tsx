@@ -1,6 +1,6 @@
 import { CircleHelp, X } from 'lucide-react'
-import { useEffect } from 'react'
 import { setUiLanguage, useUiTranslation, type UiLanguage } from '../../i18n'
+import { ModalShell } from '../common/ModalShell'
 
 const SECTIONS = [
   { id: 'start', image: '/help/direct-image.jpg', imageKey: 'directImage' },
@@ -21,25 +21,17 @@ export function HelpOverlay({ open, onClose }: { open: boolean; onClose: () => v
   const { t, i18n } = useUiTranslation('help')
   const language: UiLanguage = String(i18n.resolvedLanguage || i18n.language).startsWith('es') ? 'es' : 'en'
 
-  useEffect(() => {
-    if (!open) return
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [open, onClose])
-
-  if (!open) return null
-
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-3 md:p-6" role="presentation" onClick={onClose}>
+    <ModalShell
+      open={open}
+      title={t('title')}
+      onClose={onClose}
+      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-3 md:p-6"
+      onMouseDown={event => { if (event.target === event.currentTarget) onClose() }}
+    >
       <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="hocuspocus-help-title"
         className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl border border-border bg-bg-secondary shadow-2xl"
-        onClick={event => event.stopPropagation()}
+        onMouseDown={event => event.stopPropagation()}
       >
         <div className="flex items-center gap-3 border-b border-border px-4 py-3">
           <CircleHelp size={16} className="text-accent-blue" />
@@ -92,6 +84,6 @@ export function HelpOverlay({ open, onClose }: { open: boolean; onClose: () => v
           ))}
         </div>
       </div>
-    </div>
+    </ModalShell>
   )
 }
