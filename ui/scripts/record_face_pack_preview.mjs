@@ -10,7 +10,9 @@ const PUB = '/tmp/hocus-action-sets-20260911/ui/public/examples/face-pack'
 const WAV = join(PUB, 'neutral-vowels.wav')
 const FPS = 12
 const DURATION = 8
-const SHOTS = ['hangar-talk', 'sea-talk', 'voxel-talk']
+const SHOTS = process.env.FACE_PACK_SHOTS
+  ? process.env.FACE_PACK_SHOTS.split(',')
+  : ['felt-talk', 'pumpkin-talk', 'cat-talk']
 
 const ffmpeg = (...args) => {
   const result = spawnSync('ffmpeg', ['-y', '-hide_banner', '-loglevel', 'error', ...args], { stdio: 'inherit' })

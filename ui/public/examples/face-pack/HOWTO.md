@@ -1,5 +1,8 @@
 # How to make a mascot face pack
 
+Bundled examples in this folder (`*-pack.png`, `*-visemes.png`, `*-talk.mp4`,
+`neutral-vowels.wav`) are **CC0** — free for anyone. See `LICENSE`.
+
 A face pack is a PNG the TV-head screen samples while someone talks.
 **Mouth (viseme) and expression are independent.** Happy + A is still happy;
 only the mouth changes.
@@ -22,6 +25,16 @@ One PNG, no divider lines, no text, no extra panels.
 
 The engine looks up `column = viseme`, `row = expression`. Talking never
 moves the row by itself.
+
+## Cube-front plane (required look)
+
+The tile is the **front face of a cube**, not a round portrait. Skin fills the
+square edge to edge; only eyes, nose and mouth. Prompts:
+Character Creator → **Lipsync face (cube plane)**. Prompts live in
+`ui/src/features/scene3d/speech/facePackPrompts.ts`.
+
+CLI: `python3 ui/scripts/assemble_face_pack_from_dir.py stills/ -o pack.png`
+with files named `rest.png`, `A.png`, `happy.png`, …
 
 ## Two ways to author
 

@@ -92,6 +92,8 @@
     "facePackHint": "Bundled faces for a TV-head screen: visemes and expressions. Experimental.",
     "expressionHold": "Expression while talking",
     "expressionHoldHint": "Vowels only change the mouth. This expression stays on the whole line unless you add expression cues.",
+    "facePackMaker": "Make a pack from stills",
+    "facePackMakerHint": "Cube-front faces and lips are built in Character Creator: prompts, stills, then a 9×6 pack with locked skin color.",
     "pack": {
       "tv": "CRT",
       "skull": "Skull",
