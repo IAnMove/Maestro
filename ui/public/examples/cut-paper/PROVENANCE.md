@@ -13,6 +13,6 @@
 | `puppets/kito-canonical.jpg` | Imagine `image_gen` + `image_edit` | Paper-boat hat; name label removed. |
 | `puppets/*-body.png` | rembg cutout from canonical | One transparent body per speaking puppet. |
 | `mouths/paper-*.png` | Drawn paper visemes | Small cream+ink ovals (`closed` is empty). Not lipstick cards, not full-face copies. |
-| `voices/*.wav` | Example dialogue WAVs | Stand-ins until Qwen3 CustomVoice generates the line. Kits store the preset (`dylan`/`serena`/`sohee`/`ryan`/`vivian`/`eric`). |
+| `voices/*.wav` | Qwen3 CustomVoice 12 Hz 1.7B | Presets `dylan` (Nilo), `serena` (Berta), `sohee` (Kito). Local, not cloned actors. |
 
 No private GLB. No `tv-head-humanoid.glb`.
