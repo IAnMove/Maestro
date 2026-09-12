@@ -70,20 +70,24 @@ export type FacePackStills = {
   expressions?: Partial<Record<Expression, CanvasImageSource>>
 }
 
+function completeTiles<K extends string>(keys: readonly K[], fill: (key: K) => ImageData): Record<K, ImageData> {
+  const tiles = {} as Record<K, ImageData>
+  for (const key of keys) tiles[key] = fill(key)
+  return tiles
+}
+
 export function composeFacePack(stills: FacePackStills): HTMLCanvasElement {
   const rest = matchFaceSkin(rasterFaceTile(stills.rest), rasterFaceTile(stills.rest))
-  const visemes: Record<Viseme, ImageData> = { rest }
-  for (const viseme of VISEMES) {
-    if (viseme === 'rest') continue
+  const visemes = completeTiles(VISEMES, (viseme) => {
+    if (viseme === 'rest') return rest
     const source = stills.visemes?.[viseme] ?? stills.visemes?.[VISEME_ALIASES[viseme] ?? viseme] ?? stills.rest
-    visemes[viseme] = matchFaceSkin(rasterFaceTile(source), rest)
-  }
-  const expressions: Record<Expression, ImageData> = { neutral: rest }
-  for (const expression of EXPRESSIONS) {
-    if (expression === 'neutral') continue
+    return matchFaceSkin(rasterFaceTile(source), rest)
+  })
+  const expressions = completeTiles(EXPRESSIONS, (expression) => {
+    if (expression === 'neutral') return rest
     const source = stills.expressions?.[expression] ?? stills.rest
-    expressions[expression] = matchFaceSkin(rasterFaceTile(source), rest)
-  }
+    return matchFaceSkin(rasterFaceTile(source), rest)
+  })
   const canvas = document.createElement('canvas')
   canvas.width = FACE_PACK_TILE * VISEMES.length
   canvas.height = FACE_PACK_TILE * EXPRESSIONS.length
