@@ -177,6 +177,8 @@ test('notes blur then approve persist both decisions while the first save is in 
       onPersist={commands => new Promise<void>(resolve => { saves.push({ commands, resolve }) })} />)
     fireEvent.change(screen.getByLabelText('Notes'), { target: { value: 'keep the lantern' } })
     fireEvent.blur(screen.getByLabelText('Notes'))
+    assert.equal(screen.getByRole('button', { name: 'Approve' }).matches(':disabled'), false,
+      'blur must not disable the button before the browser dispatches its click')
     fireEvent.click(screen.getByRole('button', { name: 'Approve' }))
     assert.equal(saves.length, 1)
     await act(async () => { saves[0].resolve() })
@@ -187,6 +189,60 @@ test('notes blur then approve persist both decisions while the first save is in 
     await act(async () => { saves[1].resolve() })
     assert.equal(desk.shots[0].notes, 'keep the lantern')
     assert.equal(desk.shots[0].decision, 'approved')
+  } finally { cleanup() }
+})
+
+test('queued take selection and approval are applied in order after notes', async () => {
+  const { render, screen, fireEvent, act, cleanup } = await import('@testing-library/react')
+  const { ProductionReviewDesk } = await import('../src/features/production-review/ProductionReviewDesk')
+  let desk = projectReviewDesk({ pipeline: pipeline() })
+  const saves: Array<{ commands: unknown[]; resolve: () => void }> = []
+  try {
+    render(<ProductionReviewDesk desk={desk} onChange={next => { desk = next }}
+      onPersist={commands => new Promise<void>(resolve => { saves.push({ commands, resolve }) })} />)
+    fireEvent.change(screen.getByLabelText('Notes'), { target: { value: 'use the earlier take' } })
+    fireEvent.blur(screen.getByLabelText('Notes'))
+    fireEvent.click(screen.getByRole('button', { name: 'old-id' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Approve' }))
+    assert.equal(saves.length, 1)
+    await act(async () => { saves[0].resolve() })
+    assert.equal(saves.length, 2)
+    await act(async () => { saves[1].resolve() })
+    assert.equal(saves.length, 3)
+    await act(async () => { saves[2].resolve() })
+    assert.equal(desk.shots[0].selectedTakeId, 'old-id')
+    assert.equal(desk.shots[0].notes, 'use the earlier take')
+    assert.equal(desk.shots[0].decision, 'approved')
+  } finally { cleanup() }
+})
+
+test('an approval that failed to save never enters the exported selection', async () => {
+  const { render, screen, fireEvent, act, cleanup } = await import('@testing-library/react')
+  const { ProductionReviewDesk } = await import('../src/features/production-review/ProductionReviewDesk')
+  const exported: string[][] = []
+  try {
+    render(<ProductionReviewDesk desk={projectReviewDesk({ pipeline: pipeline() })}
+      onPersist={async () => { throw new Error('Production is busy') }}
+      onExport={async selection => { exported.push(selection.clips.map(clip => clip.filename)) }} />)
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Approve' })))
+    assert.match(screen.getByRole('alert').textContent || '', /Production is busy/)
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Export approved selection' })))
+    assert.deepEqual(exported, [['approved.mp4']])
+  } finally { cleanup() }
+})
+
+test('a saved hydrated response remains available to the next review operation', async context => {
+  const { render, screen, fireEvent, act, cleanup } = await import('@testing-library/react')
+  const { ProductionReviewHost } = await import('../src/features/production-review/ProductionReviewHost')
+  const saved = pipeline()
+  context.mock.method(globalThis, 'fetch', async () => {
+    saved.clips[0].video_attempts!.push({ id: 'recovered-id', filename: 'recovered.mp4' })
+    return response(saved)
+  })
+  try {
+    render(<ProductionReviewHost workspace="original" pipeline={pipeline() as SavedPipelineState} />)
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Approve' })))
+    assert.equal(screen.queryAllByRole('button', { name: 'recovered-id' }).length, 1)
   } finally { cleanup() }
 })
 

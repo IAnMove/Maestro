@@ -30,6 +30,7 @@ export function ProductionReviewHost({ pipeline, workspace, onSaved }: {
       onPersist={async commands => {
         const saved = await persistReview(desk, commands)
         if (mounted.current) onSaved?.(saved)
+        return projectReviewDesk({ pipeline: { ...saved, workspace } })
       }}
       onRegenerate={plan => regenerateReview(desk, plan)}
       onExport={async selection => { setError(''); setJob(await exportReview(desk, selection)) }}
