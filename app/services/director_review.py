@@ -1,11 +1,10 @@
 """Persist review decisions onto the existing Director pipeline, atomically."""
 from pathlib import Path
-import json
 import time
 
 from services.director_pipeline import (
-    _exclusive_pipeline_operation, _find_pipeline_file, _pipeline_file_lock,
-    _write_pipeline_json_unlocked,
+    _exclusive_pipeline_operation, _find_pipeline_file, _load_pipeline_state_locked,
+    _pipeline_file_lock, _write_pipeline_json_unlocked, hydrate_queue_clips,
 )
 
 
@@ -69,7 +68,11 @@ def save_review(workspace: str, pid: str, commands: list) -> dict:
     if not path or Path(path).resolve().parent != Path(workspace).resolve():
         raise ValueError("Production not found in this workspace")
     with _pipeline_file_lock:
-        state = json.loads(Path(path).read_text(encoding="utf-8"))
+        # Same projection GET uses: sidecar/output_files histories are visible
+        # on the desk, so persist must accept and return those takes.
+        state = _load_pipeline_state_locked(workspace, pid)
+        if not state or str(state.get("pipeline_id") or "") != pid:
+            raise ValueError("Production not found in this workspace")
         _apply_review(state, commands, Path(workspace), pid)
         _write_pipeline_json_unlocked(path, state)
-    return state
+    return hydrate_queue_clips(state)
