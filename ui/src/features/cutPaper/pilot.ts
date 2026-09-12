@@ -8,7 +8,7 @@ import {
   emptyCutPaperScene,
   slidePuppet,
 } from './puppet.ts'
-import { cutPaperDialogueBeats } from './voiceAlign.ts'
+import { cutPaperDialogueBeats, cutPaperVoiceFilename, type CutPaperLocale } from './voiceAlign.ts'
 
 export const CUT_PAPER_PILOT_DURATION = 78
 
@@ -20,10 +20,19 @@ export const CUT_PAPER_PILOT_SCRIPT = [
   { id: 'kito-1', speaker: 'kito', start: 62, end: 68, text: '¡Era un sticker!' },
 ] as const
 
+export const CUT_PAPER_PILOT_SCRIPT_EN = [
+  { id: 'nilo-1', speaker: 'nilo', start: 6, end: 16, text: 'The fountain is not frozen. Someone stuck a square of tracing paper on it.' },
+  { id: 'berta-1', speaker: 'berta', start: 17, end: 24, text: 'Well it tastes like ice. I tried it.' },
+  { id: 'nilo-2', speaker: 'nilo', start: 25, end: 30, text: "Berta, that's glue." },
+  { id: 'berta-2', speaker: 'berta', start: 31, end: 38, text: 'Cold glue. Like ice.' },
+  { id: 'kito-1', speaker: 'kito', start: 62, end: 68, text: 'It was a sticker!' },
+] as const
+
 /** 78 s, three shots: plaza, talk, paper-sled gag. Dialogue first, then mouths, then slides. */
-export function compileCutPaperPilotScene(): Scene {
+export function compileCutPaperPilotScene(locale: CutPaperLocale = 'es'): Scene {
+  const script = locale === 'en' ? CUT_PAPER_PILOT_SCRIPT_EN : CUT_PAPER_PILOT_SCRIPT
   const duration = CUT_PAPER_PILOT_DURATION
-  const scene = emptyCutPaperScene('Tijeral · la fuente', duration)
+  const scene = emptyCutPaperScene(locale === 'en' ? 'Tijeral · the fountain' : 'Tijeral · la fuente', duration)
   scene.layers = [
     cutPaperCamera(duration),
     cutPaperLocationLayer('plaza', duration),
@@ -50,13 +59,13 @@ export function compileCutPaperPilotScene(): Scene {
     parallax: 0.4,
   })
   scene.layers = slidePuppet(scene.layers, 'kito', { x: 118, y: 70 }, { x: 52, y: 70 }, 54, 61)
-  scene.dialogueBeats = CUT_PAPER_PILOT_SCRIPT.flatMap(line => cutPaperDialogueBeats(line))
+  scene.dialogueBeats = script.flatMap(line => cutPaperDialogueBeats(line, line.start, locale))
   scene.layers = rebuildCutoutDialogueLayers(scene.layers, scene.dialogueBeats ?? [], 30, duration)
   scene.texts = [
     { id: 'title', text: 'Tijeral', start: 0.4, end: 3.6, preset: 'rise', x: 50, y: 12, size: 7, color: '#1d2b5a', rotation: 0 },
   ]
-  scene.audioTracks = CUT_PAPER_PILOT_SCRIPT.map(line => ({
-    id: `vo-${line.id}`, filename: `vo-${line.speaker}-${line.id}.wav`,
+  scene.audioTracks = script.map(line => ({
+    id: `vo-${line.id}`, filename: cutPaperVoiceFilename(line.speaker, line.id, locale),
     name: `${line.speaker} · ${line.text.slice(0, 24)}`, kind: 'speech' as const,
     startTime: line.start, volume: 1,
   }))
@@ -106,13 +115,14 @@ function clampLayerToShotDuration(layer: SceneLayer, duration: number): SceneLay
 }
 
 /** One Video 2D clip per Story Lab beat. Same kit, shorter timeline. */
-export function compileCutPaperShot(shot: CutPaperShotId): Scene {
-  const full = compileCutPaperPilotScene()
+export function compileCutPaperShot(shot: CutPaperShotId, locale: CutPaperLocale = 'es'): Scene {
+  const full = compileCutPaperPilotScene(locale)
+  const script = locale === 'en' ? CUT_PAPER_PILOT_SCRIPT_EN : CUT_PAPER_PILOT_SCRIPT
   if (shot === 'plaza') {
     const duration = 6
     const layers = full.layers.filter(layer => layer.type === 'camera' || layer.id === 'location-plaza' || layer.id === 'sticker-ice')
       .map(layer => clampLayerToShotDuration(layer, duration))
-    const scene = { ...full, name: 'Tijeral · plano 1 plaza', duration, layers, dialogueBeats: [], audioTracks: [], texts: full.texts }
+    const scene = { ...full, name: locale === 'en' ? 'Tijeral · shot 1 plaza' : 'Tijeral · plano 1 plaza', duration, layers, dialogueBeats: [], audioTracks: [], texts: full.texts }
     assertCutPaperKitHasNoPrivateGlb(scene)
     return scene
   }
@@ -123,7 +133,7 @@ export function compileCutPaperShot(shot: CutPaperShotId): Scene {
       || layer.id.startsWith('puppet-nilo') || layer.id.startsWith('puppet-berta'))
       .map(layer => clampLayerToShotDuration(layer, duration))
     const scene = {
-      ...full, name: 'Tijeral · plano 2 cola fría', duration, layers,
+      ...full, name: locale === 'en' ? 'Tijeral · shot 2 cold glue' : 'Tijeral · plano 2 cola fría', duration, layers,
       dialogueBeats: (full.dialogueBeats ?? []).filter(beat => beat.start < 40),
       audioTracks: (full.audioTracks ?? []).filter(track => track.startTime < 40),
       texts: [],
@@ -132,7 +142,7 @@ export function compileCutPaperShot(shot: CutPaperShotId): Scene {
     return scene
   }
   const duration = 26
-  const scene = emptyCutPaperScene('Tijeral · plano 3 sticker', duration)
+  const scene = emptyCutPaperScene(locale === 'en' ? 'Tijeral · shot 3 sticker' : 'Tijeral · plano 3 sticker', duration)
   scene.layers = [
     cutPaperCamera(duration),
     cutPaperLocationLayer('plaza', duration),
@@ -154,11 +164,11 @@ export function compileCutPaperShot(shot: CutPaperShotId): Scene {
     }
   }
   scene.layers = slidePuppet(scene.layers, 'kito', { x: 118, y: 70 }, { x: 52, y: 70 }, 2, 9)
-  const kito = CUT_PAPER_PILOT_SCRIPT.find(line => line.id === 'kito-1')!
-  scene.dialogueBeats = cutPaperDialogueBeats(kito, 10)
+  const kito = script.find(line => line.id === 'kito-1')!
+  scene.dialogueBeats = cutPaperDialogueBeats(kito, 10, locale)
   scene.layers = rebuildCutoutDialogueLayers(scene.layers, scene.dialogueBeats ?? [], 30, duration)
     .map(layer => clampLayerToShotDuration(layer, duration))
-  scene.audioTracks = [{ id: 'vo-kito-1', filename: 'vo-kito-kito-1.wav', name: 'kito · sticker', kind: 'speech', startTime: 10, volume: 1 }]
+  scene.audioTracks = [{ id: 'vo-kito-1', filename: cutPaperVoiceFilename('kito', 'kito-1', locale), name: 'kito · sticker', kind: 'speech', startTime: 10, volume: 1 }]
   assertCutPaperKitHasNoPrivateGlb(scene)
   return scene
 }

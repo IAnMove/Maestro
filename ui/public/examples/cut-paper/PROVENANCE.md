@@ -13,6 +13,7 @@
 | `puppets/kito-canonical.jpg` | Imagine `image_gen` + `image_edit` | Paper-boat hat; name label removed. |
 | `puppets/*-body.png` | rembg cutout from canonical | One transparent body per speaking puppet. |
 | `mouths/paper-*.png` | Drawn paper visemes | Small cream+ink ovals (`closed` is empty). Not lipstick cards, not full-face copies. |
-| `voices/*.wav` | Qwen3 CustomVoice 12 Hz 1.7B | Presets `dylan` (Nilo), `serena` (Berta), `sohee` (Kito). Local, not cloned actors. |
+| `voices/vo-*-1.wav` | Qwen3 CustomVoice 12 Hz 1.7B | Spanish lines. Presets `dylan` / `serena` / `sohee`. |
+| `voices/vo-*-en.wav` | Qwen3 CustomVoice 12 Hz 1.7B | English lines, same speakers. Speak-the-written-language. Not cloned actors. |
 
 No private GLB. No `tv-head-humanoid.glb`.

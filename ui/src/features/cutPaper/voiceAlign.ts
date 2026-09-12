@@ -59,15 +59,85 @@ export const CUT_PAPER_VOICE_ALIGN: Record<string, CutPaperVoiceAlign> = {
   },
 }
 
-export function cutPaperLineEnd(lineId: string, start: number): number {
-  return start + CUT_PAPER_VOICE_ALIGN[lineId].duration
+export type CutPaperLocale = 'es' | 'en'
+
+export const CUT_PAPER_VOICE_ALIGN_EN: Record<string, CutPaperVoiceAlign> = {
+  'nilo-1': {
+    duration: 6.617,
+    words: [
+      { text: 'The', start: 0, end: 0.2 },
+      { text: 'fountain', start: 0.2, end: 0.6 },
+      { text: 'is', start: 0.6, end: 1.14 },
+      { text: 'not', start: 1.14, end: 1.42 },
+      { text: 'frozen', start: 1.42, end: 2.1 },
+      { text: 'Someone', start: 2.98, end: 3.58 },
+      { text: 'stuck', start: 3.58, end: 4.16 },
+      { text: 'a', start: 4.16, end: 4.38 },
+      { text: 'square', start: 4.38, end: 4.78 },
+      { text: 'of', start: 4.78, end: 5.2 },
+      { text: 'tracing', start: 5.2, end: 5.72 },
+      { text: 'paper', start: 5.72, end: 6.08 },
+      { text: 'on', start: 6.08, end: 6.46 },
+      { text: 'it', start: 6.46, end: 6.58 },
+    ],
+  },
+  'berta-1': {
+    duration: 3.257,
+    words: [
+      { text: 'Well', start: 0, end: 0.28 },
+      { text: 'it', start: 0.28, end: 0.64 },
+      { text: 'tastes', start: 0.64, end: 0.98 },
+      { text: 'like', start: 0.98, end: 1.32 },
+      { text: 'ice', start: 1.32, end: 1.72 },
+      { text: 'I', start: 2.38, end: 2.54 },
+      { text: 'tried', start: 2.54, end: 2.88 },
+      { text: 'it', start: 2.88, end: 3.08 },
+    ],
+  },
+  'nilo-2': {
+    duration: 1.817,
+    words: [
+      { text: 'Berta', start: 0, end: 0.9 },
+      { text: "that's", start: 0.9, end: 1.14 },
+      { text: 'glue', start: 1.28, end: 1.48 },
+    ],
+  },
+  'berta-2': {
+    duration: 2.617,
+    words: [
+      { text: 'Cold', start: 0, end: 0.36 },
+      { text: 'glue', start: 0.36, end: 0.88 },
+      { text: 'Like', start: 1.22, end: 1.88 },
+      { text: 'ice', start: 1.88, end: 2.24 },
+    ],
+  },
+  'kito-1': {
+    duration: 1.177,
+    words: [
+      { text: 'It', start: 0, end: 0.18 },
+      { text: 'was', start: 0.18, end: 0.36 },
+      { text: 'a', start: 0.36, end: 0.46 },
+      { text: 'sticker', start: 0.46, end: 0.8 },
+    ],
+  },
+}
+
+export function cutPaperLineEnd(lineId: string, start: number, locale: CutPaperLocale = 'es'): number {
+  const table = locale === 'en' ? CUT_PAPER_VOICE_ALIGN_EN : CUT_PAPER_VOICE_ALIGN
+  return start + table[lineId].duration
+}
+
+export function cutPaperVoiceFilename(speaker: string, lineId: string, locale: CutPaperLocale = 'es'): string {
+  return locale === 'en' ? `vo-${speaker}-${lineId}-en.wav` : `vo-${speaker}-${lineId}.wav`
 }
 
 export function cutPaperDialogueBeats(
   line: { id: string; speaker: string; start: number; text: string },
   start = line.start,
+  locale: CutPaperLocale = 'es',
 ) {
-  const align = CUT_PAPER_VOICE_ALIGN[line.id]
+  const table = locale === 'en' ? CUT_PAPER_VOICE_ALIGN_EN : CUT_PAPER_VOICE_ALIGN
+  const align = table[line.id]
   const units = align.words.length ? align.words : [{ text: line.text, start: 0, end: align.duration }]
   const mouths = ['closed', 'small', 'wide', 'round'].map(state => `puppet-${line.speaker}-mouth-${state}`)
   return units.map((word, index) => ({

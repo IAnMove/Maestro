@@ -20,9 +20,11 @@ so you can edit the shot. The assembled episode is **not** an MP4 baked outside 
    full-face copies. Talking must not change the brows.
 4. Optional: a later beat can use **Video 3D** (`sceneLink.editor = video3d`) if a shot needs depth. This gag stays 2D.
 5. Voices: each library character has a local Qwen3 CustomVoice preset.
-   Example WAVs in `voices/` are those Qwen lines. Mouth visemes are timed from
-   Hocus audio analysis (`aligned-audio`), then Export MP4 from Video 2.5D.
-   Do not clone actors.
+   Example WAVs exist in **Spanish** (`vo-*-nilo-1.wav`) and **English**
+   (`vo-*-nilo-1-en.wav`). Import `shots/` or `shots/en/`. Mouth visemes use
+   Hocus audio analysis (`aligned-audio`) then **Export MP4** from Video 2.5D.
+   Do not clone actors. The planner treats spoken vowels in Spanish and English
+   (`you`/`see`/`hielo`); consonants are not silence.
 6. MiniMax Image uses the linked kit still (`identityReference` or body) as
    `subject_reference`. Bundled `/examples/` stills are uploaded first.
 

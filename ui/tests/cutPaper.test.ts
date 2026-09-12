@@ -8,7 +8,7 @@ import {
   CUT_PAPER_PIECES,
   CUT_PAPER_TOWN,
 } from '../src/features/cutPaper/bible.ts'
-import { compileCutPaperPilotScene, compileCutPaperShot, CUT_PAPER_PILOT_DURATION, CUT_PAPER_PILOT_SCRIPT } from '../src/features/cutPaper/pilot.ts'
+import { compileCutPaperPilotScene, compileCutPaperShot, CUT_PAPER_PILOT_DURATION, CUT_PAPER_PILOT_SCRIPT, CUT_PAPER_PILOT_SCRIPT_EN } from '../src/features/cutPaper/pilot.ts'
 import { createTijeralCharacterKits, tijeralCharacterKitId, CUT_PAPER_TTS } from '../src/features/cutPaper/characterKits.ts'
 import { createTijeralStoryProject, TIJERAL_STORY_ID } from '../src/features/cutPaper/storyProject.ts'
 import { normalizeStoryProject } from '../src/features/stories/model.ts'
@@ -90,6 +90,10 @@ test('Story Lab chapter roundtrips and each beat links to Video 2D', () => {
   assert.ok(parseSceneFile(serializeSceneFile(talk)).dialogueBeats?.length)
   assert.equal(plaza.layers.find(layer => layer.id === 'location-plaza')?.fill, true)
   assert.ok(project.characters.every(character => character.characterKitRef?.id.startsWith('tijeral-') && character.characterKitRef.workspace === 'default'))
+  const talkEn = compileCutPaperShot('talk', 'en')
+  assert.equal(talkEn.audioTracks?.[0]?.filename, 'vo-nilo-nilo-1-en.wav')
+  assert.ok(talkEn.dialogueBeats?.some(beat => /fountain|frozen/i.test(beat.text)))
+  assert.equal(CUT_PAPER_PILOT_SCRIPT_EN.length, CUT_PAPER_PILOT_SCRIPT.length)
 })
 
 test('Tijeral character kits are 2D cutouts with Qwen voices and optional bodies', () => {

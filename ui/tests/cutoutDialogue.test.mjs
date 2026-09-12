@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { applyCutoutDialogue, bindCutoutFaceToPose, ensureCutoutFacePlayback, findCutoutMouthLayers, normalizeFaceBinding, planCutoutDialogue, rebuildCutoutDialogueLayers } from '../src/lib/cutoutDialogue.ts'
+import { applyCutoutDialogue, bindCutoutFaceToPose, ensureCutoutFacePlayback, findCutoutMouthLayers, normalizeFaceBinding, planAlignedCutoutDialogue, planCutoutDialogue, rebuildCutoutDialogueLayers, visemeForToken } from '../src/lib/cutoutDialogue.ts'
 import { evaluateSceneLayer } from '../src/lib/sceneTimeline.ts'
 
 const layer = id => ({ id, animation: { start: { x: 50, y: 48, scale: .12, opacity: 1 }, end: { x: 50, y: 48, scale: .12, opacity: 1 }, duration: 5, curve: 'hold' } })
@@ -20,6 +20,30 @@ test('a short aligned word still gets one readable open pulse', () => {
   assert.equal(plan.visemes[0].state, 'closed')
   assert.equal(plan.visemes.at(-1).state, 'closed')
   assert.ok(plan.visemes.some(beat => beat.state !== 'closed'))
+  const open = plan.visemes.find(beat => beat.state !== 'closed')
+  assert.ok(open && open.end - open.start > 0.12)
+})
+
+test('spoken tokens pick Spanish and English vowels; consonants are not silence', () => {
+  assert.equal(visemeForToken('la'), 'wide')
+  assert.equal(visemeForToken('hielo'), 'round')
+  assert.equal(visemeForToken('you'), 'round')
+  assert.equal(visemeForToken('see'), 'small')
+  assert.equal(visemeForToken('cat'), 'wide')
+  assert.equal(visemeForToken('sticker'), 'wide')
+})
+
+test('aligned words stay open during speech and close in the gaps', () => {
+  const plan = planAlignedCutoutDialogue([
+    { text: 'Era', start: 10, end: 10.3 },
+    { text: 'un', start: 10.3, end: 10.52 },
+    { text: 'sticker', start: 10.52, end: 10.96 },
+  ], 30)
+  const at = time => plan.visemes.find(beat => time >= beat.start && time < beat.end)?.state
+  assert.equal(at(10.15), 'wide')
+  assert.equal(at(10.4), 'round')
+  assert.equal(at(10.7), 'wide')
+  assert.equal(plan.visemes.at(-1).state, 'closed')
 })
 
 test('a long mixed-vowel line retains every available mouth family', () => {
