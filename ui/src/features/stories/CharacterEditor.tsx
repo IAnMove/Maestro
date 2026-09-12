@@ -22,7 +22,7 @@ export function CharacterEditor({
   const { t } = useUiTranslation('storyLab')
   const { imageBusy, generateVisual, requestUpload, removeReference } = useStoryLabVisuals()
   const workspace = useStore(s => s.activeWorkspace)
-  const { kits } = useCharacterKitLibrary(workspace)
+  const { kits, error } = useCharacterKitLibrary(workspace)
   const set = (patch: Partial<StoryCharacter>) => update(current => {
     current.characters = current.characters.map(item => item.id === character.id ? { ...item, approval: 'draft', ...patch } : item)
     return current
@@ -82,7 +82,7 @@ export function CharacterEditor({
         <button className={button} onClick={() => requestUpload({ kind: 'character', id: character.id })}><Upload size={13} /> {t('characters.upload')}</button>
       </div>
       <ReferenceGallery ids={character.referenceAssetIds} assets={project.assets} primaryId={character.primaryReferenceAssetId} onPrimary={id => set({ primaryReferenceAssetId: id })} onRemove={id => removeReference('character', character.id, id)} />
-      <CharacterKitLink value={character.characterKitRef} onChange={characterKitRef => set({ characterKitRef })} kits={kits} />
+      <CharacterKitLink value={character.characterKitRef} onChange={characterKitRef => set({ characterKitRef })} kits={kits} error={error} />
       <CharacterKitSummary kit={character.characterKitRef ? kits.find(kit => kit.id === character.characterKitRef?.id) : undefined} />
     </div>
   )

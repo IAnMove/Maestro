@@ -6,7 +6,7 @@ import { useCharacterKitLibrary } from './useCharacterKitLibrary'
 
 /** Stores an id, not a display-name match or a duplicate character definition. */
 export function CharacterKitLink({
-  value, onChange, workspace: scope, disabled, requireSpeech3d = false, kits: kitsOverride,
+  value, onChange, workspace: scope, disabled, requireSpeech3d = false, kits: kitsOverride, error: errorOverride,
 }: {
   value?: CharacterKitRef
   onChange: (ref: CharacterKitRef | undefined) => void
@@ -15,13 +15,14 @@ export function CharacterKitLink({
   /** Video 3D talkers need a GLB. Story/Series cast lists 2D cutouts too. */
   requireSpeech3d?: boolean
   kits?: CharacterKit[]
+  error?: string
 }) {
   const active = useStore(s => s.activeWorkspace)
   const workspace = scope ?? active
   const { t } = useUiTranslation('scene3dEditor')
   const fetched = useCharacterKitLibrary(workspace, requireSpeech3d, !kitsOverride)
   const kits = kitsOverride ? listCharacterKitsFrom(kitsOverride, { requireSpeech3d }) : fetched.kits
-  const error = kitsOverride ? undefined : fetched.error
+  const error = kitsOverride ? errorOverride : fetched.error
   const selected = value?.workspace === workspace ? value.id : ''
   return (
     <label className="block space-y-1 text-xs">

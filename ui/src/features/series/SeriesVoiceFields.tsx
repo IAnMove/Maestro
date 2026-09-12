@@ -16,7 +16,7 @@ export function SeriesVoiceFields({
 }) {
   const { t } = useUiTranslation('seriesLab')
   const workspace = useStore(s => s.activeWorkspace)
-  const { kits } = useCharacterKitLibrary(workspace)
+  const { kits, error } = useCharacterKitLibrary(workspace)
   return (
     <div className="space-y-3">
       {series.characters.map((character, index) => {
@@ -29,6 +29,7 @@ export function SeriesVoiceFields({
           <CharacterKitLink
             value={character.voiceProfile?.characterKitRef}
             kits={kits}
+            error={error}
             onChange={characterKitRef => {
               const next = kits.find(item => item.id === characterKitRef?.id)
               onPatchVoice(index, {

@@ -23,7 +23,7 @@ export function CompactSubjectEditor({
   const { t } = useUiTranslation('storyLab')
   const { imageBusy, generateVisual, requestUpload, removeReference } = useStoryLabVisuals()
   const workspace = useStore(s => s.activeWorkspace)
-  const { kits } = useCharacterKitLibrary(workspace)
+  const { kits, error } = useCharacterKitLibrary(workspace)
   const set = (change: Partial<StoryCharacter>) => update(current => {
     current.characters = current.characters.map(item => item.id === character.id
       ? { ...item, approval: 'draft', ...change } : item)
@@ -66,7 +66,7 @@ export function CompactSubjectEditor({
       <details className="rounded border border-border px-2 py-1.5 text-[10px] text-text-muted">
         <summary className="cursor-pointer text-text-secondary">{t('compact.optionalVoice')}</summary>
         <div className="mt-2 space-y-2">
-          <CharacterKitLink value={character.characterKitRef} onChange={characterKitRef => set({ characterKitRef })} kits={kits} />
+          <CharacterKitLink value={character.characterKitRef} onChange={characterKitRef => set({ characterKitRef })} kits={kits} error={error} />
           <CharacterKitSummary kit={character.characterKitRef ? kits.find(kit => kit.id === character.characterKitRef?.id) : undefined} />
         </div>
         <div className="mt-2 grid gap-2 sm:grid-cols-2">

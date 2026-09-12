@@ -8,9 +8,10 @@ import type { Scene3DSourceRef } from '../types'
 import type { SpeechProductionInput } from './production'
 import { speechInput, SpeechNumber } from './FaceControls'
 import { CharacterKitLink } from '../../characters/CharacterKitLink'
+import { useCharacterKitLibrary } from '../../characters/useCharacterKitLibrary'
 import { fetchCharacterKitLibrary } from '../../../api/characters'
 import type { CharacterKitRef } from '../../../lib/characterVoice'
-import { characterSlotPatch } from './characterBinding'
+import { characterSlotPatch, speechCastIsReady } from './characterBinding'
 
 type ProductionEntryProps = {
   kind: SpeechProductionInput['kind']; title: string; sourceId?: string; audio?: Scene3DSourceRef
@@ -23,6 +24,7 @@ export function SpeechProductionEntry(props: ProductionEntryProps) {
 }
 function ScopedSpeechProductionEntry({ kind, title, sourceId, audio, cast: initialCast = [{ id: 'speaker', name: '' }], castOptions, lines, workspace }: ProductionEntryProps & { workspace: string }) {
   const { t } = useUiTranslation('scene3dEditor')
+  const { kits: speech3dKits } = useCharacterKitLibrary(workspace, true)
   const [open, setOpen] = useState(false), [items, setItems] = useState<ApiOutput[]>([])
   const [models, setModels] = useState<Record<string, ApiOutput | undefined>>({})
   const [links, setLinks] = useState<Record<string, CharacterKitRef | undefined>>({})
@@ -65,7 +67,7 @@ function ScopedSpeechProductionEntry({ kind, title, sourceId, audio, cast: initi
       <p className="text-text-muted">{t('speech.phoneticHint')}</p>
       {!phonetic && <p className="text-amber-200">{t('speech.amplitudeHint')}</p>}
       {!source && <p className="text-text-muted">{t('speech.textOnlyProduction')}</p>}
-      <button type="button" className={speechInput} disabled={busy || !hasCompleteCast(cast, models, links)}
+      <button type="button" className={speechInput} disabled={busy || !speechCastIsReady(cast, models, links, speech3dKits)}
         onClick={() => {
           setBusy(true); setError(''); job.current = new AbortController()
           const captured = job.current
@@ -100,6 +102,4 @@ function ProductionCharacterSelect({ options, value, onChange }: { options: Prod
     {options.map(character => <option key={character.id} value={character.id}>{character.name}</option>)}
   </select></label>
 }
-function hasCompleteCast(cast: NonNullable<ProductionEntryProps['cast']>, models: Record<string, ApiOutput | undefined>, links: Record<string, CharacterKitRef | undefined>) {
-  return cast.length > 0 && cast.length <= 2 && cast.every(c => models[c.id] || (Object.hasOwn(links, c.id) ? links[c.id] : c.characterKitRef))
-}
+

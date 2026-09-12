@@ -61,6 +61,10 @@ test('Story/Series character link lists 2D kits; 3D talker link can hide them', 
     const talkerLabels = [...(screen.getByTestId('character-kit-link') as HTMLSelectElement).options].map(option => option.textContent)
     assert.equal(talkerLabels.some(label => label?.includes('Nilo')), false)
     assert.ok(talkerLabels.some(label => label?.includes('Alice')))
+    rerender(
+      <CharacterKitLink workspace="default" kits={[]} error="Could not load Character Kits" value={undefined} onChange={() => undefined} />,
+    )
+    assert.equal(screen.getByRole('status').textContent, 'Could not load Character Kits')
   } finally {
     cleanup()
   }
