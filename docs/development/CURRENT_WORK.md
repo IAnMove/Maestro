@@ -4,6 +4,14 @@ Verificado el 7 de septiembre de 2026 contra `origin/development` **`ef5b0871`**
 Es una fotografía con evidencia, no un sustituto de Git. Antes de reservar trabajo:
 `git fetch origin development`, consultar PR abiertos y comprobar sus archivos.
 
+## Correcciones de integración — 12 septiembre 2026
+
+Rama `fix/integration-audit-20260912`, base `5f68eb12`, preparada para PR hacia
+development. Ocho correcciones en generación, borradores, ejecución Wizard,
+exportación World3D, inspector y revisión de producción. Evidencia y límites en
+[INTEGRATION_AUDIT_2026-09-12](INTEGRATION_AUDIT_2026-09-12.md). No implica merge
+ni publicación de la aplicación local.
+
 ## SFX, habla y MCP — 10 septiembre 2026
 
 PR **#299** (draft hacia development), base integrada `729f784c`. Contrato:

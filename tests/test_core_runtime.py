@@ -647,7 +647,7 @@ class CoreRuntimeTests(unittest.TestCase):
         try:
             Path("outputs").mkdir()
             fake = {"name": "minimax.jpg", "path": "minimax.jpg", "prompt": "a lantern", "aspect_ratio": "1:1"}
-            with patch("services.minimax_image_service.generate_image", return_value=fake), patch(
+            with patch("services.core_remote_image.generate_image", return_value=fake), patch(
                 "services.execution_mode.validate_remote_provider",
             ):
                 response = self.client.post("/api/v1/generate", json={
@@ -719,7 +719,7 @@ class CoreRuntimeTests(unittest.TestCase):
         try:
             Path("outputs").mkdir()
             fake = {"name": "minimax.jpg", "path": "minimax.jpg", "prompt": "a lantern", "aspect_ratio": "1:1"}
-            with patch("services.minimax_image_service.generate_image", return_value=fake), patch(
+            with patch("services.core_remote_image.generate_image", return_value=fake), patch(
                 "services.execution_mode.validate_remote_provider",
             ), patch("services.core_remote_image.threading.Thread", ImmediateThread):
                 missing = self.client.post("/api/v1/generation/commands", json=[])
@@ -774,7 +774,7 @@ class CoreRuntimeTests(unittest.TestCase):
         try:
             Path("outputs").mkdir()
             fake = {"name": "minimax.jpg", "path": "minimax.jpg", "prompt": "a lantern", "aspect_ratio": "1:1"}
-            with patch("services.minimax_image_service.generate_image", return_value=fake), patch(
+            with patch("services.core_remote_image.generate_image", return_value=fake), patch(
                 "services.execution_mode.validate_remote_provider",
             ), patch("services.core_remote_image.threading.Thread", ImmediateThread):
                 admitted = self.client.post("/api/v1/generation/commands", json=command)
@@ -996,7 +996,7 @@ class CoreRuntimeTests(unittest.TestCase):
                 rejected = self.client.post("/api/v1/generation/commands", json=command)
                 command["input"]["params"]["prompt"] = "a lantern in the rain"
                 fake = {"name": "minimax.jpg", "path": "minimax.jpg", "prompt": "a lantern", "aspect_ratio": "1:1"}
-                with patch("services.minimax_image_service.generate_image", return_value=fake), patch(
+                with patch("services.core_remote_image.generate_image", return_value=fake), patch(
                     "services.core_remote_image.threading.Thread", ImmediateThread,
                 ):
                     accepted = self.client.post("/api/v1/generation/commands", json=command)
@@ -1014,7 +1014,7 @@ class CoreRuntimeTests(unittest.TestCase):
         try:
             Path("outputs").mkdir()
             fake = {"name": "minimax.jpg", "path": "minimax.jpg", "prompt": "a lantern", "aspect_ratio": "1:1"}
-            with patch("services.minimax_image_service.generate_image", return_value=fake), patch(
+            with patch("services.core_remote_image.generate_image", return_value=fake), patch(
                 "services.execution_mode.validate_remote_provider",
             ), patch("services.core_remote_image.threading.Thread", ImmediateThread):
                 first = self.client.post("/api/v1/generation/commands", json=command)

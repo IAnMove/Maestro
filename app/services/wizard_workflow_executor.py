@@ -49,6 +49,11 @@ def _step_intent(workflow_id: str, step_id: str) -> str:
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:160]
 
 
+def _execution_intent(workflow: dict, step_id: str) -> str:
+    step = next(item for item in workflow["steps"] if item["stepId"] == step_id)
+    return step.get("executionKey") or _step_intent(workflow["workflowId"], step_id)
+
+
 def _file_url(name: str, workspace: str) -> str:
     text = str(name or "").strip()
     if text.startswith("/api/v1/"):
@@ -203,7 +208,7 @@ def _image_command(workflow: dict[str, Any]) -> dict[str, Any]:
     return {
         "version": 1,
         "operation": IMAGE_OPERATION,
-        "intent_id": _step_intent(workflow["workflowId"], STEP_IMAGE),
+        "intent_id": _execution_intent(workflow, STEP_IMAGE),
         "input": payload,
     }
 
@@ -258,7 +263,7 @@ def _upscale_command(workflow: dict[str, Any]) -> dict[str, Any]:
     return {
         "version": 2,
         "operation": UPSCALE_OPERATION,
-        "intent_id": _step_intent(workflow["workflowId"], STEP_UPSCALE),
+        "intent_id": _execution_intent(workflow, STEP_UPSCALE),
         "input": {
             "workspace": workflow["workspace"],
             "params": {
@@ -386,6 +391,7 @@ class WizardWorkflowExecutor:
         self._get_task = get_task
         self._owner = owner
         self._lock = threading.RLock()
+        self._advance_lock = asyncio.Lock()
 
     def _dir(self, workspace: str) -> str:
         return self._workspace_dir(workspace)
@@ -559,7 +565,10 @@ class WizardWorkflowExecutor:
         if status in FAILED_TASK_STATES:
             return self._fail(workspace, collection, workflow, step, f"Task {step.get('taskId')} {status}")
         if status in ACTIVE_TASK_STATES:
-            workflow["state"] = "running" if status == "running" else "queued"
+            desired = "running" if status == "running" else "queued"
+            if workflow["state"] == desired:
+                return {"revision": collection["revision"], "workflow": workflow}
+            workflow["state"] = desired
             return self._commit(workspace, collection, workflow)
         return {"revision": collection["revision"], "workflow": workflow}
 
@@ -603,6 +612,10 @@ class WizardWorkflowExecutor:
         return await self._run_step(workspace, collection, workflow, step)
 
     async def _advance(self, workspace: str, workflow_id: str) -> dict[str, Any]:
+        async with self._advance_lock:
+            return await self._advance_serial(workspace, workflow_id)
+
+    async def _advance_serial(self, workspace: str, workflow_id: str) -> dict[str, Any]:
         result: dict[str, Any] | str = {"revision": 0, "workflow": {}}
         for _ in range(12):
             result = await self._advance_once(workspace, workflow_id)
@@ -692,6 +705,12 @@ class WizardWorkflowExecutor:
                 return {"revision": collection["revision"], "workflow": workflow}
             step = workflow["steps"][workflow["currentStep"]] if workflow["currentStep"] < len(workflow["steps"]) else None
             if step and step["state"] != "completed":
+                task = self._get_task(workspace, step.get("taskId") or "")
+                if task and task.get("status") in FAILED_TASK_STATES:
+                    step["executionKey"] = _step_intent(workflow_id, f"{step['stepId']}:retry:{uuid.uuid4().hex}")
+                    step["taskId"] = ""
+                    step["output"] = {}
+                    step["startedAt"] = 0
                 step["state"] = "pending"
                 step["error"] = ""
             workflow["state"] = "retrying"
