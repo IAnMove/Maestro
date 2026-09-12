@@ -9,6 +9,12 @@ import i18n, { useUiTranslation } from '../../i18n'
 import { ProductionReviewHost } from '../../features/production-review/ProductionReviewHost'
 import { reviewCopy } from '../../features/production-review/copy'
 
+function applySavedReview(pipeline: SavedPipelineState, workspace: string) {
+  useStore.setState(state => state.activeWorkspace === workspace
+    && state.dashboardSelectedPipeline?.pipeline_id === pipeline.pipeline_id
+    ? { dashboardSelectedPipeline: pipeline } : {})
+}
+
 /** Safely coerce any value to a displayable string */
 function safeStr(val: unknown): string {
   if (val == null) return ''
@@ -1157,7 +1163,8 @@ function DirectorDashboardInner() {
 
             <details className="rounded-lg border border-border p-3">
               <summary className="cursor-pointer text-sm">{reviewCopy().title}</summary>
-              <ProductionReviewHost key={`${activeWorkspace}:${selectedPipeline.pipeline_id}`} pipeline={selectedPipeline} workspace={activeWorkspace} />
+              <ProductionReviewHost key={`${activeWorkspace}:${selectedPipeline.pipeline_id}`} pipeline={selectedPipeline} workspace={activeWorkspace}
+                onSaved={pipeline => applySavedReview(pipeline, activeWorkspace)} />
             </details>
             {/* LLM Log */}
             <div className="bg-bg-secondary rounded-lg border border-border p-3">

@@ -16,7 +16,7 @@ const action = `${chip} inline-flex items-center gap-1 hover:bg-bg-hover disable
 
 export interface ProductionReviewDeskProps {
   desk: ReviewDesk
-  onChange: (desk: ReviewDesk) => void
+  onChange?: (desk: ReviewDesk) => void
   onPersist?: (commands: PersistCommand[]) => void | Promise<void>
   onRegenerate?: (plan: RegenPlan) => Promise<RegenOutcome[]>
   onExport?: (selection: ExportSelection) => Promise<void>
@@ -39,6 +39,9 @@ function TakeStage({
   selected: boolean
   onSelect: () => void
 }) {
+  const source = take?.filename ? fileUrl(take.filename) : ''
+  const [measured, setMeasured] = useState<{ source: string; seconds: number } | null>(null)
+  const duration = measured?.source === source ? measured.seconds : take?.durationSeconds
   return (
     <article data-testid={label === copy.takeA ? 'take-a' : 'take-b'} className={`rounded-lg border p-2 ${selected ? 'border-emerald-400 bg-emerald-500/10' : 'border-border'}`}>
       <div className="mb-1 flex items-center justify-between gap-2 text-[10px]">
@@ -46,10 +49,14 @@ function TakeStage({
         <span>{take ? interpolate(copy.status, { value: copy[take.status] || take.status }) : copy.noTake}</span>
       </div>
       {take?.filename
-        ? <video className="aspect-video w-full rounded bg-black" src={fileUrl(take.filename)} controls data-take-id={take.id} />
+        ? <video key={source} className="aspect-video w-full rounded bg-black" src={source} controls preload="metadata" data-take-id={take.id}
+            onLoadedMetadata={event => {
+              const seconds = event.currentTarget.duration
+              if (Number.isFinite(seconds) && seconds > 0) setMeasured({ source, seconds })
+            }} />
         : <div className="flex aspect-video items-center justify-center rounded bg-black/70 text-[10px] text-text-muted">{take ? copy[take.status] : copy.noTake}</div>}
       <p className="mt-1 truncate font-mono text-[9px]" title={take?.id}>{take ? interpolate(copy.take, { id: take.id }) : copy.noTake}</p>
-      <p className="text-[9px] text-text-muted">{durationLabel(copy, take?.durationSeconds)}</p>
+      <p className="text-[9px] text-text-muted">{durationLabel(copy, duration)}</p>
       {take && <button type="button" className={`${action} mt-1`} onClick={onSelect} aria-pressed={selected}>{copy.selectTake}</button>}
     </article>
   )
@@ -169,7 +176,7 @@ export function ProductionReviewDesk({
   const save = async (next: ReviewDesk, shotIds?: string[]) => {
     if (!onPersist) throw new Error(copy.unavailable)
     await onPersist(persistCommandsFor(next, shotIds))
-    setCurrent(next); onChange(next)
+    setCurrent(next); onChange?.(next)
   }
   const persist = (next: ReviewDesk, shotIds?: string[]) => {
     void run(() => save(next, shotIds))

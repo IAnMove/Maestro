@@ -108,6 +108,9 @@ test('regenerate asks for confirmation and export reports approved takes only', 
         onExport={async () => undefined}
         onRegenerate={async plan => {
           plans.push(plan)
+          // Exercise the pending state too: comparing an HTMLElement to null
+          // here made Node format the whole React DOM graph and exhaust its heap.
+          await new Promise(resolve => setTimeout(resolve, 30))
           return [
             { shotId: plan.jobs[0].shotId, ok: true, take: { id: 'gen-1c', generationId: 'gen-1c', filename: 's1c.mp4', status: 'completed', durationSeconds: 4, notes: '', refs: plan.jobs[0].refs } },
           ]
@@ -119,7 +122,7 @@ test('regenerate asks for confirmation and export reports approved takes only', 
     assert.ok(screen.getByRole('dialog', { name: 'Regenerate a subset?' }))
     fireEvent.click(screen.getByRole('button', { name: 'Confirm regenerate' }))
     await waitFor(() => assert.equal(plans.length, 1))
-    await waitFor(() => assert.equal(screen.queryByText('Saving or processing…'), null))
+    await waitFor(() => assert.equal(screen.queryByText('Saving or processing…') === null, true))
     assert.equal(plans[0].jobs[0].refs.includes('hero-1.png'), true)
     fireEvent.click(screen.getByRole('button', { name: 'Export approved selection' }))
     await waitFor(() => assert.match(screen.getByRole('status').textContent || '', /No approved|Export/))

@@ -1,4 +1,5 @@
 import { BASE } from '../../api/http'
+import type { SavedPipelineState } from '../../types'
 import { fetchSavedPipeline, rerunClipVideo } from '../../api/director'
 import { probeVideoEditorClip, startVideoEditorExport } from '../../api/video-editor'
 import { projectReviewDesk } from './project'
@@ -7,7 +8,7 @@ import type { ExportSelection, PersistCommand, RegenOutcome, RegenPlan, ReviewDe
 export const reviewFileUrl = (name: string, workspace: string) =>
   `/api/v1/file/${encodeURIComponent(name)}?workspace=${encodeURIComponent(workspace)}`
 
-export async function persistReview(desk: ReviewDesk, commands: PersistCommand[]): Promise<void> {
+export async function persistReview(desk: ReviewDesk, commands: PersistCommand[]): Promise<SavedPipelineState> {
   const decisions = commands.filter(command => command.type !== 'rerun_clip')
   const response = await fetch(`${BASE}/api/v1/director/pipelines/${encodeURIComponent(desk.pipelineId)}/review`, {
     method: 'PUT', headers: { 'Content-Type': 'application/json' },
@@ -17,6 +18,9 @@ export async function persistReview(desk: ReviewDesk, commands: PersistCommand[]
     const body = await response.json().catch(() => ({}))
     throw new Error(body.detail || 'Could not save review')
   }
+  const saved: SavedPipelineState = await response.json()
+  if (saved.pipeline_id !== desk.pipelineId) throw new Error('Saved review belongs to another production')
+  return saved
 }
 
 export async function regenerateReview(desk: ReviewDesk, plan: RegenPlan): Promise<RegenOutcome[]> {

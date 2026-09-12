@@ -24,6 +24,8 @@ export interface AttemptLike {
   seed?: number | null
   prompt?: string
   video_length?: number | null
+  fps?: number | null
+  duration_seconds?: number | null
   source?: string
 }
 

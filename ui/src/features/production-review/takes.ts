@@ -26,15 +26,18 @@ function inferredStatus(clip: PipelineClipLike, filename: string, pipelineLive: 
   return 'completed'
 }
 
-function durationFrom(record: TakeRecord | undefined, clip: PipelineClipLike): number | null {
+function durationFrom(attempt: AttemptLike, record: TakeRecord | undefined, clip: PipelineClipLike): number | null {
   const fromRecord = finiteNumber(record?.timestamps?.duration_ms)
-  if (fromRecord != null) return fromRecord / 1000
+  if (fromRecord != null && fromRecord > 0) return fromRecord / 1000
+  const seconds = finiteNumber(attempt.duration_seconds)
+  if (seconds != null && seconds > 0) return seconds
+  const frames = finiteNumber(attempt.video_length), fps = finiteNumber(attempt.fps)
+  if (frames != null && frames > 0 && fps != null && fps > 0) return frames / fps
+  // Clip-level timing describes the selected clip; planned start/end is not
+  // the media duration of every historical take. The preview can probe it.
+  if (attempt.filename !== (clip.selected_video_filename || clip.video_filename)) return null
   const fromClip = finiteNumber(clip.duration_seconds)
-  if (fromClip != null) return fromClip
-  const planned = finiteNumber(clip.planned_clip?.duration_sec)
-  if (planned != null) return planned
-  const start = finiteNumber(clip.planned_clip?.start), end = finiteNumber(clip.planned_clip?.end)
-  return start != null && end != null && end > start ? end - start : null
+  return fromClip != null && fromClip > 0 ? fromClip : null
 }
 
 export function recordForAttempt(
@@ -67,7 +70,7 @@ export function takeFromAttempt(
     generationId: record?.generation_id || null,
     filename,
     status,
-    durationSeconds: durationFrom(record, clip),
+    durationSeconds: durationFrom(attempt, record, clip),
     notes: '',
     source: attempt.source,
     seed: attempt.seed,

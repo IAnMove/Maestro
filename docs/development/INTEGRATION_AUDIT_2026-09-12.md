@@ -1,8 +1,8 @@
 # Correcciones de integración — 12/09/2026
 
 Base: `5f68eb124146c73cef8e5aeac33204aa07f2704e` (`development`).
-Rama: `fix/integration-audit-20260912`. Implementación preparada para un único
-PR, sin merge ni publicación de la aplicación.
+Rama: `fix/integration-audit-20260912`, PR #404 hacia development.
+Sin merge ni publicación de la aplicación.
 
 | Hallazgo | Comportamiento corregido | Evidencia principal |
 | --- | --- | --- |
@@ -20,6 +20,28 @@ también el segmento H3 único y los outputs, sin reordenar intentos ni cambiar
 sus identidades. Si guardar falla, el panel conserva la selección anterior y
 muestra el error. Las notas se guardan al salir del campo.
 
+El guardado devuelve el pipeline persistido al dashboard y refresca su selección,
+tags y contadores. Una respuesta tardía no cambia la producción/workspace que se
+esté viendo después de salir de la revisión. Las duraciones de comparación usan
+metadata de cada archivo y, cuando están disponibles, segundos o frames/fps de
+la toma; no asignan la duración planificada a todas las versiones de un plano.
+
+## Corrección de CI y revisión de #404
+
+El job de UI del primer HEAD (`93c99821`) terminó con el runner apagado y
+134 tests cancelados. Se reprodujo un agotamiento de heap en el test de revisión
+con 30 ms de latencia: `assert.equal(HTMLElement, null)` intentaba representar
+el grafo DOM/React mientras esperaba el guardado. La aserción compara ahora un
+booleano y el test mantiene esa latencia para ejercitar el estado pendiente.
+La reproducción anterior falla con heap de 256 MiB; las 20 pruebas enfocadas
+corregidas pasan con ese mismo límite.
+
+`npm test` fija la concurrencia en dos procesos, de forma que local y CI ejecuten
+la misma suite completa. No se omiten tests ni se modifican umbrales de checks.
+También se corrigen los dos avisos de Bugbot: actualización del dashboard y
+duración individual de las tomas, incluyendo metadata del vídeo y protección
+frente a respuestas de guardado tardías.
+
 El codec de comandos de vídeo pasa a `ui/src/lib/videoGenerationCommand.ts`.
 Wizard conserva sus exports y el inspector utiliza `ui/src/api`; ninguna
 superficie nueva importa directamente `features/agent`.
@@ -33,9 +55,9 @@ modifican baselines de calidad ni se rebajan los checks.
 
 - Regresiones del servidor y de UI, persistencia real en archivos/SQLite con
   proveedores simulados y pruebas de componentes montados.
-- Suite completa de UI: 1716 pruebas, cero fallos, concurrencia limitada a dos
-  procesos. TypeScript, ESLint, compilación e inventario ES/EN correctos.
-- Presupuesto del bundle: entrada principal 190547 bytes gzip, límite 327680.
+- Suite completa de UI: 1720 pruebas, cero fallos, concurrencia limitada a dos
+  procesos mediante `npm test` (94,99 s). TypeScript, ESLint, compilación e inventario ES/EN correctos.
+- Presupuesto del bundle: entrada principal 190565 bytes gzip, límite 327680.
 - Smoke explícito con Chromium y FFmpeg reales sobre `ui/dist`: carga un GLB,
   avanza su movimiento, exporta y verifica el MP4. No usa modelos ni proveedores.
 - Navegador: 36 pruebas generales y cuatro de habla correctas. Estas últimas

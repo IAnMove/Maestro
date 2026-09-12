@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { SavedPipelineState } from '../../types'
 import { fetchVideoEditorExport, type VideoEditorExportJob } from '../../api/video-editor'
 import { ProductionReviewDesk } from './ProductionReviewDesk'
@@ -6,10 +6,14 @@ import { projectReviewDesk } from './project'
 import { exportReview, persistReview, regenerateReview, reviewFileUrl } from './runtime'
 import { reviewCopy } from './copy'
 
-export function ProductionReviewHost({ pipeline, workspace }: { pipeline: SavedPipelineState; workspace: string }) {
+export function ProductionReviewHost({ pipeline, workspace, onSaved }: {
+  pipeline: SavedPipelineState; workspace: string; onSaved?: (pipeline: SavedPipelineState) => void
+}) {
   const desk = useMemo(() => projectReviewDesk({ pipeline: { ...pipeline, workspace } }), [pipeline, workspace])
   const [job, setJob] = useState<VideoEditorExportJob | null>(null)
   const [error, setError] = useState('')
+  const mounted = useRef(false)
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
   const copy = reviewCopy()
   useEffect(() => {
     if (!job || ['completed', 'failed', 'cancelled'].includes(job.status)) return
@@ -22,8 +26,11 @@ export function ProductionReviewHost({ pipeline, workspace }: { pipeline: SavedP
     return () => { stopped = true; window.clearTimeout(timeout) }
   }, [job])
   return <div>
-    <ProductionReviewDesk desk={desk} onChange={() => undefined}
-      onPersist={commands => persistReview(desk, commands)}
+    <ProductionReviewDesk desk={desk}
+      onPersist={async commands => {
+        const saved = await persistReview(desk, commands)
+        if (mounted.current) onSaved?.(saved)
+      }}
       onRegenerate={plan => regenerateReview(desk, plan)}
       onExport={async selection => { setError(''); setJob(await exportReview(desk, selection)) }}
       fileUrl={filename => reviewFileUrl(filename, workspace)} />

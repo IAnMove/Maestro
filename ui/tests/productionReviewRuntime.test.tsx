@@ -106,3 +106,79 @@ test('approval belongs to the exact take, and frame counts are not guessed as se
   assert.equal(selected.shots[0].takes[0].durationSeconds, null)
   assert.deepEqual(exportApprovedSelection(selected).clips.map(clip => clip.filename), ['approved.mp4'])
 })
+
+test('take timing uses each attempt frame rate and never borrows planned duration', () => {
+  const source = pipeline()
+  source.clips[0].planned_clip = { start: 0, end: 30 }
+  source.clips[0].video_attempts![0] = { id: 'old-id', filename: 'old.mp4', video_length: 48, fps: 24 }
+  source.clips[0].video_attempts![1] = { id: 'new-id', filename: 'new.mp4', video_length: 120, fps: 30 }
+  const project = () => projectReviewDesk({ pipeline: source }).shots[0].takes.map(take => take.durationSeconds)
+  assert.deepEqual(project(), [2, 4])
+  source.clips[0].video_attempts![0].fps = 0
+  assert.deepEqual(project(), [null, 4])
+})
+
+test('loaded video metadata displays distinct take durations and resets on source changes', async context => {
+  const { render, screen, fireEvent, act, cleanup } = await import('@testing-library/react')
+  const { ProductionReviewHost } = await import('../src/features/production-review/ProductionReviewHost')
+  let saved = pipeline()
+  saved.clips[0].planned_clip = { start: 0, end: 30 }
+  context.mock.method(globalThis, 'fetch', async (_url: string, options: RequestInit = {}) => {
+    saved = applyPersistCommands(saved, JSON.parse(String(options.body)).commands)
+    return response(saved)
+  })
+  try {
+    render(<ProductionReviewHost workspace="original" pipeline={saved as SavedPipelineState} />)
+    for (const [id, duration] of [['take-a', 2.5], ['take-b', 4.25]] as const) {
+      const video = screen.getByTestId(id).querySelector('video')!
+      Object.defineProperty(video, 'duration', { value: duration, configurable: true })
+      fireEvent.loadedMetadata(video)
+      assert.match(screen.getByTestId(id).textContent || '', new RegExp(`Duration ${duration.toFixed(1)}`))
+    }
+    const originalSource = screen.getByTestId('take-a').querySelector('video')!.getAttribute('src')
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'old-id' })))
+    assert.notEqual(screen.getByTestId('take-a').querySelector('video')!.getAttribute('src'), originalSource)
+    assert.doesNotMatch(screen.getByTestId('take-a').textContent || '', /Duration 2\.5/)
+  } finally { cleanup() }
+})
+
+test('saving in the mounted dashboard updates the selected pipeline immediately', async context => {
+  const { render, screen, within, fireEvent, act, cleanup } = await import('@testing-library/react')
+  const { DirectorDashboard } = await import('../src/components/DirectorDashboard/DirectorDashboard')
+  const { useStore } = await import('../src/stores/useStore')
+  let saved = { ...pipeline(), video_params: {}, output_files: [] } as SavedPipelineState
+  context.mock.method(globalThis, 'fetch', async (url: string, options: RequestInit = {}) => {
+    assert.ok(url.endsWith('/review'))
+    saved = applyPersistCommands(saved, JSON.parse(String(options.body)).commands) as SavedPipelineState
+    return response(saved)
+  })
+  const previous = useStore.getState()
+  useStore.setState({ activeWorkspace: 'original', dashboardOpen: true, dashboardLoading: false,
+    dashboardSelectedPipeline: saved, dashboardPipelineList: [], dashboardLoadError: null })
+  try {
+    render(<DirectorDashboard />)
+    const panel = within(screen.getByRole('region', { name: 'Production review', hidden: true }))
+    await act(async () => fireEvent.click(panel.getByRole('button', { name: 'old-id', hidden: true })))
+    assert.equal(useStore.getState().dashboardSelectedPipeline?.clips[0].video_filename, 'old.mp4')
+    await act(async () => fireEvent.click(panel.getByRole('button', { name: 'Approve', hidden: true })))
+    assert.equal(useStore.getState().dashboardSelectedPipeline?.clips.filter(clip => clip.tag === 'good').length, 2)
+    await act(async () => fireEvent.click(panel.getByRole('button', { name: 'Reject', hidden: true })))
+    assert.equal(useStore.getState().dashboardSelectedPipeline?.clips[0].tag, 'needs_work')
+  } finally { cleanup(); useStore.setState(previous, true) }
+})
+
+test('a late save after leaving review cannot replace another dashboard selection', async context => {
+  const { render, screen, fireEvent, act, cleanup } = await import('@testing-library/react')
+  const { ProductionReviewHost } = await import('../src/features/production-review/ProductionReviewHost')
+  let finish!: (value: Response) => void
+  context.mock.method(globalThis, 'fetch', () => new Promise<Response>(resolve => { finish = resolve }))
+  const notified: string[] = []
+  try {
+    const root = render(<ProductionReviewHost workspace="original" pipeline={pipeline() as SavedPipelineState}
+      onSaved={saved => { notified.push(saved.pipeline_id) }} />)
+    fireEvent.click(screen.getByRole('button', { name: 'old-id' }))
+    root.unmount()
+    await act(async () => { finish(response(pipeline())) })
+    assert.deepEqual(notified, [])
+  } finally { cleanup() }
+})
