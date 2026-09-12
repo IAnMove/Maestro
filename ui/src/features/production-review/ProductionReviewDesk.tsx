@@ -6,7 +6,7 @@ import { approveShot, persistCommandsFor, rejectShot, setShotNotes } from './dec
 import { exportApprovedSelection } from './exportSelection.ts'
 import { applyRegenPlan, planSubsetRegeneration } from './regenerate.ts'
 import { canApproveTake, isTakeCompleted } from './status.ts'
-import { comparePair, selectExactTake, setCompareTake } from './takes.ts'
+import { comparePair, restoreCompareChoices, selectExactTake, setCompareTake } from './takes.ts'
 import type {
   ActivityOpenSource, ExportSelection, PersistCommand, RegenOutcome, RegenPlan, ReviewDesk, ReviewShot, ReviewTake,
 } from './types.ts'
@@ -168,9 +168,10 @@ export function ProductionReviewDesk({
   const committed = useRef(desk)
   useEffect(() => {
     if (pending.current) return
-    desired.current = desk
-    committed.current = desk
-    setCurrent(desk)
+    const refreshed = restoreCompareChoices(committed.current, desk)
+    desired.current = refreshed
+    committed.current = refreshed
+    setCurrent(refreshed)
   }, [desk])
   const shot = current.shots.find(item => item.id === focusId) || current.shots[0]
   const pair = useMemo(() => shot ? comparePair(shot) : { a: null, b: null }, [shot])
@@ -197,7 +198,7 @@ export function ProductionReviewDesk({
   }
   const save = async (next: ReviewDesk, shotIds?: string[]) => {
     if (!onPersist) throw new Error(copy.unavailable)
-    const saved = await onPersist(persistCommandsFor(next, shotIds)) || next
+    const saved = restoreCompareChoices(next, await onPersist(persistCommandsFor(next, shotIds)) || next)
     committed.current = saved
     desired.current = saved
     setCurrent(saved); onChange?.(saved)
