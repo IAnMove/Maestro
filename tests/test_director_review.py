@@ -147,3 +147,25 @@ def test_invalid_review_does_not_persist_hydrated_history_or_partial_notes(tmp_p
             {'type': 'tag_clip', 'pipelineId': 'review-test', 'clipIndex': 0, 'tag': 'invalid'},
         ])
     assert path.read_bytes() == before
+
+
+def test_review_notes_keep_a_stale_selected_take_stale(tmp_path):
+    path, state = fixture(tmp_path)
+    state['clips'][0].update(
+        selected_video_filename='old.mp4',
+        video_filename='old.mp4',
+        video_stale=True,
+        tag='good',
+    )
+    path.write_text(json.dumps(state))
+    loaded = pipeline.load_pipeline_state(str(tmp_path), 'review-test')
+    assert loaded['clips'][0]['video_stale'] is True
+    assert loaded['clips'][0]['selected_video_filename'] == 'old.mp4'
+    save_review(str(tmp_path), 'review-test', [
+        {'type': 'note_clip', 'pipelineId': 'review-test', 'clipIndex': 0, 'notes': 'keep stale'},
+    ])
+    saved = json.loads(path.read_text())
+    assert saved['clips'][0]['video_stale'] is True
+    assert saved['clips'][0]['selected_video_filename'] == 'old.mp4'
+    assert saved['clips'][0]['review_notes'] == 'keep stale'
+    assert saved['clips'][0]['tag'] == 'good'
