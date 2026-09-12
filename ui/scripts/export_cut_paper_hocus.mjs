@@ -8,10 +8,13 @@ import { fileURLToPath } from 'node:url'
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const outDir = process.env.HOCUS_EXPORT_DIR || join(root, '..', 'outputs', 'tijeral-clips')
 const base = process.env.HOCUS_UI || 'http://127.0.0.1:4210'
+const lang = process.env.HOCUS_LANG === 'en' ? 'en' : 'es'
+const shotDir = lang === 'en' ? join(root, 'public/examples/cut-paper/shots/en') : join(root, 'public/examples/cut-paper/shots')
+const suffix = lang === 'en' ? '-en' : ''
 const shots = [
-  ['01-plaza', join(root, 'public/examples/cut-paper/shots/01-plaza.maestro-scene.json')],
-  ['02-talk', join(root, 'public/examples/cut-paper/shots/02-talk.maestro-scene.json')],
-  ['03-sticker', join(root, 'public/examples/cut-paper/shots/03-sticker.maestro-scene.json')],
+  [`01-plaza${suffix}`, join(shotDir, '01-plaza.maestro-scene.json')],
+  [`02-talk${suffix}`, join(shotDir, '02-talk.maestro-scene.json')],
+  [`03-sticker${suffix}`, join(shotDir, '03-sticker.maestro-scene.json')],
 ]
 
 await mkdir(outDir, { recursive: true })

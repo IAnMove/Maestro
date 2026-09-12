@@ -10,7 +10,8 @@ export {
   cutPaperAssetUrl,
   cutPaperCharacter,
 } from './bible.ts'
-export { compileCutPaperPilotScene, compileCutPaperShot, CUT_PAPER_PILOT_DURATION, CUT_PAPER_PILOT_SCRIPT } from './pilot.ts'
+export { compileCutPaperPilotScene, compileCutPaperShot, CUT_PAPER_PILOT_DURATION, CUT_PAPER_PILOT_SCRIPT, CUT_PAPER_PILOT_SCRIPT_EN } from './pilot.ts'
+export { CUT_PAPER_VOICE_ALIGN, CUT_PAPER_VOICE_ALIGN_EN, cutPaperDialogueBeats, cutPaperVoiceFilename } from './voiceAlign.ts'
 export { createTijeralCharacterKits, seedTijeralCharacterKits, tijeralCharacterKitId, CUT_PAPER_TTS } from './characterKits.ts'
 export { createTijeralStoryProject, TIJERAL_STORY_ID } from './storyProject.ts'
 export {

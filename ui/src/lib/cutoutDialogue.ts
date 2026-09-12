@@ -94,11 +94,37 @@ export function bindCutoutFaceToPose(layers: SceneLayer[], poseLayerId: string):
   })
 }
 
-const VOWEL = /[aeiouáéíóúäëïöü]/i
-const ROUND_VOWEL = /[ouóúöü]/i
+const VOWEL = /[aeiouyáéíóúäëïöü]/i
+const ROUND_VOWEL = /[ouóúöüw]/i
 const visemeForGlyph = (glyph: string): CutoutViseme => /[.,;:!?—-]/.test(glyph) || !VOWEL.test(glyph)
   ? 'closed'
   : ROUND_VOWEL.test(glyph) ? 'round' : /[aeáé]/i.test(glyph) ? 'wide' : 'small'
+
+/** Dominant spoken mouth for a whole word (ES + EN). Closed is silence, not a consonant. */
+export function visemeForToken(text: string): CutoutViseme {
+  const folded = text.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
+  const letters = [...folded].filter(ch => /[a-z]/.test(ch))
+  const classes: CutoutViseme[] = []
+  for (let index = 0; index < letters.length; index += 1) {
+    const ch = letters[index]
+    const next = letters[index + 1]
+    if ((ch === 'e' && next === 'e') || (ch === 'e' && next === 'a') || (ch === 'i' && next === 'e')) {
+      classes.push('small')
+      index += 1
+      continue
+    }
+    if ((ch === 'o' && next === 'o') || (ch === 'o' && next === 'u') || (ch === 'o' && next === 'w')) {
+      classes.push('round')
+      index += 1
+      continue
+    }
+    if (ch === 'o' || ch === 'u' || ch === 'w') classes.push('round')
+    else if (ch === 'i' || ch === 'y') classes.push('small')
+    else if (ch === 'a' || ch === 'e') classes.push('wide')
+  }
+  if (!classes.length) return 'small'
+  return classes[classes.length - 1]
+}
 const pointFor = (layer: SceneLayer, time: number, opacity: number): SceneKeyframe => {
   const authored = layer.animation?.start
   const transform = layer.transform
@@ -127,6 +153,23 @@ export function planCutoutDialogue(text: string, start: number, end: number, fps
   const frame = 1 / Math.max(1, fps)
   const minHold = Math.max(frame * 2, .12)
   const available = safeEnd - safeStart
+  // Whisper word units are often 120–280 ms. Letter sampling + closed bookends
+  // would leave "la" / "the" / "un" shut for half the word. One-frame edges,
+  // open viseme from the token (Spanish and English vowels, including y).
+  if (available <= minHold * 2.5) {
+    const edge = Math.min(frame, available / 6)
+    const spoken = visemeForToken(glyphs.join(''))
+    const openState = spoken === 'closed' ? 'small' : spoken
+    return {
+      start: safeStart,
+      end: safeEnd,
+      visemes: [
+        { start: safeStart, end: safeStart + edge, state: 'closed' },
+        { start: safeStart + edge, end: Math.max(safeStart + edge, safeEnd - edge), state: openState },
+        { start: Math.max(safeStart + edge, safeEnd - edge), end: safeEnd, state: 'closed' },
+      ],
+    }
+  }
   const maxBeats = Math.max(2, Math.floor(available / minHold))
   const stride = Math.max(1, Math.ceil(glyphs.length / maxBeats))
   const glyphStates = glyphs.map(visemeForGlyph)
@@ -161,18 +204,64 @@ export function planCutoutDialogue(text: string, start: number, end: number, fps
   // after the edge guard. Preserve one readable centre pulse whenever the
   // word has a vowel; its terminal closed keyframe still protects edits/cuts.
   if (!visemes.some(beat => beat.state !== 'closed') && glyphs.some(glyph => VOWEL.test(glyph)) && available >= frame * 3) {
-    const middle = safeStart + available / 2
+    const edge = Math.min(frame, available / 6)
+    const spoken = visemeForToken(glyphs.join(''))
     return {
       start: safeStart,
       end: safeEnd,
       visemes: [
-        { start: safeStart, end: middle, state: 'closed' },
-        { start: middle, end: safeEnd, state: ROUND_VOWEL.test(glyphs.join('')) ? 'round' : 'wide' },
-        { start: safeEnd, end: safeEnd, state: 'closed' },
+        { start: safeStart, end: safeStart + edge, state: 'closed' },
+        { start: safeStart + edge, end: safeEnd - edge, state: spoken === 'closed' ? 'small' : spoken },
+        { start: safeEnd - edge, end: safeEnd, state: 'closed' },
       ],
     }
   }
   return { start: safeStart, end: safeEnd, visemes }
+}
+
+export type AlignedCutoutUnit = { text: string; start: number; end: number }
+
+/** Keep source text literal and map only usable speech onto the scene clock. */
+export function normalizeAlignedCutoutUnits(
+  units: AlignedCutoutUnit[], offset = 0, duration = Infinity,
+): AlignedCutoutUnit[] {
+  return units.flatMap(unit => {
+    if (typeof unit.text !== 'string' || !unit.text.trim()
+      || !Number.isFinite(unit.start) || !Number.isFinite(unit.end)) return []
+    const start = Math.max(0, unit.start + offset)
+    const end = Math.min(duration, unit.end + offset)
+    return end > start ? [{ text: unit.text, start, end }] : []
+  }).sort((a, b) => a.start - b.start || a.end - b.end)
+}
+
+/** Word times from Hocus audio analysis: closed in gaps, one viseme per spoken word. */
+export function planAlignedCutoutDialogue(
+  units: AlignedCutoutUnit[],
+  fps = 30,
+): CutoutDialoguePlan {
+  const usable = normalizeAlignedCutoutUnits(units)
+  if (!usable.length) return { start: 0, end: 1 / Math.max(1, fps), visemes: [{ start: 0, end: 1 / Math.max(1, fps), state: 'closed' }] }
+  const start = usable[0].start
+  const end = usable[usable.length - 1].end
+  // Rest closed must occupy a distinct time before the first spoken viseme.
+  // A zero-length closed at `start` shares a timestamp with the first word;
+  // rebuild keeps the later (open) frame, so evaluateSceneLayer holds that
+  // open mouth from t=0 until speech begins.
+  const visemes: CutoutDialoguePlan['visemes'] = start > 0
+    ? [{ start: 0, end: start, state: 'closed' }]
+    : []
+  let cursor = start
+  for (const [index, unit] of usable.entries()) {
+    const unitStart = unit.start
+    const unitEnd = Math.min(unit.end, usable[index + 1]?.start ?? unit.end)
+    if (unitEnd <= unitStart) continue
+    if (unitStart > cursor) visemes.push({ start: cursor, end: unitStart, state: 'closed' })
+    const spoken = visemeForToken(unit.text)
+    visemes.push({ start: unitStart, end: unitEnd, state: spoken === 'closed' ? 'small' : spoken })
+    cursor = unitEnd
+  }
+  visemes.push({ start: cursor, end: Math.max(cursor, end), state: 'closed' })
+  return { start, end, visemes }
 }
 
 /** Recompile edited beat records into ordinary mouth opacity keyframes.
@@ -188,18 +277,37 @@ export function rebuildCutoutDialogueLayers(
   const layerById = new Map(layers.map(layer => [layer.id, layer]))
   const framesByLayer = new Map<string, SceneKeyframe[]>()
   const affected = new Set(clearLayerIds)
+  const groups: SceneDialogueBeat[][] = []
   for (const beat of beats) {
-    const targets = beat.mouthLayerIds.flatMap(id => layerById.get(id) ? [layerById.get(id)!] : [])
+    const last = groups.at(-1)
+    const sameMouths = last && last[0].mouthLayerIds.join('\0') === beat.mouthLayerIds.join('\0')
+    const alignedRun = beat.confidence === 'aligned-audio' && last?.[0].confidence === 'aligned-audio'
+    if (sameMouths && alignedRun) last.push(beat)
+    else groups.push([beat])
+  }
+  for (const group of groups) {
+    const targets = group[0].mouthLayerIds.flatMap(id => layerById.get(id) ? [layerById.get(id)!] : [])
     if (!targets.length) continue
     const mouthLayers = findCutoutMouthLayers(targets)
     if (!(mouthLayers.open ?? mouthLayers.small ?? mouthLayers.wide ?? mouthLayers.round)) continue
-    const start = Math.max(0, Math.min(duration, beat.start))
-    if (start >= duration) continue
-    const end = Math.max(start + 1 / Math.max(1, fps), Math.min(duration, beat.end))
-    const generated = applyCutoutDialogue(mouthLayers, planCutoutDialogue(beat.text, start, end, fps))
+    const units = normalizeAlignedCutoutUnits(group, 0, duration)
+    if (!units.length) continue
+    const plan = group[0].confidence === 'aligned-audio'
+      ? planAlignedCutoutDialogue(units, fps)
+      : planCutoutDialogue(
+        group[0].text,
+        Math.max(0, Math.min(duration, group[0].start)),
+        Math.max(group[0].start + 1 / Math.max(1, fps), Math.min(duration, group[0].end)),
+        fps,
+      )
+    if (plan.start >= duration) continue
+    const generated = applyCutoutDialogue(mouthLayers, plan)
     for (const [layerId, frames] of Object.entries(generated)) {
       affected.add(layerId)
-      framesByLayer.set(layerId, [...(framesByLayer.get(layerId) ?? []), ...frames])
+      const previous = framesByLayer.get(layerId) ?? []
+      // A later turn's leading rest must not replace speech already at t=0.
+      const appended = previous.length && plan.start > 0 ? frames.filter(frame => frame.time > 0) : frames
+      framesByLayer.set(layerId, [...previous, ...appended])
     }
   }
   return layers.map(layer => {

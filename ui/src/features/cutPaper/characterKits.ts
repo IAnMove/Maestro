@@ -13,12 +13,12 @@ export const TIJERAL_CHARACTER_PREFIX = 'tijeral-'
 
 /** Distinct Qwen3 CustomVoice presets; not cloned actors. */
 export const CUT_PAPER_TTS: Record<string, CharacterVoice> = {
-  nilo: { provider: 'local', model: 'qwen3_tts_customvoice', voiceId: 'dylan', instructions: 'Slow, formal, slightly too precise. Spanish from a highland village.' },
-  berta: { provider: 'local', model: 'qwen3_tts_customvoice', voiceId: 'serena', instructions: 'Fast, hungry, always tasting things. Nasal kid, Spanish.' },
-  kito: { provider: 'local', model: 'qwen3_tts_customvoice', voiceId: 'sohee', instructions: 'Short lines, high, always arriving. Excited kid, Spanish.' },
-  rami: { provider: 'local', model: 'qwen3_tts_customvoice', voiceId: 'ryan', instructions: 'Few words, dry, a drum hit is a sentence. Spanish.' },
-  paca: { provider: 'local', model: 'qwen3_tts_customvoice', voiceId: 'vivian', instructions: 'Dry adult alto. School caretaker. Spanish.' },
-  lino: { provider: 'local', model: 'qwen3_tts_customvoice', voiceId: 'eric', instructions: 'Warm mid-baritone. Speaks with flour in the air. Spanish.' },
+  nilo: { provider: 'local', model: 'qwen3_tts_customvoice', voiceId: 'dylan', instructions: 'Slow, formal, slightly too precise. Speak the written language (Spanish or English).' },
+  berta: { provider: 'local', model: 'qwen3_tts_customvoice', voiceId: 'serena', instructions: 'Fast, hungry, always tasting things. Nasal kid. Speak the written language (Spanish or English).' },
+  kito: { provider: 'local', model: 'qwen3_tts_customvoice', voiceId: 'sohee', instructions: 'Short lines, high, always arriving. Excited kid. Speak the written language (Spanish or English).' },
+  rami: { provider: 'local', model: 'qwen3_tts_customvoice', voiceId: 'ryan', instructions: 'Few words, dry, a drum hit is a sentence. Speak the written language (Spanish or English).' },
+  paca: { provider: 'local', model: 'qwen3_tts_customvoice', voiceId: 'vivian', instructions: 'Dry adult alto. School caretaker. Speak the written language (Spanish or English).' },
+  lino: { provider: 'local', model: 'qwen3_tts_customvoice', voiceId: 'eric', instructions: 'Warm mid-baritone. Speaks with flour in the air. Speak the written language (Spanish or English).' },
 }
 
 const SPEAKING = new Set(['nilo', 'berta', 'kito'])
