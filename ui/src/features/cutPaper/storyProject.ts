@@ -1,6 +1,7 @@
 import { createStoryProject } from '../stories/model'
 import type { StoryProject, StoryVisualAsset } from '../stories/types'
 import { CUT_PAPER_CAST, CUT_PAPER_KIT_ID, CUT_PAPER_LOCATIONS, CUT_PAPER_PUBLIC_ROOT, CUT_PAPER_TOWN } from './bible.ts'
+import { tijeralCharacterKitId } from './characterKits.ts'
 
 function asset(id: string, name: string, source: string, prompt: string): StoryVisualAsset {
   return {
@@ -10,7 +11,7 @@ function asset(id: string, name: string, source: string, prompt: string): StoryV
 }
 
 /** Bundled Story Lab chapter. Beats open Video 2D scenes; they are not baked MP4s. */
-export function createTijeralStoryProject(): StoryProject {
+export function createTijeralStoryProject(workspace = 'default'): StoryProject {
   const now = '2026-09-11T00:00:00.000Z'
   const base = createStoryProject('full_story')
   const assets: Record<string, StoryVisualAsset> = {
@@ -83,6 +84,7 @@ export function createTijeralStoryProject(): StoryProject {
       conflict: 'The fountain looks frozen.',
       arc: 'The sticker peels.',
       voice: `${character.voice.pitch}: ${character.voice.notes}`,
+      characterKitRef: { id: tijeralCharacterKitId(character.id), workspace },
       appearance: `${character.silhouette}. ${character.hat}. Palette ${character.palette.join(', ')}.`,
       wardrobe: character.notes,
       visualPrompt: `${character.silhouette}, construction-paper puppet, square frontal face card, ${character.notes}`,

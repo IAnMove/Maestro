@@ -11,10 +11,12 @@ export {
   cutPaperCharacter,
 } from './bible.ts'
 export { compileCutPaperPilotScene, compileCutPaperShot, CUT_PAPER_PILOT_DURATION, CUT_PAPER_PILOT_SCRIPT } from './pilot.ts'
+export { createTijeralCharacterKits, seedTijeralCharacterKits, tijeralCharacterKitId, CUT_PAPER_TTS } from './characterKits.ts'
 export { createTijeralStoryProject, TIJERAL_STORY_ID } from './storyProject.ts'
 export {
   applyPuppetSpeech,
   assertCutPaperKitHasNoPrivateGlb,
+  CUT_PAPER_MOUTH_ANCHOR,
   cutPaperCamera,
   cutPaperKitManifest,
   cutPaperLocationLayer,

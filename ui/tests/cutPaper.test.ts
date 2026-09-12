@@ -9,6 +9,7 @@ import {
   CUT_PAPER_TOWN,
 } from '../src/features/cutPaper/bible.ts'
 import { compileCutPaperPilotScene, compileCutPaperShot, CUT_PAPER_PILOT_DURATION, CUT_PAPER_PILOT_SCRIPT } from '../src/features/cutPaper/pilot.ts'
+import { createTijeralCharacterKits, tijeralCharacterKitId, CUT_PAPER_TTS } from '../src/features/cutPaper/characterKits.ts'
 import { createTijeralStoryProject, TIJERAL_STORY_ID } from '../src/features/cutPaper/storyProject.ts'
 import { normalizeStoryProject } from '../src/features/stories/model.ts'
 import { assertCutPaperKitHasNoPrivateGlb, cutPaperKitManifest, cutPaperPuppetLayers } from '../src/features/cutPaper/puppet.ts'
@@ -80,6 +81,24 @@ test('Story Lab chapter roundtrips and each beat links to Video 2D', () => {
   assert.ok(sticker.layers.some(layer => layer.id === 'puppet-kito'))
   assert.ok(parseSceneFile(serializeSceneFile(talk)).dialogueBeats?.length)
   assert.equal(plaza.layers.find(layer => layer.id === 'location-plaza')?.fill, true)
+  assert.ok(project.characters.every(character => character.characterKitRef?.id.startsWith('tijeral-') && character.characterKitRef.workspace === 'default'))
+})
+
+test('Tijeral character kits are 2D cutouts with Qwen voices and optional bodies', () => {
+  const kits = createTijeralCharacterKits()
+  assert.equal(kits.length, 6)
+  assert.deepEqual(kits.map(kit => kit.id), CUT_PAPER_CAST.map(item => tijeralCharacterKitId(item.id)))
+  const nilo = kits.find(kit => kit.id === 'tijeral-nilo')
+  const rami = kits.find(kit => kit.id === 'tijeral-rami')
+  assert.equal(nilo?.style, 'cutout')
+  assert.equal(nilo?.voice?.voiceId, CUT_PAPER_TTS.nilo.voiceId)
+  assert.ok(nilo?.base?.source.endsWith('nilo-body.png'))
+  assert.equal(nilo?.mouth.wide?.kind, 'overlay')
+  assert.ok(nilo?.identityReference?.source.includes('nilo-canonical'))
+  assert.equal(nilo?.speech3d, undefined)
+  assert.equal(rami?.base, undefined)
+  assert.equal(rami?.voice?.voiceId, CUT_PAPER_TTS.rami.voiceId)
+  assert.equal(new Set(kits.map(kit => kit.voice?.voiceId)).size, 6)
 })
 
 function animatorImportedDuration(scene: ReturnType<typeof compileCutPaperShot>): number {

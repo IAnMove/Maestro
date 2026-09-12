@@ -1,4 +1,10 @@
 {
+  "sheet": {
+    "stillAlt": "Library identity of {{name}}",
+    "ttsVoice": "TTS · Qwen3 {{voiceId}}",
+    "ttsNone": "No TTS voice on this character yet",
+    "linkedHint": "Look and TTS come from the library character. Acting notes stay on this story or series."
+  },
   "facePackMaker": {
     "title": "Lipsync face (cube plane)",
     "intro": "For a talking character: generate a square face texture (skin fills the cube front — eyes, nose, rest mouth). Then edit only the mouth (visemes) or only the eyes (expressions). Drop the stills here to build the 9×6 pack. Skin color is locked to rest so talking does not flash.",

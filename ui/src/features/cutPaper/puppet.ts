@@ -15,7 +15,7 @@ import {
 const BODY_SCALE: Record<string, number> = { nilo: 0.42, berta: 0.4, kito: 0.32 }
 
 /** Pose-local mouth anchors (percent of the body layer, same units as Character Kit). */
-const MOUTH_ANCHOR: Record<string, { offsetX: number; offsetY: number; scale: number }> = {
+export const CUT_PAPER_MOUTH_ANCHOR: Record<string, { offsetX: number; offsetY: number; scale: number }> = {
   nilo: { offsetX: 0.86, offsetY: -17.55, scale: 0.12 },
   berta: { offsetX: 0.17, offsetY: -16.55, scale: 0.11 },
   kito: { offsetX: 0, offsetY: 6.39, scale: 0.16 },
@@ -86,7 +86,7 @@ export function cutPaperPuppetLayers(placement: PuppetPlacement, duration: numbe
     duration, parallax: 1, shadow: 0.25,
   })
   const layers: SceneLayer[] = [pose]
-  const anchor = MOUTH_ANCHOR[character.id] ?? DEFAULT_MOUTH_ANCHOR
+  const anchor = CUT_PAPER_MOUTH_ANCHOR[character.id] ?? DEFAULT_MOUTH_ANCHOR
   const mouthX = placement.x + anchor.offsetX * bodyScale
   const mouthY = placement.y + anchor.offsetY * bodyScale
   const mouthScale = bodyScale * anchor.scale

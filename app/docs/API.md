@@ -834,8 +834,8 @@ export HOCUSPOCUS_URL=http://127.0.0.1:7860
 
 The output-folder token is `default` or `[A-Za-z0-9][A-Za-z0-9_-]*`. Kit mouth
 keys are `closed`, `small`, `wide`, and `round`; eye keys are `open` and
-`blink`. `blob:` sources are rejected, and the UI-only `lookNotes` field is
-stripped when the kit is normalized for persistence.
+`blink`. `blob:` sources are rejected. Optional `lookNotes` (max 4000
+characters) and `voice` (local Qwen3 CustomVoice) persist on the kit.
 
 ```bash
 curl "$HOCUSPOCUS_URL/api/v1/character-kits/library?workspace=default"
