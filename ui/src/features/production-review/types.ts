@@ -49,7 +49,7 @@ export interface PipelineClipLike {
   start_image_filename?: string | null
   keyframe_filenames?: string[]
   h3_references?: ClipRefsLike | null
-  planned_clip?: { duration_sec?: number } | null
+  planned_clip?: { duration_sec?: number; start?: number; end?: number } | null
 }
 
 export interface PipelineLike {

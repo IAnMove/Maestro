@@ -9947,6 +9947,9 @@ def director_pipeline_resume(pid: str):
 
 # ── Director Pipeline Dashboard ───────────────────────────────────────────
 
+from routers.director_review import create_director_review_router
+api.include_router(create_director_review_router(_workspace_dir))
+
 @api.get("/api/v1/director/pipelines")
 def list_saved_pipelines(limit: int = 0, offset: int = 0):
     """List saved pipeline states for the active workspace.
@@ -36924,13 +36927,14 @@ from services.scene_commands import SceneCommands, command_catalog as scene_comm
 from routers.scene_commands import create_scene_commands_router
 _scene_commands = SceneCommands(_workspace_dir)
 api.include_router(create_scene_commands_router(_scene_commands))
-from routers.world3d_export import create_world3d_export_router
+from routers.world3d_export import create_world3d_export_router, bind_world3d_renderer_origin
 from services.world3d_export import World3DExportService, command_catalog as world3d_export_catalog, command_handlers as world3d_export_handlers
 _world3d_export = World3DExportService(
     workspace_dir=_workspace_dir,
     registry_for=_task_registry,
     app_url=os.environ.get("HOCUS_APP_URL", ""),
 )
+bind_world3d_renderer_origin(api, _world3d_export)
 api.include_router(create_world3d_export_router(_world3d_export))
 
 from services.mcp_access import McpAccess
@@ -36948,7 +36952,7 @@ _wizard_workflow_executor = WizardWorkflowExecutor(
     command_receipt=_image_generation_commands.receipt,
     get_task=lambda workspace, task_id: _task_registry(workspace).get(task_id),
 )
-api.include_router(create_wizard_workflow_executor_router(_wizard_workflow_executor))
+api.include_router(create_wizard_workflow_executor_router(_wizard_workflow_executor, list_workspaces=_list_workspaces))
 api.include_router(create_wangp_mcp_router(
     token_getter=_mcp_access.token,
     handlers={"models": lambda args: get_model_options(args['model_type']) if args.get('model_type') else list_models(), "processors": wangp_capabilities, "status": get_status,

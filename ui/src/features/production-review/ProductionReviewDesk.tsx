@@ -1,14 +1,14 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Check, Download, RefreshCw, X } from 'lucide-react'
 import { isSameProduction } from './activityOpen.ts'
 import { interpolate, reviewCopy, type ReviewCopy } from './copy.ts'
 import { approveShot, persistCommandsFor, rejectShot, setShotNotes } from './decisions.ts'
 import { exportApprovedSelection } from './exportSelection.ts'
-import { applyRegenPlan, planSubsetRegeneration, queuedTakeFromJob, rerunCommands } from './regenerate.ts'
+import { applyRegenPlan, planSubsetRegeneration } from './regenerate.ts'
 import { canApproveTake, isTakeCompleted } from './status.ts'
 import { comparePair, selectExactTake, setCompareTake } from './takes.ts'
 import type {
-  ActivityOpenSource, PersistCommand, RegenOutcome, RegenPlan, ReviewDesk, ReviewShot, ReviewTake,
+  ActivityOpenSource, ExportSelection, PersistCommand, RegenOutcome, RegenPlan, ReviewDesk, ReviewShot, ReviewTake,
 } from './types.ts'
 
 const chip = 'rounded border border-border px-2 py-1 text-[10px]'
@@ -19,6 +19,7 @@ export interface ProductionReviewDeskProps {
   onChange: (desk: ReviewDesk) => void
   onPersist?: (commands: PersistCommand[]) => void | Promise<void>
   onRegenerate?: (plan: RegenPlan) => Promise<RegenOutcome[]>
+  onExport?: (selection: ExportSelection) => Promise<void>
   activityTarget?: ActivityOpenSource | null
   fileUrl?: (filename: string) => string
 }
@@ -109,10 +110,11 @@ function DecisionBar({
       <label className="block text-[10px]">{copy.notes}
         <textarea
           className="mt-1 min-h-16 w-full rounded border border-border bg-bg-secondary p-2 text-[11px]"
-          value={shot.notes}
+          key={`${shot.id}:${shot.notes}`}
+          defaultValue={shot.notes}
           placeholder={copy.notesPlaceholder}
           aria-label={copy.notes}
-          onChange={event => onNotes(event.target.value)}
+          onBlur={event => { if (event.target.value !== shot.notes) onNotes(event.target.value) }}
         />
       </label>
     </div>
@@ -141,7 +143,7 @@ function ConfirmRegen({
 }
 
 export function ProductionReviewDesk({
-  desk, onChange, onPersist, onRegenerate, activityTarget, fileUrl,
+  desk, onChange, onPersist, onRegenerate, onExport, activityTarget, fileUrl,
 }: ProductionReviewDeskProps) {
   const copy = reviewCopy()
   const [current, setCurrent] = useState(desk)
@@ -149,38 +151,51 @@ export function ProductionReviewDesk({
   const [picked, setPicked] = useState<string[]>([])
   const [confirm, setConfirm] = useState(false)
   const [exportNote, setExportNote] = useState('')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  const pending = useRef(false)
   useEffect(() => { setCurrent(desk) }, [desk])
   const shot = current.shots.find(item => item.id === focusId) || current.shots[0]
   const pair = useMemo(() => shot ? comparePair(shot) : { a: null, b: null }, [shot])
   const media = fileUrl || ((filename: string) => `#${filename}`)
   const fromActivity = isSameProduction(current, activityTarget)
-  const persist = (next: ReviewDesk, shotIds?: string[], extra: PersistCommand[] = []) => {
-    setCurrent(next)
-    onChange(next)
-    void onPersist?.([...persistCommandsFor(next, shotIds), ...extra])
+  const run = async (operation: () => Promise<void>) => {
+    if (pending.current) return
+    pending.current = true; setBusy(true); setError('')
+    try { await operation() } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason))
+    } finally { pending.current = false; setBusy(false) }
+  }
+  const save = async (next: ReviewDesk, shotIds?: string[]) => {
+    if (!onPersist) throw new Error(copy.unavailable)
+    await onPersist(persistCommandsFor(next, shotIds))
+    setCurrent(next); onChange(next)
+  }
+  const persist = (next: ReviewDesk, shotIds?: string[]) => {
+    void run(() => save(next, shotIds))
   }
 
   const togglePick = (id: string, checked: boolean) => {
     setPicked(current => checked ? [...new Set([...current, id])] : current.filter(item => item !== id))
   }
 
-  const runExport = () => {
+  const runExport = () => void run(async () => {
     const selection = exportApprovedSelection(current)
-    setExportNote(selection.clips.length
-      ? interpolate(copy.exportReady, { count: selection.clips.length })
-      : copy.exportEmpty)
-  }
+    if (!selection.clips.length) { setExportNote(copy.exportEmpty); return }
+    if (!onExport) throw new Error(copy.unavailable)
+    await onExport(selection)
+    setExportNote(copy.exportStarted)
+  })
 
-  const runRegen = async () => {
+  const runRegen = () => run(async () => {
     const plan = planSubsetRegeneration(current, picked, { confirm: true, copy })
-    const outcomes = onRegenerate
-      ? await onRegenerate(plan)
-      : plan.jobs.map(job => ({ shotId: job.shotId, ok: true, take: queuedTakeFromJob(job, `queued:${job.shotId}`) }))
+    if (!onRegenerate) throw new Error(copy.unavailable)
+    const outcomes = await onRegenerate(plan)
     const next = applyRegenPlan(current, plan, outcomes, { copy })
-    persist(next, plan.jobs.map(job => job.shotId), rerunCommands(current, plan))
+    await save(next, plan.jobs.map(job => job.shotId))
     setConfirm(false)
     setPicked([])
-  }
+  })
 
   if (!shot) {
     return <section role="region" className="rounded-xl border border-border p-4 text-sm" aria-label={copy.title}><h2>{copy.title}</h2><p>{copy.empty}</p></section>
@@ -188,11 +203,14 @@ export function ProductionReviewDesk({
 
   return (
     <section role="region" className="rounded-xl border border-border bg-bg-secondary p-3 text-text-primary" aria-label={copy.title} data-production-id={current.productionId}>
+      {error && <p role="alert" className="mb-2 text-sm text-red-300">{error}</p>}
+      {busy && <p role="status" className="mb-2 text-sm">{copy.working}</p>}
+      <fieldset disabled={busy || !onPersist}>
       <header className="mb-2 flex flex-wrap items-center gap-2">
         <h2 className="text-sm font-semibold">{copy.title}</h2>
         {fromActivity && <span className="text-[10px] text-violet-300">{copy.openedFromActivity}</span>}
-        <button type="button" className={action} onClick={() => setConfirm(true)} disabled={!picked.length}><RefreshCw size={12} />{copy.regenerate}</button>
-        <button type="button" className={action} onClick={runExport}><Download size={12} />{copy.export}</button>
+        <button type="button" className={action} onClick={() => setConfirm(true)} disabled={!picked.length || !onRegenerate}><RefreshCw size={12} />{copy.regenerate}</button>
+        <button type="button" className={action} onClick={runExport} disabled={!onExport}><Download size={12} />{copy.export}</button>
       </header>
       {exportNote && <p role="status" className="mb-2 text-[10px]">{exportNote}</p>}
       {confirm && <ConfirmRegen copy={copy} count={picked.length} onCancel={() => setConfirm(false)} onConfirm={() => void runRegen()} />}
@@ -228,6 +246,7 @@ export function ProductionReviewDesk({
           />
         </div>
       </div>
+      </fieldset>
     </section>
   )
 }

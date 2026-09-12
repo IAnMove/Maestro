@@ -517,7 +517,9 @@ function pruneDraftIndex(storage: DraftStorage, keepKey: string) {
   const entries = readIndex(storage).sort((left, right) => right.updatedAt - left.updatedAt)
   const kept: IndexEntry[] = []
   for (const entry of entries) {
-    if (kept.length < SCENE3D_MAX_DRAFTS || entry.key === keepKey) {
+    const payload = readDraftPayload(storage, entry)
+    const unsaved = payload && !documentsEqual(payload.document, payload.checkpoint)
+    if (kept.length < SCENE3D_MAX_DRAFTS || entry.key === keepKey || unsaved) {
       kept.push(entry)
       continue
     }
@@ -527,7 +529,7 @@ function pruneDraftIndex(storage: DraftStorage, keepKey: string) {
       storage.removeItem(`${entry.key}:tmp`)
     } catch { /* keep last valid of the active document */ }
   }
-  writeIndex(storage, kept.filter(entry => entry.key === keepKey || kept.indexOf(entry) < SCENE3D_MAX_DRAFTS))
+  writeIndex(storage, kept)
 }
 
 function readIndex(storage: DraftStorage): IndexEntry[] {
@@ -541,7 +543,7 @@ function readIndex(storage: DraftStorage): IndexEntry[] {
 
 function writeIndex(storage: DraftStorage, entries: IndexEntry[]) {
   try {
-    storage.setItem(SCENE3D_DRAFT_INDEX_KEY, JSON.stringify(entries.slice(0, SCENE3D_MAX_DRAFTS + 2)))
+    storage.setItem(SCENE3D_DRAFT_INDEX_KEY, JSON.stringify(entries))
   } catch { /* index is advisory */ }
 }
 

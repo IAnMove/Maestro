@@ -144,7 +144,8 @@ test('export uses the approved selection only and skips queued takes', () => {
   const exported = exportApprovedSelection(desk)
   assert.deepEqual(exported.clips.map(item => item.takeId), ['gen-3b'])
   assert.equal(exported.clips.some(item => item.takeId === 'gen-queued'), false)
-  assert.equal(exported.omitted.some(item => item.shotId === 'shot-1' && item.reason === 'queued'), true)
+  assert.equal(desk.shots[0].approvedTakeId, null)
+  assert.equal(exported.omitted.some(item => item.shotId === 'shot-1' && item.reason === 'not_approved'), true)
   assert.equal(exported.omitted.filter(item => item.reason === 'not_approved').length >= 8, true)
 })
 

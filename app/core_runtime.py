@@ -33,7 +33,7 @@ from routers.style_library import create_style_library_router
 from routers.system_capabilities import create_system_capabilities_router, require_capability_http
 from routers.user_diagnostics import create_user_diagnostics_router
 from routers.wizard_workflow_executor import create_wizard_workflow_executor_router
-from routers.world3d_export import create_world3d_export_router
+from routers.world3d_export import create_world3d_export_router, bind_world3d_renderer_origin
 from routers.workspace_collections import create_workspace_collections_router
 from services import (
     core_canonical_tasks,
@@ -110,11 +110,13 @@ api.include_router(create_scene_packages_router(
     uploads_dir=core.uploads_dir,
     list_workspaces=core.list_workspaces,
 ))
-api.include_router(create_world3d_export_router(World3DExportService(
+_world3d_export = World3DExportService(
     workspace_dir=core.workspace_dir,
     registry_for=core_generation_commands.registry_for,
     app_url=os.environ.get("HOCUS_APP_URL", ""),
-)))
+)
+bind_world3d_renderer_origin(api, _world3d_export)
+api.include_router(create_world3d_export_router(_world3d_export))
 api.include_router(create_core_labs_router())
 api.include_router(create_series_assembly_router(
     resolve_workspace=labs._series_workspace,
@@ -143,7 +145,7 @@ api.include_router(create_wizard_workflow_executor_router(WizardWorkflowExecutor
     submit_command=_core_image_commands.submit,
     command_receipt=_core_image_commands.receipt,
     get_task=core_generation_commands.get_task,
-)))
+), list_workspaces=core.list_workspaces))
 api.include_router(create_character_kit_face_router(
     workspace_dir=core.workspace_dir,
     uploads_root=core.uploads_dir,

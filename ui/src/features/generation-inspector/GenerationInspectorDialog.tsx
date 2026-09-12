@@ -166,7 +166,7 @@ export function GenerationInspectorDialog({
   currentModel?: CurrentModel
   candidates?: InspectedAttempt[]
   compareAttempt?: InspectedAttempt | null
-  onGenerate?: (plan: ClonePlan, recipe: PortableRecipe) => void
+  onGenerate?: (plan: ClonePlan, recipe: PortableRecipe) => Promise<string>
 }) {
   const copy = inspectorCopy()
   const env = environment(workspace, catalog, currentModel)
@@ -174,6 +174,8 @@ export function GenerationInspectorDialog({
   const [preflight, setPreflight] = useState<PreflightReport | null>(null)
   const [compareId, setCompareId] = useState(compareAttempt?.attemptId || '')
   const [note, setNote] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
   const [seenId, setSeenId] = useState(attempt.attemptId)
   if (seenId !== attempt.attemptId) {
     setSeenId(attempt.attemptId)
@@ -186,9 +188,11 @@ export function GenerationInspectorDialog({
   const allowed = attempt.outputFolder === workspace
 
   const applyPlan = (next: ClonePlan) => {
+    if (busy) return
     setPlan(next)
     setPreflight(preflightGenerate(next, env))
     setNote('')
+    setError('')
   }
 
   const handleRecipe = async () => {
@@ -197,9 +201,15 @@ export function GenerationInspectorDialog({
     setNote(copy.recipeCopied)
   }
 
-  const handleGenerate = () => {
-    if (!plan || !preflight?.ok) return
-    onGenerate?.(plan, copyRecipe(attempt, attempt.attemptId))
+  const handleGenerate = async () => {
+    if (!plan || !preflight?.ok || !onGenerate || busy) return
+    setBusy(true); setError(''); setNote('')
+    try {
+      const task = await onGenerate(plan, copyRecipe(attempt, attempt.attemptId))
+      setNote(`${copy.taskReady}: ${task}`)
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : String(failure))
+    } finally { setBusy(false) }
   }
 
   return (
@@ -231,10 +241,11 @@ export function GenerationInspectorDialog({
           <button type="button" onClick={() => applyPlan(planClone(attempt, env))} className="rounded border border-accent-blue/40 px-2 py-1 text-[11px] text-accent-blue">{copy.clone}</button>
           <button type="button" onClick={() => applyPlan(planRetry(attempt, env))} className="rounded border border-border px-2 py-1 text-[11px] text-text-secondary">{copy.retry}</button>
           <button type="button" onClick={() => { void handleRecipe() }} className="rounded border border-border px-2 py-1 text-[11px] text-text-secondary">{copy.copyRecipe}</button>
-          <button type="button" disabled={!preflight?.ok} onClick={handleGenerate} className="rounded border border-emerald-400/40 px-2 py-1 text-[11px] text-emerald-300 disabled:opacity-40">{copy.generate}</button>
+          <button type="button" disabled={!preflight?.ok || !onGenerate || busy} onClick={() => void handleGenerate()} className="rounded border border-emerald-400/40 px-2 py-1 text-[11px] text-emerald-300 disabled:opacity-40">{copy.generate}</button>
         </div>
         <PlanStatus plan={plan} preflight={preflight} copy={copy} />
         {note ? <p role="status" className="mt-2 text-[11px] text-emerald-300">{note}</p> : null}
+        {error ? <p role="alert" className="mt-2 text-[11px] text-red-300">{error}</p> : null}
       </div>
     </ModalShell>
   )

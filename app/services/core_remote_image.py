@@ -133,7 +133,11 @@ def cancel_job(job_id: str) -> dict[str, Any] | None:
             job.update(status="cancelled", phase="cancelled", message="Cancelled", finished_at=time.time())
         else:
             job.update(status="cancelling", phase="cancelling", message="Cancellation requested")
-        return _public(job)
+        result = _public(job)
+        notify = job.get("_on_update")
+    if notify:
+        notify()
+    return result
 
 
 def _patch(job_id: str, **fields: Any) -> None:
@@ -141,6 +145,23 @@ def _patch(job_id: str, **fields: Any) -> None:
         job = _JOBS.get(job_id)
         if job:
             job.update(fields)
+        notify = job.get("_on_update") if job else None
+    if notify:
+        notify()
+
+
+def restore_job(task: dict[str, Any]) -> None:
+    """Restore polling from a durable task without invoking a provider."""
+    job_id = task["backend_job_id"]
+    with _LOCK:
+        _JOBS.setdefault(job_id, {
+            "id": job_id, "task_id": task["id"], "root_task_id": task.get("root_id"),
+            "status": task["status"], "phase": task["status"],
+            "progress": 100 if task["status"] == "completed" else 0,
+            "message": task.get("message") or "", "error": task.get("error"),
+            "output_files": list(task.get("result_refs") or []),
+            "created_at": task.get("created_at"), "workspace": task.get("workspace"),
+        })
 
 
 def encode_subject_reference(source: str, workspace: str) -> str:
@@ -164,7 +185,7 @@ def encode_subject_reference(source: str, workspace: str) -> str:
     return local_image_data_uri(path)
 
 
-def start_job(body: dict[str, Any], *, workspace: str, job_id: str | None = None) -> dict[str, Any]:
+def start_job(body: dict[str, Any], *, workspace: str, job_id: str | None = None, on_update=None) -> dict[str, Any]:
     from services import execution_mode
 
     prompt = prepare_prompt(str(body.get("prompt") or ""))
@@ -186,6 +207,7 @@ def start_job(body: dict[str, Any], *, workspace: str, job_id: str | None = None
             "output_files": [], "error": None, "workspace": workspace,
             "created_at": now, "started_at": None, "finished_at": None,
             "_cancel_requested": False,
+            "_on_update": on_update,
             "request": {"prompt": prompt, "aspect_ratio": ratio, "subject_reference": subject},
         }
         _JOBS[job_id] = job
@@ -203,9 +225,10 @@ def _run(job_id: str) -> None:
         _patch(job_id, status="running", phase="running", progress=10, started_at=time.time(),
                message="Calling MiniMax Image-01")
         with _LOCK:
-            if (_JOBS.get(job_id) or {}).get("_cancel_requested"):
-                _patch(job_id, status="cancelled", phase="cancelled", message="Cancelled", finished_at=time.time())
-                return
+            cancelled = (_JOBS.get(job_id) or {}).get("_cancel_requested")
+        if cancelled:
+            _patch(job_id, status="cancelled", phase="cancelled", message="Cancelled", finished_at=time.time())
+            return
         result = generate_image(
             api_key=resolve_minimax_key(core.services_raw(), "image"),
             prompt=str(request.get("prompt") or ""),

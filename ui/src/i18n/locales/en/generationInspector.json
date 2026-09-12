@@ -24,6 +24,7 @@
   "retry": "Transport retry",
   "copyRecipe": "Copy recipe",
   "generate": "Generate",
+  "taskReady": "Task available in Activity",
   "preflightBlocked": "Preflight blocked generate.",
   "preflightOk": "Preflight passed.",
   "newIntent": "New intent",

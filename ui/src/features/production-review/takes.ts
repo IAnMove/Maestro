@@ -26,16 +26,15 @@ function inferredStatus(clip: PipelineClipLike, filename: string, pipelineLive: 
   return 'completed'
 }
 
-function durationFrom(record: TakeRecord | undefined, clip: PipelineClipLike, attempt: AttemptLike): number | null {
+function durationFrom(record: TakeRecord | undefined, clip: PipelineClipLike): number | null {
   const fromRecord = finiteNumber(record?.timestamps?.duration_ms)
   if (fromRecord != null) return fromRecord / 1000
   const fromClip = finiteNumber(clip.duration_seconds)
   if (fromClip != null) return fromClip
   const planned = finiteNumber(clip.planned_clip?.duration_sec)
   if (planned != null) return planned
-  const length = finiteNumber(attempt.video_length)
-  if (length == null) return null
-  return length > 120 ? length / 24 : length
+  const start = finiteNumber(clip.planned_clip?.start), end = finiteNumber(clip.planned_clip?.end)
+  return start != null && end != null && end > start ? end - start : null
 }
 
 export function recordForAttempt(
@@ -68,7 +67,7 @@ export function takeFromAttempt(
     generationId: record?.generation_id || null,
     filename,
     status,
-    durationSeconds: durationFrom(record, clip, attempt),
+    durationSeconds: durationFrom(record, clip),
     notes: '',
     source: attempt.source,
     seed: attempt.seed,
@@ -168,6 +167,8 @@ export function selectExactTake(desk: ReviewDesk, shotId: string, takeId: string
   return replaceShot(desk, {
     ...shot,
     selectedTakeId: take.id,
+    ...(shot.decision === 'approved' && shot.approvedTakeId !== take.id
+      ? { decision: 'pending' as const, approvedTakeId: null } : {}),
     compareTakeId: previousTakeId(shot.takes, take.id),
     durationSeconds: take.durationSeconds ?? shot.durationSeconds,
   })

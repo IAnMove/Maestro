@@ -24,6 +24,7 @@
   "retry": "Reintento de transporte",
   "copyRecipe": "Copiar receta",
   "generate": "Generar",
+  "taskReady": "Tarea disponible en Actividad",
   "preflightBlocked": "La comprobación previa bloqueó generar.",
   "preflightOk": "La comprobación previa es correcta.",
   "newIntent": "Intento nuevo",
