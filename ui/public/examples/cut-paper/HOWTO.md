@@ -7,6 +7,9 @@ so you can edit the shot. The assembled episode is **not** an MP4 baked outside 
 
 1. **Story Lab** → **Load Tijeral cut-paper example**.
    Lore (world, cast, relationships, structure) is already filled.
+   Nilo, Berta, Kito, Rami, Paca and Lino are also inserted into the
+   Character Kit library of the current workspace (skipped if that id already
+   exists). Story characters link those kits (`characterKitRef`).
 2. Open **Structure**. Each beat has **Open in Video 2D**.
    - Plano 1 plaza → establishing shot
    - Plano 2 cola fría → Nilo / Berta dialogue
@@ -16,7 +19,11 @@ so you can edit the shot. The assembled episode is **not** an MP4 baked outside 
    (`closed` `small` `wide` `round`) parented to that body. Do not stack opaque
    full-face copies. Talking must not change the brows.
 4. Optional: a later beat can use **Video 3D** (`sceneLink.editor = video3d`) if a shot needs depth. This gag stays 2D.
-5. Voices: attach WAV/TTS from **Video 2D** audio tracks (Qwen TTS in Hocus, or the example WAVs in `voices/`). Do not clone actors.
+5. Voices: each library character has a local Qwen3 CustomVoice preset.
+   Example WAVs in `voices/` are stand-ins until you generate the line in
+   Video 2D with that preset. Do not clone actors.
+6. MiniMax Image uses the linked kit still (`identityReference` or body) as
+   `subject_reference`. Bundled `/examples/` stills are uploaded first.
 
 ## What you author vs what the kit ships
 
@@ -35,6 +42,7 @@ Not `tv-head-humanoid.glb`.
 
 ## Files
 
+- `ui/src/features/cutPaper/characterKits.ts` — library characters + Qwen presets
 - `ui/src/features/cutPaper/storyProject.ts` — Story Lab chapter
 - `ui/src/features/cutPaper/pilot.ts` — Video 2D compilers
 - `ui/public/examples/cut-paper/shots/` — one scene per beat

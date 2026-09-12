@@ -10,6 +10,9 @@ import { useWorkspaceImageOutputs } from '../../lib/labsImagePick'
 import type { ApiOutput } from '../../api/outputs'
 
 import { generateImageAsset } from '../../lib/imageGeneration'
+import { fetchCharacterKitLibrary } from '../../api/characters'
+import { characterKitStillSource } from '../../lib/characterKit'
+import { seedTijeralCharacterKits } from '../cutPaper/characterKits.ts'
 import { MINIMAX_IMAGE_API_MODEL } from '../../lib/externalModels'
 import { resolveSupportedVideoFormat } from '../../lib/productionProfile'
 import { StoryLabNavigation } from './StoryLabNavigation'
@@ -1498,7 +1501,7 @@ export function StoryLabPanel() {
       renderStyle,
       current.enforceVisualStyle,
     )
-    const primaryReference = options.usePrimaryReference !== false && character?.primaryReferenceAssetId
+    let primaryReference = options.usePrimaryReference !== false && character?.primaryReferenceAssetId
       ? current.assets[character.primaryReferenceAssetId]?.source
       : undefined
     const effectivePrompt = [
@@ -1513,6 +1516,17 @@ export function StoryLabPanel() {
     setImageBusy(key)
     if (!options.quiet) setNotice(null)
     try {
+      if (options.usePrimaryReference !== false && character?.characterKitRef) {
+        try {
+          const library = await fetchCharacterKitLibrary(character.characterKitRef.workspace)
+          const still = library.kits[character.characterKitRef.id]
+            ? characterKitStillSource(library.kits[character.characterKitRef.id])
+            : undefined
+          if (still) primaryReference = still
+        } catch {
+          /* Story still remains the fallback when the library is offline. */
+        }
+      }
       if (existingJobId) options.onJobSubmitted?.(existingJobId)
       const generated = await generateImageAsset(
         effectiveImageProvider,
@@ -3872,7 +3886,12 @@ export function StoryLabPanel() {
         onNewProject={newProject}
         onDuplicate={() => duplicateProject()}
         onDelete={() => deleteProject(project.id)}
-        onLoadTijeralExample={loadTijeralExample}
+        onLoadTijeralExample={() => {
+          loadTijeralExample(activeWorkspace)
+          void seedTijeralCharacterKits(activeWorkspace).catch(error => {
+            setNotice({ kind: 'error', text: (error as Error).message })
+          })
+        }}
       />
 
       {notice && (

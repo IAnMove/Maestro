@@ -316,7 +316,7 @@ interface StoryState {
   beginProjectOperation: (id: string) => void
   endProjectOperation: (id: string) => void
   newProject: (projectType?: StoryProjectType) => void
-  loadTijeralExample: () => void
+  loadTijeralExample: (workspace?: string) => void
   duplicateProject: (id?: string) => void
   openProject: (id: string) => void
   deleteProject: (id: string) => void
@@ -514,9 +514,18 @@ export const useStoryStore = create<StoryState>((set, get) => ({
       activeProjectOperations: { ...state.activeProjectOperations, [id]: count - 1 },
     }
   }),
-  loadTijeralExample: () => set(state => {
+  loadTijeralExample: (workspace = 'default') => set(state => {
     const existing = Object.values(state.projects).find(item => item.id === TIJERAL_STORY_ID)
-    const project = existing ?? createTijeralStoryProject()
+    const fresh = createTijeralStoryProject(workspace)
+    const project = existing
+      ? {
+        ...existing,
+        characters: existing.characters.map(character => {
+          const bundled = fresh.characters.find(item => item.id === character.id)
+          return character.characterKitRef || !bundled ? character : { ...character, characterKitRef: bundled.characterKitRef }
+        }),
+      }
+      : fresh
     return {
       project,
       projects: { ...state.projects, [project.id]: project },
